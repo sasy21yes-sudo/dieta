@@ -717,31 +717,42 @@ function viewDiario(v) {
    circonferenza misurata, quindi la sagoma cambia quando cambiano i numeri.
    Resta comunque schematica — serve a vedere le proporzioni, non a fare
    una scansione del corpo. */
+/* Punti di repere, in unità SVG. Le proporzioni verticali seguono il canone
+   anatomico: inguine a metà altezza, ginocchio al 73%, caviglia al 94%. */
 const FIG = { W: 240, H: 520, CX: 120,
-  yCrown: 30, yChin: 86, yNeck: 104, yShTop: 120, ySh: 132, yChest: 176,
-  yWaist: 232, yHip: 270, yCrotch: 292, yElbow: 240, yWrist: 302,
-  yKnee: 396, yAnkle: 490 };
+  yCrown: 26, yChin: 83, yNeck: 96, ySh: 114, yPit: 142,
+  yWaist: 197, yHip: 235, yCrotch: 254, yElbow: 197, yWrist: 254, yHand: 288,
+  yKnee: 354, yCalf: 388, yAnkle: 459, ySole: 482 };
 
-/** Circonferenza in cm → mezza larghezza in unità SVG.
-    Il tronco è ellittico (profondità ~0.72 della larghezza), gli arti quasi
-    circolari: due fattori diversi, altrimenti le cosce escono dai fianchi. */
-function circHalf(c, tondo) {
-  if (!(c > 0)) return null;
-  const scala = (FIG.yAnkle - FIG.yCrown) / D.profilo.altezza_cm;
-  return (c / (Math.PI * (tondo ? 2 : 1.72))) * scala;
+/* Mezze larghezze del template, tarate su una figura maschile ben proporzionata
+   alta quanto il riquadro. Corrispondono al fisico di riferimento in
+   target_fisico.misure: disegnato con quelle misure, l'omino È il template.
+   Le misure dell'utente lo modulano per rapporto, così la figura resta sempre
+   ben disegnata e insieme onesta sui numeri. */
+const TPL = { collo: 17.5, torace: 46, vita: 37, fianchi: 43, coscia: 22, braccio: 14.5 };
+
+function widths(m) {
+  const R = D.target_fisico.misure;
+  const w = {};
+  for (const id of Object.keys(TPL))
+    w[id] = TPL[id] * (m[id] > 0 && R[id] > 0 ? m[id] / R[id] : 1);
+  // La spalla non si misura col metro: nasce dalla gabbia toracica più il
+  // deltoide, quindi risponde sia al torace sia al braccio.
+  w.spalla = w.torace * 0.86 + w.braccio * 1.62;
+  return w;
 }
 
 /** Catmull-Rom → Bézier: curve morbide che passano per i punti dati. */
 function smooth(pts, close) {
   if (pts.length < 2) return '';
-  const n = (v) => v.toFixed(1);
-  let d = `M ${n(pts[0][0])} ${n(pts[0][1])}`;
+  const n = v => v.toFixed(1);
+  let d = 'M ' + n(pts[0][0]) + ' ' + n(pts[0][1]);
   for (let i = 0; i < pts.length - 1; i++) {
     const p0 = pts[i - 1] || pts[i], p1 = pts[i];
     const p2 = pts[i + 1], p3 = pts[i + 2] || pts[i + 1];
-    d += ` C ${n(p1[0] + (p2[0] - p0[0]) / 6)} ${n(p1[1] + (p2[1] - p0[1]) / 6)}`
-       + ` ${n(p2[0] - (p3[0] - p1[0]) / 6)} ${n(p2[1] - (p3[1] - p1[1]) / 6)}`
-       + ` ${n(p2[0])} ${n(p2[1])}`;
+    d += ' C ' + n(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + n(p1[1] + (p2[1] - p0[1]) / 6)
+       + ' ' + n(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + n(p2[1] - (p3[1] - p1[1]) / 6)
+       + ' ' + n(p2[0]) + ' ' + n(p2[1]);
   }
   return d + (close ? ' Z' : '');
 }
@@ -756,61 +767,72 @@ function figMeas(src) {
   };
 }
 
-/** Sagoma completa: testa, tronco, braccia, gambe.
-    Il deltoide appartiene al braccio, non al tronco: è quello che dà la spalla. */
+/** Sagoma completa: corpo (tronco + gambe + piedi), braccia, testa. */
 function figure(m) {
-  const F = FIG, cx = F.CX;
-  const nw = circHalf(m.collo), cw = circHalf(m.torace), ww = circHalf(m.vita);
-  const hw = circHalf(m.fianchi), tw = circHalf(m.coscia, true);
-  const aw = circHalf(m.braccio, true);
+  const F = FIG, cx = F.CX, W = widths(m);
+  const nw = W.collo, cw = W.torace, ww = W.vita, hw = W.fianchi;
+  const tw = W.coscia, aw = W.braccio, sw = W.spalla;
 
-  // lato destro del tronco, dal collo ai fianchi
-  const dx = [
-    [nw * 0.94, F.yChin + 4], [nw, F.yNeck], [cw * 0.58, F.yShTop - 2],
-    [cw * 0.94, F.ySh + 2], [cw, F.yChest], [ww * 1.05, F.yWaist - 28],
-    [ww, F.yWaist], [hw * 0.99, F.yHip - 14], [hw, F.yHip]
+  // --- tronco: la spalla appartiene al tronco, così la silhouette ha
+  //     le spalle larghe della foto invece del gancio da appendiabiti
+  const busto = [
+    [nw * 0.86, F.yChin + 3], [nw, F.yNeck],
+    // il trapezio si allarga in fretta perché la spalla sta solo ~30 unità
+    // sotto il mento: allungare il collo è ciò che produce l'appendiabiti
+    [nw * 1.55, F.yNeck + 5], [sw * 0.62, F.yNeck + 11], [sw * 0.88, F.ySh - 2],
+    // due punti oltre il massimo: senza, la spalla resta uno spigolo netto
+    [sw, F.ySh + 4], [sw * 0.96, F.ySh + 16],
+    [cw * 1.05, F.yPit - 2], [cw, F.yPit + 8], [cw * 0.98, F.yPit + 26],
+    [ww, F.yWaist], [hw * 0.96, F.yHip - 16], [hw, F.yHip]
   ];
 
-  // le cosce non possono compenetrarsi: l'asse si allarga se sono grosse
-  const ax = Math.max(hw * 0.52, tw + 4);
-  const lvGamba = [
-    { y: F.yCrotch - 14, x: ax, w: tw * 0.95 },
-    { y: F.yCrotch + 20, x: ax, w: tw },
-    { y: F.yKnee,        x: ax * 0.86, w: tw * 0.50 },
-    { y: F.yKnee + 48,   x: ax * 0.82, w: tw * 0.56 },  // polpaccio
-    { y: F.yAnkle,       x: ax * 0.78, w: tw * 0.26 }
+  // --- gambe: le cosce non possono compenetrarsi, l'asse si allarga se sono grosse
+  const ax = Math.max(hw * 0.50, tw + 3.5);
+  const lvG = [
+    { y: F.yCrotch + 28, x: ax,        w: tw },
+    { y: F.yKnee - 22,   x: ax * 0.91, w: tw * 0.56 },
+    { y: F.yKnee,        x: ax * 0.90, w: tw * 0.49 },
+    { y: F.yCalf,        x: ax * 0.88, w: tw * 0.57 },
+    { y: F.yAnkle,       x: ax * 0.83, w: tw * 0.23 },
+    // due livelli quasi coincidenti: la suola esce piatta invece che a uncino
+    { y: F.ySole - 3,    x: ax * 0.82, w: tw * 0.30 },
+    { y: F.ySole,        x: ax * 0.82, w: tw * 0.30 }   // piede
   ];
 
-  // Tronco e gambe sono un profilo solo: se il tronco si chiudesse per conto
+  // Tronco e gambe sono un profilo unico: se il tronco si chiudesse per conto
   // suo, il suo bordo inferiore verrebbe disegnato sopra le cosce e la figura
-  // sembrerebbe in mutande. Mezzo profilo: collo → fianco → esterno gamba →
-  // caviglia → interno gamba; poi il centro dell'inguine e lo specchio.
-  const half = dx
-    .concat(lvGamba.map(l => [l.x + l.w, l.y]))
-    .concat([[lvGamba[4].x, F.yAnkle + lvGamba[4].w * 0.95]])
-    .concat(lvGamba.slice(1).reverse().map(l => [l.x - l.w, l.y]));
+  // sembrerebbe in mutande. L'apice dell'inguine chiude i due lati.
+  const half = busto
+    .concat([[ax + tw * 0.99, F.yCrotch - 12]])                  // anca → coscia
+    .concat(lvG.map(l => [l.x + l.w, l.y]))                      // esterno, giù
+    .concat(lvG.slice().reverse().map(l => [l.x - l.w, l.y]));   // interno, su
   const corpo = smooth(half.map(p => [cx + p[0], p[1]])
-    .concat([[cx, F.yCrotch + 2]])
+    .concat([[cx, F.yCrotch]])
     .concat(half.slice().reverse().map(p => [cx - p[0], p[1]])), true);
 
-  // A rastremare è la larghezza, non l'asse: se si muovono insieme il bordo
-  // esterno esce dritto e il braccio sembra un bastone. Il bordo interno deve
-  // divergere in fretta sotto la spalla, altrimenti scende in mezzo al petto e
-  // la figura sembra vestita con un gilet invece che avere due braccia.
-  const lvBraccio = [
-    { y: F.ySh - 2,     x: cw * 1.02, w: aw * 1.12 },   // deltoide
-    { y: F.yChest + 4,  x: cw * 1.06, w: aw * 0.92 },
-    { y: F.yElbow,      x: cw * 1.10, w: aw * 0.58 },
-    { y: F.yElbow + 34, x: cw * 1.12, w: aw * 0.62 },   // avambraccio
-    { y: F.yWrist,      x: cw * 1.14, w: aw * 0.38 }
-  ];
-  // estremità arrotondate: senza il cap in cima la spalla esce come una barra
+  // --- braccia: definite dal BORDO ESTERNO, che in alto coincide con la
+  // spalla del tronco. Disegnate DIETRO il busto: la parte alta resta coperta
+  // e il braccio emerge da solo sotto l'ascella, dove il tronco si restringe.
+  // Sopra il busto invece la cupola del deltoide spunterebbe oltre il trapezio
+  // e la spalla verrebbe a punta.
+  const lvB = [
+    { y: F.ySh + 6,     o: sw * 0.99, w: aw * 1.22 },   // deltoide
+    { y: F.yPit + 6,    o: sw * 1.00, w: aw * 1.00 },
+    { y: F.yElbow,      o: sw * 1.01, w: aw * 0.60 },
+    { y: F.yWrist - 26, o: sw * 1.03, w: aw * 0.64 },   // avambraccio
+    { y: F.yWrist,      o: sw * 1.00, w: aw * 0.42 },
+    { y: F.yHand,       o: sw * 1.02, w: aw * 0.52 }    // mano
+  ].map(l => ({ y: l.y, x: l.o - l.w, w: l.w }));
+
   const braccio = s => {
-    const out = lvBraccio.map(l => [cx + s * (l.x + l.w), l.y]);
-    const inn = lvBraccio.slice().reverse().map(l => [cx + s * (l.x - l.w), l.y]);
-    const t = lvBraccio[4], h = lvBraccio[0];
-    return smooth(out.concat([[cx + s * t.x, t.y + t.w * 0.95]], inn,
-      [[cx + s * h.x, h.y - h.w * 0.9]]), true);
+    const out = lvB.map(l => [cx + s * (l.x + l.w), l.y]);
+    const inn = lvB.slice().reverse().map(l => [cx + s * (l.x - l.w), l.y]);
+    const t = lvB[lvB.length - 1], h = lvB[0];
+    return smooth(out
+      .concat([[cx + s * t.x, t.y + t.w * 1.1]])     // punta della mano
+      .concat(inn)
+      .concat([[cx + s * h.x, h.y - h.w * 0.15]]),   // capo, coperto dal busto
+      true);
   };
 
   // profili aperti per la sagoma target: sovrapporre le forme chiuse
@@ -820,34 +842,29 @@ function figure(m) {
 
   return {
     corpo, braccia: [braccio(1), braccio(-1)],
-    profili: [apri(dx.slice(1), 1), apri(dx.slice(1), -1),
-              bordo(lvBraccio, 1), bordo(lvBraccio, -1),
-              bordo(lvGamba, 1), bordo(lvGamba, -1)],
-    testa: { cx, cy: (F.yCrown + F.yChin) / 2 - 1, rx: nw * 1.16,
-             ry: (F.yChin - F.yCrown) / 2 }, nw, cw, ww, hw, tw, aw };
+    profili: [apri(busto.slice(1), 1), apri(busto.slice(1), -1),
+              bordo(lvB, 1), bordo(lvB, -1), bordo(lvG, 1), bordo(lvG, -1)],
+    testa: { cx, cy: (F.yCrown + F.yChin) / 2, rx: nw * 1.04,
+             ry: (F.yChin - F.yCrown) / 2 }, nw, cw, ww, hw, tw, aw, sw };
 }
 
 /** SVG: sagoma attuale piena, target tratteggiato SOPRA — se stesse dietro
     sparirebbe dove il target è più stretto, cioè proprio dove conta. */
 function bodySVG(cur, tgt) {
   const a = figure(cur), b = tgt ? figure(tgt) : null;
-  const solid = d => `<path d="${d}" fill="var(--pine-soft)" stroke="var(--pine)"
-      stroke-width="2" stroke-linejoin="round"/>`;
-  const ghost = b ? `<g fill="none" stroke="var(--pine)" stroke-width="1.6"
-      stroke-dasharray="6 4" stroke-linecap="round" opacity=".55">
-      ${b.profili.map(d => `<path d="${d}"/>`).join('')}
-    </g>` : '';
-  return `<svg viewBox="0 0 ${FIG.W} ${FIG.H}" xmlns="http://www.w3.org/2000/svg"
-      role="img" aria-label="Figura in scala sulle misure registrate">
-    <g>
-      ${solid(a.corpo)}
-      ${a.braccia.map(solid).join('')}
-      <ellipse cx="${a.testa.cx}" cy="${a.testa.cy.toFixed(1)}"
-        rx="${a.testa.rx.toFixed(1)}" ry="${a.testa.ry.toFixed(1)}"
-        fill="var(--pine-soft)" stroke="var(--pine)" stroke-width="2"/>
-    </g>
-    ${ghost}
-  </svg>`;
+  const solid = d => '<path d="' + d + '" fill="var(--pine-soft)" '
+    + 'stroke="var(--pine)" stroke-width="2" stroke-linejoin="round"/>';
+  const ghost = b ? '<g fill="none" stroke="var(--pine)" stroke-width="1.6" '
+    + 'stroke-dasharray="6 4" stroke-linecap="round" opacity=".55">'
+    + b.profili.map(d => '<path d="' + d + '"/>').join('') + '</g>' : '';
+  return '<svg viewBox="0 0 ' + FIG.W + ' ' + FIG.H + '" '
+    + 'xmlns="http://www.w3.org/2000/svg" role="img" '
+    + 'aria-label="Figura in scala sulle misure registrate">'
+    + '<g>' + a.braccia.map(solid).join('') + solid(a.corpo)
+    + '<ellipse cx="' + a.testa.cx + '" cy="' + a.testa.cy.toFixed(1) + '" '
+    + 'rx="' + a.testa.rx.toFixed(1) + '" ry="' + a.testa.ry.toFixed(1) + '" '
+    + 'fill="var(--pine-soft)" stroke="var(--pine)" stroke-width="2"/></g>'
+    + ghost + '</svg>';
 }
 
 /* ------------------------------------------------------------ vista */
