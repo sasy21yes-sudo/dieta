@@ -1,5 +1,5 @@
 /* Cache offline: l'app deve funzionare anche in cucina senza rete. */
-const V = 'dieta-v2';
+const V = 'dieta-v3';
 const ASSETS = ['./', './index.html', './style.css', './app.js',
                 './data/dieta.json', './manifest.json',
                 './icons/icon-180.png', './icons/icon-192.png',
@@ -18,16 +18,30 @@ self.addEventListener('activate', e => {
     Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))
   ).then(() => self.clients.claim()));
 });
+
+/*
+ * Rete-prima su tutto, cache come rete di sicurezza.
+ *
+ * Prima il guscio era cache-prima: piu' veloce all'avvio, ma qualsiasi
+ * versione nuova di app.js restava invisibile finche' non cambiava V. Si
+ * finisce a guardare una copia vecchia dell'app credendo che le modifiche
+ * non abbiano funzionato — ed e' esattamente quello che e' successo.
+ * L'app pesa ~100 KB: il costo di ricontrollare la rete e' trascurabile,
+ * il costo di mostrare codice vecchio no.
+ */
 self.addEventListener('fetch', e => {
   const r = e.request;
   if (r.method !== 'GET') return;
-  // rete-prima per i dati, cache-prima per il guscio
-  if (r.url.includes('dieta.json')) {
-    e.respondWith(fetch(r).then(res => {
-      const cp = res.clone(); caches.open(V).then(c => c.put(r, cp)); return res;
-    }).catch(() => caches.match(r)));
-  } else {
-    e.respondWith(caches.match(r).then(hit => hit || fetch(r).catch(() =>
-      caches.match('./index.html'))));
-  }
+  // richieste verso altri domini (i font): lasciale gestire al browser
+  if (new URL(r.url).origin !== self.location.origin) return;
+  e.respondWith(
+    fetch(r).then(res => {
+      if (res && res.ok) {
+        const cp = res.clone();
+        caches.open(V).then(c => c.put(r, cp)).catch(() => {});
+      }
+      return res;
+    }).catch(() => caches.match(r).then(hit =>
+      hit || (r.mode === 'navigate' ? caches.match('./index.html') : Response.error())))
+  );
 });

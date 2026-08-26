@@ -20,6 +20,22 @@ const today = () => dkey(new Date());
 const dayIdx = d => (new Date(d).getDay() + 6) % 7;   // 0 = lunedì
 const addDays = (k, n) => { const d = new Date(k); d.setDate(d.getDate() + n); return dkey(d); };
 
+/**
+ * Legge un numero accettando sia il punto sia la virgola. Serve perché su
+ * tastiera italiana si digita 67,5 e <input type="number"> considera quel
+ * valore non valido: .value torna stringa vuota, +"" fa 0, e il campo diventa
+ * inutilizzabile senza dare nessun errore. Per questo i campi numerici sono
+ * type="text" con inputmode="decimal": la tastiera resta quella dei numeri,
+ * ma il testo digitato arriva intero fin qui.
+ */
+function parseNum(v) {
+  if (v == null) return undefined;
+  const t = String(v).trim().replace(',', '.');
+  if (!t || !/^-?\d*\.?\d+$/.test(t)) return undefined;
+  const n = parseFloat(t);
+  return isNaN(n) ? undefined : n;
+}
+
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.hidden = false;
   clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2200);
@@ -609,13 +625,13 @@ function sheetExtra(k) {
   w.append(el('div', 'field',
     `<label>Descrizione</label><input type="text" id="x-n" placeholder="Es. cornetto al bar">`));
   const g = el('div'); g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px';
-  g.append(el('div', 'field', `<label>kcal</label><input type="number" id="x-k" inputmode="numeric">`),
-           el('div', 'field', `<label>Proteine (g)</label><input type="number" id="x-p" inputmode="decimal">`));
+  g.append(el('div', 'field', `<label>kcal</label><input type="text" id="x-k" inputmode="numeric">`),
+           el('div', 'field', `<label>Proteine (g)</label><input type="text" id="x-p" inputmode="decimal">`));
   w.append(g);
   const b = el('button', 'btn wide pri', 'Registra');
   b.onclick = () => {
     const n = $('#x-n').value.trim() || 'Fuori piano';
-    day(k).extra.push({ nome: n, kcal: +$('#x-k').value || 0, p: +$('#x-p').value || 0,
+    day(k).extra.push({ nome: n, kcal: parseNum($('#x-k').value) || 0, p: parseNum($('#x-p').value) || 0,
                         c: 0, g: 0, fibre: 0 });
     save(); closeSheet(); route(); toast('Registrato');
   };
@@ -635,10 +651,9 @@ function viewDiario(v) {
   const num = (id, lab, unit, step, hint) => {
     const f = el('div', 'field',
       `<label>${lab}${unit ? ` <span class="muted">(${unit})</span>` : ''}</label>
-       <input type="number" step="${step}" inputmode="decimal" id="f-${id}"
+       <input type="text" inputmode="decimal" id="f-${id}"
               value="${d[id] ?? ''}">${hint ? `<div class="hint">${hint}</div>` : ''}`);
-    f.querySelector('input').oninput = e =>
-      set(id, e.target.value === '' ? undefined : +e.target.value);
+    f.querySelector('input').oninput = e => set(id, parseNum(e.target.value));
     return f;
   };
 
@@ -776,7 +791,9 @@ function figure(m) {
   // --- tronco: la spalla appartiene al tronco, così la silhouette ha
   //     le spalle larghe della foto invece del gancio da appendiabiti
   const busto = [
-    [nw * 0.86, F.yChin + 3], [nw, F.yNeck],
+    // il collo sale DENTRO la testa: fermarlo sotto il mento lascia un vuoto,
+    // perché l'ellisse si assottiglia a zero sul fondo
+    [nw * 0.92, F.yChin - 13], [nw, F.yNeck],
     // il trapezio si allarga in fretta perché la spalla sta solo ~30 unità
     // sotto il mento: allungare il collo è ciò che produce l'appendiabiti
     [nw * 1.55, F.yNeck + 5], [sw * 0.62, F.yNeck + 11], [sw * 0.88, F.ySh - 2],
@@ -844,7 +861,10 @@ function figure(m) {
     corpo, braccia: [braccio(1), braccio(-1)],
     profili: [apri(busto.slice(1), 1), apri(busto.slice(1), -1),
               bordo(lvB, 1), bordo(lvB, -1), bordo(lvG, 1), bordo(lvG, -1)],
-    testa: { cx, cy: (F.yCrown + F.yChin) / 2, rx: nw * 1.04,
+    // La testa NON si scala sulla circonferenza del collo: non è una misura
+    // del cranio. Legarcela faceva rimpicciolire la testa fino a sembrare
+    // spillata sul corpo quando il collo era fuori scala.
+    testa: { cx, cy: (F.yCrown + F.yChin) / 2, rx: (F.ySole - F.yCrown) * 0.0405,
              ry: (F.yChin - F.yCrown) / 2 }, nw, cw, ww, hw, tw, aw, sw };
 }
 
@@ -1111,13 +1131,18 @@ function sheetMisura(m, k) {
         : `${nf(Math.abs(m.target - cur), 1)} cm ${m.target > cur ? 'da mettere' : 'da togliere'}`}` : ''}.`));
   }
   w.append(el('div', 'field',
-    `<label>Centimetri</label><input type="number" step="0.1" inputmode="decimal"
-      id="m-v" value="${d.misure[m.id] ?? m.base ?? ''}">
+    `<label>Centimetri</label><input type="text" inputmode="decimal"
+      id="m-v" value="${d.misure[m.id] ?? lastMeas(m.id) ?? ''}">
      ${m.nota ? `<div class="hint">${esc(m.nota)}</div>` : ''}`));
   const b = el('button', 'btn wide pri', 'Salva');
   b.onclick = () => {
-    const val = +$('#m-v').value;
-    if (val > 0) d.misure[m.id] = val; else delete d.misure[m.id];
+    const raw = $('#m-v').value.trim(), val = parseNum(raw);
+    // campo vuoto = cancella; numero valido = salva; scritto male = fermati e
+    // dillo, invece di azzerare in silenzio una misura che l'utente credeva
+    // di aver aggiornato
+    if (raw === '') delete d.misure[m.id];
+    else if (val > 0 && val < 300) d.misure[m.id] = val;
+    else { toast('Valore non valido'); return; }
     S.model ||= {}; S.model.rev = (S.model.rev || 0) + 1;
     save(); closeSheet(); route(); toast('Misura salvata');
   };
