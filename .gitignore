@@ -1,0 +1,12 @@
+# file di lavoro temporanei
+tmp-*
+*.tmp
+
+# sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# backup esportati dall'app: contengono il diario personale,
+# non vanno nel repo
+dieta-backup-*.json

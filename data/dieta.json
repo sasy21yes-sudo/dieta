@@ -1,0 +1,1672 @@
+{
+ "meta": {
+  "titolo": "Piano vegano — ricomposizione corporea",
+  "versione": 1,
+  "note": "Valori 'stima' vanno sostituiti con quelli in etichetta."
+ },
+ "profilo": {
+  "nome": "Salvatore",
+  "eta": 24,
+  "altezza_cm": 180,
+  "peso_iniziale_kg": 67.15,
+  "sesso": "m"
+ },
+ "target": {
+  "kcal": 2482,
+  "p": 135,
+  "c": 287,
+  "g": 82,
+  "fibre": 38,
+  "p_per_kg": 2,
+  "acqua_l": 2.75,
+  "passi": 8000,
+  "sonno_h": 7,
+  "min_p_per_pasto": 25
+ },
+ "alimenti": {
+  "pasta di semola": {
+   "kcal": 371,
+   "p": 13,
+   "c": 74.7,
+   "g": 1.5,
+   "fibre": 3,
+   "unita": "g",
+   "categoria": "cereali",
+   "fonte": "tabella"
+  },
+  "pasta di lenticchie": {
+   "kcal": 340,
+   "p": 24,
+   "c": 50,
+   "g": 2.5,
+   "fibre": 8,
+   "unita": "g",
+   "categoria": "cereali",
+   "fonte": "tabella"
+  },
+  "riso": {
+   "kcal": 355,
+   "p": 7,
+   "c": 78,
+   "g": 0.6,
+   "fibre": 1,
+   "unita": "g",
+   "categoria": "cereali",
+   "fonte": "tabella"
+  },
+  "pane": {
+   "kcal": 265,
+   "p": 8.8,
+   "c": 49,
+   "g": 3.2,
+   "fibre": 3.5,
+   "unita": "g",
+   "categoria": "cereali",
+   "fonte": "tabella"
+  },
+  "panino": {
+   "kcal": 270,
+   "p": 9,
+   "c": 50,
+   "g": 3.2,
+   "fibre": 3,
+   "unita": "g",
+   "categoria": "cereali",
+   "fonte": "tabella"
+  },
+  "piadina": {
+   "kcal": 340,
+   "p": 8,
+   "c": 51,
+   "g": 11,
+   "fibre": 2.5,
+   "unita": "g",
+   "categoria": "cereali",
+   "fonte": "stima"
+  },
+  "cereali integrali": {
+   "kcal": 375,
+   "p": 10,
+   "c": 68,
+   "g": 5.5,
+   "fibre": 8,
+   "unita": "g",
+   "categoria": "cereali",
+   "fonte": "stima"
+  },
+  "granola": {
+   "kcal": 430,
+   "p": 9,
+   "c": 60,
+   "g": 16,
+   "fibre": 7,
+   "unita": "g",
+   "categoria": "cereali",
+   "fonte": "stima"
+  },
+  "farina d'avena": {
+   "kcal": 380,
+   "p": 13.5,
+   "c": 60,
+   "g": 7,
+   "fibre": 10,
+   "unita": "g",
+   "categoria": "cereali",
+   "fonte": "tabella"
+  },
+  "patate": {
+   "kcal": 77,
+   "p": 2,
+   "c": 17,
+   "g": 0.1,
+   "fibre": 2.2,
+   "unita": "g",
+   "categoria": "cereali",
+   "fonte": "tabella"
+  },
+  "impasto pizza cotto": {
+   "kcal": 280,
+   "p": 8.5,
+   "c": 54,
+   "g": 3,
+   "fibre": 2.5,
+   "unita": "g",
+   "categoria": "cereali",
+   "fonte": "stima"
+  },
+  "ceci lessati": {
+   "kcal": 120,
+   "p": 6.8,
+   "c": 16,
+   "g": 2.4,
+   "fibre": 6.5,
+   "unita": "g",
+   "categoria": "legumi",
+   "fonte": "tabella"
+  },
+  "fagioli lessati": {
+   "kcal": 110,
+   "p": 7.5,
+   "c": 15,
+   "g": 0.6,
+   "fibre": 6,
+   "unita": "g",
+   "categoria": "legumi",
+   "fonte": "tabella"
+  },
+  "tofu": {
+   "kcal": 140,
+   "p": 16,
+   "c": 1.5,
+   "g": 8,
+   "fibre": 1,
+   "unita": "g",
+   "categoria": "proteici",
+   "fonte": "tabella"
+  },
+  "tempeh": {
+   "kcal": 192,
+   "p": 19,
+   "c": 9,
+   "g": 8,
+   "fibre": 6,
+   "unita": "g",
+   "categoria": "proteici",
+   "fonte": "tabella"
+  },
+  "straccetti GG": {
+   "kcal": 225,
+   "p": 22,
+   "c": 3.4,
+   "g": 11,
+   "fibre": 7.7,
+   "unita": "g",
+   "categoria": "proteici",
+   "fonte": "verificato"
+  },
+  "fette veg salame": {
+   "kcal": 224,
+   "p": 27.2,
+   "c": 5,
+   "g": 9.1,
+   "fibre": 6.7,
+   "unita": "g",
+   "categoria": "proteici",
+   "fonte": "verificato"
+  },
+  "burger vegetale": {
+   "kcal": 230,
+   "p": 17,
+   "c": 8,
+   "g": 14,
+   "fibre": 4,
+   "unita": "g",
+   "categoria": "proteici",
+   "fonte": "stima"
+  },
+  "hot dog vegani": {
+   "kcal": 220,
+   "p": 16,
+   "c": 6,
+   "g": 14,
+   "fibre": 3,
+   "unita": "g",
+   "categoria": "proteici",
+   "fonte": "stima"
+  },
+  "nuggets vegetali": {
+   "kcal": 230,
+   "p": 15,
+   "c": 18,
+   "g": 11,
+   "fibre": 4,
+   "unita": "g",
+   "categoria": "proteici",
+   "fonte": "stima"
+  },
+  "proteine vegetali": {
+   "kcal": 380,
+   "p": 78,
+   "c": 8,
+   "g": 5,
+   "fibre": 4,
+   "unita": "g",
+   "categoria": "proteici",
+   "fonte": "stima"
+  },
+  "latte soia cioccolato": {
+   "kcal": 60,
+   "p": 3,
+   "c": 8,
+   "g": 1.8,
+   "fibre": 0.5,
+   "unita": "ml",
+   "categoria": "latticini veg",
+   "fonte": "tabella"
+  },
+  "yogurt di soia": {
+   "kcal": 50,
+   "p": 4,
+   "c": 2,
+   "g": 2.5,
+   "fibre": 0.8,
+   "unita": "g",
+   "categoria": "latticini veg",
+   "fonte": "tabella"
+  },
+  "formaggio vegano": {
+   "kcal": 300,
+   "p": 1.5,
+   "c": 22,
+   "g": 23,
+   "fibre": 0.5,
+   "unita": "g",
+   "categoria": "latticini veg",
+   "fonte": "stima"
+  },
+  "olio EVO": {
+   "kcal": 900,
+   "p": 0,
+   "c": 0,
+   "g": 100,
+   "fibre": 0,
+   "unita": "g",
+   "categoria": "grassi",
+   "fonte": "tabella"
+  },
+  "burro d'arachidi": {
+   "kcal": 620,
+   "p": 25,
+   "c": 12,
+   "g": 50,
+   "fibre": 6,
+   "unita": "g",
+   "categoria": "grassi",
+   "fonte": "tabella"
+  },
+  "mandorle": {
+   "kcal": 600,
+   "p": 21,
+   "c": 5,
+   "g": 52,
+   "fibre": 12.5,
+   "unita": "g",
+   "categoria": "grassi",
+   "fonte": "tabella"
+  },
+  "noci brasiliane": {
+   "kcal": 660,
+   "p": 14,
+   "c": 4,
+   "g": 66,
+   "fibre": 7.5,
+   "unita": "g",
+   "categoria": "grassi",
+   "fonte": "tabella"
+  },
+  "cioccolato fondente": {
+   "kcal": 570,
+   "p": 8,
+   "c": 33,
+   "g": 42,
+   "fibre": 11,
+   "unita": "g",
+   "categoria": "grassi",
+   "fonte": "tabella"
+  },
+  "hummus": {
+   "kcal": 270,
+   "p": 7.5,
+   "c": 15,
+   "g": 19,
+   "fibre": 6,
+   "unita": "g",
+   "categoria": "grassi",
+   "fonte": "tabella"
+  },
+  "zucchine": {
+   "kcal": 17,
+   "p": 1.6,
+   "c": 2,
+   "g": 0.3,
+   "fibre": 1.2,
+   "unita": "g",
+   "categoria": "verdura",
+   "fonte": "tabella"
+  },
+  "zucca": {
+   "kcal": 26,
+   "p": 1,
+   "c": 5,
+   "g": 0.1,
+   "fibre": 1.5,
+   "unita": "g",
+   "categoria": "verdura",
+   "fonte": "tabella"
+  },
+  "passata di pomodoro": {
+   "kcal": 32,
+   "p": 1.5,
+   "c": 5.5,
+   "g": 0.3,
+   "fibre": 1.5,
+   "unita": "g",
+   "categoria": "verdura",
+   "fonte": "tabella"
+  },
+  "pomodoro": {
+   "kcal": 20,
+   "p": 1,
+   "c": 3.5,
+   "g": 0.2,
+   "fibre": 1.2,
+   "unita": "g",
+   "categoria": "verdura",
+   "fonte": "tabella"
+  },
+  "mela": {
+   "kcal": 52,
+   "p": 0.3,
+   "c": 12,
+   "g": 0.2,
+   "fibre": 2.4,
+   "unita": "g",
+   "categoria": "frutta",
+   "fonte": "tabella"
+  },
+  "fragole": {
+   "kcal": 32,
+   "p": 0.7,
+   "c": 5.5,
+   "g": 0.3,
+   "fibre": 2,
+   "unita": "g",
+   "categoria": "frutta",
+   "fonte": "tabella"
+  },
+  "ananas": {
+   "kcal": 50,
+   "p": 0.5,
+   "c": 11.5,
+   "g": 0.1,
+   "fibre": 1.4,
+   "unita": "g",
+   "categoria": "frutta",
+   "fonte": "tabella"
+  },
+  "arancia": {
+   "kcal": 47,
+   "p": 0.9,
+   "c": 9,
+   "g": 0.1,
+   "fibre": 2.4,
+   "unita": "g",
+   "categoria": "frutta",
+   "fonte": "tabella"
+  },
+  "mandarini": {
+   "kcal": 53,
+   "p": 0.8,
+   "c": 11,
+   "g": 0.3,
+   "fibre": 1.8,
+   "unita": "g",
+   "categoria": "frutta",
+   "fonte": "tabella"
+  },
+  "sciroppo d'acero": {
+   "kcal": 260,
+   "p": 0,
+   "c": 67,
+   "g": 0,
+   "fibre": 0,
+   "unita": "g",
+   "categoria": "condimenti",
+   "fonte": "tabella"
+  },
+  "salsa di soia": {
+   "kcal": 60,
+   "p": 6,
+   "c": 5,
+   "g": 0,
+   "fibre": 0,
+   "unita": "g",
+   "categoria": "condimenti",
+   "fonte": "tabella"
+  },
+  "ketchup": {
+   "kcal": 100,
+   "p": 1.2,
+   "c": 23,
+   "g": 0.2,
+   "fibre": 1,
+   "unita": "g",
+   "categoria": "condimenti",
+   "fonte": "tabella"
+  },
+  "senape": {
+   "kcal": 66,
+   "p": 4,
+   "c": 5,
+   "g": 3.5,
+   "fibre": 2,
+   "unita": "g",
+   "categoria": "condimenti",
+   "fonte": "tabella"
+  },
+  "maionese vegana": {
+   "kcal": 650,
+   "p": 0.5,
+   "c": 3,
+   "g": 70,
+   "fibre": 0,
+   "unita": "g",
+   "categoria": "condimenti",
+   "fonte": "tabella"
+  }
+ },
+ "pasti": {
+  "C1": {
+   "nome": "Cereali + latte di soia al cioccolato",
+   "ingredienti": [
+    {
+     "alimento": "cereali integrali",
+     "qta": 80
+    },
+    {
+     "alimento": "latte soia cioccolato",
+     "qta": 300
+    },
+    {
+     "alimento": "burro d'arachidi",
+     "qta": 25
+    }
+   ],
+   "macro": {
+    "kcal": 635,
+    "p": 23.2,
+    "c": 81.4,
+    "g": 22.3,
+    "fibre": 9.4
+   }
+  },
+  "C2": {
+   "nome": "Pancake proteici",
+   "ingredienti": [
+    {
+     "alimento": "farina d'avena",
+     "qta": 60
+    },
+    {
+     "alimento": "proteine vegetali",
+     "qta": 35
+    },
+    {
+     "alimento": "latte soia cioccolato",
+     "qta": 200
+    },
+    {
+     "alimento": "sciroppo d'acero",
+     "qta": 20
+    }
+   ],
+   "macro": {
+    "kcal": 533,
+    "p": 41.4,
+    "c": 68.2,
+    "g": 9.6,
+    "fibre": 8.4
+   }
+  },
+  "C3": {
+   "nome": "Toast salato",
+   "ingredienti": [
+    {
+     "alimento": "pane",
+     "qta": 110
+    },
+    {
+     "alimento": "fette veg salame",
+     "qta": 55
+    },
+    {
+     "alimento": "formaggio vegano",
+     "qta": 30
+    },
+    {
+     "alimento": "latte soia cioccolato",
+     "qta": 250
+    }
+   ],
+   "macro": {
+    "kcal": 655,
+    "p": 32.6,
+    "c": 83.2,
+    "g": 19.9,
+    "fibre": 8.9
+   }
+  },
+  "P1": {
+   "nome": "Pasta e ceci cremosa",
+   "ingredienti": [
+    {
+     "alimento": "pasta di semola",
+     "qta": 100
+    },
+    {
+     "alimento": "ceci lessati",
+     "qta": 240
+    },
+    {
+     "alimento": "olio EVO",
+     "qta": 10
+    }
+   ],
+   "macro": {
+    "kcal": 749,
+    "p": 29.3,
+    "c": 113.1,
+    "g": 17.3,
+    "fibre": 18.6
+   }
+  },
+  "P1b": {
+   "nome": "Pasta e fagioli",
+   "ingredienti": [
+    {
+     "alimento": "pasta di semola",
+     "qta": 100
+    },
+    {
+     "alimento": "fagioli lessati",
+     "qta": 240
+    },
+    {
+     "alimento": "olio EVO",
+     "qta": 10
+    }
+   ],
+   "macro": {
+    "kcal": 725,
+    "p": 31,
+    "c": 110.7,
+    "g": 12.9,
+    "fibre": 17.4
+   }
+  },
+  "P2": {
+   "nome": "Pasta cremosa di zucchine con straccetti",
+   "ingredienti": [
+    {
+     "alimento": "pasta di semola",
+     "qta": 100
+    },
+    {
+     "alimento": "straccetti GG",
+     "qta": 87.5
+    },
+    {
+     "alimento": "zucchine",
+     "qta": 200
+    },
+    {
+     "alimento": "olio EVO",
+     "qta": 10
+    }
+   ],
+   "macro": {
+    "kcal": 692,
+    "p": 35.5,
+    "c": 81.7,
+    "g": 21.7,
+    "fibre": 12.1
+   }
+  },
+  "P3": {
+   "nome": "Pasta di legumi al pomodoro con tofu",
+   "ingredienti": [
+    {
+     "alimento": "pasta di lenticchie",
+     "qta": 100
+    },
+    {
+     "alimento": "passata di pomodoro",
+     "qta": 150
+    },
+    {
+     "alimento": "tofu",
+     "qta": 150
+    },
+    {
+     "alimento": "olio EVO",
+     "qta": 10
+    }
+   ],
+   "macro": {
+    "kcal": 688,
+    "p": 50.2,
+    "c": 60.5,
+    "g": 24.9,
+    "fibre": 11.8
+   }
+  },
+  "P3d": {
+   "nome": "Pasta di legumi al pomodoro con tofu",
+   "ingredienti": [
+    {
+     "alimento": "pasta di lenticchie",
+     "qta": 100
+    },
+    {
+     "alimento": "passata di pomodoro",
+     "qta": 150
+    },
+    {
+     "alimento": "tofu",
+     "qta": 150
+    },
+    {
+     "alimento": "olio EVO",
+     "qta": 10
+    }
+   ],
+   "macro": {
+    "kcal": 688,
+    "p": 50.2,
+    "c": 60.5,
+    "g": 24.9,
+    "fibre": 11.8
+   }
+  },
+  "P4": {
+   "nome": "Piadina con tofu marinato e hummus",
+   "ingredienti": [
+    {
+     "alimento": "piadina",
+     "qta": 80
+    },
+    {
+     "alimento": "tofu",
+     "qta": 150
+    },
+    {
+     "alimento": "hummus",
+     "qta": 40
+    }
+   ],
+   "macro": {
+    "kcal": 590,
+    "p": 33.4,
+    "c": 49,
+    "g": 28.4,
+    "fibre": 5.9
+   }
+  },
+  "CE1": {
+   "nome": "Tofu marinato + patate al forno",
+   "ingredienti": [
+    {
+     "alimento": "tofu",
+     "qta": 200
+    },
+    {
+     "alimento": "patate",
+     "qta": 350
+    },
+    {
+     "alimento": "olio EVO",
+     "qta": 10
+    },
+    {
+     "alimento": "salsa di soia",
+     "qta": 15
+    }
+   ],
+   "macro": {
+    "kcal": 648,
+    "p": 39.9,
+    "c": 63.2,
+    "g": 26.4,
+    "fibre": 9.7
+   }
+  },
+  "CE2": {
+   "nome": "Burger vegetale nel panino",
+   "ingredienti": [
+    {
+     "alimento": "burger vegetale",
+     "qta": 110
+    },
+    {
+     "alimento": "panino",
+     "qta": 90
+    },
+    {
+     "alimento": "formaggio vegano",
+     "qta": 30
+    },
+    {
+     "alimento": "ketchup",
+     "qta": 20
+    },
+    {
+     "alimento": "maionese vegana",
+     "qta": 10
+    }
+   ],
+   "macro": {
+    "kcal": 671,
+    "p": 27.5,
+    "c": 65.3,
+    "g": 32.2,
+    "fibre": 7.5
+   }
+  },
+  "CE3": {
+   "nome": "Tempeh marinato + riso (prima volta, porzione ridotta)",
+   "ingredienti": [
+    {
+     "alimento": "tempeh",
+     "qta": 80
+    },
+    {
+     "alimento": "riso",
+     "qta": 100
+    },
+    {
+     "alimento": "salsa di soia",
+     "qta": 20
+    },
+    {
+     "alimento": "olio EVO",
+     "qta": 8
+    }
+   ],
+   "macro": {
+    "kcal": 593,
+    "p": 23.4,
+    "c": 86.2,
+    "g": 15,
+    "fibre": 5.8
+   }
+  },
+  "CE4": {
+   "nome": "Hot dog vegani",
+   "ingredienti": [
+    {
+     "alimento": "hot dog vegani",
+     "qta": 120
+    },
+    {
+     "alimento": "panino",
+     "qta": 100
+    },
+    {
+     "alimento": "ketchup",
+     "qta": 20
+    },
+    {
+     "alimento": "senape",
+     "qta": 10
+    }
+   ],
+   "macro": {
+    "kcal": 561,
+    "p": 28.8,
+    "c": 62.3,
+    "g": 20.4,
+    "fibre": 7
+   }
+  },
+  "CE5": {
+   "nome": "Vellutata di zucca + nuggets",
+   "ingredienti": [
+    {
+     "alimento": "zucca",
+     "qta": 350
+    },
+    {
+     "alimento": "nuggets vegetali",
+     "qta": 150
+    },
+    {
+     "alimento": "pane",
+     "qta": 50
+    },
+    {
+     "alimento": "olio EVO",
+     "qta": 8
+    }
+   ],
+   "macro": {
+    "kcal": 640,
+    "p": 30.4,
+    "c": 69,
+    "g": 26.5,
+    "fibre": 13
+   }
+  },
+  "PIZZA": {
+   "nome": "Pizza vegana con salame veg",
+   "ingredienti": [
+    {
+     "alimento": "impasto pizza cotto",
+     "qta": 220
+    },
+    {
+     "alimento": "passata di pomodoro",
+     "qta": 80
+    },
+    {
+     "alimento": "formaggio vegano",
+     "qta": 60
+    },
+    {
+     "alimento": "olio EVO",
+     "qta": 10
+    },
+    {
+     "alimento": "fette veg salame",
+     "qta": 70
+    }
+   ],
+   "macro": {
+    "kcal": 1068,
+    "p": 39.8,
+    "c": 139.9,
+    "g": 37,
+    "fibre": 11.7
+   }
+  },
+  "S1": {
+   "nome": "Frullato proteico",
+   "ingredienti": [
+    {
+     "alimento": "proteine vegetali",
+     "qta": 35
+    },
+    {
+     "alimento": "latte soia cioccolato",
+     "qta": 300
+    }
+   ],
+   "macro": {
+    "kcal": 313,
+    "p": 36.3,
+    "c": 26.8,
+    "g": 7.2,
+    "fibre": 2.9
+   }
+  },
+  "S2": {
+   "nome": "Yogurt di soia con granola e fragole",
+   "ingredienti": [
+    {
+     "alimento": "yogurt di soia",
+     "qta": 200
+    },
+    {
+     "alimento": "granola",
+     "qta": 40
+    },
+    {
+     "alimento": "fragole",
+     "qta": 150
+    }
+   ],
+   "macro": {
+    "kcal": 320,
+    "p": 12.7,
+    "c": 36.2,
+    "g": 11.8,
+    "fibre": 7.4
+   }
+  },
+  "S3": {
+   "nome": "Panino con salame veg",
+   "ingredienti": [
+    {
+     "alimento": "pane",
+     "qta": 70
+    },
+    {
+     "alimento": "fette veg salame",
+     "qta": 55
+    },
+    {
+     "alimento": "pomodoro",
+     "qta": 30
+    }
+   ],
+   "macro": {
+    "kcal": 315,
+    "p": 21.4,
+    "c": 38.1,
+    "g": 7.3,
+    "fibre": 6.5
+   }
+  },
+  "S4": {
+   "nome": "Latte di soia, mandorle e mandarini",
+   "ingredienti": [
+    {
+     "alimento": "latte soia cioccolato",
+     "qta": 300
+    },
+    {
+     "alimento": "mandorle",
+     "qta": 25
+    },
+    {
+     "alimento": "mandarini",
+     "qta": 80
+    }
+   ],
+   "macro": {
+    "kcal": 372,
+    "p": 14.9,
+    "c": 34,
+    "g": 18.6,
+    "fibre": 6.1
+   }
+  },
+  "S5": {
+   "nome": "Cioccolato fondente, ananas e noci brasiliane",
+   "ingredienti": [
+    {
+     "alimento": "cioccolato fondente",
+     "qta": 25
+    },
+    {
+     "alimento": "ananas",
+     "qta": 200
+    },
+    {
+     "alimento": "noci brasiliane",
+     "qta": 8
+    }
+   ],
+   "macro": {
+    "kcal": 295,
+    "p": 4.1,
+    "c": 31.6,
+    "g": 16,
+    "fibre": 6.1
+   }
+  },
+  "S6": {
+   "nome": "Yogurt di soia con arancia",
+   "ingredienti": [
+    {
+     "alimento": "yogurt di soia",
+     "qta": 250
+    },
+    {
+     "alimento": "arancia",
+     "qta": 150
+    }
+   ],
+   "macro": {
+    "kcal": 196,
+    "p": 11.3,
+    "c": 18.5,
+    "g": 6.4,
+    "fibre": 5.6
+   }
+  },
+  "PN1": {
+   "nome": "Latte di soia al cioccolato",
+   "ingredienti": [
+    {
+     "alimento": "latte soia cioccolato",
+     "qta": 200
+    }
+   ],
+   "macro": {
+    "kcal": 120,
+    "p": 6,
+    "c": 16,
+    "g": 3.6,
+    "fibre": 1
+   }
+  },
+  "PN2": {
+   "nome": "Latte di soia al cioccolato",
+   "ingredienti": [
+    {
+     "alimento": "latte soia cioccolato",
+     "qta": 250
+    }
+   ],
+   "macro": {
+    "kcal": 150,
+    "p": 7.5,
+    "c": 20,
+    "g": 4.5,
+    "fibre": 1.2
+   }
+  },
+  "PN3": {
+   "nome": "Yogurt di soia con mela",
+   "ingredienti": [
+    {
+     "alimento": "yogurt di soia",
+     "qta": 250
+    },
+    {
+     "alimento": "mela",
+     "qta": 150
+    }
+   ],
+   "macro": {
+    "kcal": 203,
+    "p": 10.4,
+    "c": 23,
+    "g": 6.5,
+    "fibre": 5.6
+   }
+  }
+ },
+ "settimana": [
+  {
+   "giorno": "LUNEDÌ",
+   "attivita": "Allenamento — Schiena",
+   "allenamento": true,
+   "pasti": [
+    {
+     "slot": "Colazione",
+     "codice": "C1",
+     "ora": "09:15"
+    },
+    {
+     "slot": "Pranzo",
+     "codice": "P1",
+     "ora": "13:00"
+    },
+    {
+     "slot": "Spuntino",
+     "codice": "S1",
+     "ora": "16:30"
+    },
+    {
+     "slot": "Cena",
+     "codice": "CE1",
+     "ora": "20:30"
+    },
+    {
+     "slot": "Pre-nanna",
+     "codice": "PN1",
+     "ora": "23:00"
+    }
+   ],
+   "totali": {
+    "kcal": 2466,
+    "p": 134.8,
+    "c": 300.6,
+    "g": 76.7,
+    "fibre": 41.6
+   }
+  },
+  {
+   "giorno": "MARTEDÌ",
+   "attivita": "Allenamento — Gambe",
+   "allenamento": true,
+   "pasti": [
+    {
+     "slot": "Colazione",
+     "codice": "C3",
+     "ora": "09:15"
+    },
+    {
+     "slot": "Pranzo",
+     "codice": "P2",
+     "ora": "13:00"
+    },
+    {
+     "slot": "Spuntino",
+     "codice": "S1",
+     "ora": "16:30"
+    },
+    {
+     "slot": "Cena",
+     "codice": "CE3",
+     "ora": "20:30"
+    },
+    {
+     "slot": "Pre-nanna",
+     "codice": "PN3",
+     "ora": "23:00"
+    }
+   ],
+   "totali": {
+    "kcal": 2455,
+    "p": 138.2,
+    "c": 300.9,
+    "g": 70.4,
+    "fibre": 35.4
+   }
+  },
+  {
+   "giorno": "MERCOLEDÌ",
+   "attivita": "Riposo",
+   "allenamento": false,
+   "pasti": [
+    {
+     "slot": "Colazione",
+     "codice": "C1",
+     "ora": "09:15"
+    },
+    {
+     "slot": "Pranzo",
+     "codice": "P3",
+     "ora": "13:00"
+    },
+    {
+     "slot": "Spuntino",
+     "codice": "S3",
+     "ora": "16:30"
+    },
+    {
+     "slot": "Cena",
+     "codice": "CE2",
+     "ora": "20:30"
+    },
+    {
+     "slot": "Pre-nanna",
+     "codice": "PN2",
+     "ora": "23:00"
+    }
+   ],
+   "totali": {
+    "kcal": 2459,
+    "p": 130,
+    "c": 265.3,
+    "g": 91.3,
+    "fibre": 36.3
+   }
+  },
+  {
+   "giorno": "GIOVEDÌ",
+   "attivita": "Allenamento — Petto + tricipiti",
+   "allenamento": true,
+   "pasti": [
+    {
+     "slot": "Colazione",
+     "codice": "C2",
+     "ora": "09:15"
+    },
+    {
+     "slot": "Pranzo",
+     "codice": "P1b",
+     "ora": "13:00"
+    },
+    {
+     "slot": "Spuntino",
+     "codice": "S4",
+     "ora": "16:30"
+    },
+    {
+     "slot": "Cena",
+     "codice": "CE1",
+     "ora": "20:30"
+    },
+    {
+     "slot": "Pre-nanna",
+     "codice": "PN1",
+     "ora": "23:00"
+    }
+   ],
+   "totali": {
+    "kcal": 2399,
+    "p": 133.2,
+    "c": 292.2,
+    "g": 71.1,
+    "fibre": 42.6
+   }
+  },
+  {
+   "giorno": "VENERDÌ",
+   "attivita": "Allenamento — Spalle + bicipiti",
+   "allenamento": true,
+   "pasti": [
+    {
+     "slot": "Colazione",
+     "codice": "C3",
+     "ora": "09:15"
+    },
+    {
+     "slot": "Pranzo",
+     "codice": "P2",
+     "ora": "13:00"
+    },
+    {
+     "slot": "Spuntino",
+     "codice": "S1",
+     "ora": "16:30"
+    },
+    {
+     "slot": "Cena",
+     "codice": "CE4",
+     "ora": "20:30"
+    },
+    {
+     "slot": "Pre-nanna",
+     "codice": "S5",
+     "ora": "23:00"
+    }
+   ],
+   "totali": {
+    "kcal": 2515,
+    "p": 137.3,
+    "c": 285.6,
+    "g": 85.2,
+    "fibre": 37.1
+   }
+  },
+  {
+   "giorno": "SABATO",
+   "attivita": "Riposo",
+   "allenamento": false,
+   "pasti": [
+    {
+     "slot": "Colazione",
+     "codice": "C1",
+     "ora": "09:15"
+    },
+    {
+     "slot": "Pranzo",
+     "codice": "P4",
+     "ora": "13:00"
+    },
+    {
+     "slot": "Spuntino",
+     "codice": "S3",
+     "ora": "16:30"
+    },
+    {
+     "slot": "Cena",
+     "codice": "CE5",
+     "ora": "20:30"
+    },
+    {
+     "slot": "Pre-nanna",
+     "codice": "S1",
+     "ora": "23:00"
+    }
+   ],
+   "totali": {
+    "kcal": 2493,
+    "p": 144.8,
+    "c": 264.3,
+    "g": 91.6,
+    "fibre": 37.7
+   }
+  },
+  {
+   "giorno": "DOMENICA",
+   "attivita": "Riposo — pizza",
+   "allenamento": false,
+   "pasti": [
+    {
+     "slot": "Colazione",
+     "codice": "C1",
+     "ora": "09:15"
+    },
+    {
+     "slot": "Pranzo",
+     "codice": "P3d",
+     "ora": "13:00"
+    },
+    {
+     "slot": "Spuntino",
+     "codice": "S6",
+     "ora": "16:30"
+    },
+    {
+     "slot": "Cena",
+     "codice": "PIZZA",
+     "ora": "20:30"
+    }
+   ],
+   "totali": {
+    "kcal": 2587,
+    "p": 124.7,
+    "c": 300.3,
+    "g": 90.7,
+    "fibre": 38.4
+   }
+  }
+ ],
+ "sostituzioni_consigliate": [
+  {
+   "da": "tofu",
+   "qta_da": 100,
+   "a": "tempeh",
+   "qta_a": 85,
+   "nota": "Più fibre e carboidrati"
+  },
+  {
+   "da": "straccetti GG",
+   "qta_da": 87.5,
+   "a": "tofu",
+   "qta_a": 130,
+   "nota": "Meno sale, niente glutine"
+  },
+  {
+   "da": "burger vegetale",
+   "qta_da": 110,
+   "a": "straccetti GG",
+   "qta_a": 120,
+   "nota": "Più proteine, meno grassi"
+  },
+  {
+   "da": "fette veg salame",
+   "qta_da": 55,
+   "a": "tofu",
+   "qta_a": 95,
+   "nota": "Molto meno sale"
+  },
+  {
+   "da": "pasta di lenticchie",
+   "qta_da": 100,
+   "a": "pasta di semola",
+   "qta_a": 100,
+   "nota": "Più economico: aggiungi 60 g di legumi lessati"
+  }
+ ],
+ "leve": [
+  {
+   "delta_kcal": 150,
+   "azione": "+25 g burro d'arachidi a colazione"
+  },
+  {
+   "delta_kcal": 150,
+   "azione": "+40 g pasta a pranzo"
+  },
+  {
+   "delta_kcal": -150,
+   "azione": "Togli il pre-nanna"
+  },
+  {
+   "delta_kcal": -150,
+   "azione": "−20 g pasta e −5 g olio"
+  }
+ ],
+ "integratori": [
+  {
+   "nome": "B12 (cianocobalamina)",
+   "dose": "2000 mcg",
+   "cadenza": "settimanale",
+   "giorno": 0,
+   "ora": "09:30",
+   "priorita": "obbligatorio",
+   "nota": "Non negoziabile in una dieta vegana"
+  },
+  {
+   "nome": "Creatina monoidrato",
+   "dose": "3–5 g",
+   "cadenza": "giornaliera",
+   "ora": "09:30",
+   "priorita": "alto valore",
+   "nota": "Anche nei giorni di riposo"
+  },
+  {
+   "nome": "Vitamina D3 vegana",
+   "dose": "1000–2000 UI",
+   "cadenza": "giornaliera",
+   "ora": "13:15",
+   "priorita": "consigliato",
+   "nota": "Con un pasto che contiene grassi"
+  },
+  {
+   "nome": "Omega-3 da microalghe",
+   "dose": "250–500 mg EPA+DHA",
+   "cadenza": "giornaliera",
+   "ora": "13:15",
+   "priorita": "consigliato"
+  },
+  {
+   "nome": "Noci brasiliane (selenio)",
+   "dose": "1–2",
+   "cadenza": "giornaliera",
+   "ora": "16:30",
+   "priorita": "cibo",
+   "nota": "Mai più di 3–4 al giorno"
+  }
+ ],
+ "diario_campi": [
+  {
+   "id": "peso",
+   "label": "Peso",
+   "tipo": "num",
+   "unita": "kg",
+   "core": true,
+   "nota": "Mattina, dopo il bagno, prima di bere"
+  },
+  {
+   "id": "kcal",
+   "label": "Calorie",
+   "tipo": "num",
+   "unita": "kcal",
+   "core": true
+  },
+  {
+   "id": "p",
+   "label": "Proteine",
+   "tipo": "num",
+   "unita": "g",
+   "core": true
+  },
+  {
+   "id": "acqua",
+   "label": "Acqua",
+   "tipo": "num",
+   "unita": "L",
+   "core": true
+  },
+  {
+   "id": "coca",
+   "label": "Coca Zero",
+   "tipo": "num",
+   "unita": "lattine",
+   "core": true
+  },
+  {
+   "id": "passi",
+   "label": "Passi",
+   "tipo": "num",
+   "unita": "",
+   "core": true
+  },
+  {
+   "id": "sonno",
+   "label": "Sonno",
+   "tipo": "num",
+   "unita": "h",
+   "core": true
+  },
+  {
+   "id": "allenamento",
+   "label": "Allenamento",
+   "tipo": "bool",
+   "core": true
+  },
+  {
+   "id": "fame",
+   "label": "Fame",
+   "tipo": "scala",
+   "core": false
+  },
+  {
+   "id": "energia",
+   "label": "Energia",
+   "tipo": "scala",
+   "core": false
+  },
+  {
+   "id": "aderenza",
+   "label": "Aderenza",
+   "tipo": "aderenza",
+   "core": false
+  },
+  {
+   "id": "gi",
+   "label": "Sintomi gastrointestinali",
+   "tipo": "bool",
+   "core": false
+  }
+ ],
+ "misure": [
+  {
+   "id": "vita",
+   "label": "Vita (ombelico)",
+   "base": 89,
+   "chiave": true,
+   "x": 50,
+   "y": 46,
+   "target": 79
+  },
+  {
+   "id": "torace",
+   "label": "Torace",
+   "base": 91,
+   "x": 50,
+   "y": 33,
+   "target": 99
+  },
+  {
+   "id": "collo",
+   "label": "Collo",
+   "base": 30,
+   "x": 50,
+   "y": 17,
+   "nota": "Rimisura: 30 cm è anomalo, la media è 37–39",
+   "target": 38
+  },
+  {
+   "id": "braccio",
+   "label": "Braccio contratto",
+   "base": null,
+   "x": 22,
+   "y": 36,
+   "target": 36
+  },
+  {
+   "id": "coscia",
+   "label": "Coscia",
+   "base": null,
+   "x": 38,
+   "y": 66,
+   "target": 55
+  },
+  {
+   "id": "fianchi",
+   "label": "Fianchi",
+   "base": null,
+   "x": 50,
+   "y": 54,
+   "target": 92
+  }
+ ],
+ "regole_calorie": [
+  {
+   "peso_kg_sett": [
+    0.1,
+    0.3
+   ],
+   "vita": "stabile",
+   "carichi": "su",
+   "azione": 0,
+   "esito": "Perfetto. Non toccare niente"
+  },
+  {
+   "peso_kg_sett": [
+    -0.05,
+    0.05
+   ],
+   "vita": "stabile",
+   "carichi": "fermi",
+   "azione": 150,
+   "esito": "Stallo su tutti i fronti: alza"
+  },
+  {
+   "peso_kg_sett": [
+    -9,
+    -0.2
+   ],
+   "vita": "giu",
+   "carichi": "fermi",
+   "azione": 200,
+   "esito": "Stai perdendo peso senza guadagnare forza"
+  },
+  {
+   "peso_kg_sett": [
+    0.4,
+    9
+   ],
+   "vita": "su",
+   "carichi": "su",
+   "azione": -150,
+   "esito": "Cresci troppo in fretta"
+  },
+  {
+   "peso_kg_sett": [
+    0.4,
+    9
+   ],
+   "vita": "su",
+   "carichi": "fermi",
+   "azione": -200,
+   "esito": "Stai accumulando solo grasso"
+  },
+  {
+   "peso_kg_sett": [
+    -0.05,
+    0.05
+   ],
+   "vita": "giu",
+   "carichi": "su",
+   "azione": 0,
+   "esito": "Ricomposizione in corso. Non toccare NIENTE"
+  }
+ ],
+ "modello": {
+  "kcal_per_kg": 7700,
+  "laf": 1.35,
+  "sigma_tdee_prior": 220,
+  "sigma_peso_giornaliero": 0.75,
+  "deriva_tdee_giorno": 6,
+  "min_giorni_calibrazione": 10,
+  "orizzonti": [
+   1,
+   7,
+   14,
+   28
+  ],
+  "fonte": "tabella",
+  "nota": "TDEE iniziale da Mifflin-St Jeor × LAF; poi ricalibrato sul bilancio energetico osservato. 7700 kcal/kg è la densità del tessuto adiposo: vale per il grasso, non per la massa magra."
+ },
+ "target_fisico": {
+  "nome": "Brad Pitt — Fight Club",
+  "fonte": "stima",
+  "nota": "Misure dichiarate dalla stampa, mai verificate. Il 5–6% di grasso spesso citato è condizione da gara, non mantenibile: il target operativo qui è 10%, che dà lo stesso aspetto e si può tenere tutto l'anno.",
+  "altezza_cm": 180,
+  "peso_kg": 67,
+  "bf_pct": 10,
+  "bf_pct_citato": 6,
+  "massa_magra_kg": 60,
+  "misure": {
+   "vita": 79,
+   "torace": 99,
+   "collo": 38,
+   "braccio": 36,
+   "coscia": 55,
+   "fianchi": 92
+  },
+  "rapporti": {
+   "vita_altezza": 0.44,
+   "torace_vita": 1.25
+  },
+  "chiave": "A parità di altezza il peso è quasi identico a quello di partenza. Non è un obiettivo di dimagrimento: è uno scambio di circa 6 kg di grasso con 6 kg di muscolo. La bilancia è lo strumento sbagliato per accorgersene, il metro è quello giusto."
+ }
+}

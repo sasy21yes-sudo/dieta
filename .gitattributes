@@ -1,0 +1,3 @@
+# nel repo sempre LF: questi file finiscono su un web server
+* text=auto eol=lf
+*.png binary
