@@ -51,7 +51,7 @@ function load() {
     vecchio, scritto da una versione che certe chiavi non le aveva. */
 function normalize() {
   S.log ||= {}; S.spesa ||= {}; S.settings ||= { start: today() };
-  S.model ||= {}; S.model.prev ||= [];
+  S.model ||= {}; S.model.prev ||= []; S.prodotti ||= [];
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
@@ -71,11 +71,19 @@ function addM(a, b, k = 1) {
   return a;
 }
 function foodM(nome, qta) {
-  const a = D.alimenti[nome]; if (!a) return M0();
+  const a = alimento(nome); if (!a) return M0();   // rispetta i prodotti reali
   const m = M0(); return addM(m, a, qta / 100);
 }
 function mealM(code) {
   const p = D.pasti[code]; if (!p) return M0();
+  // I macro del piano sono precalcolati e verificati a monte: si usano cosi'
+  // come sono. L'unica eccezione e' un ingrediente per cui l'utente ha
+  // registrato il prodotto vero letto in etichetta — li' la stima va superata.
+  if (p.ingredienti && p.ingredienti.some(i => overrideDi(i.alimento))) {
+    const m = M0();
+    for (const i of p.ingredienti) addM(m, foodM(i.alimento, i.qta));
+    return m;
+  }
   return { ...p.macro };
 }
 /** Macro effettivamente consumate: pasti spuntati + extra fuori piano. */
@@ -91,12 +99,13 @@ function dayTarget(k) { return D.settimana[dayIdx(k)].totali; }
 /* --------------------------------------------------- motore sostituzioni */
 /** Trova alimenti della stessa categoria che replicano il macro dominante. */
 function swaps(nome, qta, n = 5) {
-  const a = D.alimenti[nome]; if (!a) return [];
+  const a = alimento(nome); if (!a) return [];
   const src = foodM(nome, qta);
   // se >20% delle calorie viene da proteine, la proteina è il vincolo
   const dom = a.kcal && (a.p * 4) / a.kcal > 0.2 ? 'p' : 'kcal';
   const out = [];
-  for (const [k, v] of Object.entries(D.alimenti)) {
+  for (const k of Object.keys(D.alimenti)) {
+    const v = alimento(k);
     if (k === nome || v.categoria !== a.categoria) continue;
     if (!v[dom]) continue;
     const q = (src[dom] / v[dom]) * 100;
@@ -478,9 +487,11 @@ function backupBanner(v) {
 
 /* --------------------------------------------------------------- router */
 const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
-                 analisi: viewAnalisi, spesa: viewSpesa };
+                 dati: viewDati, analisi: viewAnalisi, spesa: viewSpesa,
+                 prodotti: viewProdotti, foto: viewFoto };
 const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
-                 analisi: 'Analisi', spesa: 'Spesa' };
+                 dati: 'Dati', analisi: 'Analisi', spesa: 'Spesa',
+                 prodotti: 'Prodotti', foto: 'Foto' };
 
 function route() {
   const name = (location.hash.replace('#/', '') || 'oggi').split('?')[0];
@@ -1278,6 +1289,14 @@ function sheetMenu() {
   mk('Scarica i promemoria (.ics)',
      'iOS non permette a una web app di programmare notifiche locali. Questo file crea gli eventi ricorrenti nel Calendario: pasti, integratori, pesata e revisione domenicale. Aprilo una volta e le notifiche arrivano native, senza server.',
      () => { download('dieta-promemoria.ics', icsFile(), 'text/calendar'); toast('Aprilo con Calendario'); });
+
+  mk('Prodotti e codici a barre',
+     'Registra i prodotti che compri davvero, con i valori letti in etichetta. Collegandoli al piano, l\'app smette di usare le stime.',
+     () => { closeSheet(); location.hash = '#/prodotti'; });
+
+  mk('Foto dei progressi',
+     'Uno scatto al giorno nella stessa posa. Restano sul telefono e non entrano nel backup JSON: sono troppo grandi.',
+     () => { closeSheet(); location.hash = '#/foto'; });
 
   mk('Esporta backup', 'La memoria del browser può essere svuotata, e non esiste '
      + 'copia altrove. È l\'unico modo per non perdere lo storico.'

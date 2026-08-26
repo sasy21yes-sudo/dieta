@@ -64,8 +64,14 @@ Ricordarlo all'utente ogni ~20 giorni di log.
 ```
 index.html      guscio: topbar, <main>, tab bar, sheet modale
 style.css       design system (variabili CSS, tema chiaro/scuro automatico)
-app.js          tutto: stato, router, viste, motori
-sw.js           cache offline; rete-prima sui dati, cache-prima sul guscio
+viz.css         tavolozza dei grafici + componenti di Dati, Prodotti, Foto
+app.js          stato, router, viste principali, motori. Caricato PER ULTIMO:
+                costruisce ROUTES e chiama init(), quindi le viste degli altri
+                file devono gia' esistere
+charts.js       toolkit SVG dei grafici + vista Dati
+prodotti.js     prodotti reali, codici a barre, override degli alimenti
+foto.js         foto dei progressi (IndexedDB) + timelapse
+sw.js           cache offline; rete-prima su tutto, cache come riserva
 manifest.json   PWA
 data/dieta.json IL DOMINIO — vedi sotto
 icons/          180 (apple-touch), 192, 512, maskable
@@ -111,9 +117,42 @@ non un dettaglio.
   target si sovrappone tratteggiata); tabelle ora/target/manca; grafico peso con
   media mobile a 7 giorni e previsione tratteggiata
 - **Previsione** — motore adattivo del dispendio (vedi sotto)
+- **Dati** — cruscotto: 4 riquadri statistici, calendario della costanza e 14
+  grafici (peso, calorie, proteine, ripartizione dei macro, fibre, passi, sonno,
+  acqua, Coca Zero, fame/energia, misure, composizione, dispendio stimato,
+  errore delle previsioni), con selettore di periodo 7/30/90/180 giorni
+- **Prodotti** — registro dei prodotti reali con i valori letti in etichetta;
+  lettura del codice a barre dove il browser la supporta, con ricerca opzionale
+  su Open Food Facts. Collegando un prodotto a un alimento del piano, i suoi
+  valori **sostituiscono la stima ovunque**: pasti, sostituzioni, analisi,
+  previsione
+- **Foto** — uno scatto al giorno per posa (fronte/lato/schiena), confronto
+  primo/ultimo e timelapse sfogliabile. Stanno in IndexedDB, compresse a 1280 px
 - **Analisi** — motore a regole "cosa sto sbagliando" (vedi sotto)
 - **Spesa** — fabbisogno settimanale aggregato per categoria, con spunta
 - **Impostazioni** — generatore `.ics`, export/import backup JSON
+
+### I grafici
+
+La tavolozza in `viz.css` **non e' stata scelta a occhio**: e' passata dal
+validatore della skill dataviz su tutti i controlli, in entrambi i temi —
+banda di luminosita', soglia di croma, separazione per daltonismo su tutte le
+coppie, soglia a vista normale, contrasto sulla superficie. Se la si cambia, va
+rivalidata.
+
+Regole che il toolkit applica e che non vanno violate:
+
+- **Un asse solo.** Mai due scale y sullo stesso grafico: l'allineamento fra le
+  due e' arbitrario e inventa correlazioni che nei dati non ci sono
+- **Tre categorici al massimo**, e solo dove le serie SONO il soggetto (macro,
+  composizione). Tutto il resto e' a serie singola e usa `--pine`
+- **Piu' serie con una sola che conta** -> evidenza (una in accento, le altre
+  grigie) piu' etichetta diritta, non tre colori
+- **Valori di scala tondi** via `niceTicks()`: dividere l'intervallo in parti
+  uguali produce due etichette "2" per numeri diversi
+- **La lettura e' al tocco**, non al passaggio del mouse: su un telefono non
+  esiste. La riga `.read` sotto il grafico e' il tooltip
+- Un grafico senza dati **dice che mancano i dati**, non disegna una scatola vuota
 
 ### Il motore di previsione
 
@@ -179,19 +218,20 @@ In ordine di rapporto valore/sforzo.
    Quando tutte le serie toccano il tetto del range a RIR ≤2, proporre +2,5 kg (parte
    alta) o +5 kg (parte bassa). Alimenterebbe automaticamente il campo "carichi"
    dell'analisi, oggi manuale
-2. **Scanner codice a barre** — `BarcodeDetector` funziona in Safari 17+; in fallback
-   `ZXing`. Serve a sostituire le stime dei prodotti confezionati con i valori veri
-3. **Revisione settimanale** — schermata domenicale con tutte le medie a confronto
+2. **Revisione settimanale** — schermata domenicale con tutte le medie a confronto
    con la settimana precedente
-4. **Rampa fibre** — l'utente parte da ~15-20 g e il piano ne prevede 38. Avvisare se
+3. **Rampa fibre** — l'utente parte da ~15-20 g e il piano ne prevede 38. Avvisare se
    il salto settimanale supera i 5 g
-5. **Modifica porzioni** — scalare un pasto con un moltiplicatore e ricalcolare
-6. **Push reale** via Cloudflare Worker, solo se i promemoria da Calendario non bastano
+4. **Modifica porzioni** — scalare un pasto con un moltiplicatore e ricalcolare
+5. **Push reale** via Cloudflare Worker, solo se i promemoria da Calendario non bastano
 
 ## Cose da non fare
 
-- Non aggiungere un framework: l'app è ~1200 righe, un bundler la renderebbe solo
-  più difficile da modificare dal telefono
+- Non aggiungere un framework né una libreria di grafici: i grafici sono SVG
+  costruito a mano proprio per non introdurre un build step. L'app è divisa in
+  più file per restare modificabile dal telefono, non per essere impacchettata
+- Non mettere le foto nel backup JSON: sono in IndexedDB perché in localStorage
+  non ci starebbero. Vanno salvate a parte, e l'app deve dirlo
 - Non spostare i dati nutrizionali dentro il codice
 - Non introdurre un punteggio "cibo buono / cibo cattivo"
 - Non aggiungere obiettivi di peso a scadenza né conti alla rovescia

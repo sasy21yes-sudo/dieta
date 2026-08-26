@@ -1,0 +1,109 @@
+/* ============================================================ tavolozza
+   Colori dei grafici. Non scelti a occhio: validati sui sei controlli
+   (banda di luminosita', soglia di croma, separazione per daltonismo su
+   tutte le coppie, soglia a vista normale, contrasto sulla superficie).
+   I tre categorici servono solo dove le serie SONO il soggetto: macro,
+   composizione corporea. Tutto il resto e' a serie singola e usa --pine,
+   che e' l'accento dell'app.
+   ------------------------------------------------------------------- */
+:root{
+  --c1:#2a78d6; --c2:#eb6834; --c3:#1baf7a;          /* categorici */
+  --s1:#8FBFB0; --s2:#5DA08D; --s3:#357A6A; --s4:#12594A;  /* sequenziale */
+  --grid:#EDF1F4;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --c1:#3987e5; --c2:#d95926; --c3:#199e70;
+    --s1:#35796A; --s2:#45947E; --s3:#57AF94; --s4:#6FC8AA;
+    --grid:#1B242A;
+  }
+}
+
+/* ---------------- riquadri statistici ---------------- */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px}
+.tile{background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+  padding:11px 12px;min-width:0}
+.tile .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.tile .v{font-size:25px;font-weight:600;letter-spacing:-.02em;line-height:1.15;
+  margin-top:3px;font-variant-numeric:tabular-nums}
+.tile .v em{font-style:normal;font-size:12px;color:var(--ink-3);
+  font-weight:400;margin-left:3px}
+.tile .d{font-family:var(--mono);font-size:11px;margin-top:1px}
+.tile .d.up{color:var(--pine)} .tile .d.dn{color:var(--alert)}
+.tile .d.flat{color:var(--ink-3)}
+.tile svg{margin-top:5px;display:block;width:100%;height:22px}
+
+/* ---------------- carta del grafico ---------------- */
+.cw{background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+  padding:13px 13px 11px;margin-bottom:12px}
+.cw h3{font-family:var(--serif);font-size:15.5px;font-weight:700;margin:0;
+  letter-spacing:-.01em}
+.cw .sub{font-size:11.5px;color:var(--ink-3);margin:3px 0 9px;line-height:1.4}
+.cw svg{width:100%;height:auto;display:block;overflow:visible}
+.cw .note{font-size:11px;color:var(--ink-3);margin:7px 0 0;line-height:1.4}
+/* riga di lettura: sostituisce il tooltip al passaggio del mouse, che su
+   un telefono non esiste. Si tocca il grafico e il valore compare qui. */
+.read{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);
+  min-height:17px;margin-top:6px;display:flex;gap:10px;flex-wrap:wrap}
+.read b{color:var(--ink);font-weight:600}
+.read .ph{color:var(--ink-3)}
+
+/* ---------------- legenda ---------------- */
+.leg{display:flex;flex-wrap:wrap;gap:12px;margin:8px 0 0;
+  font-size:11.5px;color:var(--ink-2)}
+.leg span{display:flex;align-items:center;gap:5px}
+.leg i{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none}
+
+/* ---------------- calendario ---------------- */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:4px}
+.cal i{aspect-ratio:1;border-radius:3px;background:var(--wash);
+  border:1px solid var(--rule);display:block}
+.cal i[data-l="1"]{background:var(--s1);border-color:transparent}
+.cal i[data-l="2"]{background:var(--s2);border-color:transparent}
+.cal i[data-l="3"]{background:var(--s3);border-color:transparent}
+.cal i[data-l="4"]{background:var(--s4);border-color:transparent}
+.cal i[data-today]{outline:2px solid var(--ink);outline-offset:1px}
+.caldays{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;
+  font-family:var(--mono);font-size:9px;color:var(--ink-3);text-align:center;
+  margin-bottom:3px}
+.calscale{display:flex;align-items:center;gap:5px;margin-top:9px;
+  font-family:var(--mono);font-size:10px;color:var(--ink-3)}
+.calscale i{width:11px;height:11px;border-radius:3px;display:block}
+
+/* ---------------- prodotti ---------------- */
+.prod{display:flex;align-items:center;gap:11px;padding:11px 0;
+  border-bottom:1px solid var(--rule);width:100%;background:none;border-left:0;
+  border-right:0;border-top:0;text-align:left;font:inherit;color:inherit;
+  cursor:pointer}
+.prod:last-child{border-bottom:0}
+.prod .nm{font-weight:600;font-size:14px}
+.prod .mt{font-size:11.5px;color:var(--ink-3);font-family:var(--mono);
+  margin-top:2px}
+.prod .kc{font-family:var(--mono);font-size:13px;text-align:right;flex:none}
+#scanbox{width:100%;border-radius:11px;background:#000;aspect-ratio:4/3;
+  object-fit:cover;display:block}
+.scanwrap{position:relative;margin-bottom:10px}
+.scanwrap .aim{position:absolute;inset:22% 12%;border:2px solid #fff;
+  border-radius:9px;opacity:.75;pointer-events:none}
+
+/* ---------------- foto ---------------- */
+.shots{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.shots figure{margin:0;position:relative;aspect-ratio:3/4;border-radius:9px;
+  overflow:hidden;background:var(--wash);border:1px solid var(--rule)}
+.shots img{width:100%;height:100%;object-fit:cover;display:block}
+.shots figcaption{position:absolute;left:0;right:0;bottom:0;
+  font-family:var(--mono);font-size:9.5px;color:#fff;padding:8px 5px 3px;
+  background:linear-gradient(transparent,rgba(0,0,0,.72));text-align:center}
+.lapse{border-radius:12px;overflow:hidden;background:var(--wash);
+  border:1px solid var(--rule);aspect-ratio:3/4;max-height:56vh;
+  margin:0 auto 10px;display:flex;align-items:center;justify-content:center}
+.lapse img{width:100%;height:100%;object-fit:contain;display:block}
+.lapsebar{display:flex;align-items:center;gap:10px}
+.lapsebar input[type=range]{flex:1;accent-color:var(--pine)}
+.posebar{display:flex;gap:6px;margin-bottom:10px}
+.posebar button{flex:1}
+
+/* sei schede invece di cinque: il testo va stretto */
+#tabbar a{font-size:10px;letter-spacing:.02em;padding-left:0;padding-right:0}
