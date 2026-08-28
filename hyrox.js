@@ -243,8 +243,64 @@ function volumeHyrox(days) {
   return out;
 }
 
-/* ================================================================= vista */
-let hxTab = 'gara';
+/* ------------------------------------------------------- capacita' fisica */
+/**
+ * Che atleta sei adesso, letto dai dati che l'app ha gia': i massimali della
+ * palestra, il lavoro aerobico registrato, i record di stazione. Serve al
+ * programma: a chi ha gambe deboli non si danno altre ripetute, si da' forza.
+ *
+ * Le soglie sono rapporti di uso comune (massimale su peso corporeo), non
+ * misure su di te: servono a dire "molto sotto / in linea / sopra", non a
+ * dare un voto.
+ */
+function capacitaFisica(k = today()) {
+  const peso = lastWeight() ?? D.profilo.peso_iniziale_kg;
+  const meglio = ids => {
+    let v = 0, chi = null;
+    for (const id of ids) {
+      if (typeof e1rmPerSeduta !== 'function') break;
+      const s = e1rmPerSeduta(id);
+      if (!s.length) continue;
+      const m = Math.max(...s.map(x => x.v));
+      if (m > v) { v = m; chi = id; }
+    }
+    return v ? { kg: v, rap: v / peso, id: chi } : null;
+  };
+  const fascia = (r, lo, hi) => r == null ? null : r < lo ? 'debole' : r > hi ? 'forte' : 'in linea';
+
+  const gambe = meglio(['squat', 'leg-press', 'stacco', 'hip-thrust', 'affondi']);
+  const tirata = meglio(['rematore', 'trazioni', 'lat-machine', 'pulley', 'stacco']);
+
+  /* motore aerobico: minuti di corsa e lavoro compromesso nelle ultime 4 settimane */
+  let minAer = 0;
+  for (const d of span(28, k)) {
+    const s = HXS().sessioni[d];
+    if (!s || !s.fatto) continue;
+    const a = HX.allenamenti.find(x => x.id === s.id);
+    if (a && ['corsa', 'compromesso', 'simulazione'].includes(a.tipo))
+      minAer += s.durata || a.durata || 0;
+  }
+  const perSett = minAer / 4;
+  const passi = avg(span(28, k).map(d => S.log[d]?.passi).filter(x => x != null));
+
+  const ct = typeof caricoTrend === 'function' ? caricoTrend(k) : { stato: null };
+
+  return {
+    peso,
+    gambe: gambe ? { ...gambe, fascia: fascia(gambe.rap, 1.2, 1.8) } : null,
+    tirata: tirata ? { ...tirata, fascia: fascia(tirata.rap, 0.8, 1.2) } : null,
+    aerobico: { minSett: perSett,
+                fascia: perSett < 90 ? 'debole' : perSett > 180 ? 'forte' : 'in linea' },
+    passi, carichi: ct.stato,
+    dati: !!(gambe || tirata || perSett > 0)
+  };
+}
+
+/* ================================================================= viste */
+/* Tre sezioni, non sei: il conto alla rovescia sta sempre in testa, il piano
+   dice cosa fare, le stazioni dicono a che punto sei e da li' parte la
+   simulazione. Tutto il resto era navigazione in piu'. */
+let hxTab = 'piano';
 
 function viewHyrox(v) {
   if (!HX) { v.append(el('div', 'card', '<p class="muted">Dati HYROX non caricati.</p>')); return; }
@@ -252,13 +308,13 @@ function viewHyrox(v) {
   const wrap = el('div', 'hx');
   v.append(wrap);
 
-  /* ---- testata ---- */
   const gg = giorniAllaGara();
+  const P = pacing(h.profilo.target_min * 60);
+  const prev = previsioneFinish();
+
   const hero = el('div', 'hx-hero');
   hero.append(el('div', 'hx-kicker', 'Road to'));
   hero.append(el('div', 'hx-logo', 'HYROX'));
-  const P = pacing(h.profilo.target_min * 60);
-  const prev = previsioneFinish();
   hero.append(el('div', 'hx-clock',
     gg == null ? '<span class="hx-set">Imposta la data della gara</span>'
     : gg > 0 ? `<b>${gg}</b><span>giorn${gg === 1 ? 'o' : 'i'} alla gara</span>`
@@ -270,33 +326,194 @@ function viewHyrox(v) {
      <div><span>Target</span><b>${hms(h.profilo.target_min * 60)}</b></div>
      <div><span>Previsto</span><b>${prev ? hms(prev.sec) : '—'}</b></div>`;
   hero.append(dati);
-  const bimp = el('button', 'hx-btn', 'Imposta gara e target');
+  const bimp = el('button', 'hx-btn', 'Imposta gara, target e attrezzatura');
   bimp.onclick = () => sheetGara();
   hero.append(bimp);
   wrap.append(hero);
 
-  /* ---- navigazione interna ---- */
   const nav = el('div', 'hx-tabs');
-  for (const [id, lab] of [['gara', 'Gara'], ['stazioni', 'Stazioni'], ['piano', 'Piano'],
-                           ['sim', 'Simulazioni'], ['dati', 'Dati'], ['check', 'Race day']]) {
+  for (const [id, lab] of [['piano', 'Il piano'], ['stazioni', 'Stazioni'], ['gara', 'Giorno della gara']]) {
     const b = el('button', hxTab === id ? 'on' : null, lab);
     b.onclick = () => { hxTab = id; route(); };
     nav.append(b);
   }
   wrap.append(nav);
 
-  ({ gara: hxGara, stazioni: hxStazioni, piano: hxPiano,
-     sim: hxSim, dati: hxDati, check: hxCheck }[hxTab])(wrap, h, P, prev);
+  ({ piano: hxPiano, stazioni: hxStazioni, gara: hxGara }[hxTab])(wrap, h, P, prev);
 }
 
-/* ------------------------------------------------------------ scheda gara */
+/* ----------------------------------------------------------- 1. IL PIANO */
+function hxPiano(w, h) {
+  const cap = capacitaFisica();
+  const pw = pianoSettimana();
+
+  /* che atleta sei */
+  const cc = el('div', 'hx-card');
+  cc.append(el('div', 'hx-h', 'Da dove parti'));
+  if (!cap.dati) {
+    cc.append(el('p', 'hx-p',
+      'Non ho ancora abbastanza dati per tararti addosso il programma. Registra qualche seduta in Gym e segna gli allenamenti qui: da lì leggo forza delle gambe, forza di tirata e motore aerobico, e il programma cambia di conseguenza.'));
+  } else {
+    const riga = (nome, o, testo) => {
+      const r = el('div', 'hx-gap' + (o?.fascia === 'forte' ? ' ok' : o?.fascia === 'in linea' ? ' plain' : ''));
+      r.innerHTML = `<span class="nm">${esc(nome)}</span>
+        <span class="v">${esc(testo)}</span>
+        <span class="d">${o?.fascia ? esc(o.fascia) : '—'}</span>`;
+      cc.append(r);
+    };
+    riga('Forza gambe', cap.gambe, cap.gambe
+      ? `${nf(cap.gambe.kg, 0)} kg · ${nf(cap.gambe.rap, 2)}× peso` : 'nessun dato');
+    riga('Forza di tirata', cap.tirata, cap.tirata
+      ? `${nf(cap.tirata.kg, 0)} kg · ${nf(cap.tirata.rap, 2)}× peso` : 'nessun dato');
+    riga('Motore aerobico', cap.aerobico, `${nf(cap.aerobico.minSett)} min/sett`);
+    if (cap.carichi) {
+      const r = el('div', 'hx-gap plain');
+      r.innerHTML = `<span class="nm">Carichi in palestra</span>
+        <span class="v">${cap.carichi === 'su' ? 'in salita' : cap.carichi === 'giu' ? 'in calo' : 'fermi'}</span>
+        <span class="d"></span>`;
+      cc.append(r);
+    }
+    cc.append(el('p', 'hx-note',
+      'Le soglie sono rapporti di uso comune fra massimale e peso corporeo, non misure su di te: dicono "molto sotto / in linea / sopra", non danno un voto. Cinque stazioni su otto stanno in piedi sulle gambe, tre sulla tirata.'));
+  }
+  w.append(cc);
+
+  /* fase e attrezzatura */
+  const fc = el('div', 'hx-card');
+  fc.append(el('div', 'hx-h', 'Fase: ' + pw.fase.nome));
+  const sett = settimaneAllaGara();
+  fc.append(el('p', 'hx-p',
+    (sett != null ? `${sett} settiman${sett === 1 ? 'a' : 'e'} alla gara. ` : 'Nessuna data impostata. ')
+    + esc(pw.fase.nota)));
+  const perche = [];
+  if (pw.deboli.length) perche.push('insiste su '
+    + pw.deboli.map(id => esc(stazione(id)?.nome.toLowerCase() || id)).join(', ')
+    + ', dove perdi piu\' tempo');
+  if (cap.gambe?.fascia === 'debole') perche.push('aggiunge forza gambe, che regge cinque stazioni su otto');
+  if (cap.tirata?.fascia === 'debole') perche.push('aggiunge forza di tirata per slitta, rowing e ski');
+  if (cap.aerobico.fascia === 'debole') perche.push('aggiunge corsa: sotto i 90 minuti a settimana il motore non regge otto chilometri');
+  if (perche.length) fc.append(el('p', 'hx-note',
+    'Il programma di questa settimana ' + perche.join('; ') + '.'));
+  const mancano = HX.attrezzatura.filter(a => !hoAttrezzo(a.id));
+  if (mancano.length) fc.append(el('p', 'hx-note',
+    'Non hai ' + mancano.map(a => esc(a.nome.toLowerCase())).join(', ')
+    + ': scelgo solo fra quello che puoi fare, e dove serve uso le sedute di ripiego.'));
+  w.append(fc);
+
+  /* la settimana */
+  const sc = el('div', 'hx-card');
+  sc.append(el('div', 'hx-h', 'Questa settimana'));
+  for (const a of pw.sessioni) {
+    const fatta = Object.entries(h.sessioni).some(([k2, x]) =>
+      x.id === a.id && x.fatto && k2 >= addDays(today(), -6));
+    const r = el('button', 'hx-sess' + (a.mirato ? ' mirato' : '') + (fatta ? ' fatta' : ''));
+    r.innerHTML = `<span class="tp">${esc(a.tipo)}${a.ripiego ? ' · ripiego' : ''}</span>
+      <span class="nm">${fatta ? '✓ ' : ''}${esc(a.nome)}</span>
+      <span class="du">${a.durata}'</span>`;
+    r.onclick = () => sheetAllenamento(a);
+    sc.append(r);
+  }
+  sc.append(el('p', 'hx-note',
+    'Sette proposte per una settimana: prendine quante ne reggi, non tutte. Il volume che non recuperi non allena, affatica soltanto.'));
+  w.append(sc);
+
+  const lc = el('div', 'hx-card');
+  lc.append(el('div', 'hx-h', 'Tutti gli allenamenti'));
+  for (const a of HX.allenamenti.filter(fattibile)) {
+    const r = el('button', 'hx-sess');
+    r.innerHTML = `<span class="tp">${esc(a.tipo)}${a.ripiego ? ' · ripiego' : ''}</span>
+      <span class="nm">${esc(a.nome)}</span><span class="du">${a.durata}'</span>`;
+    r.onclick = () => sheetAllenamento(a);
+    lc.append(r);
+  }
+  w.append(lc);
+}
+
+/* --------------------------------------------------------- 2. STAZIONI */
+function hxStazioni(w, h) {
+  const std = (HX.standard[h.profilo.categoria] || HX.standard.open)[h.profilo.sesso] || {};
+  const P = pacing(h.profilo.target_min * 60);
+
+  const c = el('div', 'hx-card');
+  c.append(el('div', 'hx-h', 'Le otto stazioni'));
+  c.append(el('p', 'hx-p', 'Tocca una stazione per il tuo tempo migliore, lo standard della categoria e come sostituirla se ti manca l\'attrezzo.'));
+  const grid = el('div', 'hx-grid');
+  for (const [i, st] of stazioni().entries()) {
+    const mio = h.pb[st.id], tgt = P.righe.find(r => r.id === st.id)?.target;
+    const t = el('button', 'hx-tile' + (mio ? ' has' : ''));
+    t.innerHTML = `<span class="n">0${i + 1}</span>
+      <span class="nm">${esc(st.breve)}</span>
+      <span class="ms">${esc(st.misura)}</span>
+      <span class="pb">${mio ? mmss(mio) : '—'}</span>
+      <span class="tg">target ${mmss(tgt)}</span>
+      <span class="st">${esc(std[st.id] || '')}${hoAttrezzo(st.richiede) ? '' : ' · non l\'hai'}</span>`;
+    t.onclick = () => sheetStazione(st);
+    grid.append(t);
+  }
+  c.append(grid);
+  c.append(el('p', 'hx-note', esc(HX.meta.verifica)));
+  w.append(c);
+
+  /* simulazione */
+  const sc = el('div', 'hx-card');
+  sc.append(el('div', 'hx-h', 'Simulazione'));
+  sc.append(el('p', 'hx-p',
+    'La gara intera a cronometro e\' un test, non un allenamento: al massimo ogni 4-6 settimane, e va recuperata come una gara. La mezza costa molto meno e dice quasi le stesse cose. I tempi che registri aggiornano i record da soli.'));
+  const b = el('button', 'hx-btn', 'Registra una simulazione completa');
+  b.onclick = () => sheetSim(null);
+  sc.append(b);
+  w.append(sc);
+
+  const sims = h.sim.slice().sort((a, b2) => b2.data.localeCompare(a.data));
+  for (const s of sims) {
+    const box = el('div', 'hx-card');
+    const corsa = (s.corse || []).reduce((a, x) => a + (x || 0), 0);
+    const staz = Object.values(s.stazioni || {}).reduce((a, x) => a + (x || 0), 0);
+    const rox = Math.max(0, (s.totale || 0) - corsa - staz);
+    box.append(el('div', 'hx-h', `${s.tipo === 'intera' ? 'Intera' : 'Mezza'} · ${s.data}`));
+    box.append(el('div', 'hx-big', hms(s.totale)));
+    const q = el('div', 'hx-quote');
+    q.innerHTML = `<div><span>Corsa</span><b>${hms(corsa)}</b><em>${nf(corsa / (s.totale || 1) * 100)}%</em></div>
+      <div><span>Stazioni</span><b>${hms(staz)}</b><em>${nf(staz / (s.totale || 1) * 100)}%</em></div>
+      <div><span>Roxzone</span><b>${hms(rox)}</b><em>${nf(rox / (s.totale || 1) * 100)}%</em></div>`;
+    box.append(q);
+    const dg = degradoCorsa(s);
+    if (dg) {
+      box.append(el('p', 'hx-note',
+        `Corsa compromessa: dal primo all'ultimo chilometro hai perso <strong>${mmss(Math.abs(dg.delta))}</strong> `
+        + `(${dg.perGiro >= 0 ? '+' : '−'}${Math.abs(dg.perGiro).toFixed(0)} s a giro). `
+        + (Math.abs(dg.perGiro) < 6 ? 'Degrado contenuto: il ritmo di partenza era sostenibile.'
+          : 'Degrado alto: quasi sempre significa primi due chilometri troppo veloci, non mancanza di motore.')));
+      box.append(chartBars({
+        titolo: 'Le otto corse', sub: 'Tempo di ogni chilometro, nell\'ordine di gara.',
+        days: (s.corse || []).map((_, i) => 'Corsa ' + (i + 1)), vals: s.corse, unit: 's', dec: 0
+      }));
+    }
+    const mod = el('button', 'hx-btn ghost', 'Modifica o elimina');
+    mod.onclick = () => sheetSim(s);
+    box.append(mod);
+    w.append(box);
+  }
+
+  const conStaz = h.sim.filter(s => s.stazioni && Object.keys(s.stazioni).length)
+    .sort((a, b) => a.data.localeCompare(b.data));
+  if (conStaz.length >= 2)
+    w.append(chartEmphasis({
+      titolo: 'Stazioni nel tempo', sub: 'In evidenza quella dove perdi piu\' tempo.',
+      days: conStaz.map(s => s.data), unit: 's', dec: 0,
+      serie: gapStazioni().slice(0, 4).map((g, i) => ({
+        nome: g.breve.toLowerCase(), forte: i === 0,
+        vals: conStaz.map(s => s.stazioni[g.id] || null) }))
+    }));
+}
+
+/* --------------------------------------------------- 3. GIORNO DELLA GARA */
 function hxGara(w, h, P, prev) {
-  /* previsione */
   const c = el('div', 'hx-card');
   c.append(el('div', 'hx-h', 'Tempo previsto'));
   if (!prev) {
     c.append(el('p', 'hx-p',
-      'Servono almeno quattro record di stazione, oppure una simulazione intera. Registra qualcosa nella scheda Stazioni e la previsione compare.'));
+      'Servono almeno quattro record di stazione, oppure una simulazione intera. Registrali nella scheda Stazioni.'));
   } else {
     c.append(el('div', 'hx-big', hms(prev.sec)));
     const d = prev.sec - h.profilo.target_min * 60;
@@ -306,12 +523,19 @@ function hxGara(w, h, P, prev) {
       tendenza: `Dalla tendenza delle tue ${prev.n} simulazioni intere, proiettata al giorno della gara${prev.secSett ? ` (${prev.secSett <= 0 ? '−' : '+'}${mmss(Math.abs(prev.secSett))} a settimana)` : ''}.`,
       unica: 'Da una sola simulazione: e\' un punto, non una tendenza.',
       ultima: 'Dall\'ultima simulazione registrata.',
-      montaggio: `Montato dai tuoi ${prev.n} record di stazione piu' una stima delle corse, con un +8% di penale. I record si fanno a freddo e da soli: in gara ogni stazione costa di piu', e sommare i migliori senza penale darebbe un numero che non vedrai mai.`
+      montaggio: `Montato dai tuoi ${prev.n} record di stazione piu' una stima delle corse, con un +8% di penale: i record si fanno a freddo e da soli, in gara ogni stazione costa di piu'.`
     }[prev.metodo]));
   }
   w.append(c);
 
-  /* piano dei passaggi */
+  const sims = h.sim.filter(s => s.totale > 0).sort((a, b) => a.data.localeCompare(b.data));
+  if (sims.length >= 2)
+    w.append(chartLine({
+      titolo: 'Come stai andando', sub: 'Ogni punto e\' una simulazione. La riga tratteggiata e\' il target.',
+      days: sims.map(s => s.data), vals: sims.map(s => s.totale / 60),
+      unit: 'min', dec: 1, target: h.profilo.target_min
+    }));
+
   const pc = el('div', 'hx-card');
   pc.append(el('div', 'hx-h', 'Piano dei passaggi'));
   pc.append(el('p', 'hx-p',
@@ -329,15 +553,13 @@ function hxGara(w, h, P, prev) {
   }
   pc.append(tb);
   pc.append(el('p', 'hx-note',
-    `Il roxzone (${mmss(P.perRox)} a stazione, ${mmss(P.perRox * 8)} in totale) e' gia' dentro i passaggi cumulati. E' il tempo piu' facile da recuperare di tutta la gara: non richiede di essere piu' forti, solo di non fermarsi.`));
+    `Roxzone ${mmss(P.perRox)} a stazione, ${mmss(P.perRox * 8)} in tutto, gia' dentro i passaggi. E' il tempo piu' facile da recuperare: non serve essere piu' forti, serve non fermarsi.`));
   w.append(pc);
 
-  /* punti deboli */
   const gaps = gapStazioni().filter(g => g.gap != null);
   if (gaps.length) {
     const gc = el('div', 'hx-card');
     gc.append(el('div', 'hx-h', 'Dove perdi piu\' tempo'));
-    gc.append(el('p', 'hx-p', 'Differenza fra il tuo record e il passo che servirebbe per il target.'));
     for (const g of gaps.slice(0, 5)) {
       const r = el('div', 'hx-gap' + (g.gap > 0 ? '' : ' ok'));
       r.innerHTML = `<span class="nm">${esc(g.nome)}</span>
@@ -345,257 +567,38 @@ function hxGara(w, h, P, prev) {
         <span class="d">${g.gap > 0 ? '+' : '−'}${mmss(Math.abs(g.gap))}</span>`;
       gc.append(r);
     }
-    const peggio = gaps[0];
-    if (peggio && peggio.gap > 0)
-      gc.append(el('p', 'hx-note',
-        `<strong>${esc(peggio.nome)}</strong> — ${esc(peggio.chiave)}`));
+    if (gaps[0]?.gap > 0)
+      gc.append(el('p', 'hx-note', `<strong>${esc(gaps[0].nome)}</strong> — ${esc(gaps[0].chiave)}`));
     w.append(gc);
   }
-}
 
-/* -------------------------------------------------------- scheda stazioni */
-function hxStazioni(w, h) {
-  const std = (HX.standard[h.profilo.categoria] || HX.standard.open)[h.profilo.sesso] || {};
-  const P = pacing(h.profilo.target_min * 60);
-  const c = el('div', 'hx-card');
-  c.append(el('div', 'hx-h', 'Le otto stazioni'));
-  c.append(el('p', 'hx-p', 'Tocca una stazione per registrare il tuo tempo migliore.'));
-  const grid = el('div', 'hx-grid');
-  for (const [i, st] of stazioni().entries()) {
-    const mio = h.pb[st.id], tgt = P.righe.find(r => r.id === st.id)?.target;
-    const t = el('button', 'hx-tile' + (mio ? ' has' : ''));
-    t.innerHTML = `<span class="n">0${i + 1}</span>
-      <span class="nm">${esc(st.breve)}</span>
-      <span class="ms">${esc(st.misura)}</span>
-      <span class="pb">${mio ? mmss(mio) : '—'}</span>
-      <span class="tg">target ${mmss(tgt)}</span>
-      <span class="st">${esc(std[st.id] || '')}</span>`;
-    t.onclick = () => sheetStazione(st);
-    grid.append(t);
-  }
-  c.append(grid);
-  w.append(c);
-
-  const sc = el('div', 'hx-card');
-  sc.append(el('div', 'hx-h', 'Standard della tua categoria'));
-  sc.append(el('p', 'hx-p',
-    `${esc((HX.categorie.find(x => x.id === h.profilo.categoria) || {}).nome)} · ${h.profilo.sesso === 'f' ? 'donne' : 'uomini'}`));
-  for (const st of stazioni()) {
-    // "plain": qui la terza colonna e' un dato di regolamento, non uno scarto.
-    // Col rosso degli scarti sembrerebbe un giudizio su un peso ufficiale.
-    const r = el('div', 'hx-gap plain');
-    r.innerHTML = `<span class="nm">${esc(st.nome)}</span>
-      <span class="v">${esc(st.misura)}</span><span class="d">${esc(std[st.id] || '—')}</span>`;
-    sc.append(r);
-  }
-  sc.append(el('p', 'hx-note', esc(HX.meta.verifica)));
-  w.append(sc);
-}
-
-/* ----------------------------------------------------------- scheda piano */
-function hxPiano(w, h) {
-  const pw = pianoSettimana();
-  const c = el('div', 'hx-card');
-  c.append(el('div', 'hx-h', 'Fase: ' + pw.fase.nome));
-  const sett = settimaneAllaGara();
-  c.append(el('p', 'hx-p',
-    (sett != null ? `${sett} settiman${sett === 1 ? 'a' : 'e'} alla gara. ` : '')
-    + esc(pw.fase.nota)));
-  if (pw.deboli.length)
-    c.append(el('p', 'hx-note', 'Il programma insiste su '
-      + pw.deboli.map(id => esc(stazione(id)?.nome.toLowerCase() || id)).join(', ')
-      + ': sono le stazioni dove perdi piu\' tempo.'));
-  w.append(c);
-
-  const sc = el('div', 'hx-card');
-  sc.append(el('div', 'hx-h', 'Settimana proposta'));
-  for (const a of pw.sessioni) {
-    const r = el('button', 'hx-sess' + (a.mirato ? ' mirato' : ''));
-    r.innerHTML = `<span class="tp">${esc(a.tipo)}${a.ripiego ? ' · ripiego' : ''}</span>
-      <span class="nm">${esc(a.nome)}</span>
-      <span class="du">${a.durata}'</span>`;
-    r.onclick = () => sheetAllenamento(a);
-    sc.append(r);
-  }
-  const mancano = HX.attrezzatura.filter(a => !hoAttrezzo(a.id));
-  if (mancano.length)
-    sc.append(el('p', 'hx-note',
-      'Non hai ' + mancano.map(a => esc(a.nome.toLowerCase())).join(', ')
-      + ': il programma sceglie solo fra gli allenamenti che puoi fare, e dove serve usa le sedute di ripiego. '
-      + esc(HX.ripiego_nota || '')));
-  sc.append(el('p', 'hx-note',
-    'Sette proposte per una settimana: prendine quante ne reggi, non tutte. Il volume che non recuperi non allena, affatica soltanto.'));
-  w.append(sc);
-
-  const lc = el('div', 'hx-card');
-  lc.append(el('div', 'hx-h', 'Catalogo completo'));
-  for (const a of HX.allenamenti) {
-    const r = el('button', 'hx-sess');
-    r.innerHTML = `<span class="tp">${esc(a.tipo)}</span>
-      <span class="nm">${esc(a.nome)}</span><span class="du">${a.durata}'</span>`;
-    r.onclick = () => sheetAllenamento(a);
-    lc.append(r);
-  }
-  w.append(lc);
-}
-
-/* ----------------------------------------------------- scheda simulazioni */
-function hxSim(w, h) {
-  const c = el('div', 'hx-card');
-  c.append(el('div', 'hx-h', 'Simulazioni'));
-  c.append(el('p', 'hx-p',
-    'Una gara intera a cronometro e\' un test, non un allenamento: al massimo ogni 4-6 settimane. La mezza costa molto meno e dice quasi le stesse cose.'));
-  const b = el('button', 'hx-btn', 'Registra una simulazione');
-  b.onclick = () => sheetSim(null);
-  c.append(b);
-  w.append(c);
-
-  const sims = h.sim.slice().sort((a, b2) => b2.data.localeCompare(a.data));
-  if (!sims.length) return;
-
-  for (const s of sims) {
-    const sc = el('div', 'hx-card');
-    const corsa = (s.corse || []).reduce((a, x) => a + (x || 0), 0);
-    const staz = Object.values(s.stazioni || {}).reduce((a, x) => a + (x || 0), 0);
-    const rox = Math.max(0, (s.totale || 0) - corsa - staz);
-    sc.append(el('div', 'hx-h', `${s.tipo === 'intera' ? 'Intera' : 'Mezza'} · ${s.data}`));
-    sc.append(el('div', 'hx-big', hms(s.totale)));
-    const q = el('div', 'hx-quote');
-    q.innerHTML = `<div><span>Corsa</span><b>${hms(corsa)}</b><em>${nf(corsa / (s.totale || 1) * 100)}%</em></div>
-      <div><span>Stazioni</span><b>${hms(staz)}</b><em>${nf(staz / (s.totale || 1) * 100)}%</em></div>
-      <div><span>Roxzone</span><b>${hms(rox)}</b><em>${nf(rox / (s.totale || 1) * 100)}%</em></div>`;
-    sc.append(q);
-
-    const dg = degradoCorsa(s);
-    if (dg) {
-      sc.append(el('p', 'hx-note',
-        `Corsa compromessa: dal primo all'ultimo chilometro hai perso <strong>${mmss(Math.abs(dg.delta))}</strong> `
-        + `(${dg.perGiro >= 0 ? '+' : '−'}${Math.abs(dg.perGiro).toFixed(0)} s a giro). `
-        + (Math.abs(dg.perGiro) < 6
-          ? 'Degrado contenuto: il ritmo di partenza era sostenibile.'
-          : 'Degrado alto: quasi sempre significa primi due chilometri troppo veloci, non mancanza di motore.')));
-      sc.append(chartBars({
-        titolo: 'Le otto corse', sub: 'Tempo di ogni chilometro, nell\'ordine di gara.',
-        days: (s.corse || []).map((_, i) => 'Corsa ' + (i + 1)),
-        vals: s.corse, unit: 's', dec: 0
-      }));
-    }
-    const del = el('button', 'hx-btn ghost', 'Modifica o elimina');
-    del.onclick = () => sheetSim(s);
-    sc.append(del);
-    w.append(sc);
-  }
-}
-
-/* ------------------------------------------------------------ scheda dati */
-function hxDati(w, h) {
-  const sims = h.sim.filter(s => s.totale > 0).sort((a, b) => a.data.localeCompare(b.data));
-
-  if (sims.length >= 2) {
-    w.append(chartLine({
-      titolo: 'Tempo di arrivo', sub: 'Ogni punto e\' una simulazione. La linea e\' la tendenza.',
-      days: sims.map(s => s.data), vals: sims.map(s => s.totale / 60),
-      unit: 'min', dec: 1,
-      note: 'In minuti. Il target e\' ' + h.profilo.target_min + ' minuti.',
-      target: h.profilo.target_min
-    }));
-  }
-
-  /* tempi di stazione nel tempo */
-  const conStaz = sims.filter(s => s.stazioni && Object.keys(s.stazioni).length);
-  if (conStaz.length >= 2) {
-    w.append(chartEmphasis({
-      titolo: 'Stazioni nel tempo', sub: 'In evidenza quella dove perdi piu\' tempo.',
-      days: conStaz.map(s => s.data), unit: 's', dec: 0,
-      serie: gapStazioni().slice(0, 4).map((g, i) => ({
-        nome: g.breve.toLowerCase(), forte: i === 0,
-        vals: conStaz.map(s => s.stazioni[g.id] || null)
-      }))
-    }));
-  }
-
-  /* ripartizione */
-  if (sims.length) {
-    w.append(chartStack({
-      titolo: 'Dove se ne va il tempo', sub: 'Corsa, stazioni e roxzone su ogni simulazione.',
-      days: sims.map(s => s.data), pct: true, unit: '%',
-      serie: [
-        { nome: 'Corsa', vals: sims.map(s => (s.corse || []).reduce((a, x) => a + (x || 0), 0)) },
-        { nome: 'Stazioni', vals: sims.map(s => Object.values(s.stazioni || {}).reduce((a, x) => a + (x || 0), 0)) },
-        { nome: 'Roxzone', vals: sims.map(s => Math.max(0, s.totale
-            - (s.corse || []).reduce((a, x) => a + (x || 0), 0)
-            - Object.values(s.stazioni || {}).reduce((a, x) => a + (x || 0), 0))) }
-      ]
-    }));
-  }
-
-  /* volume settimanale per tipo */
-  const sett = span(28);
-  const vol = volumeHyrox(sett);
-  const righe = Object.entries(vol).filter(([, m]) => m > 0)
-    .map(([t, m]) => ({ nome: t, v: m })).sort((a, b) => b.v - a.v);
-  if (righe.length) {
-    w.append(chartHBars({
-      titolo: 'Minuti per tipo di lavoro', sub: 'Ultime 4 settimane, sedute segnate come fatte.',
-      righe, unit: 'min',
-      note: 'In fase di costruzione il lavoro compromesso dovrebbe essere la fetta piu\' grande dopo la corsa.'
-    }));
-  } else {
-    const c = el('div', 'hx-card');
-    c.append(el('div', 'hx-h', 'Minuti per tipo di lavoro'));
-    c.append(el('p', 'hx-p', 'Segna come fatte le sedute nella scheda Piano e qui comparira\' la ripartizione del lavoro.'));
-    w.append(c);
-  }
-
-  /* record */
-  const rc = el('div', 'hx-card');
-  rc.append(el('div', 'hx-h', 'Record personali'));
-  const gaps = gapStazioni();
-  for (const g of gaps) {
-    const r = el('div', 'hx-gap' + (g.gap != null && g.gap <= 0 ? ' ok' : ''));
-    r.innerHTML = `<span class="nm">${esc(g.nome)}</span>
-      <span class="v">${g.mio ? mmss(g.mio) : '—'}</span>
-      <span class="d">${g.gap == null ? '' : (g.gap > 0 ? '+' : '−') + mmss(Math.abs(g.gap))}</span>`;
-    rc.append(r);
-  }
-  if (h.pb.corsa_km) {
-    const r = el('div', 'hx-gap');
-    r.innerHTML = `<span class="nm">Ritmo su 1 km</span><span class="v">${mmss(h.pb.corsa_km)}</span><span class="d"></span>`;
-    rc.append(r);
-  }
-  w.append(rc);
-}
-
-/* -------------------------------------------------------- scheda race day */
-function hxCheck(w, h) {
-  const c = el('div', 'hx-card');
-  c.append(el('div', 'hx-h', 'Checklist gara'));
+  const cl = el('div', 'hx-card');
+  cl.append(el('div', 'hx-h', 'Checklist'));
   for (const x of HX.checklist) {
     const on = !!h.checklist[x.id];
     const r = el('button', 'hx-check' + (on ? ' on' : ''));
     r.innerHTML = `<span class="bx">${on ? '✓' : ''}</span>
       <span class="tx"><b>${esc(x.t)}</b><em>${esc(x.n)}</em></span>`;
     r.onclick = () => { h.checklist[x.id] = !on; save(); route(); };
-    c.append(r);
+    cl.append(r);
   }
-  w.append(c);
+  w.append(cl);
 
-  /* alimentazione del giorno gara, agganciata al piano */
-  const nc = el('div', 'hx-card');
-  nc.append(el('div', 'hx-h', 'Il giorno della gara'));
   const peso = lastWeight() ?? D.profilo.peso_iniziale_kg;
+  const nc = el('div', 'hx-card');
+  nc.append(el('div', 'hx-h', 'Cosa mangiare e bere'));
   nc.append(el('div', 'hx-quote',
-    `<div><span>Carboidrati 3h prima</span><b>${nf(peso * 1.5, 0)}–${nf(peso * 2, 0)} g</b><em>${nf(peso, 0)} kg di peso</em></div>
+    `<div><span>Carboidrati 3h prima</span><b>${nf(peso * 1.5, 0)}–${nf(peso * 2, 0)} g</b><em>sui tuoi ${nf(peso, 0)} kg</em></div>
      <div><span>Acqua 2h prima</span><b>${nf(peso * 7, 0)} ml</b><em>poi solo sorsi</em></div>
      <div><span>Gel 30' prima</span><b>25–30 g</b><em>di carboidrati</em></div>`));
   nc.append(el('p', 'hx-note',
-    'Quantita\' orientative da linee guida generali sullo sport di endurance, scalate sul tuo peso: non sono un piano nutrizionale personalizzato, e vanno provate in allenamento prima della gara. Il giorno della gara non si sperimenta niente di nuovo.'));
+    'Quantita\' orientative da linee guida generali sull\'endurance, scalate sul tuo peso: non sono un piano nutrizionale personalizzato e vanno provate in allenamento. Il giorno della gara non si sperimenta niente di nuovo.'));
   w.append(nc);
 
   const sc = el('div', 'hx-card');
   sc.append(el('div', 'hx-h', 'Strategia'));
   sc.append(el('p', 'hx-p',
-    'I primi due chilometri sono quelli che decidono la gara: quasi tutti li corrono troppo forte e lo pagano dal burpee in poi. Il piano dei passaggi esiste per quello.'));
+    'I primi due chilometri decidono la gara: quasi tutti li corrono troppo forte e lo pagano dal burpee in poi.'));
   for (const st of stazioni()) {
     const r = el('div', 'hx-tip');
     r.innerHTML = `<b>${esc(st.nome)}</b><span>${esc(st.chiave)}</span>`;

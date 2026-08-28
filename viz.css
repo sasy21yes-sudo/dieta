@@ -336,3 +336,29 @@
   background:var(--paper);color:var(--ink);font:inherit;text-align:center;
   font-variant-numeric:tabular-nums}
 .qedit .rm{color:var(--alert)}
+
+/* ---------------- righe di una scheda ---------------- */
+.sk-h,.sk-r{display:grid;grid-template-columns:26px 1fr 30px 44px 40px 12px;
+  gap:7px;align-items:center}
+.sk-h{font-family:var(--mono);font-size:9px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink-3);padding:0 0 5px;
+  border-bottom:1px solid var(--rule)}
+.sk-h span:nth-child(n+3){text-align:right}
+.sk-r{width:100%;background:none;border:0;border-bottom:1px solid var(--rule);
+  padding:10px 0;color:inherit;font:inherit;text-align:left;cursor:pointer;
+  font-size:13.5px}
+.sk-r .g,.sk-g{font-family:var(--mono);font-size:10px;font-weight:700;
+  color:var(--pine);background:var(--pine-soft);border-radius:5px;
+  padding:2px 0;text-align:center;display:block}
+.sk-g{display:inline-block;padding:2px 5px;margin-right:5px}
+.sk-r.grp .g{background:var(--pine);color:#fff}
+.sk-r .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.sk-r .nm em{display:block;font-style:normal;font-family:var(--mono);
+  font-size:10px;color:var(--amber);font-weight:400}
+.sk-r .v{font-family:var(--mono);font-size:12px;text-align:right;color:var(--ink-2)}
+.sk-r .go{color:var(--ink-3);text-align:right}
+.setrow.sethead{font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:10px}
+.setrow.sethead span{text-align:center}
+.hx-sess.fatta .nm{color:var(--pine)}
+.hx-sess.fatta{opacity:.72}

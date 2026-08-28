@@ -58,8 +58,11 @@ function volumeMuscoli(days) {
       const ex = esercizio(s.ex); if (!ex) continue;
       for (const m of muscoli()) {
         const w = pesoMuscolare(ex, m.id); if (!w) continue;
-        out[m.id].serie += w;
-        out[m.id].tonn += w * (+s.kg || 0) * (+s.reps || 0);
+        // uno scarico di stripping e' lavoro vero ma piu' corto di una serie
+        // piena: conta mezza serie, che e' la convenzione piu' diffusa
+        out[m.id].serie += w * (1 + (s.drop || []).length * 0.5);
+        out[m.id].tonn += w * ((+s.kg || 0) * (+s.reps || 0)
+          + (s.drop || []).reduce((a, x) => a + x.kg * x.reps, 0));
         out[m.id].sedute.add(k);
       }
     }
@@ -87,7 +90,8 @@ function formaFatica(mus, fino = today(), giorni = 120) {
     for (const s of serieDelGiorno(k)) {
       const ex = esercizio(s.ex); if (!ex) continue;
       const w = pesoMuscolare(ex, mus); if (!w) continue;
-      imp += w * sforzo(s.rir);
+      // gli scarichi si fanno a cedimento: stimolo pieno, mezza serie
+      imp += w * sforzo(s.rir) * (1 + (s.drop || []).length * 0.5);
     }
     if (imp) {
       forma += imp; fatica += imp;
@@ -658,15 +662,26 @@ function scheda(id) { return schede().find(s => s.id === id) || null; }
 function sheetSeduta(k) {
   const p = P();
   p.sessioni[k] ||= { nome: '', serie: [] };
-  if (!p.sessioni[k].serie.length) return sheetSceltaModo(k);
-  return sheetLibero(k);
+  // sempre la schermata di scelta: prima, se c'erano gia' delle serie, si
+  // finiva dritti nella seduta libera e alle schede non si arrivava piu'
+  return sheetSceltaModo(k);
 }
 
 function sheetSceltaModo(k) {
+  const p = P(), gia = p.sessioni[k]?.serie?.length || 0;
   const w = el('div');
   w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
   w.append(el('h2', 'sec', 'Come registri?'));
   w.lastChild.style.marginTop = '0';
+
+  if (gia) {
+    const cont = el('button', 'btn wide pri',
+      `Continua quella di oggi — ${gia} serie registrate finora`);
+    cont.onclick = () => sheetLibero(k);
+    w.append(cont);
+    w.append(el('p', 'hint',
+      'Scegliendo una scheda qui sotto, le serie registrate finora oggi vengono sostituite da quelle nuove.'));
+  }
 
   const list = schede();
   if (list.length) {
@@ -694,50 +709,80 @@ function sheetSceltaModo(k) {
   b1.onclick = () => sheetSchede();
   w.append(b1);
 
-  const b2 = el('button', 'btn wide pri', 'Seduta libera, esercizio per esercizio');
+  const b2 = el('button', 'btn wide' + (gia ? '' : ' pri'),
+    'Seduta libera, esercizio per esercizio');
   b2.style.marginTop = '8px';
   b2.onclick = () => sheetLibero(k);
   w.append(b2);
   sheet(w);
 }
 
+/** "50x6, 40x5" -> gli scarichi di uno stripping. */
+function parseScarichi(txt) {
+  if (!txt) return [];
+  return String(txt).split(/[,;]+/).map(p => {
+    const m = p.trim().match(/^([\d.,]+)\s*[x×*]\s*(\d+)$/i);
+    if (!m) return null;
+    const kg = parseNum(m[1]), reps = parseNum(m[2]);
+    return kg != null && reps > 0 ? { kg, reps } : null;
+  }).filter(Boolean);
+}
+const scarichiTesto = d => (d || []).map(x => `${nf(x.kg, 1)}x${x.reps}`).join(', ');
+
 /** Seduta da scheda: si toccano solo carico, ripetizioni e RIR. */
 function sheetDaScheda(k, schedaId) {
   const p = P(), sc = scheda(schedaId);
   if (!sc) return sheetSceltaModo(k);
   const s = p.sessioni[k];
+  const et = etichetteScheda(sc.esercizi);
+
   const w = el('div');
   w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
   w.append(el('h2', 'sec', esc(sc.nome)));
   w.lastChild.style.marginTop = '0';
-  w.append(el('p', 'muted', 'Esercizi e serie sono quelli della scheda. Cambia solo quello che hai fatto davvero.'));
+  w.append(el('p', 'muted',
+    'Gli esercizi e le serie sono quelli della scheda. Scrivi solo cosa hai fatto davvero: se salti una serie, lascia vuote le ripetizioni.'));
 
   for (const [ei, riga] of sc.esercizi.entries()) {
     const ex = esercizio(riga.ex);
     if (!ex) continue;
     const prec = ultimoUso(riga.ex, k);
-    const [lo, hi] = ex.range || [8, 12];
+    const lo = riga.reps, hi = riga.repsMax || riga.reps;
+    const t = tecnica(riga.tecnica);
+
     const box = el('div', 'card flat');
     box.style.marginBottom = '10px';
     box.append(el('div', 'row between',
-      `<strong>${esc(ex.nome)}</strong>
-       <span class="mono muted" style="font-size:11px">${riga.serie} serie · ${lo}–${hi} rip</span>`));
+      `<strong><span class="sk-g">${et[ei].testo}</span> ${esc(ex.nome)}</strong>
+       <span class="mono muted" style="font-size:11px">${riga.serie} × ${lo}–${hi}</span>`));
+    if (riga.tecnica && riga.tecnica !== 'normale')
+      box.append(el('div', 'hint', `<strong>${esc(t.nome)}</strong> — ${esc(t.d)}`));
+    if (riga.superserie && ei > 0)
+      box.append(el('div', 'hint',
+        `Subito dopo ${esc(esercizio(sc.esercizi[ei - 1].ex)?.nome || '')}, senza recupero.`));
+
     const pp = prossimoPasso(riga.ex);
     if (pp) box.append(el('div', 'hint', esc(pp.testo)));
     else if (prec) box.append(el('div', 'hint',
       `L'ultima volta (${prec.k}): ${prec.serie.map(x => `${nf(x.kg, 1)}×${x.reps}`).join(', ')}.`));
 
+    box.append(el('div', 'setrow sethead',
+      '<span class="n"></span><span>kg</span><span>rip</span><span>RIR</span>'));
     for (let si = 0; si < riga.serie; si++) {
       const d = prec?.serie[si] || {};
-      const kg = d.kg ?? riga.kg ?? '';
-      const rp = d.reps ?? riga.reps ?? lo;
-      const rr = d.rir ?? 2;
       const row = el('div', 'setrow');
       row.innerHTML = `<span class="n">${si + 1}</span>
-        <input type="text" inputmode="decimal" id="sc-${ei}-${si}-kg" value="${kg}" placeholder="kg">
-        <input type="text" inputmode="numeric" id="sc-${ei}-${si}-rp" value="${rp}" placeholder="rip">
-        <input type="text" inputmode="numeric" id="sc-${ei}-${si}-rr" value="${rr}" placeholder="RIR">`;
+        <input type="text" inputmode="decimal" id="sc-${ei}-${si}-kg" value="${d.kg ?? riga.kg ?? ''}">
+        <input type="text" inputmode="numeric" id="sc-${ei}-${si}-rp" value="${d.reps ?? ''}" placeholder="${lo}–${hi}">
+        <input type="text" inputmode="numeric" id="sc-${ei}-${si}-rr" value="${d.rir ?? 2}">`;
       box.append(row);
+      if (riga.tecnica === 'stripping') {
+        const sr = el('div', 'field');
+        sr.style.margin = '4px 0 8px';
+        sr.innerHTML = `<input type="text" id="sc-${ei}-${si}-dr"
+          value="${esc(scarichiTesto(d.drop))}" placeholder="scarichi: 50x6, 40x5">`;
+        box.append(sr);
+      }
     }
     w.append(box);
   }
@@ -750,16 +795,23 @@ function sheetDaScheda(k, schedaId) {
       for (let si = 0; si < riga.serie; si++) {
         const reps = parseNum(($('#sc-' + ei + '-' + si + '-rp') || {}).value);
         if (!(reps > 0)) continue;                 // serie non fatta: si salta
-        serie.push({ ex: riga.ex,
+        const rec = { ex: riga.ex,
           kg: parseNum(($('#sc-' + ei + '-' + si + '-kg') || {}).value) ?? 0,
-          reps, rir: parseNum(($('#sc-' + ei + '-' + si + '-rr') || {}).value) ?? 2 });
+          reps, rir: parseNum(($('#sc-' + ei + '-' + si + '-rr') || {}).value) ?? 2 };
+        if (riga.tecnica && riga.tecnica !== 'normale') rec.tecnica = riga.tecnica;
+        if (riga.superserie) rec.superserie = true;
+        const dr = parseScarichi(($('#sc-' + ei + '-' + si + '-dr') || {}).value);
+        if (dr.length) rec.drop = dr;
+        serie.push(rec);
       }
     }
-    if (!serie.length) { toast('Nessuna serie compilata'); return; }
+    if (!serie.length) { toast('Non hai compilato nessuna serie'); return; }
     s.serie = serie;
     s.nome = sc.nome;
     s.scheda = sc.id;
-    save(); closeSheet(); route(); toast(`${serie.length} serie registrate`);
+    save(); closeSheet(); route();
+    const nDrop = serie.reduce((a, x) => a + (x.drop?.length || 0), 0);
+    toast(`${serie.length} serie registrate${nDrop ? ` + ${nDrop} scarichi` : ''}`);
   };
   w.append(salva);
 
@@ -847,6 +899,11 @@ function sheetLibero(k) {
   if (sugg) box.append(el('div', 'hint', esc(sugg.testo)));
   w.append(box);
 
+  const back = el('button', 'btn wide', 'Usa una scheda invece');
+  back.style.marginTop = '10px';
+  back.onclick = () => { s.nome = $('#s-nome').value.trim(); save(); sheetSceltaModo(k); };
+  w.append(back);
+
   if (s.serie.length) {
     const asch = el('button', 'btn wide', 'Salva questa seduta come scheda');
     asch.style.marginTop = '10px';
@@ -876,19 +933,54 @@ function sheetLibero(k) {
 }
 
 /* ------------------------------------------------------------- schede */
+/* Una scheda e' la lista degli esercizi di una seduta: quali, quante serie, in
+   che range di ripetizioni, con che tecnica. Il carico invece cambia ogni
+   volta, e infatti si aggiorna quando la usi.
+   Prima toccare una riga la CANCELLAVA e non c'era modo di modificarla: da qui
+   l'impressione di poter inserire roba senza capire cosa. */
+
+const TECNICHE = [
+  { id: 'normale', nome: 'Normale',
+    d: 'Serie standard con recupero pieno fra una e l\'altra.' },
+  { id: 'stripping', nome: 'Stripping',
+    d: 'Arrivi a fine serie, cali subito il peso e continui senza recupero. Ogni scarico conta come lavoro in piu\' nel volume settimanale.' },
+  { id: 'rest-pause', nome: 'Rest-pause',
+    d: 'Fine serie, 15-20 secondi di pausa, altre ripetizioni con lo stesso peso. Si registra come una serie sola col totale delle ripetizioni.' },
+  { id: 'piramidale', nome: 'Piramidale',
+    d: 'Il carico sale a ogni serie e le ripetizioni scendono. Il range indicato e\' quello dell\'ultima serie.' }
+];
+const tecnica = id => TECNICHE.find(t => t.id === id) || TECNICHE[0];
+
+/** Etichette A1/A2/B/C: le lettere raggruppano le superserie. */
+function etichetteScheda(esercizi) {
+  const out = [];
+  let lettera = 64, dentro = 0;
+  for (const [i, e] of esercizi.entries()) {
+    if (i === 0 || !e.superserie) { lettera++; dentro = 1; }
+    else dentro++;
+    const gruppo = String.fromCharCode(lettera);
+    const prossimo = esercizi[i + 1];
+    const inGruppo = dentro > 1 || (prossimo && prossimo.superserie);
+    out.push({ testo: inGruppo ? gruppo + dentro : gruppo, gruppo, inGruppo });
+  }
+  return out;
+}
+
 function sheetSchede() {
   const w = el('div');
   w.append(el('div', 'eyebrow', 'Schede'));
   w.append(el('h2', 'sec', 'Le tue schede'));
   w.lastChild.style.marginTop = '0';
   w.append(el('p', 'muted',
-    'Una scheda fissa gli esercizi e il numero di serie. Quando la usi aggiorni solo carico e ripetizioni: e\' l\'unica cosa che cambia da una settimana all\'altra.'));
+    'Una scheda e\' la lista degli esercizi di una seduta: <strong>quali, quante serie e in che range di ripetizioni</strong>. Il carico no: quello cambia ogni volta, e lo aggiorni quando la usi.'));
   const list = schede();
   if (!list.length) w.append(el('p', 'hint', 'Nessuna scheda ancora.'));
   for (const sc of list) {
     const r = el('button', 'prod');
+    const nSer = sc.esercizi.reduce((a, e) => a + (e.serie || 0), 0);
     r.innerHTML = `<div class="grow"><div class="nm">${esc(sc.nome)}</div>
-      <div class="mt">${sc.esercizi.map(e => esc(esercizio(e.ex)?.nome || e.ex)).join(' · ')}</div></div>`;
+      <div class="mt">${sc.esercizi.length} esercizi · ${nSer} serie</div></div>
+      <div class="kc">apri &rsaquo;</div>`;
     r.onclick = () => sheetScheda(sc.id);
     w.append(r);
   }
@@ -899,76 +991,70 @@ function sheetSchede() {
   sheet(w);
 }
 
-function sheetScheda(id) {
+function sheetScheda(id, statoPre) {
   const sc = id ? scheda(id) : { id: uid(), nome: '', esercizi: [] };
-  const stato = { nome: sc.nome, esercizi: sc.esercizi.map(x => ({ ...x })) };
+  // statoPre serve a tornare qui dall'editor di una riga senza perdere ne'
+  // il nome che stavi scrivendo ne' le righe aggiunte e non ancora salvate
+  const stato = statoPre || { nome: sc.nome, esercizi: sc.esercizi.map(x => ({ ...x })) };
+
   const w = el('div');
-  w.append(el('div', 'eyebrow', id ? 'Modifica scheda' : 'Nuova scheda'));
-  w.append(el('h2', 'sec', 'Composizione'));
+  w.append(el('div', 'eyebrow', id ? 'Scheda' : 'Nuova scheda'));
+  w.append(el('h2', 'sec', 'Cosa contiene'));
   w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Metti gli esercizi nell\'ordine in cui li fai. Per ognuno: quante serie e fra quante e quante ripetizioni vuoi stare. Il peso di partenza e\' facoltativo — se lo lasci vuoto, la prima volta lo scrivi mentre ti alleni.'));
   w.append(el('div', 'field',
-    `<label>Nome</label><input type="text" id="sk-nome" value="${esc(stato.nome)}" placeholder="Push A">`));
+    `<label>Nome della scheda</label>
+     <input type="text" id="sk-nome" value="${esc(stato.nome)}" placeholder="Esempio: Push A">`));
 
   const lista = el('div');
   const disegna = () => {
     lista.innerHTML = '';
     if (!stato.esercizi.length) {
-      lista.append(el('p', 'muted', 'Nessun esercizio. Aggiungine uno qui sotto.'));
+      lista.append(el('p', 'muted', 'Ancora nessun esercizio. Usa il pulsante qui sotto.'));
       return;
     }
+    lista.append(el('div', 'sk-h',
+      '<span></span><span>Esercizio</span><span>Serie</span><span>Rip</span><span>kg</span><span></span>'));
+    const et = etichetteScheda(stato.esercizi);
     stato.esercizi.forEach((riga, i) => {
       const ex = esercizio(riga.ex);
-      const r = el('div', 'cmp-r');
-      r.style.cursor = 'pointer';
-      r.innerHTML = `<span>${esc(ex?.nome || riga.ex)}</span>
-        <span class="mono">${riga.serie} serie</span>
-        <span class="mono muted">${riga.reps} rip</span>
-        <span class="mono">${riga.kg ? nf(riga.kg, 1) + ' kg' : '—'}</span>`;
+      const t = tecnica(riga.tecnica);
+      const r = el('button', 'sk-r' + (et[i].inGruppo ? ' grp' : ''));
+      r.innerHTML = `<span class="g">${et[i].testo}</span>
+        <span class="nm">${esc(ex?.nome || riga.ex)}
+          ${riga.tecnica && riga.tecnica !== 'normale'
+            ? `<em>${esc(t.nome.toLowerCase())}</em>` : ''}</span>
+        <span class="v">${riga.serie}</span>
+        <span class="v">${riga.reps}–${riga.repsMax || riga.reps}</span>
+        <span class="v">${riga.kg ? nf(riga.kg, 1) : '—'}</span>
+        <span class="go">›</span>`;
       r.onclick = () => {
-        if (!confirm(`Togliere ${ex?.nome || riga.ex} dalla scheda?`)) return;
-        stato.esercizi.splice(i, 1); disegna();
+        stato.nome = $('#sk-nome').value;      // non perdere quello che ha scritto
+        sheetRigaScheda(stato, i, () => sheetScheda(id, stato));
       };
       lista.append(r);
     });
+    const gruppi = new Set(et.filter(x => x.inGruppo).map(x => x.gruppo));
+    if (gruppi.size) lista.append(el('p', 'hint',
+      'Le righe con la stessa lettera sono in superserie: si fanno una dietro l\'altra senza recupero in mezzo.'));
   };
   disegna();
   w.append(lista);
 
-  const box = el('div', 'card flat');
-  box.style.marginTop = '12px';
-  box.append(el('div', 'eyebrow', 'Aggiungi un esercizio'));
-  const sel = el('select');
-  sel.id = 'sk-ex';
-  sel.style.cssText = 'width:100%;padding:9px 10px;border:1px solid var(--rule);'
-    + 'border-radius:9px;background:var(--paper);color:var(--ink);font:inherit;margin-bottom:8px';
-  for (const e of catalogo().slice().sort((a, b) => a.nome.localeCompare(b.nome)))
-    sel.append(new Option(`${e.nome} — ${e.attrezzo}`, e.id));
-  box.append(sel);
-  const g = el('div');
-  g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px';
-  g.innerHTML = `<div class="field"><label>Serie</label>
-      <input type="text" inputmode="numeric" id="sk-serie" value="3"></div>
-    <div class="field"><label>Rip</label>
-      <input type="text" inputmode="numeric" id="sk-reps" value="8"></div>
-    <div class="field"><label>kg</label>
-      <input type="text" inputmode="decimal" id="sk-kg" value=""></div>`;
-  box.append(g);
-  const ba = el('button', 'btn wide', 'Aggiungi');
-  ba.onclick = () => {
-    const n = parseNum($('#sk-serie').value);
-    if (!(n > 0 && n <= 12)) { toast('Da 1 a 12 serie'); return; }
-    stato.esercizi.push({ ex: $('#sk-ex').value, serie: Math.round(n),
-      reps: parseNum($('#sk-reps').value) ?? 8, kg: parseNum($('#sk-kg').value) ?? 0 });
-    disegna();
+  const badd = el('button', 'btn wide', '+ Aggiungi un esercizio');
+  badd.style.marginTop = '10px';
+  badd.onclick = () => {
+    stato.nome = $('#sk-nome').value;
+    sheetRigaScheda(stato, null, () => sheetScheda(id, stato));
   };
-  box.append(ba);
-  w.append(box);
+  w.append(badd);
 
   const salva = el('button', 'btn wide pri', 'Salva la scheda');
-  salva.style.marginTop = '10px';
+  salva.style.marginTop = '8px';
   salva.onclick = () => {
     const nome = $('#sk-nome').value.trim();
-    if (!nome) { toast('Serve il nome'); return; }
+    if (!nome) { toast('Serve il nome della scheda'); return; }
     if (!stato.esercizi.length) { toast('Serve almeno un esercizio'); return; }
     const rec = { id: sc.id, nome, esercizi: stato.esercizi };
     const L = schede();
@@ -977,6 +1063,7 @@ function sheetScheda(id) {
     save(); closeSheet(); route(); toast('Scheda salvata');
   };
   w.append(salva);
+
   if (id) {
     const del = el('button', 'btn wide', 'Elimina la scheda');
     del.style.marginTop = '8px';
@@ -985,6 +1072,136 @@ function sheetScheda(id) {
       P().schede = schede().filter(x => x.id !== id);
       save(); closeSheet(); route(); toast('Eliminata');
     };
+    w.append(del);
+  }
+  sheet(w);
+}
+
+/** Una riga della scheda: si apre per modificarla, non per cancellarla. */
+function sheetRigaScheda(stato, idx, onChiudi) {
+  const nuovo = idx == null;
+  const riga = nuovo
+    ? { ex: catalogo()[0]?.id, serie: 3, reps: 8, repsMax: 12, kg: 0,
+        tecnica: 'normale', superserie: false }
+    : { ...stato.esercizi[idx] };
+
+  const w = el('div');
+  w.append(el('div', 'eyebrow', nuovo ? 'Aggiungi' : 'Modifica'));
+  w.append(el('h2', 'sec', nuovo ? 'Un esercizio nella scheda'
+    : esc(esercizio(riga.ex)?.nome || riga.ex)));
+  w.lastChild.style.marginTop = '0';
+
+  if (nuovo) {
+    const f = el('div', 'field', '<label>Quale esercizio</label>');
+    const sel = el('select');
+    sel.id = 'rg-ex';
+    sel.style.cssText = 'width:100%;padding:10px;border:1px solid var(--rule);'
+      + 'border-radius:9px;background:var(--paper);color:var(--ink);font:inherit';
+    for (const e of catalogo().slice().sort((a, b) => a.nome.localeCompare(b.nome)))
+      sel.append(new Option(`${e.nome} — ${e.attrezzo}`, e.id, false, e.id === riga.ex));
+    sel.onchange = () => {
+      const ex = esercizio(sel.value);
+      if (ex?.range) { $('#rg-lo').value = ex.range[0]; $('#rg-hi').value = ex.range[1]; }
+    };
+    f.append(sel);
+    f.append(el('div', 'hint', 'Non lo trovi? Aggiungilo da "I tuoi esercizi" nella scheda Gym.'));
+    w.append(f);
+  }
+
+  const g = el('div');
+  g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0 8px';
+  g.innerHTML = `<div class="field"><label>Serie</label>
+      <input type="text" inputmode="numeric" id="rg-serie" value="${riga.serie}"></div>
+    <div class="field"><label>Rip da</label>
+      <input type="text" inputmode="numeric" id="rg-lo" value="${riga.reps}"></div>
+    <div class="field"><label>Rip a</label>
+      <input type="text" inputmode="numeric" id="rg-hi" value="${riga.repsMax || riga.reps}"></div>
+    <div class="field"><label>kg</label>
+      <input type="text" inputmode="decimal" id="rg-kg" value="${riga.kg || ''}"></div>`;
+  w.append(g);
+  w.append(el('p', 'hint',
+    'Il range di ripetizioni serve alla doppia progressione: si sale di carico solo quando tutte le serie arrivano al numero piu\' alto.'));
+
+  /* tecnica */
+  const ft = el('div', 'field', '<label>Tecnica</label>');
+  const seg = el('div', 'seg');
+  const spieg = el('div', 'hint');
+  const dipingi = () => {
+    [...seg.children].forEach(b => b.setAttribute('aria-pressed',
+      b.dataset.t === (riga.tecnica || 'normale')));
+    spieg.textContent = tecnica(riga.tecnica).d;
+  };
+  for (const t of TECNICHE) {
+    const b = el('button', null, t.nome);
+    b.dataset.t = t.id;
+    b.onclick = () => { riga.tecnica = t.id; dipingi(); };
+    seg.append(b);
+  }
+  ft.append(seg); ft.append(spieg); dipingi();
+  w.append(ft);
+
+  /* superserie */
+  const primo = !nuovo && idx === 0;
+  if (!primo) {
+    const fs = el('div', 'field', '<label>Superserie</label>');
+    const ss = el('div', 'seg');
+    for (const [val, lab] of [[false, 'A se stante'], [true, 'Attaccato al precedente']]) {
+      const b = el('button', null, lab);
+      b.setAttribute('aria-pressed', !!riga.superserie === val);
+      b.onclick = () => { riga.superserie = val;
+        [...ss.children].forEach(x => x.setAttribute('aria-pressed', x.textContent === lab)); };
+      ss.append(b);
+    }
+    fs.append(ss);
+    fs.append(el('div', 'hint',
+      'Attaccato al precedente significa: lo fai subito dopo, senza recupero in mezzo. Le due righe prendono la stessa lettera (A1, A2).'));
+    w.append(fs);
+  }
+
+  /* posizione */
+  if (!nuovo && stato.esercizi.length > 1) {
+    const fp = el('div', 'field', '<label>Posizione</label>');
+    const rp = el('div', 'seg');
+    const su = el('button', null, '↑ Su'), giu = el('button', null, '↓ Giu');
+    su.onclick = () => {
+      if (idx === 0) return;
+      stato.esercizi.splice(idx - 1, 0, stato.esercizi.splice(idx, 1)[0]);
+      onChiudi();
+    };
+    giu.onclick = () => {
+      if (idx >= stato.esercizi.length - 1) return;
+      stato.esercizi.splice(idx + 1, 0, stato.esercizi.splice(idx, 1)[0]);
+      onChiudi();
+    };
+    rp.append(su, giu); fp.append(rp); w.append(fp);
+  }
+
+  const ok = el('button', 'btn wide pri', nuovo ? 'Aggiungi alla scheda' : 'Salva');
+  ok.onclick = () => {
+    const n = parseNum($('#rg-serie').value);
+    if (!(n > 0 && n <= 12)) { toast('Da 1 a 12 serie'); return; }
+    const lo = parseNum($('#rg-lo').value) ?? 8;
+    const hi = parseNum($('#rg-hi').value) ?? lo;
+    const rec = {
+      ex: nuovo ? $('#rg-ex').value : riga.ex,
+      serie: Math.round(n), reps: Math.round(lo), repsMax: Math.round(Math.max(lo, hi)),
+      kg: parseNum($('#rg-kg').value) ?? 0,
+      tecnica: riga.tecnica || 'normale', superserie: !!riga.superserie
+    };
+    if (nuovo) stato.esercizi.push(rec); else stato.esercizi[idx] = rec;
+    onChiudi();                        // torna alla scheda, non chiude tutto
+  };
+  w.append(ok);
+
+  const ann = el('button', 'btn wide', 'Annulla');
+  ann.style.marginTop = '8px';
+  ann.onclick = () => onChiudi();
+  w.append(ann);
+
+  if (!nuovo) {
+    const del = el('button', 'btn wide', 'Togli dalla scheda');
+    del.style.marginTop = '8px';
+    del.onclick = () => { stato.esercizi.splice(idx, 1); onChiudi(); };
     w.append(del);
   }
   sheet(w);

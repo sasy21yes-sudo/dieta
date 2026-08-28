@@ -149,7 +149,7 @@ non un dettaglio.
   previsione
 - **Foto** — uno scatto al giorno per posa (fronte/lato/schiena), confronto
   primo/ultimo e timelapse sfogliabile. Stanno in IndexedDB, compresse a 1280 px
-- **Palestra** (scheda "Pesi") — registro delle sedute, mappa muscolare fronte e
+- **Palestra** (scheda "Gym") — registro delle sedute, mappa muscolare fronte e
   schiena su tre modi (volume, stanchi, in crescita), modello forma-fatica di
   Banister per muscolo, massimale stimato con Epley corretto col RIR, proiezione
   della forza per regressione lineare, doppia progressione, volume settimanale a
@@ -185,6 +185,37 @@ esercizio con ≥3 sedute in 8 settimane, la si normalizza sul valore corrente
 (+2,5 kg su 60 non è come su 200) e si usa la **mediana** fra esercizi, che un
 singolo record fortunato non sposta. Il selettore manuale resta solo come
 ripiego quando i dati non bastano.
+
+### Schede e tecniche
+
+Una scheda fissa **esercizi, serie e range di ripetizioni**; il carico si
+aggiorna a ogni uso. Supporta superserie (`superserie: true` = attaccato al
+precedente, etichette A1/A2) e tecniche: stripping, rest-pause, piramidale.
+Gli scarichi di uno stripping si scrivono come `50x6, 40x5` e contano **mezza
+serie ciascuno** nel volume e nello stimolo — sono lavoro vero ma più corto.
+
+Due regole di interfaccia imparate a caro prezzo:
+- toccare una riga la **apre**, non la cancella
+- l'editor di una riga torna alla scheda, non chiude tutto: `closeSheet()` lì
+  faceva sparire il lavoro in corso
+- il punto d'ingresso mostra **sempre** la scelta scheda/libera, anche se ci
+  sono già serie registrate quel giorno
+
+### Il piano HYROX è tarato sull'atleta
+
+`capacitaFisica()` legge forza gambe e forza di tirata dai massimali stimati
+della palestra (rapporto sul peso corporeo), il motore aerobico dai minuti di
+corsa registrati, e la tendenza dei carichi. Il generatore del programma
+aggiunge forza dove le gambe sono deboli, corsa dove il motore non regge, e
+sceglie solo fra gli allenamenti che l'attrezzatura dichiarata permette. La
+sezione dice sempre **perché** ha scelto così.
+
+Le soglie sono rapporti di uso comune, non misure: dicono "molto sotto / in
+linea / sopra", non danno un voto — e la UI deve continuare a dirlo.
+
+HYROX ha **tre sezioni**, non sei: il conto alla rovescia sta sempre in testa,
+il piano dice cosa fare, le stazioni dicono a che punto sei e da lì parte la
+simulazione. Tutto il resto era navigazione in più.
 
 ### Il motore della palestra
 
