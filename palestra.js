@@ -317,6 +317,20 @@ function viewPalestra(v) {
   const k = today(), st = statoMuscoli(k);
   const V = PD.volume;
 
+  /* --- ingresso a Road to HYROX --- */
+  if (HX) {
+    const hxb = el('button', 'hx-entry');
+    const gg = giorniAllaGara();
+    const hp = S.hyrox?.profilo;
+    hxb.innerHTML = `<span class="k">Road to</span><span class="l">HYROX</span>
+      <span class="d">${gg != null
+        ? `${gg > 0 ? gg + ' giorni alla gara' : gg === 0 ? 'Oggi si corre' : 'Gara passata da ' + (-gg) + ' giorni'} · obiettivo ${hms((hp?.target_min || 90) * 60)}`
+        : '8 km di corsa e 8 stazioni. Piano dei passaggi, simulazioni, punti deboli e programma settimanale.'}</span>
+      <span class="g">Apri &rsaquo;</span>`;
+    hxb.onclick = () => { location.hash = '#/hyrox'; };
+    v.append(hxb);
+  }
+
   /* --- seduta di oggi --- */
   const oggi = P().sessioni[k];
   const testa = el('div', 'card');

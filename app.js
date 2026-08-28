@@ -626,11 +626,11 @@ function cardConsiglio(k) {
 const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
                  palestra: viewPalestra, dati: viewDati, analisi: viewAnalisi,
                  spesa: viewSpesa, prodotti: viewProdotti, foto: viewFoto,
-                 piano: viewPiano };
+                 piano: viewPiano, hyrox: viewHyrox };
 const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
                  palestra: 'Palestra', dati: 'Dati', analisi: 'Analisi',
                  spesa: 'Spesa', prodotti: 'Prodotti', foto: 'Foto',
-                 piano: 'Piano' };
+                 piano: 'Piano', hyrox: 'Road to HYROX' };
 
 function route() {
   const name = (location.hash.replace('#/', '') || 'oggi').split('?')[0];
@@ -1514,6 +1514,8 @@ async function init() {
     // il catalogo palestra non e' vitale: se manca, il resto dell'app vive
     try { PD = await (await fetch('data/palestra.json', { cache: 'no-cache' })).json(); }
     catch { PD = null; }
+    try { HX = await (await fetch('data/hyrox.json', { cache: 'no-cache' })).json(); }
+    catch { HX = null; }
   } catch {
     $('#view').innerHTML = '<div class="card">Dati non caricati. Serve un server HTTP (anche GitHub Pages): aprire il file da disco non funziona.</div>';
     return;

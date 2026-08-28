@@ -143,3 +143,162 @@
   letter-spacing:-.01em}
 .advice-c{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.5}
 .advice.mirato .advice-c{color:var(--ink)}
+
+/* ============================================================ ROAD TO HYROX
+   Il tema ridefinisce i token nel proprio ambito: cosi' TUTTO il toolkit dei
+   grafici gia' scritto adotta la palette scura da solo, senza duplicare una
+   riga. Il giallo e' l'accento dell'interfaccia (14,5:1 sul fondo, verificato);
+   per le serie multiple restano i tre categorici validati sul fondo scuro.
+   ------------------------------------------------------------------------ */
+.hx{
+  --paper:#14181A; --wash:#1C2124; --rule:#2A3134;
+  --ink:#FFFFFF; --ink-2:#C2CACE; --ink-3:#8A9499;
+  --pine:#F2E205; --pine-soft:#2A2705; --pine-line:#6B6320;
+  --grid:#242A2D;
+  --s1:#6B6320; --s2:#9C9110; --s3:#C7B808; --s4:#F2E205;
+  --c1:#3987e5; --c2:#d95926; --c3:#199e70;
+  --alert:#FF6B4A; --amber:#F2E205;
+  background:#0B0D0E; color:#FFFFFF;
+  margin:-16px -16px -24px; padding:16px 16px 28px;
+  min-height:calc(100vh - 190px);
+}
+.hx .cw,.hx .card{background:var(--paper);border-color:var(--rule)}
+.hx .card.flat{background:var(--wash)}
+
+/* testata */
+.hx-hero{border:1px solid var(--rule);border-radius:14px;padding:20px 16px 16px;
+  background:linear-gradient(160deg,#181C1E,#0E1112);margin-bottom:14px}
+.hx-kicker{font-family:var(--mono);font-size:10px;letter-spacing:.34em;
+  text-transform:uppercase;color:var(--ink-3)}
+.hx-logo{font-size:38px;font-weight:800;letter-spacing:.10em;line-height:1;
+  margin:2px 0 14px;color:#fff}
+.hx-clock{display:flex;align-items:baseline;gap:9px;margin-bottom:14px}
+.hx-clock b{font-size:52px;font-weight:800;line-height:.9;color:var(--pine);
+  letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.hx-clock span{font-family:var(--mono);font-size:11px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3)}
+.hx-clock .hx-set{font-size:13px;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+.hx-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  border-top:1px solid var(--rule);padding-top:12px;margin-bottom:13px}
+.hx-meta span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
+.hx-meta b{font-size:14px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+.hx-btn{width:100%;background:var(--pine);color:#0B0D0E;border:0;border-radius:10px;
+  padding:13px;font:inherit;font-weight:800;letter-spacing:.08em;
+  text-transform:uppercase;font-size:12px;cursor:pointer}
+.hx-btn:active{opacity:.82}
+.hx-btn.ghost{background:none;color:var(--ink-3);border:1px solid var(--rule);
+  margin-top:10px;font-weight:600}
+
+/* navigazione interna */
+.hx-tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;
+  padding-bottom:2px;-webkit-overflow-scrolling:touch}
+.hx-tabs button{flex:none;background:none;border:1px solid var(--rule);color:var(--ink-3);
+  border-radius:20px;padding:8px 14px;font:inherit;font-size:11px;font-weight:700;
+  letter-spacing:.09em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+.hx-tabs button.on{background:var(--pine);color:#0B0D0E;border-color:var(--pine)}
+
+/* carte */
+.hx-card{border:1px solid var(--rule);border-radius:13px;padding:15px 14px;
+  margin-bottom:12px;background:var(--paper)}
+.hx-h{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--pine);margin-bottom:9px}
+.hx-p{font-size:13px;color:var(--ink-2);line-height:1.5;margin:0 0 11px}
+.hx-note{font-size:11.5px;color:var(--ink-3);line-height:1.45;margin:11px 0 0;
+  border-top:1px solid var(--rule);padding-top:10px}
+.hx-big{font-size:44px;font-weight:800;letter-spacing:-.02em;line-height:1;
+  font-variant-numeric:tabular-nums;color:#fff}
+.hx-delta{font-family:var(--mono);font-size:12px;margin:6px 0 10px}
+.hx-delta.ok{color:var(--pine)} .hx-delta.no{color:var(--alert)}
+
+/* piano dei passaggi */
+.hx-split{margin-top:4px}
+.hx-split-h,.hx-split-r{display:grid;grid-template-columns:22px 1fr 52px 62px;
+  gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--rule)}
+.hx-split-h{font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);padding-bottom:6px}
+.hx-split-h span:nth-child(n+3),.hx-split-r .t,.hx-split-r .c{text-align:right}
+.hx-split-r{font-size:13px}
+.hx-split-r.run{color:var(--ink-3)}
+.hx-split-r .n{font-family:var(--mono);font-size:10px;color:var(--ink-3)}
+.hx-split-r .nm{font-weight:600;color:#fff}
+.hx-split-r.run .nm{font-weight:400;color:var(--ink-2)}
+.hx-split-r .nm em{display:block;font-style:normal;font-family:var(--mono);
+  font-size:9.5px;color:var(--ink-3)}
+.hx-split-r .t{font-family:var(--mono);color:var(--pine);font-weight:600}
+.hx-split-r .c{font-family:var(--mono);color:var(--ink-3);font-size:12px}
+
+/* griglia delle stazioni */
+.hx-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hx-tile{position:relative;text-align:left;background:var(--wash);
+  border:1px solid var(--rule);border-radius:11px;padding:11px 11px 12px;
+  color:inherit;font:inherit;cursor:pointer;display:block}
+.hx-tile.has{border-color:var(--pine-line)}
+.hx-tile .n{position:absolute;top:9px;right:10px;font-family:var(--mono);
+  font-size:9px;color:var(--ink-3);letter-spacing:.1em}
+.hx-tile .nm{display:block;font-weight:800;font-size:14px;letter-spacing:.04em;
+  text-transform:uppercase;color:#fff}
+.hx-tile .ms{display:block;font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3);margin-bottom:7px}
+.hx-tile .pb{display:block;font-family:var(--mono);font-size:20px;font-weight:600;
+  color:var(--pine);line-height:1.1}
+.hx-tile .tg,.hx-tile .st{display:block;font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3)}
+.hx-tile .st{margin-top:4px;color:var(--ink-2)}
+
+/* righe di scarto */
+.hx-gap{display:grid;grid-template-columns:1fr auto 62px;gap:9px;padding:8px 0;
+  border-bottom:1px solid var(--rule);font-size:13px;align-items:baseline}
+.hx-gap:last-child{border-bottom:0}
+.hx-gap .nm{color:var(--ink-2)}
+.hx-gap .v{font-family:var(--mono);color:#fff}
+.hx-gap .d{font-family:var(--mono);text-align:right;color:var(--alert);font-size:12px}
+.hx-gap.ok .d{color:var(--pine)}
+.hx-gap.plain .d{color:var(--ink-2)}
+
+/* sedute */
+.hx-sess{display:grid;grid-template-columns:78px 1fr 38px;gap:9px;width:100%;
+  align-items:center;background:none;border:0;border-bottom:1px solid var(--rule);
+  padding:11px 0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.hx-sess:last-of-type{border-bottom:0}
+.hx-sess .tp{font-family:var(--mono);font-size:9px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink-3)}
+.hx-sess .nm{font-weight:600;color:#fff;font-size:13.5px}
+.hx-sess .du{font-family:var(--mono);font-size:11px;color:var(--ink-3);text-align:right}
+.hx-sess.mirato .tp{color:var(--pine)}
+.hx-sess.mirato .nm::after{content:'·';color:var(--pine);margin-left:6px;font-weight:800}
+
+/* quote e checklist */
+.hx-quote{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:10px 0 0}
+.hx-quote div{background:var(--wash);border-radius:9px;padding:9px 10px}
+.hx-quote span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
+.hx-quote b{display:block;font-size:16px;font-weight:700;color:#fff;
+  font-variant-numeric:tabular-nums}
+.hx-quote em{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3);margin-top:2px}
+.hx-check{display:grid;grid-template-columns:26px 1fr;gap:11px;width:100%;
+  align-items:start;background:none;border:0;border-bottom:1px solid var(--rule);
+  padding:11px 0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.hx-check .bx{width:22px;height:22px;border-radius:6px;border:1.5px solid var(--rule);
+  display:flex;align-items:center;justify-content:center;font-size:13px;color:#0B0D0E}
+.hx-check.on .bx{background:var(--pine);border-color:var(--pine)}
+.hx-check .tx b{display:block;font-size:13.5px;color:#fff;font-weight:600}
+.hx-check .tx em{display:block;font-style:normal;font-size:11.5px;color:var(--ink-3);
+  margin-top:2px;line-height:1.4}
+.hx-tip{padding:9px 0;border-bottom:1px solid var(--rule)}
+.hx-tip:last-child{border-bottom:0}
+.hx-tip b{display:block;font-size:12px;font-weight:800;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--pine);margin-bottom:3px}
+.hx-tip span{font-size:12.5px;color:var(--ink-2);line-height:1.45}
+
+/* ingresso dalla scheda Gym */
+.hx-entry{background:linear-gradient(150deg,#181C1E,#0B0D0E);border:1px solid #2A3134;
+  border-radius:13px;padding:16px;margin-bottom:12px;color:#fff;display:block;
+  width:100%;text-align:left;font:inherit;cursor:pointer}
+.hx-entry .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.3em;
+  text-transform:uppercase;color:#8A9499}
+.hx-entry .l{font-size:26px;font-weight:800;letter-spacing:.09em;margin:2px 0 6px}
+.hx-entry .d{font-size:12.5px;color:#C2CACE;line-height:1.45}
+.hx-entry .g{display:inline-block;margin-top:9px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;color:#F2E205}
