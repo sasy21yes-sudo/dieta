@@ -247,8 +247,14 @@ function composition(k = today()) {
 }
 
 /* --------------------------------------------- motore di previsione */
-/** Peso di tendenza: media su finestra elastica, tollera i giorni saltati. */
+/**
+ * Peso di tendenza: media su finestra elastica, tollera i giorni saltati.
+ * Da quando esiste peso.js le pesate fuori scala vengono scartate: una sola
+ * sbagliata di due chili sposta la media di 0,3 kg, e quei 0,3 kg diventano
+ * 165 kcal al giorno di dispendio inventato dentro il bilancio energetico.
+ */
 function trendW(k = today(), n = 7) {
+  if (typeof trendWRobusto === 'function') return trendWRobusto(k, n).peso;
   const vals = [];
   for (let i = 0; i < n * 2 && vals.length < n; i++) {
     const w = S.log[addDays(k, -i)]?.peso;
@@ -296,7 +302,11 @@ function observedTDEE(k, span) {
   const intake = avg(ins), dw = w1 - w0;
   // il peso di tendenza è una media di ~7 pesate: l'errore sulla differenza di
   // due medie vale sigma·√(2/7), riportato al giorno dividendo per span
-  const sigma = Math.max(40, (dailyNoise() * M.kcal_per_kg * Math.sqrt(2 / 7)) / span);
+  let sigma = Math.max(40, (dailyNoise() * M.kcal_per_kg * Math.sqrt(2 / 7)) / span);
+  // una finestra che attraversa il confine fra follicolare e luteale contiene
+  // acqua che il bilancio energetico legge come grasso: non la si sottrae —
+  // quanta sia non lo sappiamo — si dice al filtro di fidarsi meno
+  if (typeof inflazioneCiclo === 'function') sigma *= inflazioneCiclo(k, span);
   return { tdee: intake - (dw * M.kcal_per_kg) / span, sigma, intake, dw, span,
            copertura: ins.length / span };
 }
@@ -684,6 +694,9 @@ function viewOggi(v) {
   nav.append(r); v.append(nav);
 
   if (k === today()) {
+    if (typeof cardPesataAnomala === 'function') {
+      const ca = cardPesataAnomala(k); if (ca) v.append(ca);
+    }
     if (typeof revisionePronta === 'function' && revisionePronta(k)) {
       const inv = el('button', 'card rev-invito');
       inv.innerHTML = `<span class="eyebrow">La settimana e' chiusa</span>
@@ -900,6 +913,8 @@ function viewDiario(v) {
     f.querySelector('input').oninput = e => set(id, parseNum(e.target.value));
     return f;
   };
+
+  if (D.profilo?.sesso === 'f' && typeof cardCiclo === 'function') v.append(cardCiclo(k));
 
   const c1 = el('div', 'card');
   c1.append(el('h2', 'sec', 'Ogni giorno'));

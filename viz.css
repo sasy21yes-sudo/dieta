@@ -609,3 +609,11 @@
 .acc-r .lv.l3{background:var(--rust,var(--amber));filter:saturate(1.2) brightness(.85)}
 .acc-r .nm{font-weight:600;font-size:14px}
 .acc-r .gg{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+
+/* ---------------- pesate anomale e ciclo ---------------- */
+.card.anomala{border-left:3px solid var(--amber)}
+.cic-barra{position:relative;display:flex;gap:2px;height:9px;margin:11px 0 10px}
+.cic-s{background:var(--wash);border-radius:3px}
+.cic-s.on{background:var(--pine)}
+.cic-cur{position:absolute;top:-3px;width:2px;height:15px;background:var(--ink);
+  border-radius:2px;transform:translateX(-1px)}
