@@ -518,6 +518,91 @@ function backupBanner(v) {
   v.append(c);
 }
 
+/* ----------------------------------------------------- consiglio del giorno */
+/**
+ * Preferisce sempre un consiglio che nasce dai TUOI dati a uno generico: un
+ * suggerimento che descrive la tua settimana viene letto, uno da bugiardino
+ * no. I generici entrano solo quando non c'e' niente di specifico da dire, e
+ * ruotano in modo deterministico sulla data: lo stesso giorno mostra lo stesso
+ * consiglio, cosi' non cambia a ogni tocco.
+ */
+function consiglioDelGiorno(k = today()) {
+  const T = D.target, d7 = windowDays(k, 7);
+  const cons = d7.map(x => S.log[x] ? consumed(x) : null).filter(m => m && m.kcal > 400);
+  const media = id => avg(d7.map(x => S.log[x]?.[id]));
+
+  const mirati = [];
+  const collo = lastMeas('collo');
+  if (collo != null && (collo < 32 || collo > 48)) mirati.push({
+    t: 'Rimisura il collo', c: `Con ${nf(collo, 1)} cm la stima del grasso resta bloccata:
+    la formula si regge sulla differenza vita-collo e un valore fuori scala la rende inutile.
+    E' la misura che sblocca meta' della scheda Corpo.` });
+
+  if (cons.length >= 3) {
+    const ap = avg(cons.map(m => m.p));
+    if (ap < T.p * 0.9) mirati.push({
+      t: 'Proteine sotto target', c: `Media ${nf(ap, 0)} g contro ${T.p}. In ricomposizione
+      e' la variabile che protegge la massa magra mentre tutto il resto si muove:
+      prima di toccare qualsiasi altra cosa, sistema questa.` });
+    const af = avg(cons.map(m => m.fibre));
+    if (af && af < T.fibre * 0.7) mirati.push({
+      t: 'Fibre indietro', c: `Media ${nf(af, 0)} g contro ${T.fibre} previsti. Di solito
+      significa che stai saltando i legumi, e con loro se ne vanno anche ferro e sazieta'.` });
+  }
+  const sn = media('sonno');
+  if (sn != null && sn < 6.5) mirati.push({
+    t: 'Dormi poco', c: `Media ${nf(sn, 1)} ore. Il sonno insufficiente alza la fame del
+    giorno dopo e abbassa la sintesi proteica: sistemarlo sposta piu' della somma di
+    tutti gli aggiustamenti sui macro.` });
+  const aq = media('acqua');
+  if (aq != null && aq < T.acqua_l * 0.75) mirati.push({
+    t: 'Bevi poco per le fibre che mangi', c: `Media ${nf(aq, 1)} L contro ${T.acqua_l}.
+    Con ${T.fibre} g di fibre l'acqua non e' un dettaglio: fibre alte e acqua bassa
+    danno gonfiore, non regolarita'.` });
+
+  const pesate = windowDays(k, 14).filter(x => S.log[x]?.peso != null).length;
+  if (pesate < 6) mirati.push({
+    t: 'Servono piu\' pesate', c: `${pesate} negli ultimi 14 giorni. Sotto le otto la media
+    mobile non significa niente, e senza quella il motore di previsione resta fermo
+    alla stima da formula.` });
+
+  if (typeof statoMuscoli === 'function' && PD) {
+    const st = statoMuscoli(k);
+    const fermi = Object.values(st).filter(x => x.serie === 0 && x.forma > 0.15);
+    if (fermi.length) mirati.push({
+      t: 'Un gruppo e\' rimasto indietro', c: `Questa settimana non hai allenato
+      ${fermi.slice(0, 3).map(x => x.nome.toLowerCase()).join(', ')}. Non e' un dramma su una
+      settimana, ma la forma accumulata svanisce in circa sei settimane se non la ritocchi.` });
+  }
+  if (backupDue()) mirati.push({
+    t: 'Fai un backup', c: 'Hai parecchi giorni registrati dall\'ultimo export. I dati stanno solo su questo telefono: senza un file salvato altrove, svuotare Safari significa ricominciare.' });
+
+  if (mirati.length) {
+    // ruota anche fra i mirati, cosi' non vedi sempre lo stesso
+    const i = Math.abs(hashData(k)) % mirati.length;
+    return { ...mirati[i], mirato: true, quanti: mirati.length };
+  }
+  const G = D.consigli || [];
+  if (!G.length) return null;
+  return { ...G[Math.abs(hashData(k)) % G.length], mirato: false };
+}
+/** Numero stabile ricavato dalla data: stesso giorno, stesso consiglio. */
+function hashData(k) {
+  let h = 0;
+  for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) | 0;
+  return h;
+}
+
+function cardConsiglio(k) {
+  const c = consiglioDelGiorno(k);
+  if (!c) return null;
+  const box = el('div', 'card advice' + (c.mirato ? ' mirato' : ''));
+  box.append(el('div', 'eyebrow', c.mirato ? 'Dai tuoi dati' : 'Consiglio del giorno'));
+  box.append(el('h3', 'advice-t', esc(c.t)));
+  box.append(el('p', 'advice-c', esc(c.c.replace(/\s+/g, ' ').trim())));
+  return box;
+}
+
 /* --------------------------------------------------------------- router */
 const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
                  palestra: viewPalestra, dati: viewDati, analisi: viewAnalisi,
@@ -555,6 +640,8 @@ function viewOggi(v) {
   r.children[2].onclick = () => { viewDate = addDays(viewDate, 1); route(); };
   r.children[1].style.textAlign = 'center';
   nav.append(r); v.append(nav);
+
+  if (k === today()) { const cc = cardConsiglio(k); if (cc) v.append(cc); }
 
   // barre macro
   const cons = consumed(k), tgt = dayTarget(k);

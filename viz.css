@@ -134,3 +134,12 @@
 
 /* la mappa muscolare ha bisogno di piu' spazio della figura di Corpo */
 .bodywrap.gymmap{max-width:258px}
+
+/* ---------------- consiglio del giorno ---------------- */
+.advice{border-left:3px solid var(--ink-3)}
+.advice.mirato{border-left-color:var(--pine);background:var(--pine-soft);
+  border-color:var(--pine-line);border-left-color:var(--pine)}
+.advice-t{font-family:var(--serif);font-size:16px;font-weight:700;margin:2px 0 5px;
+  letter-spacing:-.01em}
+.advice-c{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+.advice.mirato .advice-c{color:var(--ink)}

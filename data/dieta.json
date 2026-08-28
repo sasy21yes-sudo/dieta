@@ -1668,5 +1668,107 @@
    "torace_vita": 1.25
   },
   "chiave": "A parità di altezza il peso è quasi identico a quello di partenza. Non è un obiettivo di dimagrimento: è uno scambio di circa 6 kg di grasso con 6 kg di muscolo. La bilancia è lo strumento sbagliato per accorgersene, il metro è quello giusto."
- }
+ },
+ "consigli": [
+  {
+   "id": "proteine-distribuzione",
+   "t": "Distribuisci, non accumulare",
+   "c": "Venti grammi di proteine a colazione fanno piu' dei quaranta aggiunti a cena. La sintesi proteica si riattiva a ogni pasto che supera la soglia, e a fine giornata non si recupera il pasto saltato al mattino."
+  },
+  {
+   "id": "legumi-ferro",
+   "t": "Ferro e vitamina C insieme",
+   "c": "Il ferro dei legumi si assorbe molto meglio se nello stesso pasto c'e' vitamina C: un po' di limone sui ceci, o del peperone crudo, valgono piu' di un integratore."
+  },
+  {
+   "id": "fibre-acqua",
+   "t": "Le fibre senza acqua lavorano male",
+   "c": "Alzare le fibre senza alzare l'acqua produce gonfiore e stitichezza, non regolarita'. Sono due leve che si muovono insieme."
+  },
+  {
+   "id": "pesata-varianza",
+   "t": "La bilancia misura anche l'acqua",
+   "c": "Un pasto salato, poche ore di sonno o un allenamento duro spostano il numero del mattino di un chilo, e non e' grasso. Per questo conta la media, non il singolo giorno."
+  },
+  {
+   "id": "metro-vs-bilancia",
+   "t": "Il metro vede quello che la bilancia non vede",
+   "c": "In ricomposizione il peso puo' restare fermo per settimane mentre la vita cala e il torace sale. Se guardi solo la bilancia, ti perdi esattamente il progresso che stai cercando."
+  },
+  {
+   "id": "sonno-fame",
+   "t": "Il sonno e' una leva sulla fame",
+   "c": "Dormire meno di sei ore alza la fame del giorno dopo e abbassa la sintesi proteica. Sistemare il sonno sposta piu' di qualunque aggiustamento sui macro."
+  },
+  {
+   "id": "progressione-ripetizioni",
+   "t": "Prima le ripetizioni, poi il carico",
+   "c": "Aggiungere peso prima di aver riempito il range di ripetizioni significa fare meno lavoro con un numero piu' bello. La doppia progressione esiste per evitarlo."
+  },
+  {
+   "id": "rir-onesto",
+   "t": "Il RIR va stimato onesto",
+   "c": "Dichiarare RIR 2 quando ne avevi cinque in serbatoio non inganna l'app: inganna il calcolo del massimale e del volume, e quindi i suggerimenti che ricevi."
+  },
+  {
+   "id": "volume-minimo",
+   "t": "Sotto le dieci serie si mantiene, non si cresce",
+   "c": "Per la maggior parte dei gruppi muscolari servono almeno dieci serie settimanali per crescere. Sotto quella soglia si conserva quello che c'e', il che va benissimo in certi periodi, ma va saputo."
+  },
+  {
+   "id": "recupero-non-riposo",
+   "t": "Il muscolo cresce fra una seduta e l'altra",
+   "c": "L'allenamento e' lo stimolo, non la crescita. Se un gruppo e' ancora affaticato, allenarlo di nuovo aggiunge fatica senza aggiungere adattamento."
+  },
+  {
+   "id": "b12-silenziosa",
+   "t": "La B12 non da' sintomi finche' non e' tardi",
+   "c": "La carenza si accumula per mesi senza segnali, e quando arriva puo' lasciare danni nervosi. E' l'unico integratore non negoziabile di una dieta vegana."
+  },
+  {
+   "id": "creatina-costanza",
+   "t": "La creatina conta per costanza, non per orario",
+   "c": "Non importa se la prendi prima o dopo l'allenamento: conta che la prendi tutti i giorni, anche in quelli di riposo, perche' agisce per saturazione."
+  },
+  {
+   "id": "passi-neat",
+   "t": "I passi sono la leva piu' indolore",
+   "c": "Duemila passi in piu' al giorno valgono circa cento calorie senza toccare un solo grammo di cibo e senza aumentare la fame come farebbe piu' cardio."
+  },
+  {
+   "id": "sgarro-settimana",
+   "t": "Il bilancio e' settimanale",
+   "c": "Una cena fuori piano non annulla sei giorni buoni, e non va compensata saltando il pasto dopo. Compensare e' il modo piu' rapido di trasformare una cena in una settimana storta."
+  },
+  {
+   "id": "misure-stesso-momento",
+   "t": "Misura sempre nelle stesse condizioni",
+   "c": "Vita al mattino a digiuno, senza trattenere il respiro, metro aderente ma non stretto. Cambiare condizioni fra una misura e l'altra produce differenze piu' grandi del progresso reale."
+  },
+  {
+   "id": "stima-non-verita",
+   "t": "Il grasso stimato e' una direzione",
+   "c": "La formula su vita e collo sbaglia di tre o quattro punti. Serve a vedere se stai andando nel verso giusto, non a sapere la tua percentuale vera."
+  },
+  {
+   "id": "etichette",
+   "t": "Le stime del piano si possono sostituire",
+   "c": "I valori marcati come stima sono medie di categoria. Registrare il prodotto vero che compri, coi valori in etichetta, rende improvvisamente onesti tutti i conti a valle."
+  },
+  {
+   "id": "tempo",
+   "t": "Il muscolo si costruisce in anni, non in mesi",
+   "c": "Un principiante mette su forse mezzo chilo di massa magra al mese nel primo anno, meno dopo. Ogni promessa piu' veloce riguarda acqua, glicogeno o marketing."
+  },
+  {
+   "id": "backup",
+   "t": "I dati vivono solo su questo telefono",
+   "c": "Non c'e' nessun server dietro questa app. Un export ogni tanto e' l'unica differenza fra avere uno storico e ricominciare da zero."
+  },
+  {
+   "id": "proteine-vegetali",
+   "t": "Le fonti vegetali vanno combinate",
+   "c": "Legumi e cereali hanno profili aminoacidici complementari. Non serve farlo nello stesso pasto, ma su tutta la giornata: e' cosi' che il totale diventa completo."
+  }
+ ]
 }
