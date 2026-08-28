@@ -114,3 +114,23 @@
   display:flex;align-items:center}
 #btn-foto svg{width:21px;height:21px;display:block}
 #btn-foto:active{color:var(--pine)}
+
+/* ---------------- barre orizzontali ---------------- */
+.hb{display:grid;grid-template-columns:84px 1fr 38px;gap:9px;align-items:center;
+  padding:5px 0;font-size:12.5px}
+.hb-l{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb-t{position:relative;height:11px;border-radius:6px;background:var(--wash);
+  overflow:hidden;display:block}
+.hb-t b{position:absolute;top:0;bottom:0;background:var(--pine);opacity:.13}
+.hb-t i{position:absolute;left:0;top:0;bottom:0;border-radius:6px;
+  background:var(--pine);display:block}
+.hb-v{text-align:right;color:var(--ink);font-size:11.5px}
+.hb.off .hb-t i{background:var(--ink-3);opacity:.45}
+.hb.over .hb-t i{background:var(--amber)}
+
+/* ---------------- palestra ---------------- */
+.gym-set{display:grid;grid-template-columns:1fr auto auto auto;gap:9px;
+  padding:7px 0;border-bottom:1px solid var(--rule);font-size:13px}
+
+/* la mappa muscolare ha bisogno di piu' spazio della figura di Corpo */
+.bodywrap.gymmap{max-width:258px}

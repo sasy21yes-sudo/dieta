@@ -520,11 +520,11 @@ function backupBanner(v) {
 
 /* --------------------------------------------------------------- router */
 const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
-                 dati: viewDati, analisi: viewAnalisi, spesa: viewSpesa,
-                 prodotti: viewProdotti, foto: viewFoto };
+                 palestra: viewPalestra, dati: viewDati, analisi: viewAnalisi,
+                 spesa: viewSpesa, prodotti: viewProdotti, foto: viewFoto };
 const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
-                 dati: 'Dati', analisi: 'Analisi', spesa: 'Spesa',
-                 prodotti: 'Prodotti', foto: 'Foto' };
+                 palestra: 'Palestra', dati: 'Dati', analisi: 'Analisi',
+                 spesa: 'Spesa', prodotti: 'Prodotti', foto: 'Foto' };
 
 function route() {
   const name = (location.hash.replace('#/', '') || 'oggi').split('?')[0];
@@ -1398,6 +1398,9 @@ async function init() {
   load();
   try {
     D = await (await fetch('data/dieta.json', { cache: 'no-cache' })).json();
+    // il catalogo palestra non e' vitale: se manca, il resto dell'app vive
+    try { PD = await (await fetch('data/palestra.json', { cache: 'no-cache' })).json(); }
+    catch { PD = null; }
   } catch {
     $('#view').innerHTML = '<div class="card">Dati non caricati. Serve un server HTTP (anche GitHub Pages): aprire il file da disco non funziona.</div>';
     return;

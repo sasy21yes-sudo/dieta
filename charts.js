@@ -346,6 +346,34 @@ function chartCal(o) {
   return c;
 }
 
+/**
+ * Barre orizzontali. Forma giusta quando le categorie hanno nomi lunghi e sono
+ * tante: in verticale le etichette andrebbero ruotate e diventerebbero
+ * illeggibili. Facoltativa una fascia di riferimento sulla pista.
+ */
+function chartHBars(o) {
+  const card2 = card(o.titolo, o.sub);
+  const vals = o.righe.map(r => r.v);
+  const max = Math.max(o.max || 0, ...vals, 1) * 1.06;
+  const pct = v => Math.max(0, Math.min(100, v / max * 100));
+  for (const r of o.righe) {
+    const row = el('div', 'hb');
+    const fascia = (o.min != null && o.max != null)
+      ? `<b style="left:${pct(o.min)}%;width:${pct(o.max) - pct(o.min)}%"></b>` : '';
+    row.innerHTML = `<span class="hb-l">${esc(r.nome)}</span>
+      <span class="hb-t">${fascia}<i style="width:${pct(r.v).toFixed(1)}%"></i></span>
+      <span class="hb-v mono">${nf(r.v, 1)}</span>`;
+    if (r.stato === 'fermo') row.classList.add('off');
+    if (r.stato === 'sopra') row.classList.add('over');
+    card2.append(row);
+  }
+  if (o.min != null)
+    card2.append(el('div', 'read',
+      `<span class="ph">La fascia chiara e' il riferimento ${nf(o.min)}–${nf(o.max)} ${esc(o.unit || '')}</span>`));
+  if (o.note) card2.append(el('p', 'note', o.note));
+  return card2;
+}
+
 /** Riquadro statistico: quando il dato e' un numero solo, il numero E' il grafico. */
 function tile(o) {
   const t = el('div', 'tile');

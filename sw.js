@@ -1,7 +1,8 @@
 /* Cache offline: l'app deve funzionare anche in cucina senza rete. */
-const V = 'dieta-v4';
+const V = 'dieta-v5';
 const ASSETS = ['./', './index.html', './style.css', './app.js',
-                './viz.css', './charts.js', './prodotti.js', './foto.js',
+                './viz.css', './charts.js', './prodotti.js', './foto.js', './palestra.js',
+                './data/palestra.json',
                 './data/dieta.json', './manifest.json',
                 './icons/icon-180.png', './icons/icon-192.png',
                 './icons/icon-512.png', './icons/maskable-512.png'];
