@@ -54,7 +54,7 @@ function normalize() {
   S.log ||= {}; S.spesa ||= {}; S.settings ||= { start: today() };
   S.model ||= {}; S.model.prev ||= []; S.prodotti ||= [];
   S.palestra ||= {}; S.palestra.sessioni ||= {}; S.palestra.esercizi ||= [];
-  S.palestra.schede ||= [];
+  S.palestra.schede ||= []; S.palestra.acciacchi ||= [];
   // hyrox mancava: un backup fatto prima di questa riga si importava
   // senza gara, record e simulazioni
   S.sfide ||= {}; S.sfide.log ||= {};
@@ -1633,6 +1633,7 @@ function sheetMenu() {
 
 /* --------------------------------------------------------------- avvio */
 async function init() {
+  if (typeof recRiprendi === 'function') recRiprendi();
   load();
   try {
     DBASE = await (await fetch('data/dieta.json', { cache: 'no-cache' })).json();

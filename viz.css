@@ -558,3 +558,54 @@
 .legend{flex-wrap:wrap;row-gap:5px}
 .legend i.dt{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
 .legend i.dt.vuoto{background:var(--paper);box-shadow:inset 0 0 0 1.5px var(--ink-3)}
+
+/* ---------------- timer di recupero ----------------
+   Sta sopra la tab bar e sotto lo sheet: durante il recupero si continua a
+   navigare, ma un foglio aperto ha la precedenza. */
+#recbar{position:fixed;left:8px;right:8px;z-index:19;
+  bottom:calc(var(--safe-b) + 54px);
+  background:var(--ink);color:var(--paper);border-radius:12px;overflow:hidden;
+  box-shadow:0 6px 22px rgba(0,0,0,.22)}
+.rec-fill{position:absolute;inset:0 auto 0 0;background:var(--pine);opacity:.5;
+  transition:width .25s linear}
+#recbar.fatto .rec-fill{width:100% !important;background:var(--amber);opacity:.85}
+.rec-in{position:relative;display:flex;align-items:center;gap:8px;padding:8px 10px}
+.rec-mid{flex:1;text-align:center;line-height:1.15}
+.rec-t{display:block;font-family:var(--mono);font-size:20px;font-weight:700;
+  font-variant-numeric:tabular-nums}
+.rec-l{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;opacity:.65;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:46vw}
+.rec-b,.rec-x{background:rgba(255,255,255,.14);color:inherit;border:0;
+  border-radius:8px;font:inherit;font-size:12px;font-family:var(--mono);
+  padding:8px 9px;cursor:pointer;flex:none}
+.rec-x{font-size:13px;padding:8px 10px}
+.rec-go{background:var(--wash);color:var(--ink-2);border:1px solid var(--rule);
+  border-radius:7px;font-family:var(--mono);font-size:11px;padding:4px 7px;
+  cursor:pointer;flex:none;margin-left:auto;margin-right:8px}
+
+/* ---------------- scarico e acciacchi ---------------- */
+.card.scarico.on{border-left:3px solid var(--amber)}
+.sc-motivi{margin-top:10px}
+.sc-m{padding:9px 0;border-bottom:1px solid var(--rule)}
+.sc-m:last-child{border-bottom:0}
+.sc-m .t{display:block;font-weight:600;font-size:13.5px;margin-bottom:2px}
+.sc-m .c{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.45}
+.sc-come{margin-top:12px}
+.sc-p{display:grid;grid-template-columns:22px 1fr;gap:10px;padding:9px 0;
+  border-bottom:1px solid var(--rule)}
+.sc-p:last-child{border-bottom:0}
+.sc-p .n{width:20px;height:20px;border-radius:50%;background:var(--pine);color:#fff;
+  font-family:var(--mono);font-size:10px;font-weight:700;display:flex;
+  align-items:center;justify-content:center}
+.sc-p .c{font-size:13.5px;line-height:1.5}
+.hint.acciacco{border-left:3px solid var(--amber);padding-left:9px}
+.acc-r{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;
+  width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;
+  border-top:1px solid var(--rule);padding:11px 0;cursor:pointer}
+.acc-r .lv{font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+  text-transform:uppercase;padding:3px 7px;border-radius:99px;color:#fff}
+.acc-r .lv.l1{background:var(--ink-3)} .acc-r .lv.l2{background:var(--amber)}
+.acc-r .lv.l3{background:var(--rust,var(--amber));filter:saturate(1.2) brightness(.85)}
+.acc-r .nm{font-weight:600;font-size:14px}
+.acc-r .gg{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}

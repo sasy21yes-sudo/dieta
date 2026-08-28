@@ -438,6 +438,10 @@ function viewPalestra(v) {
   testa.append(bReg);
   v.append(testa);
 
+  const cScar = typeof cardScarico === 'function' ? cardScarico(k) : null;
+  if (cScar) v.append(cScar);
+  if (typeof cardAcciacchi === 'function') v.append(cardAcciacchi(k));
+
   /* --- mappa muscolare --- */
   const cm = el('div', 'cw');
   cm.append(el('h3', null, 'Mappa muscolare'));
@@ -752,9 +756,16 @@ function sheetDaScheda(k, schedaId) {
 
     const box = el('div', 'card flat');
     box.style.marginBottom = '10px';
-    box.append(el('div', 'row between',
-      `<strong><span class="sk-g">${et[ei].testo}</span> ${esc(ex.nome)}</strong>
-       <span class="mono muted" style="font-size:11px">${riga.serie} × ${lo}–${hi}</span>`));
+    const cap = el('div', 'row between');
+    cap.innerHTML = `<strong><span class="sk-g">${et[ei].testo}</span> ${esc(ex.nome)}</strong>
+       <span class="mono muted" style="font-size:11px">${riga.serie} × ${lo}–${hi}</span>`;
+    box.append(cap);
+    // in una superserie il recupero sta DOPO la coppia, non in mezzo:
+    // se la riga dopo e' attaccata a questa, qui il timer non ci va
+    if (!sc.esercizi[ei + 1]?.superserie)
+      cap.querySelector('span:last-child').before(bottoneRecupero(ex, riga));
+    const av = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(riga.ex, k) : null;
+    if (av) box.append(av);
     if (riga.tecnica && riga.tecnica !== 'normale')
       box.append(el('div', 'hint', `<strong>${esc(t.nome)}</strong> — ${esc(t.d)}`));
     if (riga.superserie && ei > 0)
@@ -878,6 +889,14 @@ function sheetLibero(k) {
   for (const e of catalogo().slice().sort((a, b) => a.nome.localeCompare(b.nome)))
     selEx.append(new Option(`${e.nome} — ${e.attrezzo}`, e.id, false, e.id === ultimoEx));
   box.append(selEx);
+  const avv = el('div');
+  const aggiornaAvviso = () => {
+    avv.innerHTML = '';
+    const x = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(selEx.value, k) : null;
+    if (x) avv.append(x);
+  };
+  selEx.onchange = aggiornaAvviso; aggiornaAvviso();
+  box.append(avv);
 
   const g = el('div');
   g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px';
@@ -896,7 +915,12 @@ function sheetLibero(k) {
     if (reps == null || reps <= 0) { toast('Servono le ripetizioni'); return; }
     s.serie.push({ ex: $('#s-ex').value, kg: kg ?? 0, reps, rir });
     s.nome = $('#s-nome').value.trim();
-    save(); disegna(); toast('Serie aggiunta');
+    save(); disegna();
+    // la serie e' appena finita: il recupero parte da solo, che e' il momento
+    // in cui serve. Il tocco su Aggiungi e' anche il gesto che sblocca l'audio
+    const exf = esercizio($('#s-ex').value);
+    avviaRecupero(recupeoConsigliato(exf), exf?.nome || 'recupero');
+    toast('Serie aggiunta — recupero avviato');
   };
   box.append(add);
   const sugg = ultimoEx ? prossimoPasso(ultimoEx) : null;
