@@ -666,7 +666,7 @@ function sheetGara() {
   }
   fa.append(box);
   fa.append(el('div', 'hint',
-    'Il programma settimanale propone solo allenamenti che puoi davvero fare. Per le stazioni che non puoi allenare trovi l'alternativa dentro la scheda della stazione.'));
+    'Il programma settimanale propone solo allenamenti che puoi davvero fare. Per le stazioni che non puoi allenare, come sostituirle sta dentro la scheda della stazione.'));
   w.append(fa);
 
   const b = el('button', 'btn wide pri', 'Salva');
