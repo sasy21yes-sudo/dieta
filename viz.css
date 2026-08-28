@@ -362,3 +362,29 @@
 .setrow.sethead span{text-align:center}
 .hx-sess.fatta .nm{color:var(--pine)}
 .hx-sess.fatta{opacity:.72}
+
+/* ---------------- calendario fino alla gara ---------------- */
+.cal-l{margin-top:4px}
+.cal-w{display:flex;justify-content:space-between;gap:10px;font-family:var(--mono);
+  font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);
+  padding:14px 0 6px;border-bottom:1px solid var(--rule);margin-bottom:2px}
+.cal-w span:last-child{color:var(--pine)}
+.cal-d{display:grid;grid-template-columns:74px 1fr 34px;gap:9px;width:100%;
+  align-items:baseline;background:none;border:0;border-bottom:1px solid var(--rule);
+  padding:9px 0;color:inherit;font:inherit;text-align:left;cursor:pointer;font-size:13px}
+.cal-d .g{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);
+  text-transform:uppercase;letter-spacing:.04em}
+.cal-d .n{font-weight:600;color:#fff}
+.cal-d .n em{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3);font-weight:400;margin-top:2px;letter-spacing:.05em;
+  text-transform:uppercase}
+.cal-d .t{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);text-align:right}
+.cal-d.rip{cursor:default}
+.cal-d.rip .n{color:var(--ink-3);font-weight:400}
+.cal-d.oggi .g{color:var(--pine);font-weight:700}
+.cal-d.fatta .n{color:var(--pine)}
+.cal-d.gara{border-bottom:0}
+.cal-d.gara .n{color:var(--pine);font-weight:800;letter-spacing:.12em}
+.meal.vuoto{width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  border-style:dashed}
+.meal.vuoto .meal-name{color:var(--ink-3);font-weight:400}

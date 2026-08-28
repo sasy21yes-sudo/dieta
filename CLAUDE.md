@@ -80,6 +80,26 @@ data/palestra.json catalogo esercizi, gruppi muscolari, modello forma-fatica
 icons/          180 (apple-touch), 192, 512, maskable
 ```
 
+### `data/dieta.json` è un ESEMPIO, non il default
+
+Il file contiene nome, età, peso e misure di una persona reale. **Chi installa
+l'app non deve ritrovarsi quei dati addosso.** Al primo avvio un gate in
+`route()` porta a `viewBenvenuto` e blocca tutto il resto finché non si sceglie:
+
+- **vuoto** — profilo azzerato, nessun pasto, settimana senza assegnazioni,
+  misure senza valori di partenza; i target si calcolano da Mifflin-St Jeor
+  appena si inserisce il profilo. Il database dei 44 alimenti resta, perché
+  sono valori nutrizionali generici e non dati di nessuno
+- **esempio** — carica il piano completo, con l'avviso esplicito che contiene i
+  dati di un'altra persona
+
+`S.settings.pianoBase` tiene la scelta, e `fondiPiano()` la rispetta. Si può
+cambiare idea dal passo "Piano di partenza".
+
+Conseguenza da non dimenticare: con il piano vuoto `D.pasti[s.codice]` è
+`undefined` per ogni slot. Ogni punto che legge un pasto dalla settimana deve
+reggerlo — Oggi, la spesa e l'analisi lo fanno.
+
 ### Profili e piano personalizzato
 
 `data/dieta.json` è la fonte di verità **di base**, e non va mai modificata dal
@@ -212,6 +232,12 @@ sezione dice sempre **perché** ha scelto così.
 
 Le soglie sono rapporti di uso comune, non misure: dicono "molto sotto / in
 linea / sopra", non danno un voto — e la UI deve continuare a dirlo.
+
+Il piano è un **calendario giorno per giorno da oggi alla gara**
+(`pianoFinoAllaGara()`): ogni riga è una data con la sua seduta o il riposo,
+raggruppata per settimana con la fase. Si sceglie quante sedute a settimana si
+reggono (2–6) e i giorni si distribuiscono di conseguenza; l'ultima settimana è
+scarico, la vigilia è riposo, l'ultimo giorno è la gara.
 
 HYROX ha **tre sezioni**, non sei: il conto alla rovescia sta sempre in testa,
 il piano dice cosa fare, le stazioni dicono a che punto sei e da lì parte la

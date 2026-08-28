@@ -787,6 +787,8 @@ function sheetDaScheda(k, schedaId) {
     w.append(box);
   }
 
+  w.append(el('p', 'hint', RIR_SPIEGA));
+
   const salva = el('button', 'btn wide pri', 'Salva la seduta');
   salva.onclick = () => {
     const serie = [];
@@ -885,6 +887,8 @@ function sheetLibero(k) {
   g.append(campo('kg', 'kg', prec?.kg), campo('reps', 'rip', prec?.reps), campo('rir', 'RIR', prec?.rir ?? 2));
   box.append(g);
 
+  box.append(el('div', 'hint', RIR_SPIEGA));
+
   const add = el('button', 'btn wide pri', 'Aggiungi serie');
   add.onclick = () => {
     const kg = parseNum($('#s-kg').value), reps = parseNum($('#s-reps').value);
@@ -938,6 +942,14 @@ function sheetLibero(k) {
    volta, e infatti si aggiorna quando la usi.
    Prima toccare una riga la CANCELLAVA e non c'era modo di modificarla: da qui
    l'impressione di poter inserire roba senza capire cosa. */
+
+/* Sigla che compare in ogni modulo di registrazione: va spiegata dove la si
+   digita, non solo nella documentazione. */
+const RIR_SPIEGA = `<strong>RIR</strong> = ripetizioni in riserva: quante ne `
+  + `avresti ancora potute fare a fine serie prima di fermarti. RIR 0 vuol dire `
+  + `a cedimento, RIR 2 che te ne restavano due. Serve a rendere confrontabili `
+  + `serie fatte con sforzo diverso, ed e' la variabile su cui l'app decide `
+  + `quando farti aumentare il carico.`;
 
 const TECNICHE = [
   { id: 'normale', nome: 'Normale',

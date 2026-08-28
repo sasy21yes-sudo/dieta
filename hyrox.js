@@ -296,6 +296,113 @@ function capacitaFisica(k = today()) {
   };
 }
 
+/* ------------------------------------------- programma fino al giorno gara */
+/** In che giorni della settimana ti alleni, a seconda di quante sedute reggi. */
+const GIORNI_SEDUTA = {
+  2: [1, 4], 3: [0, 2, 4], 4: [0, 1, 3, 5],
+  5: [0, 1, 2, 4, 5], 6: [0, 1, 2, 3, 4, 5]
+};
+/* Quando le sedute possibili sono meno di quelle che la fase vorrebbe, si
+   tiene quello che pesa di piu' sul risultato e si lascia cadere il resto. */
+const PRIORITA = ['simulazione', 'compromesso', 'corsa', 'forza', 'capacita', 'erg', 'test'];
+
+/**
+ * Le sedute di UNA settimana, scelte dalla fase e corrette sulle tue capacita':
+ * piu' forza se le gambe sono deboli, piu' corsa se il motore non regge, e
+ * insistendo sulle stazioni dove perdi piu' tempo.
+ */
+function sessioniSettimana(settRestanti, deboli, cap, quante, seme) {
+  const fase = HX.fasi.find(f => settRestanti <= f.da_settimana && settRestanti >= f.a_settimana)
+    || HX.fasi[0];
+  const mix = { ...fase.mix };
+  if (cap.gambe?.fascia === 'debole') mix.forza = (mix.forza || 0) + 1;
+  if (cap.tirata?.fascia === 'debole') mix.forza = (mix.forza || 0) + 1;
+  if (cap.aerobico?.fascia === 'debole') mix.corsa = (mix.corsa || 0) + 1;
+
+  const tipi = [];
+  for (const t of PRIORITA)
+    for (let i = 0; i < (mix[t] || 0); i++) tipi.push(t);
+  while (tipi.length < quante) tipi.push('corsa');
+
+  const lib = HX.allenamenti.filter(fattibile);
+  const usati = new Set();
+  const out = [];
+  for (const t of tipi.slice(0, quante)) {
+    const cand = lib.filter(a => a.tipo === t);
+    if (!cand.length) continue;
+    // prima quelli che toccano una stazione debole, poi quelli non ancora usati
+    const ord = cand.slice().sort((a, b) => {
+      const pa = (a.stazioni || []).some(s => deboli.includes(s)) ? 0 : 1;
+      const pb = (b.stazioni || []).some(s => deboli.includes(s)) ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return (usati.has(a.id) ? 1 : 0) - (usati.has(b.id) ? 1 : 0);
+    });
+    const scelto = ord[Math.abs(seme + out.length) % ord.length];
+    usati.add(scelto.id);
+    out.push({ ...scelto, fase,
+      mirato: (scelto.stazioni || []).some(s => deboli.includes(s)) });
+  }
+  return { fase, sessioni: out };
+}
+
+/**
+ * Il calendario da oggi al giorno della gara, un giorno per riga.
+ * L'ultima settimana e' scarico, la vigilia e' riposo e il giorno della gara
+ * e' la gara: non ci si allena il giorno prima sperando di guadagnare qualcosa.
+ */
+function pianoFinoAllaGara(da = today()) {
+  const gg = giorniAllaGara();
+  if (gg == null || gg < 0) return null;
+  const quante = HXS().profilo.sedute || 4;
+  const giorniOk = GIORNI_SEDUTA[quante] || GIORNI_SEDUTA[4];
+  const cap = capacitaFisica(da);
+  const deboli = gapStazioni().filter(g => g.gap > 0).slice(0, 3).map(g => g.id);
+  const h = HXS();
+
+  const righe = [];
+  let coda = [], faseSett = null;
+  for (let i = 0; i <= Math.min(gg, 180); i++) {
+    const k = addDays(da, i), gi = dayIdx(k);
+    const restaSett = Math.max(0, Math.ceil((gg - i) / 7));
+
+    if (i === 0 || gi === 0) {
+      const w = sessioniSettimana(restaSett, deboli, cap, quante, hashData(k));
+      coda = w.sessioni.slice();
+      faseSett = w.fase;
+    }
+    const fatto = h.sessioni[k]?.fatto ? h.sessioni[k] : null;
+
+    if (i === gg) { righe.push({ k, gi, restaSett, fase: faseSett, gara: true }); continue; }
+    if (gg - i === 1) {
+      righe.push({ k, gi, restaSett, fase: faseSett, riposo: true,
+        nota: 'Vigilia: riposo. Prepara la borsa e rileggi i passaggi.' });
+      continue;
+    }
+    if (gg - i === 2) {
+      righe.push({ k, gi, restaSett, fase: faseSett, fatto,
+        a: { id: 'scarico', nome: 'Sgambata leggera', tipo: 'corsa', durata: 20,
+             descrizione: '15-20 minuti molto facili con tre o quattro allunghi. Serve a sciogliere, non ad allenare.' } });
+      continue;
+    }
+    if (giorniOk.includes(gi) && coda.length) {
+      righe.push({ k, gi, restaSett, fase: faseSett, a: coda.shift(), fatto });
+    } else {
+      righe.push({ k, gi, restaSett, fase: faseSett, riposo: true, fatto });
+    }
+  }
+  return { righe, quante, cap, deboli, troncato: gg > 180 };
+}
+
+const NOMI_GIORNO = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
+const NOMI_MESE = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu',
+                   'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+function etichettaGiorno(k, i) {
+  if (i === 0) return 'OGGI';
+  if (i === 1) return 'domani';
+  const d = new Date(k);
+  return `${NOMI_GIORNO[dayIdx(k)]} ${d.getDate()} ${NOMI_MESE[d.getMonth()]}`;
+}
+
 /* ================================================================= viste */
 /* Tre sezioni, non sei: il conto alla rovescia sta sempre in testa, il piano
    dice cosa fare, le stazioni dicono a che punto sei e da li' parte la
@@ -343,19 +450,21 @@ function viewHyrox(v) {
 }
 
 /* ----------------------------------------------------------- 1. IL PIANO */
+let hxTutto = false;
+
 function hxPiano(w, h) {
   const cap = capacitaFisica();
-  const pw = pianoSettimana();
 
   /* che atleta sei */
   const cc = el('div', 'hx-card');
   cc.append(el('div', 'hx-h', 'Da dove parti'));
   if (!cap.dati) {
     cc.append(el('p', 'hx-p',
-      'Non ho ancora abbastanza dati per tararti addosso il programma. Registra qualche seduta in Gym e segna gli allenamenti qui: da lì leggo forza delle gambe, forza di tirata e motore aerobico, e il programma cambia di conseguenza.'));
+      'Non ho ancora abbastanza dati per tararti addosso il programma. Registra qualche seduta in Gym e segna gli allenamenti qui: da li leggo forza delle gambe, forza di tirata e motore aerobico, e il programma cambia di conseguenza.'));
   } else {
     const riga = (nome, o, testo) => {
-      const r = el('div', 'hx-gap' + (o?.fascia === 'forte' ? ' ok' : o?.fascia === 'in linea' ? ' plain' : ''));
+      const r = el('div', 'hx-gap' + (o?.fascia === 'forte' ? ' ok'
+        : o?.fascia === 'in linea' ? ' plain' : ''));
       r.innerHTML = `<span class="nm">${esc(nome)}</span>
         <span class="v">${esc(testo)}</span>
         <span class="d">${o?.fascia ? esc(o.fascia) : '—'}</span>`;
@@ -378,55 +487,77 @@ function hxPiano(w, h) {
   }
   w.append(cc);
 
-  /* fase e attrezzatura */
-  const fc = el('div', 'hx-card');
-  fc.append(el('div', 'hx-h', 'Fase: ' + pw.fase.nome));
-  const sett = settimaneAllaGara();
-  fc.append(el('p', 'hx-p',
-    (sett != null ? `${sett} settiman${sett === 1 ? 'a' : 'e'} alla gara. ` : 'Nessuna data impostata. ')
-    + esc(pw.fase.nota)));
+  /* il calendario vero e proprio */
+  const cal = pianoFinoAllaGara();
+  const cp = el('div', 'hx-card');
+  cp.append(el('div', 'hx-h', 'Da oggi al giorno della gara'));
+
+  if (!cal) {
+    cp.append(el('p', 'hx-p',
+      'Imposta la data della gara e qui compare il programma giorno per giorno, da oggi fino alla partenza.'));
+    w.append(cp);
+    return;
+  }
+
+  /* quante sedute a settimana */
+  const fs = el('div', 'hx-tabs');
+  fs.style.marginBottom = '10px';
+  for (const n of [2, 3, 4, 5, 6]) {
+    const b = el('button', (h.profilo.sedute || 4) === n ? 'on' : null, n + ' a sett.');
+    b.onclick = () => { h.profilo.sedute = n; save(); route(); };
+    fs.append(b);
+  }
+  cp.append(fs);
+
   const perche = [];
-  if (pw.deboli.length) perche.push('insiste su '
-    + pw.deboli.map(id => esc(stazione(id)?.nome.toLowerCase() || id)).join(', ')
-    + ', dove perdi piu\' tempo');
-  if (cap.gambe?.fascia === 'debole') perche.push('aggiunge forza gambe, che regge cinque stazioni su otto');
-  if (cap.tirata?.fascia === 'debole') perche.push('aggiunge forza di tirata per slitta, rowing e ski');
-  if (cap.aerobico.fascia === 'debole') perche.push('aggiunge corsa: sotto i 90 minuti a settimana il motore non regge otto chilometri');
-  if (perche.length) fc.append(el('p', 'hx-note',
-    'Il programma di questa settimana ' + perche.join('; ') + '.'));
+  if (cal.deboli.length) perche.push('insiste su '
+    + cal.deboli.map(id => esc(stazione(id)?.nome.toLowerCase() || id)).join(', '));
+  if (cap.gambe?.fascia === 'debole' || cap.tirata?.fascia === 'debole')
+    perche.push('aggiunge forza, perche\' la tua e\' sotto i valori tipici');
+  if (cap.aerobico?.fascia === 'debole')
+    perche.push('aggiunge corsa: sotto i 90 minuti a settimana il motore non regge otto chilometri');
   const mancano = HX.attrezzatura.filter(a => !hoAttrezzo(a.id));
-  if (mancano.length) fc.append(el('p', 'hx-note',
-    'Non hai ' + mancano.map(a => esc(a.nome.toLowerCase())).join(', ')
-    + ': scelgo solo fra quello che puoi fare, e dove serve uso le sedute di ripiego.'));
-  w.append(fc);
+  if (mancano.length) perche.push('evita ' + mancano.map(a => esc(a.nome.toLowerCase())).join(', ')
+    + ' e usa le sedute di ripiego');
+  if (perche.length)
+    cp.append(el('p', 'hx-p', 'Il programma ' + perche.join('; ') + '.'));
 
-  /* la settimana */
-  const sc = el('div', 'hx-card');
-  sc.append(el('div', 'hx-h', 'Questa settimana'));
-  for (const a of pw.sessioni) {
-    const fatta = Object.entries(h.sessioni).some(([k2, x]) =>
-      x.id === a.id && x.fatto && k2 >= addDays(today(), -6));
-    const r = el('button', 'hx-sess' + (a.mirato ? ' mirato' : '') + (fatta ? ' fatta' : ''));
-    r.innerHTML = `<span class="tp">${esc(a.tipo)}${a.ripiego ? ' · ripiego' : ''}</span>
-      <span class="nm">${fatta ? '✓ ' : ''}${esc(a.nome)}</span>
-      <span class="du">${a.durata}'</span>`;
-    r.onclick = () => sheetAllenamento(a);
-    sc.append(r);
+  const limite = hxTutto ? cal.righe.length : Math.min(cal.righe.length, 21);
+  let settVista = null;
+  const lista = el('div', 'cal-l');
+  for (let i = 0; i < limite; i++) {
+    const r = cal.righe[i];
+    if (r.restaSett !== settVista) {
+      settVista = r.restaSett;
+      lista.append(el('div', 'cal-w',
+        `<span>${r.restaSett === 0 ? 'settimana di gara' : r.restaSett + ' settimane alla gara'}</span>
+         <span>${esc(r.fase ? r.fase.nome : '')}</span>`));
+    }
+    const row = el('button', 'cal-d'
+      + (i === 0 ? ' oggi' : '') + (r.gara ? ' gara' : '')
+      + (r.riposo ? ' rip' : '') + (r.fatto ? ' fatta' : ''));
+    const nome = r.gara ? 'GARA'
+      : r.riposo ? 'Riposo'
+      : (r.fatto ? '✓ ' : '') + (r.a?.nome || '');
+    row.innerHTML = `<span class="g">${esc(etichettaGiorno(r.k, i))}</span>
+      <span class="n">${esc(nome)}${r.a?.ripiego ? '<em>ripiego</em>' : ''}
+        ${r.nota ? `<em>${esc(r.nota)}</em>` : ''}</span>
+      <span class="t">${r.a ? r.a.durata + "'" : ''}</span>`;
+    if (r.a) row.onclick = () => sheetAllenamento(r.a, r.k);
+    lista.append(row);
   }
-  sc.append(el('p', 'hx-note',
-    'Sette proposte per una settimana: prendine quante ne reggi, non tutte. Il volume che non recuperi non allena, affatica soltanto.'));
-  w.append(sc);
+  cp.append(lista);
 
-  const lc = el('div', 'hx-card');
-  lc.append(el('div', 'hx-h', 'Tutti gli allenamenti'));
-  for (const a of HX.allenamenti.filter(fattibile)) {
-    const r = el('button', 'hx-sess');
-    r.innerHTML = `<span class="tp">${esc(a.tipo)}${a.ripiego ? ' · ripiego' : ''}</span>
-      <span class="nm">${esc(a.nome)}</span><span class="du">${a.durata}'</span>`;
-    r.onclick = () => sheetAllenamento(a);
-    lc.append(r);
+  if (cal.righe.length > 21) {
+    const b = el('button', 'hx-btn ghost',
+      hxTutto ? 'Mostra solo i prossimi 21 giorni'
+              : `Mostra tutti i ${cal.righe.length} giorni`);
+    b.onclick = () => { hxTutto = !hxTutto; route(); };
+    cp.append(b);
   }
-  w.append(lc);
+  cp.append(el('p', 'hx-note',
+    'Il programma si ricalcola da solo mentre i dati cambiano: se migliori una stazione smette di insistere, se cambi attrezzatura cambia gli esercizi. Tocca un giorno per leggere la seduta e segnarla come fatta. Saltare un giorno non rompe niente — quello che non recuperi non allena.'));
+  w.append(cp);
 }
 
 /* --------------------------------------------------------- 2. STAZIONI */
@@ -672,6 +803,19 @@ function sheetGara() {
     'Il programma settimanale propone solo allenamenti che puoi davvero fare. Per le stazioni che non puoi allenare, come sostituirle sta dentro la scheda della stazione.'));
   w.append(fa);
 
+  const fq = el('div', 'field', '<label>Sedute a settimana</label>');
+  const sq = el('div', 'seg');
+  for (const n of [2, 3, 4, 5, 6]) {
+    const b2 = el('button', null, String(n));
+    b2.setAttribute('aria-pressed', (h.profilo.sedute || 4) === n);
+    b2.onclick = () => { h.profilo.sedute = n; save();
+      [...sq.children].forEach(x => x.setAttribute('aria-pressed', x.textContent === String(n))); };
+    sq.append(b2);
+  }
+  fq.append(sq);
+  fq.append(el('div', 'hint', 'Quante volte a settimana riesci ad allenarti davvero. Il programma giorno per giorno si adatta a questo numero.'));
+  w.append(fq);
+
   const b = el('button', 'btn wide pri', 'Salva');
   b.onclick = () => {
     h.profilo.data_gara = $('#hx-data').value || null;
@@ -720,8 +864,8 @@ function sheetStazione(st) {
   sheet(w);
 }
 
-function sheetAllenamento(a) {
-  const h = HXS(), k = today();
+function sheetAllenamento(a, giorno) {
+  const h = HXS(), k = giorno || today();
   const w = el('div');
   w.append(el('div', 'eyebrow', a.tipo + ' · ' + a.durata + ' minuti'));
   w.append(el('h2', 'sec', esc(a.nome)));
@@ -736,6 +880,7 @@ function sheetAllenamento(a) {
   else
     w.append(el('p', 'hint', 'Non serve nessun attrezzo.'));
   const fatto = h.sessioni[k]?.id === a.id && h.sessioni[k]?.fatto;
+  if (k !== today()) w.append(el('p', 'hint', 'Giorno: ' + k));
   const b = el('button', 'btn wide pri', fatto ? 'Segnata come fatta oggi' : 'Segna come fatta oggi');
   b.onclick = () => {
     if (fatto) delete h.sessioni[k];

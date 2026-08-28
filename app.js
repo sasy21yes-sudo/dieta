@@ -123,7 +123,11 @@ function consumed(k) {
   for (const e of d.extra) addM(t, e);
   return t;
 }
-function dayTarget(k) { return D.settimana[dayIdx(k)].totali; }
+/** Se al giorno non e' assegnato nessun pasto, il metro sono i target. */
+function dayTarget(k) {
+  const t = D.settimana[dayIdx(k)].totali;
+  return (t && t.kcal > 0) ? t : { ...D.target };
+}
 
 /* --------------------------------------------------- motore sostituzioni */
 /** Trova alimenti della stessa categoria che replicano il macro dominante. */
@@ -480,7 +484,8 @@ function analyse(k = today()) {
   // --- distribuzione proteica di oggi
   const dd = day(k), plan = D.settimana[dayIdx(k)];
   const main = plan.pasti.filter(s => ['Colazione', 'Pranzo', 'Cena'].includes(s.slot));
-  const low = main.filter(s => dd.pasti[s.codice] && D.pasti[s.codice].macro.p < T.min_p_per_pasto);
+  const low = main.filter(s => dd.pasti[s.codice] && D.pasti[s.codice]
+    && D.pasti[s.codice].macro.p < T.min_p_per_pasto);
   if (low.length) F.push(['warn', 'L', 'Dose proteica bassa in un pasto',
     `Oggi ${low.length} pasto/i principali sotto i ${T.min_p_per_pasto} g. Da fonti vegetali sotto quella soglia la leucina non basta ad attivare la sintesi proteica: meglio ridistribuire che aggiungere alla fine della giornata.`]);
 
@@ -633,14 +638,16 @@ function cardConsiglio(k) {
 const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
                  palestra: viewPalestra, dati: viewDati, analisi: viewAnalisi,
                  spesa: viewSpesa, prodotti: viewProdotti, foto: viewFoto,
-                 piano: viewPiano, hyrox: viewHyrox };
+                 piano: viewPiano, hyrox: viewHyrox, benvenuto: viewBenvenuto };
 const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
                  palestra: 'Palestra', dati: 'Dati', analisi: 'Analisi',
                  spesa: 'Spesa', prodotti: 'Prodotti', foto: 'Foto',
-                 piano: 'Piano', hyrox: 'Road to HYROX' };
+                 piano: 'Piano', hyrox: 'Road to HYROX', benvenuto: 'Benvenuto' };
 
 function route() {
-  const name = (location.hash.replace('#/', '') || 'oggi').split('?')[0];
+  let name = (location.hash.replace('#/', '') || 'oggi').split('?')[0];
+  // finche' non si e' scelto da cosa partire non si mostra il piano di nessuno
+  if (typeof pianoScelto === 'function' && !pianoScelto()) name = 'benvenuto';
   const fn = ROUTES[name] || viewOggi;
   $('#top-title').textContent = TITLES[name] || 'Oggi';
   document.querySelectorAll('#tabbar a').forEach(a =>
@@ -693,8 +700,31 @@ function viewOggi(v) {
   v.append(box);
 
   // pasti
+  if (!plan.pasti.some(s => D.pasti[s.codice])) {
+    const av = el('div', 'card flat');
+    av.append(el('div', 'eyebrow', 'Giornata da comporre'));
+    av.append(el('div', 'muted',
+      'A questo giorno non e ancora assegnato nessun pasto. Vai in Piano, passo "Quando li mangi", e scegli cosa mettere in ogni slot.'));
+    const b = el('button', 'btn wide pri', 'Apri il piano');
+    b.style.marginTop = '10px';
+    b.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'settimana';
+      location.hash = '#/piano'; };
+    av.append(b);
+    v.append(av);
+  }
   for (const s of plan.pasti) {
     const p = D.pasti[s.codice], done = !!d.pasti[s.codice];
+    // slot senza pasto: con il piano vuoto e' la norma, non un errore
+    if (!p) {
+      const vuoto = el('button', 'meal vuoto');
+      vuoto.innerHTML = `<div class="meal-h"><div class="grow">
+        <div class="meal-slot">${esc(s.slot)}${s.ora ? ' · ' + esc(s.ora) : ''}</div>
+        <div class="meal-name">Da assegnare</div></div></div>`;
+      vuoto.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'settimana';
+        location.hash = '#/piano'; };
+      v.append(vuoto);
+      continue;
+    }
     const m = el('div', 'meal' + (done ? ' done' : ''));
     const h = el('div', 'meal-h');
     const tick = el('button', 'tick', '✓');
@@ -1389,9 +1419,12 @@ function viewAnalisi(v) {
 function shoppingList() {
   const need = {};
   for (const g of D.settimana)
-    for (const s of g.pasti)
-      for (const i of D.pasti[s.codice].ingredienti)
+    for (const s of g.pasti) {
+      const p = D.pasti[s.codice];          // con il piano vuoto lo slot e' libero
+      if (!p || !p.ingredienti) continue;
+      for (const i of p.ingredienti)
         need[i.alimento] = (need[i.alimento] || 0) + i.qta;
+    }
   const byCat = {};
   for (const [nome, q] of Object.entries(need)) {
     const cat = D.alimenti[nome]?.categoria || 'altro';

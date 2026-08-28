@@ -52,23 +52,65 @@ function piano() {
   return p;
 }
 
+/** Sette giorni senza pasti assegnati, con la struttura degli slot del file. */
+function settimanaVuota() {
+  return DBASE.settimana.map(g => ({
+    giorno: g.giorno, attivita: '',
+    pasti: (g.pasti || []).map(s => ({ slot: s.slot, ora: s.ora, codice: null })),
+    totali: M0()
+  }));
+}
+
 /**
- * D = base + strato dell'utente. Gli oggetti si fondono per chiave, cosi'
- * modificare un alimento non cancella gli altri; la settimana invece si
- * sostituisce in blocco, perche' un piano riorganizzato a meta' non avrebbe
- * senso.
+ * Target di partenza per chi comincia da zero: Mifflin-St Jeor per il
+ * metabolismo a riposo, per il fattore di attivita' del modello, proteine a
+ * 2 g/kg, grassi al 25% delle calorie, il resto carboidrati. E' un punto di
+ * partenza calcolato, non un piano: la scheda Target lo dice e lo fa cambiare.
+ */
+function targetNeutro() {
+  const g = { acqua_l: DBASE.target.acqua_l, passi: DBASE.target.passi,
+              sonno_h: DBASE.target.sonno_h, p_per_kg: 2,
+              min_p_per_pasto: DBASE.target.min_p_per_pasto,
+              kcal: 0, p: 0, c: 0, g: 0, fibre: 0 };
+  const pr = { ...DBASE.profilo, ...piano().profilo };
+  const peso = piano().profilo?.peso_iniziale_kg;
+  if (!(peso > 0 && pr.altezza_cm > 0 && pr.eta > 0)) return g;
+  const bmr = 10 * peso + 6.25 * pr.altezza_cm - 5 * pr.eta + (pr.sesso === 'f' ? -161 : 5);
+  const kcal = Math.round(bmr * (DBASE.modello?.laf || 1.35) / 10) * 10;
+  const prot = Math.round(peso * 2);
+  const gr = Math.round(kcal * 0.25 / 9);
+  return { ...g, kcal, p: prot, g: gr,
+           c: Math.max(0, Math.round((kcal - prot * 4 - gr * 9) / 4)),
+           fibre: Math.round(kcal / 1000 * 14) };
+}
+
+/**
+ * D = base + strato dell'utente.
+ *
+ * Attenzione: data/dieta.json NON e' il piano di tutti, e' un ESEMPIO — con
+ * dentro nome, eta', peso e misure di una persona reale. Chi installa l'app
+ * per la prima volta non deve ritrovarsi quei dati addosso, quindi finche' non
+ * sceglie il piano resta vuoto e i suoi valori si calcolano dal suo profilo.
+ * Chi sceglie l'esempio se lo prende tutto, ed e' suo da modificare.
  */
 function fondiPiano() {
   const p = piano();
+  const esempio = S.settings?.pianoBase === 'esempio';
   D = {
     ...DBASE,
-    profilo:  { ...DBASE.profilo, ...p.profilo },
-    target:   { ...DBASE.target, ...p.target },
+    // il database degli alimenti resta sempre: sono valori nutrizionali
+    // generici, non dati di nessuno
     alimenti: { ...DBASE.alimenti, ...p.alimenti },
-    pasti:    { ...DBASE.pasti, ...p.pasti },
-    settimana: p.settimana || DBASE.settimana
+    profilo: esempio ? { ...DBASE.profilo, ...p.profilo }
+      : { nome: '', eta: null, altezza_cm: null, peso_iniziale_kg: null,
+          sesso: 'm', ...p.profilo },
+    target: esempio ? { ...DBASE.target, ...p.target }
+      : { ...targetNeutro(), ...p.target },
+    pasti: esempio ? { ...DBASE.pasti, ...p.pasti } : { ...p.pasti },
+    settimana: p.settimana || (esempio ? DBASE.settimana : settimanaVuota()),
+    // i valori di partenza delle misure sono di quella persona, non di chi installa
+    misure: esempio ? DBASE.misure : DBASE.misure.map(m => ({ ...m, base: null }))
   };
-  // i totali della settimana vanno ricalcolati se i pasti sono cambiati
   D.settimana = D.settimana.map(g => ({ ...g, totali: totaliGiorno(g) }));
 }
 
@@ -89,6 +131,54 @@ function macroDaIngredienti(ing) {
   for (const i of ing) addM(t, foodM(i.alimento, i.qta));
   for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) t[x] = Math.round(t[x] * 10) / 10;
   return t;
+}
+
+/* ========================================================== primo avvio */
+/**
+ * Gate del primo avvio. Finche' non si sceglie, l'app non mostra il piano di
+ * nessun altro: e' la differenza fra "app con dentro la dieta di Salvatore" e
+ * "app che ti fa la tua".
+ */
+function pianoScelto() { return !!S.settings?.pianoBase; }
+
+function viewBenvenuto(v) {
+  const c = el('div', 'card');
+  c.append(el('div', 'eyebrow', 'Primo avvio'));
+  c.append(el('h2', 'sec', 'Da cosa vuoi partire?'));
+  c.lastChild.style.marginTop = '0';
+  c.append(el('p', 'muted',
+    'L\'app funziona in due modi. Puoi costruire il tuo piano da zero, oppure caricare quello vegano di esempio e poi cambiarlo come vuoi. In entrambi i casi tutto resta modificabile.'));
+  v.append(c);
+
+  const vuoto = el('button', 'step mio');
+  vuoto.innerHTML = `<span class="n">1</span>
+    <span class="body">
+      <span class="t">Comincio da zero</span>
+      <span class="d">Metti i tuoi dati e i tuoi target, componi i pasti che mangi davvero.</span>
+      <span class="s">Consigliato · resta il database di ${Object.keys(DBASE.alimenti).length} alimenti per comporre i pasti</span>
+    </span><span class="go">›</span>`;
+  vuoto.onclick = () => { S.settings.pianoBase = 'vuoto'; save(); fondiPiano();
+    pianoTab = 'profilo'; location.hash = '#/piano'; route(); };
+  v.append(vuoto);
+
+  const esempio = el('button', 'step');
+  esempio.innerHTML = `<span class="n">2</span>
+    <span class="body">
+      <span class="t">Carica il piano vegano di esempio</span>
+      <span class="d">Un piano completo gia' pronto: ${Object.keys(DBASE.pasti).length} pasti su sette giorni, ${nf(DBASE.target.kcal)} kcal e ${DBASE.target.p} g di proteine.</span>
+      <span class="s">Attenzione: contiene i dati di un'altra persona (eta', altezza, peso, misure). Cambiali dal passo "Chi sei".</span>
+    </span><span class="go">›</span>`;
+  esempio.onclick = () => {
+    if (!confirm('Il piano di esempio porta con se\' profilo, target, pasti e misure di partenza di un\'altra persona. Li vedrai finche\' non li cambi. Procedo?')) return;
+    S.settings.pianoBase = 'esempio'; save(); fondiPiano();
+    location.hash = '#/oggi'; route();
+  };
+  v.append(esempio);
+
+  v.append(el('div', 'card flat',
+    `<div class="eyebrow">Si puo' cambiare idea</div>
+     <div class="muted">Da Impostazioni puoi caricare l'esempio anche dopo, o
+     ricominciare da zero. Quello che hai gia' scritto tu non viene toccato.</div>`));
 }
 
 /* =============================================================== vista */
@@ -197,6 +287,26 @@ function viewPiano(v) {
     c.onclick = () => { pianoTab = s.id; route(); };
     v.append(c);
   }
+
+  const base = el('div', 'card flat');
+  base.append(el('div', 'eyebrow', 'Piano di partenza'));
+  base.append(el('div', 'muted', S.settings.pianoBase === 'esempio'
+    ? 'Stai usando il piano vegano di esempio come base.'
+    : 'Stai costruendo il piano da zero: nessun pasto preimpostato.'));
+  const alt = el('button', 'btn wide');
+  alt.style.marginTop = '8px';
+  alt.textContent = S.settings.pianoBase === 'esempio'
+    ? 'Svuota e riparti da zero' : 'Carica il piano vegano di esempio';
+  alt.onclick = () => {
+    const verso = S.settings.pianoBase === 'esempio' ? 'vuoto' : 'esempio';
+    if (!confirm(verso === 'esempio'
+      ? 'Carico il piano di esempio come base. Quello che hai gia\' modificato tu resta com\'e\'.'
+      : 'Tolgo il piano di esempio. Restano solo le tue modifiche e il database degli alimenti.')) return;
+    S.settings.pianoBase = verso; save(); fondiPiano(); route();
+    toast(verso === 'esempio' ? 'Esempio caricato' : 'Piano svuotato');
+  };
+  base.append(alt);
+  v.append(base);
 
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Se ti sei perso</div>
