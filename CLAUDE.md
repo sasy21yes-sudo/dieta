@@ -69,13 +69,34 @@ app.js          stato, router, viste principali, motori. Caricato PER ULTIMO:
                 costruisce ROUTES e chiama init(), quindi le viste degli altri
                 file devono gia' esistere
 charts.js       toolkit SVG dei grafici + vista Dati
+piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
+palestra.js     registro sedute, mappa muscolare, forma-fatica, progressione
 prodotti.js     prodotti reali, codici a barre, override degli alimenti
 foto.js         foto dei progressi (IndexedDB) + timelapse
 sw.js           cache offline; rete-prima su tutto, cache come riserva
 manifest.json   PWA
-data/dieta.json IL DOMINIO — vedi sotto
+data/dieta.json IL DOMINIO alimentare — vedi sotto
+data/palestra.json catalogo esercizi, gruppi muscolari, modello forma-fatica
 icons/          180 (apple-touch), 192, 512, maskable
 ```
+
+### Profili e piano personalizzato
+
+`data/dieta.json` è la fonte di verità **di base**, e non va mai modificata dal
+codice. Quello che l'utente crea si sovrappone come strato in `S.piano`:
+alimenti aggiunti o corretti, pasti composti, target propri, settimana
+riorganizzata. `fondiPiano()` produce `D` = base + strato, e va richiamata dopo
+ogni modifica al piano.
+
+Ogni profilo ha la sua chiave di `localStorage` (`dieta.v1:<id>`), quindi diario,
+piano, prodotti, palestra e foto restano separati. L'indice dei profili sta in
+`dieta.profili`. Cambiare profilo ricarica la pagina: stato e piano devono
+cambiare insieme.
+
+**Attenzione:** il target giornaliero (`D.target`) e le barre della scheda Oggi
+sono due cose diverse. Le barre vengono dalla somma dei pasti assegnati alla
+settimana; `D.target` alimenta analisi, cruscotto, consigli e previsione. La
+scheda Target avvisa quando i due divergono di oltre l'8%.
 
 ### `data/dieta.json` è la fonte di verità
 
@@ -128,9 +149,38 @@ non un dettaglio.
   previsione
 - **Foto** — uno scatto al giorno per posa (fronte/lato/schiena), confronto
   primo/ultimo e timelapse sfogliabile. Stanno in IndexedDB, compresse a 1280 px
+- **Palestra** (scheda "Pesi") — registro delle sedute, mappa muscolare fronte e
+  schiena su tre modi (volume, stanchi, in crescita), modello forma-fatica di
+  Banister per muscolo, massimale stimato con Epley corretto col RIR, proiezione
+  della forza per regressione lineare, doppia progressione, volume settimanale a
+  barre orizzontali
+- **Piano** — profili multipli e editor: dati personali, target giornalieri,
+  alimenti, composizione dei pasti con macro calcolati dagli ingredienti,
+  assegnazione dei pasti alla settimana
+- **Consiglio del giorno** — su Oggi. Preferisce sempre un consiglio che nasce
+  dai dati dell'utente a uno generico; ruota in modo deterministico sulla data
 - **Analisi** — motore a regole "cosa sto sbagliando" (vedi sotto)
 - **Spesa** — fabbisogno settimanale aggregato per categoria, con spunta
 - **Impostazioni** — generatore `.ics`, export/import backup JSON
+
+### Il motore della palestra
+
+- **Massimale stimato**: Epley su (ripetizioni + RIR). Sommare il RIR è ciò che
+  rende confrontabili serie fatte con sforzo diverso. Sopra le 12 ripetizioni
+  Epley sovrastima, e la UI lo dice
+- **Forma–fatica (Banister)**: ogni seduta lascia due tracce che decadono a
+  velocità diverse — fatica τ≈7 giorni, forma τ≈42. La prontezza è la
+  differenza pesata. L'impulso NON è il tonnellaggio (un leg press e un'alzata
+  laterale non sono confrontabili in chili) ma le serie pesate per
+  coinvolgimento del muscolo e per vicinanza al cedimento
+- **Proiezione della forza**: regressione lineare, non Kalman. Qui le
+  osservazioni sono poche e distanti e il segnale è molto più grande del
+  rumore: una retta con banda e R² dice quanto serve senza fingere precisione
+- **Doppia progressione**: si sale di carico solo quando TUTTE le serie toccano
+  il tetto del range con RIR ≤ 2
+
+Le costanti stanno in `data/palestra.json` e sono valori tipici di letteratura,
+**non calibrati sull'utente**: la UI deve continuare a dirlo.
 
 ### I grafici
 
@@ -214,12 +264,12 @@ mai moralizzante — è un requisito esplicito dell'utente.
 
 In ordine di rapporto valore/sforzo.
 
-1. **Log allenamento con doppia progressione** — esercizio, serie, reps, carico, RIR.
+1. **Revisione settimanale** — schermata domenicale con tutte le medie a
+   confronto con la settimana precedente
+2. **Log allenamento con doppia progressione** — esercizio, serie, reps, carico, RIR.
    Quando tutte le serie toccano il tetto del range a RIR ≤2, proporre +2,5 kg (parte
    alta) o +5 kg (parte bassa). Alimenterebbe automaticamente il campo "carichi"
    dell'analisi, oggi manuale
-2. **Revisione settimanale** — schermata domenicale con tutte le medie a confronto
-   con la settimana precedente
 3. **Rampa fibre** — l'utente parte da ~15-20 g e il piano ne prevede 38. Avvisare se
    il salto settimanale supera i 5 g
 4. **Modifica porzioni** — scalare un pasto con un moltiplicatore e ricalcolare
@@ -230,6 +280,10 @@ In ordine di rapporto valore/sforzo.
 - Non aggiungere un framework né una libreria di grafici: i grafici sono SVG
   costruito a mano proprio per non introdurre un build step. L'app è divisa in
   più file per restare modificabile dal telefono, non per essere impacchettata
+- Non far leggere a `bodyFat()` la formula maschile su un profilo femminile:
+  sono due equazioni diverse e quella femminile richiede anche i fianchi
+- Non usare `nf()` per riempire il valore di un `<input>`: formatta 2482 come
+  "2.482" e rileggerlo dà 2,482
 - Non mettere le foto nel backup JSON: sono in IndexedDB perché in localStorage
   non ci starebbero. Vanno salvate a parte, e l'app deve dirlo
 - Non spostare i dati nutrizionali dentro il codice

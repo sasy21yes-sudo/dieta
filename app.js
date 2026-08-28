@@ -43,7 +43,8 @@ function toast(msg) {
 
 /* ---------------------------------------------------------------- stato */
 function load() {
-  try { S = JSON.parse(localStorage.getItem(KEY)) || null; } catch { S = null; }
+  // la chiave dipende dal profilo attivo: due utenti, due diari separati
+  try { S = JSON.parse(localStorage.getItem(chiaveStato())) || null; } catch { S = null; }
   if (!S) S = { log: {}, spesa: {}, settings: { start: today() } };
   normalize();
 }
@@ -53,6 +54,8 @@ function normalize() {
   S.log ||= {}; S.spesa ||= {}; S.settings ||= { start: today() };
   S.model ||= {}; S.model.prev ||= []; S.prodotti ||= [];
   S.palestra ||= {}; S.palestra.sessioni ||= {}; S.palestra.esercizi ||= [];
+  S.piano ||= {}; S.piano.alimenti ||= {}; S.piano.pasti ||= {};
+  S.piano.target ||= {}; S.piano.profilo ||= {};
   for (const k of Object.keys(S.log)) {
     const d = S.log[k]; if (!d || typeof d !== 'object') { delete S.log[k]; continue; }
     d.pasti ||= {}; d.extra ||= []; d.misure ||= {}; d.integratori ||= {};
@@ -75,7 +78,7 @@ function migra(o) {
   return null;
 }
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(S)); }
+  try { localStorage.setItem(chiaveStato(), JSON.stringify(S)); }
   catch { toast('Memoria piena: esporta un backup'); }
 }
 function day(k = today()) {
@@ -186,11 +189,26 @@ function lastWeight() {
   return days.length ? S.log[days[days.length - 1]].peso : null;
 }
 
-/** Formula della Marina USA. Errore reale ±3–4 punti: è una stima, non una DEXA. */
-function bodyFat(vita, collo, h) {
-  if (!(vita > 0 && collo > 0 && h > 0) || vita - collo < 5) return null;
-  const bf = 495 / (1.0324 - 0.19077 * Math.log10(vita - collo)
-                           + 0.15456 * Math.log10(h)) - 450;
+/**
+ * Formula della Marina USA. Errore reale ±3–4 punti: è una stima, non una DEXA.
+ * Uomini e donne hanno equazioni diverse, e quella femminile richiede anche i
+ * fianchi: usare la maschile su una donna sbaglia di parecchi punti, quindi
+ * senza la misura dei fianchi è meglio non rispondere.
+ */
+function bodyFat(vita, collo, h, sesso, fianchi) {
+  if (!(vita > 0 && collo > 0 && h > 0)) return null;
+  let bf;
+  if ((sesso || D.profilo.sesso) === 'f') {
+    if (!(fianchi > 0)) return null;
+    const somma = vita + fianchi - collo;
+    if (somma <= 0) return null;
+    bf = 495 / (1.29579 - 0.35004 * Math.log10(somma)
+                        + 0.22100 * Math.log10(h)) - 450;
+  } else {
+    if (vita - collo < 5) return null;
+    bf = 495 / (1.0324 - 0.19077 * Math.log10(vita - collo)
+                       + 0.15456 * Math.log10(h)) - 450;
+  }
   return bf > 2 && bf < 60 ? bf : null;
 }
 
@@ -201,7 +219,8 @@ function composition(k = today()) {
   const peso = trendW(k) ?? lastWeight() ?? D.profilo.peso_iniziale_kg;
   // un collo fuori scala falsa tutto: 7 cm di errore valgono 5 punti di grasso
   const colloSospetto = collo != null && (collo < 32 || collo > 48);
-  const bf = colloSospetto ? null : bodyFat(vita, collo, h);
+  const bf = colloSospetto ? null
+    : bodyFat(vita, collo, h, D.profilo.sesso, lastMeas('fianchi'));
   const lbm = bf != null ? peso * (1 - bf / 100) : null;
   const fm = bf != null ? peso - lbm : null;
   return {
@@ -606,10 +625,12 @@ function cardConsiglio(k) {
 /* --------------------------------------------------------------- router */
 const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
                  palestra: viewPalestra, dati: viewDati, analisi: viewAnalisi,
-                 spesa: viewSpesa, prodotti: viewProdotti, foto: viewFoto };
+                 spesa: viewSpesa, prodotti: viewProdotti, foto: viewFoto,
+                 piano: viewPiano };
 const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
                  palestra: 'Palestra', dati: 'Dati', analisi: 'Analisi',
-                 spesa: 'Spesa', prodotti: 'Prodotti', foto: 'Foto' };
+                 spesa: 'Spesa', prodotti: 'Prodotti', foto: 'Foto',
+                 piano: 'Piano' };
 
 function route() {
   const name = (location.hash.replace('#/', '') || 'oggi').split('?')[0];
@@ -1435,6 +1456,10 @@ function sheetMenu() {
      'iOS non permette a una web app di programmare notifiche locali. Questo file crea gli eventi ricorrenti nel Calendario: pasti, integratori, pesata e revisione domenicale. Aprilo una volta e le notifiche arrivano native, senza server.',
      () => { download('dieta-promemoria.ics', icsFile(), 'text/calendar'); toast('Aprilo con Calendario'); });
 
+  mk('Piano e profili',
+     'Cambia i target, componi i tuoi pasti, riorganizza la settimana. Oppure crea un secondo profilo: diario, piano e foto restano separati.',
+     () => { closeSheet(); location.hash = '#/piano'; });
+
   mk('Prodotti e codici a barre',
      'Registra i prodotti che compri davvero, con i valori letti in etichetta. Collegandoli al piano, l\'app smette di usare le stime.',
      () => { closeSheet(); location.hash = '#/prodotti'; });
@@ -1461,7 +1486,7 @@ function sheetMenu() {
           const nuovi = Object.keys(o.log).length, ora = Object.keys(S.log).length;
           if (ora && !confirm('Il file contiene ' + nuovi + ' giorni e sostituira\' i '
               + ora + ' che hai adesso in memoria. Non si puo\' annullare. Procedo?')) return;
-          S = o; normalize(); save(); closeSheet(); route(); toast('Backup importato');
+          S = o; normalize(); fondiPiano(); save(); closeSheet(); route(); toast('Backup importato');
         } catch (e) { toast('File non valido: ' + (e.message || 'illeggibile')); }
       };
       r.readAsText(f);
@@ -1484,7 +1509,8 @@ function sheetMenu() {
 async function init() {
   load();
   try {
-    D = await (await fetch('data/dieta.json', { cache: 'no-cache' })).json();
+    DBASE = await (await fetch('data/dieta.json', { cache: 'no-cache' })).json();
+    fondiPiano();       // D = piano di base + modifiche di questo profilo
     // il catalogo palestra non e' vitale: se manca, il resto dell'app vive
     try { PD = await (await fetch('data/palestra.json', { cache: 'no-cache' })).json(); }
     catch { PD = null; }

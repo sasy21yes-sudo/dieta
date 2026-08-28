@@ -550,7 +550,8 @@ function viewDati(v) {
     const w = weightMA(d);
     const vv = S.log[d]?.misure?.vita, cc = S.log[d]?.misure?.collo;
     if (w == null || vv == null || cc == null) return null;
-    const bf = bodyFat(vv, cc, D.profilo.altezza_cm);
+    const bf = bodyFat(vv, cc, D.profilo.altezza_cm, D.profilo.sesso,
+      S.log[d]?.misure?.fianchi);
     if (bf == null) return null;
     return { magra: w * (1 - bf / 100), grassa: w * bf / 100 };
   });
