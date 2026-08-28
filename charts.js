@@ -712,6 +712,8 @@ function viewDati(v) {
   ci.append(tb);
   v.append(ci);
 
+  if (typeof cardTraguardi === 'function') { const tg = cardTraguardi(); if (tg) v.append(tg); }
+
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Come leggerli</div>
      <div class="muted">Nessuno di questi grafici va letto su un giorno solo. La

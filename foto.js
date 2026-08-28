@@ -89,6 +89,9 @@ function viewFoto(v) {
       const { blob, w, h } = await comprimi(f);
       await fotoSalva({ id: uid(), giorno: today(), posa: fotoPosa, blob, w, h,
                         peso: S.log[today()]?.peso ?? null });
+      // contatore per i traguardi: le foto stanno in IndexedDB e i traguardi
+      // si calcolano su S, che e' sincrono
+      S.settings.nFoto = (S.settings.nFoto || 0) + 1; save();
       route(); toast('Scatto salvato');
     } catch (e) { toast('Non riesco a leggere l\'immagine'); }
   };

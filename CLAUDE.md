@@ -69,6 +69,8 @@ app.js          stato, router, viste principali, motori. Caricato PER ULTIMO:
                 costruisce ROUTES e chiama init(), quindi le viste degli altri
                 file devono gia' esistere
 charts.js       toolkit SVG dei grafici + vista Dati
+sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
+giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
 piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
 palestra.js     registro sedute, mappa muscolare, forma-fatica, progressione
 prodotti.js     prodotti reali, codici a barre, override degli alimenti
@@ -77,6 +79,7 @@ sw.js           cache offline; rete-prima su tutto, cache come riserva
 manifest.json   PWA
 data/dieta.json IL DOMINIO alimentare — vedi sotto
 data/palestra.json catalogo esercizi, gruppi muscolari, modello forma-fatica
+data/sfide.json 38 sfide giornaliere + 23 traguardi
 icons/          180 (apple-touch), 192, 512, maskable
 ```
 
@@ -179,6 +182,14 @@ non un dettaglio.
   multipli e editor: dati personali, target giornalieri,
   alimenti, composizione dei pasti con macro calcolati dagli ingredienti,
   assegnazione dei pasti alla settimana
+- **Sfide e traguardi** — una sfida al giorno scelta in modo deterministico
+  sulla data (non si ricarica finché non esce quella comoda), con punti e giorni
+  di fila; 23 traguardi che si sbloccano da soli sui dati già registrati
+- **Costanza** — quattro punteggi su anelli: nutrizione, allenamento, sfide,
+  generale. L'allenamento si misura sulle sedute a settimana dichiarate, non su
+  tutti i giorni: riposare quando serve non abbassa il punteggio
+- **Porzioni per giorno** — `S.log[k].porzioni[codice][alimento]` sovrascrive la
+  quantità del piano solo per quel giorno; `mealMGiorno()` la applica
 - **Consiglio del giorno** — su Oggi. Preferisce sempre un consiglio che nasce
   dai dati dell'utente a uno generico; ruota in modo deterministico sulla data
 - **Analisi** — motore a regole "cosa sto sbagliando" (vedi sotto)
@@ -366,6 +377,8 @@ In ordine di rapporto valore/sforzo.
 - Nei grafici a barre le etichette dell'asse x devono usare `g.xb` (centro della
   barra), non `g.x` (scala delle linee): lo scarto è mezza barra, invisibile su
   novanta giorni ed evidente su sette
+- Non far vedere due serie su un grafico senza legenda: i punti grezzi lontani
+  dalla media mobile sembrano un errore di allineamento, e non lo sono
 - Non usare `nf()` per riempire il valore di un `<input>`: formatta 2482 come
   "2.482" e rileggerlo dà 2,482
 - Non mettere le foto nel backup JSON: sono in IndexedDB perché in localStorage

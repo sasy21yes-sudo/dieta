@@ -230,3 +230,84 @@ function menuTendina() {
     document.addEventListener('pointerdown', chiudi);
   }, 0);
 }
+
+/* ------------------------------------------------------------ traguardi */
+/**
+ * I traguardi si leggono dai dati gia' registrati: non chiedono niente in piu'
+ * e non si possono perdere. Servono a rendere visibile il tempo passato, che
+ * e' l'unica cosa che costruisce davvero un fisico — e che nessun grafico
+ * settimanale riesce a mostrare.
+ */
+function valoreTraguardo(tipo) {
+  switch (tipo) {
+    case 'pesate': return Object.values(S.log).filter(d => d?.peso != null).length;
+    case 'fila': return typeof streak === 'function' ? streak() : 0;
+    case 'sedute': return Object.keys(S.palestra?.sessioni || {})
+      .filter(k => (S.palestra.sessioni[k].serie || []).length).length;
+    case 'schede': return (S.palestra?.schede || []).length;
+    case 'sfide': return Object.values(S.sfide?.log || {}).filter(x => x.fatta).length;
+    case 'punti': return puntiSfide().punti;
+    case 'prodotti': return (S.prodotti || []).length;
+    case 'sim': return (S.hyrox?.sim || []).length;
+    case 'backup': return S.settings?.backup ? 1 : 0;
+    case 'foto': return S.settings?.nFoto || 0;
+    case 'vita': {
+      const g = Object.keys(S.log).filter(k => S.log[k]?.misure?.vita != null).sort();
+      if (g.length < 2) return 0;
+      return Math.max(0, S.log[g[0]].misure.vita - S.log[g[g.length - 1]].misure.vita);
+    }
+    case 'forza': {
+      if (typeof e1rmPerSeduta !== 'function') return 0;
+      let best = 0;
+      const usati = [...new Set(Object.keys(S.palestra?.sessioni || {})
+        .flatMap(k => (S.palestra.sessioni[k].serie || []).map(s => s.ex)))];
+      for (const id of usati) {
+        const serie = e1rmPerSeduta(id);
+        if (serie.length < 2) continue;
+        const primo = serie[0].v, ultimo = Math.max(...serie.map(x => x.v));
+        if (primo > 0) best = Math.max(best, (ultimo - primo) / primo * 100);
+      }
+      return best;
+    }
+    default: return 0;
+  }
+}
+
+function traguardi() {
+  return (SF?.traguardi || []).map(t => {
+    const v = valoreTraguardo(t.tipo);
+    return { ...t, val: v, preso: v >= t.soglia,
+             quota: Math.max(0, Math.min(1, v / t.soglia)) };
+  });
+}
+
+function cardTraguardi() {
+  const list = traguardi();
+  if (!list.length) return null;
+  const presi = list.filter(t => t.preso);
+  const prossimi = list.filter(t => !t.preso).sort((a, b) => b.quota - a.quota).slice(0, 3);
+  const c = el('div', 'cw');
+  c.append(el('h3', null, 'Traguardi'));
+  c.append(el('div', 'sub', `${presi.length} su ${list.length}. Si sbloccano da soli sui dati che registri: non chiedono niente in piu' e non si possono perdere.`));
+
+  const g = el('div', 'trofei');
+  for (const t of list) {
+    const b = el('div', 'trofeo' + (t.preso ? ' on' : ''));
+    b.innerHTML = `<span class="ic">${t.preso ? '★' : '☆'}</span>
+      <span class="nm">${esc(t.n)}</span>
+      <span class="ds">${esc(t.d)}</span>`;
+    b.title = t.d;
+    g.append(b);
+  }
+  c.append(g);
+
+  if (prossimi.length) {
+    c.append(el('div', 'eyebrow', 'I piu vicini'));
+    c.lastChild.style.marginTop = '12px';
+    for (const t of prossimi)
+      c.append(meter({ lab: t.n, val: Math.round(t.val * 10) / 10, tgt: t.soglia,
+        unit: '', dec: t.tipo === 'vita' || t.tipo === 'forza' ? 1 : 0, tolleranza: 0 }));
+  }
+  c.append(el('p', 'note', esc(SF.nota_traguardi || '')));
+  return c;
+}

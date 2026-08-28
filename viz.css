@@ -469,3 +469,14 @@
   text-transform:uppercase;color:var(--ink-3)}
 .meal-h .grow.tap{cursor:pointer}
 .meal-h .grow.tap .meal-name::after{content:' ›';color:var(--ink-3);font-weight:400}
+
+/* ---------------- traguardi ---------------- */
+.trofei{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 0 4px}
+.trofeo{background:var(--wash);border:1px solid transparent;border-radius:10px;
+  padding:10px 8px;text-align:center;opacity:.5}
+.trofeo.on{opacity:1;background:var(--pine-soft);border-color:var(--pine-line)}
+.trofeo .ic{display:block;font-size:17px;line-height:1;color:var(--ink-3)}
+.trofeo.on .ic{color:var(--pine)}
+.trofeo .nm{display:block;font-size:11px;font-weight:600;margin-top:4px;line-height:1.25}
+.trofeo .ds{display:block;font-family:var(--mono);font-size:8.5px;color:var(--ink-3);
+  margin-top:3px;line-height:1.3}
