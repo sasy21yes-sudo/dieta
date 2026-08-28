@@ -179,10 +179,18 @@ function chartLine(o) {
     const giu = o.band.slice().reverse().map(b => `${g.x(b.i)},${g.y(b.lo)}`).join(' ');
     s.append(mk('polygon', { points: su + ' ' + giu, fill: 'var(--pine)', opacity: .12 }));
   }
-  // punti grezzi: contesto, non protagonisti
-  if (o.punti !== false)
+  // Punti grezzi: contesto, non protagonisti. Quando c'e' anche la tendenza
+  // li si unisce con una linea sottilissima: senza, il lettore vede puntini
+  // sparsi lontani dalla curva e pensa che il grafico sia disallineato, mentre
+  // sono due serie diverse - il dato del giorno e la sua media mobile.
+  if (o.punti !== false) {
+    if (o.ma && dati.length > 1)
+      s.append(mk('path', { d: dati.map((p, j) => (j ? 'L' : 'M') + g.x(p.i) + ',' + g.y(p.v)).join(' '),
+        fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 1, opacity: .35,
+        'stroke-linejoin': 'round' }));
     for (const p of dati)
       s.append(mk('circle', { cx: g.x(p.i), cy: g.y(p.v), r: 1.9, fill: 'var(--ink-3)' }));
+  }
 
   const linea = o.ma ? o.ma.map((v, i) => v == null ? null : { i, v }).filter(Boolean) : dati;
   s.append(mk('path', { d: linea.map((p, j) => (j ? 'L' : 'M') + g.x(p.i) + ',' + g.y(p.v)).join(' '),
@@ -191,6 +199,13 @@ function chartLine(o) {
 
   s.append(xLabels(g, o.days));
   c.append(s);
+  // due serie sul grafico = legenda obbligatoria, altrimenti l'identita' e'
+  // affidata solo al colore e la distanza fra punti e linea sembra un errore
+  if (o.ma)
+    c.append(el('div', 'leg',
+      `<span><i style="background:var(--ink-3)"></i>${esc(o.puntiNome || 'valore del giorno')}</span>`
+      + `<span><i style="background:var(--pine)"></i>${esc(o.maNome || 'media mobile a 7 giorni')}</span>`
+      + (o.target != null ? `<span><i style="background:var(--ink-2)"></i>target</span>` : '')));
   const read = el('div', 'read', `<span class="ph">Tocca il grafico per leggere un giorno</span>`);
   c.append(read);
   tappable(s, read, g, o.days, i => {
@@ -458,6 +473,9 @@ function viewDati(v) {
     d: vita != null ? `${nf(Math.abs(vita - D.target_fisico.misure.vita), 1)} cm dal target`
                     : 'mai misurata', dir: 'flat' }));
   v.append(kpis);
+
+  /* --- costanza a punteggio --- */
+  if (typeof cardCostanza === 'function') v.append(cardCostanza(k, datiRange));
 
   /* --- calendario --- */
   v.append(chartCal({

@@ -388,3 +388,40 @@
 .meal.vuoto{width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;
   border-style:dashed}
 .meal.vuoto .meal-name{color:var(--ink-3);font-weight:400}
+
+/* ---------------- menu a tendina ---------------- */
+#top-actions{position:relative}
+#dropdown{position:absolute;top:100%;right:0;z-index:60;min-width:224px;
+  background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+  box-shadow:0 8px 28px rgba(0,0,0,.16);overflow:hidden;margin-top:6px}
+#dropdown button{display:block;width:100%;text-align:left;background:none;border:0;
+  border-bottom:1px solid var(--rule);padding:12px 14px;font:inherit;color:inherit;
+  cursor:pointer}
+#dropdown button:last-child{border-bottom:0}
+#dropdown button:active{background:var(--wash)}
+#dropdown .t{display:block;font-weight:600;font-size:14px}
+#dropdown .s{display:block;font-size:11.5px;color:var(--ink-3);margin-top:2px}
+
+/* ---------------- sfida del giorno ---------------- */
+.card.sfida{border-left:3px solid var(--amber)}
+.card.sfida.ok{border-left-color:var(--pine);background:var(--pine-soft);
+  border-color:var(--pine-line);border-left-color:var(--pine)}
+.card.sfida.skip{opacity:.66}
+.sf-p{font-size:12px;color:var(--amber);font-weight:700}
+.card.sfida.ok .sf-p{color:var(--pine)}
+.sfida-t{font-family:var(--serif);font-size:18px;font-weight:700;margin:4px 0 5px;
+  letter-spacing:-.01em}
+.sfida-d{margin:0 0 11px;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+.sfida-f{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;padding-top:9px;
+  border-top:1px solid var(--rule);font-family:var(--mono);font-size:10.5px;
+  color:var(--ink-3)}
+.btn.grow{flex:1}
+
+/* ---------------- anelli di punteggio ---------------- */
+.rings{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0 4px}
+.ring{text-align:center;min-width:0}
+.ring svg{width:100%;max-width:70px;height:auto;display:block;margin:0 auto}
+.ring .rl{font-size:11px;font-weight:600;margin-top:5px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.ring .rs{font-family:var(--mono);font-size:9px;color:var(--ink-3);margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

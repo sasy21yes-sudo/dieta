@@ -57,6 +57,7 @@ function normalize() {
   S.palestra.schede ||= [];
   // hyrox mancava: un backup fatto prima di questa riga si importava
   // senza gara, record e simulazioni
+  S.sfide ||= {}; S.sfide.log ||= {};
   S.hyrox ||= {}; S.hyrox.profilo ||= {}; S.hyrox.pb ||= {};
   S.hyrox.sim ||= []; S.hyrox.sessioni ||= {}; S.hyrox.checklist ||= {};
   S.piano ||= {}; S.piano.alimenti ||= {}; S.piano.pasti ||= {};
@@ -676,7 +677,10 @@ function viewOggi(v) {
   r.children[1].style.textAlign = 'center';
   nav.append(r); v.append(nav);
 
-  if (k === today()) { const cc = cardConsiglio(k); if (cc) v.append(cc); }
+  if (k === today()) {
+    const cc = cardConsiglio(k); if (cc) v.append(cc);
+    if (typeof cardSfida === 'function') { const cs = cardSfida(k); if (cs) v.append(cs); }
+  }
 
   // barre macro
   const cons = consumed(k), tgt = dayTarget(k);
@@ -1318,9 +1322,17 @@ function weightCard(k) {
           <path d="M${x0},${y0} L${x1},${sy(f.peso).toFixed(1)}" fill="none"
             stroke="var(--pine)" stroke-width="1.8" stroke-dasharray="4 3"/>`;
   }
+  // i punti grezzi uniti da una linea tenue: senza, sembrano sparsi a caso
+  // rispetto alla media mobile, che e' una serie diversa
+  const grezza = pts.map((p, i) => `${i ? 'L' : 'M'}${sx(i).toFixed(1)},${sy(p.w).toFixed(1)}`).join(' ');
   c.append(el('div', null, `<svg class="chart" viewBox="0 0 ${W} ${HT}">
-    ${fc}<path d="${line}" fill="none" stroke="var(--pine)" stroke-width="2"
+    ${fc}<path d="${grezza}" fill="none" stroke="var(--ink-3)" stroke-width="1" opacity=".35"/>
+    <path d="${line}" fill="none" stroke="var(--pine)" stroke-width="2"
       stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`));
+  c.append(el('div', 'leg',
+    '<span><i style="background:var(--ink-3)"></i>pesata del giorno</span>'
+    + '<span><i style="background:var(--pine)"></i>media mobile a 7 giorni</span>'
+    + (f ? '<span><i style="background:var(--pine);opacity:.35"></i>previsione</span>' : '')));
 
   const cur = weightMA(days[last]), prev = weightMA(addDays(days[last], -7));
   c.append(el('div', 'row between',
@@ -1581,11 +1593,13 @@ async function init() {
     catch { PD = null; }
     try { HX = await (await fetch('data/hyrox.json', { cache: 'no-cache' })).json(); }
     catch { HX = null; }
+    try { SF = await (await fetch('data/sfide.json', { cache: 'no-cache' })).json(); }
+    catch { SF = null; }
   } catch {
     $('#view').innerHTML = '<div class="card">Dati non caricati. Serve un server HTTP (anche GitHub Pages): aprire il file da disco non funziona.</div>';
     return;
   }
-  $('#btn-menu').onclick = sheetMenu;
+  $('#btn-menu').onclick = menuTendina;
   $('#btn-foto').onclick = () => { location.hash = '#/foto'; };
   $('#sheet-backdrop').onclick = closeSheet;
   addEventListener('hashchange', route);
