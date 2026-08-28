@@ -310,3 +310,29 @@
 .setrow input{width:100%;padding:8px 6px;border:1px solid var(--rule);border-radius:8px;
   background:var(--paper);color:var(--ink);font:inherit;font-size:14px;
   text-align:center;font-variant-numeric:tabular-nums}
+
+/* ---------------- passi del piano ---------------- */
+.step{display:grid;grid-template-columns:30px 1fr 14px;gap:12px;width:100%;
+  align-items:start;background:var(--paper);border:1px solid var(--rule);
+  border-radius:12px;padding:14px 13px;margin-bottom:9px;text-align:left;
+  font:inherit;color:inherit;cursor:pointer}
+.step .n{width:26px;height:26px;border-radius:50%;background:var(--wash);
+  color:var(--ink-3);font-family:var(--mono);font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
+.step.mio{border-color:var(--pine-line)}
+.step.mio .n{background:var(--pine);color:#fff}
+.step .t{display:block;font-family:var(--serif);font-size:16px;font-weight:700;
+  letter-spacing:-.01em}
+.step .d{display:block;font-size:12.5px;color:var(--ink-2);margin-top:2px;line-height:1.4}
+.step .s{display:block;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);
+  margin-top:6px}
+.step.mio .s{color:var(--pine)}
+.step .go{color:var(--ink-3);font-size:18px;line-height:1}
+
+/* editor della quantita' di un ingrediente */
+.qedit{display:grid;grid-template-columns:auto 1fr auto auto;gap:6px;
+  align-items:center;padding:8px 0 10px;border-bottom:1px solid var(--rule)}
+.qedit input{width:100%;padding:8px;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper);color:var(--ink);font:inherit;text-align:center;
+  font-variant-numeric:tabular-nums}
+.qedit .rm{color:var(--alert)}

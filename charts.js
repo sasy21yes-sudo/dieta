@@ -96,13 +96,18 @@ function grid(g) {
   }
   return frag;
 }
-/** Poche date, non una per barra: le etichette fitte non si leggono. */
-function xLabels(g, days) {
+/** Poche date, non una per barra: le etichette fitte non si leggono.
+    L'ascissa deve essere la STESSA dei segni: una linea sta sul punto i, una
+    barra sta al centro della sua fetta. Usare g.x per entrambi sfalsava le
+    etichette dei grafici a barre di mezza barra — invisibile su novanta giorni,
+    evidente su sette. */
+function xLabels(g, days, barre) {
   const frag = document.createDocumentFragment();
   const n = days.length, quanti = Math.min(4, n);
+  const px = i => barre ? g.xb(i) : g.x(i);
   for (let i = 0; i < quanti; i++) {
     const idx = Math.round(i * (n - 1) / Math.max(quanti - 1, 1));
-    const t = mk('text', { x: g.x(idx), y: g.t + g.h + 12, 'text-anchor': 'middle',
+    const t = mk('text', { x: px(idx), y: g.t + g.h + 12, 'text-anchor': 'middle',
       fill: 'var(--ink-3)', 'font-size': 9, 'font-family': 'var(--mono)' });
     t.textContent = days[idx].slice(8) + '/' + days[idx].slice(5, 7);
     frag.append(t);
@@ -219,7 +224,7 @@ function chartBars(o) {
   if (o.target != null)
     s.append(mk('line', { x1: g.l, x2: g.l + g.w, y1: g.y(o.target), y2: g.y(o.target),
       stroke: 'var(--ink-2)', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }));
-  s.append(xLabels(g, o.days));
+  s.append(xLabels(g, o.days, true));
   c.append(s);
   const read = el('div', 'read', `<span class="ph">Tocca una barra</span>`);
   c.append(read);
@@ -258,7 +263,7 @@ function chartStack(o) {
       acc += v;
     });
   });
-  s.append(xLabels(g, o.days));
+  s.append(xLabels(g, o.days, true));
   c.append(s);
   const leg = el('div', 'leg', o.serie.map((se, j) =>
     `<span><i style="background:var(--c${j + 1})"></i>${esc(se.nome)}</span>`).join(''));
@@ -441,6 +446,13 @@ function viewDati(v) {
     d: kcalOk.length ? `target ${nf(D.target.kcal)} · fino a ieri` : 'nessun pasto spuntato',
     dir: 'flat', spark: cons.map(m => m && m.kcal > 400 ? m.kcal : null) }));
 
+  const brucia = giorni.map(d => typeof kcalAllenamento === 'function'
+    ? kcalAllenamento(d) : { tot: 0, righe: [] });
+  const gAll = giorni.filter((d, i) => brucia[i].tot > 0).length;
+  kpis.append(tile({ k: 'Allenamenti', v: gAll, unit: 'nel periodo',
+    d: gAll ? `${nf(gAll / datiRange * 7, 1)} a settimana` : 'nessuno registrato',
+    dir: 'flat', spark: brucia.map(b => b.tot || null) }));
+
   const vita = lastMeas('vita');
   kpis.append(tile({ k: 'Vita', v: vita != null ? nf(vita, 1) : '—', unit: 'cm',
     d: vita != null ? `${nf(Math.abs(vita - D.target_fisico.misure.vita), 1)} cm dal target`
@@ -522,6 +534,35 @@ function viewDati(v) {
     titolo: 'Coca Zero', sub: 'Non e\' un problema calorico: e\' caffeina, e l\'emivita e\' 5–6 ore.',
     days: giorni, vals: giorni.map(d => val(d, x => x.coca)), unit: 'lattine',
     colore: 'var(--ink-3)'
+  }));
+
+  /* --- spesa energetica dell'allenamento --- */
+  const tipi = ['Pesi', 'HYROX', 'Gara'];
+  const perTipo = tipi.map(t => ({
+    nome: t, vals: brucia.map(b => (b.righe.find(r => r.tipo === t) || {}).kcal || 0)
+  }));
+  v.append(chartStack({
+    titolo: 'Calorie bruciate', sub: 'Stima della spesa di ogni seduta, palestra e HYROX insieme.',
+    days: giorni, unit: 'kcal', serie: perTipo,
+    msg: 'Registra una seduta in Gym o segna un allenamento in HYROX e qui comparira\' il carico di lavoro.',
+    note: '<strong>Da non sommare al target.</strong> Il dispendio stimato dal motore nasce dal bilancio fra quanto mangi e come cambia il peso, quindi contiene gia\' tutto quello che ti muovi, allenamenti compresi. Sommare anche questo numero significherebbe contare due volte lo stesso lavoro. Serve a vedere il carico nel tempo e le settimane vuote, non a mangiare di piu\'.'
+  }));
+
+  const minuti = giorni.map((d, i) => brucia[i].righe.reduce((x, r) => x + r.min, 0) || null);
+  v.append(chartBars({
+    titolo: 'Minuti di allenamento', sub: 'Durata dichiarata dove c\'e\', stimata dalle serie dove manca.',
+    days: giorni, vals: minuti, unit: 'min',
+    msg: 'Nessun allenamento nel periodo.'
+  }));
+
+  /* introito contro dispendio: un asse solo, stessa unita' */
+  const E0 = energyModel(k);
+  v.append(chartBars({
+    titolo: 'Introito contro dispendio', sub: 'Barre: quanto hai mangiato. Riga: il dispendio che il motore stima adesso.',
+    days: giorni, vals: cons.map(m => m && m.kcal > 400 ? m.kcal : null),
+    target: E0.tdee, unit: 'kcal',
+    msg: 'Spunta i pasti per vedere il confronto.',
+    note: `Sopra la riga sei in surplus, sotto in deficit. La riga vale ${nf(E0.tdee)} kcal ${E0.n ? `e si e' ricalibrata ${E0.n} volte sui tuoi dati` : 'e viene ancora dalla formula'}: si muove col tempo, quindi il confronto va letto su settimane, non su un giorno.`
   }));
 
   /* --- come stai --- */

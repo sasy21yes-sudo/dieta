@@ -92,21 +92,62 @@ function macroDaIngredienti(ing) {
 }
 
 /* =============================================================== vista */
-let pianoTab = 'profilo';
+/* Il piano si costruisce in cinque passi, in ordine: chi sei, quanto mangiare,
+   cosa mangi, come lo combini, quando. Prima erano cinque schede con etichette
+   secche e nessuna spiegazione: non si capiva ne' cosa fossero ne' da dove
+   cominciare. Ora ogni passo dice cosa fa, perche' serve e a che punto sei. */
+let pianoTab = null;
+
+/** Stato dei cinque passi: dire cosa manca vale piu' che farlo cercare. */
+function pianoPassi() {
+  const p = piano();
+  const nAli = Object.keys(p.alimenti).length;
+  const nPas = Object.keys(p.pasti).length;
+  const baseAli = Object.keys(DBASE.alimenti).length;
+  const basePas = Object.keys(DBASE.pasti).length;
+  return [
+    { id: 'profilo', t: 'Chi sei',
+      d: 'Nome, età, altezza, peso di partenza, sesso.',
+      perche: 'Servono a stimare il dispendio a riposo e a disegnare in scala la figura della scheda Corpo. Senza, l’app usa i dati di esempio.',
+      mio: Object.keys(p.profilo).length > 0,
+      stato: `${esc(D.profilo.nome)}, ${D.profilo.eta} anni, ${D.profilo.altezza_cm} cm` },
+    { id: 'target', t: 'Quanto mangiare',
+      d: 'Calorie e macro da centrare ogni giorno.',
+      perche: 'E’ il metro con cui l’app giudica le giornate: analisi, cruscotto, consigli e previsione del peso partono tutti da qui.',
+      mio: Object.keys(p.target).length > 0,
+      stato: `${nf(D.target.kcal)} kcal · ${D.target.p} g di proteine` },
+    { id: 'alimenti', t: 'Cosa mangi',
+      d: 'Aggiungi i tuoi alimenti o correggi quelli del piano.',
+      perche: 'Sono i mattoni dei pasti. Puoi saltare questo passo: i ' + baseAli + ' del piano di partenza bastano per cominciare.',
+      mio: nAli > 0,
+      stato: nAli ? `${nAli} tuoi, oltre ai ${baseAli} di base` : `${baseAli} di base, nessuno tuo` },
+    { id: 'pasti', t: 'Come li combini',
+      d: 'Componi i pasti pesando gli ingredienti.',
+      perche: 'I macro si calcolano da soli mentre aggiungi. Un pasto composto qui puoi assegnarlo a qualunque giorno della settimana.',
+      mio: nPas > 0,
+      stato: nPas ? `${nPas} tuoi, oltre ai ${basePas} di base` : `${basePas} di base, nessuno tuo` },
+    { id: 'settimana', t: 'Quando li mangi',
+      d: 'Assegna i pasti agli slot dei sette giorni.',
+      perche: 'E’ quello che vedi nella scheda Oggi: da qui escono le barre dei macro, il totale residuo e la lista della spesa.',
+      mio: !!p.settimana,
+      stato: p.settimana ? 'riorganizzata da te' : 'quella del piano di partenza' }
+  ];
+}
 
 function viewPiano(v) {
-  const P0 = profili();
+  if (pianoTab) return pianoSezione(v);
 
-  /* --- profili --- */
+  /* --- profilo attivo --- */
+  const P0 = profili();
   const cp = el('div', 'card');
-  cp.append(el('div', 'eyebrow', 'Profilo attivo'));
+  cp.append(el('div', 'eyebrow', 'Stai modificando il profilo'));
   const sel = el('select');
-  sel.style.cssText = 'width:100%;padding:10px;border:1px solid var(--rule);border-radius:9px;'
-    + 'background:var(--paper);color:var(--ink);font:inherit;margin:6px 0 10px';
+  sel.style.cssText = 'width:100%;padding:11px;border:1px solid var(--rule);border-radius:9px;'
+    + 'background:var(--paper);color:var(--ink);font:inherit;font-weight:600;margin:6px 0 10px';
   for (const x of P0.lista) sel.append(new Option(x.nome, x.id, false, x.id === P0.attivo));
   sel.onchange = () => cambiaProfilo(sel.value);
   cp.append(sel);
-  const bn = el('button', 'btn wide', 'Nuovo profilo');
+  const bn = el('button', 'btn wide', 'Crea un secondo profilo');
   bn.onclick = () => {
     const n = prompt('Nome del profilo (per esempio: Marco)');
     if (!n || !n.trim()) return;
@@ -114,14 +155,13 @@ function viewPiano(v) {
   };
   cp.append(bn);
   cp.append(el('p', 'hint',
-    'Ogni profilo ha il suo diario, il suo piano e le sue foto, separati del tutto. '
-    + 'Il piano di partenza e\' lo stesso file per tutti: quello che cambi qui vale solo per questo profilo.'));
+    'Ogni profilo ha il suo diario, il suo piano, le sue foto e la sua palestra, separati del tutto. Il piano di partenza e’ lo stesso file per tutti: quello che cambi vale solo per il profilo attivo.'));
   if (P0.lista.length > 1 && P0.attivo !== 'principale') {
     const bd = el('button', 'btn wide');
     bd.style.marginTop = '8px';
     bd.textContent = 'Elimina questo profilo';
     bd.onclick = () => {
-      if (!confirm(`Eliminare "${profiloAttivo().nome}" con tutto il suo diario? Non si puo' annullare.`)) return;
+      if (!confirm(`Eliminare "${profiloAttivo().nome}" con tutto il suo diario? Non si puo’ annullare.`)) return;
       localStorage.removeItem(chiaveStato());
       const p = profili();
       p.lista = p.lista.filter(x => x.id !== p.attivo);
@@ -132,22 +172,76 @@ function viewPiano(v) {
   }
   v.append(cp);
 
-  /* --- schede --- */
-  const seg = el('div', 'seg');
-  for (const [id, lab] of [['profilo', 'Dati'], ['target', 'Target'],
-                           ['alimenti', 'Alimenti'], ['pasti', 'Pasti'], ['settimana', 'Settimana']]) {
-    const b = el('button', null, lab);
-    b.setAttribute('aria-pressed', pianoTab === id);
-    b.onclick = () => { pianoTab = id; route(); };
-    seg.append(b);
+  /* --- che cos'e' un piano --- */
+  const passi = pianoPassi();
+  const miei = passi.filter(x => x.mio).length;
+  v.append(el('div', 'card flat',
+    `<div class="eyebrow">Come funziona</div>
+     <div class="muted">Un piano risponde a cinque domande, in quest’ordine:
+     <strong>chi sei</strong>, <strong>quanto mangiare</strong>, <strong>cosa</strong>,
+     <strong>come lo combini</strong>, <strong>quando</strong>.
+     Puoi fermarti a qualsiasi punto: quello che non tocchi resta come nel piano
+     di partenza, e l’app continua a funzionare.</div>
+     <div class="hint" style="margin-top:8px">Hai personalizzato ${miei} passi su ${passi.length}.</div>`));
+
+  /* --- i cinque passi --- */
+  for (const [i, s] of passi.entries()) {
+    const c = el('button', 'step' + (s.mio ? ' mio' : ''));
+    c.innerHTML = `<span class="n">${i + 1}</span>
+      <span class="body">
+        <span class="t">${esc(s.t)}</span>
+        <span class="d">${s.d}</span>
+        <span class="s">${s.mio ? 'Personalizzato' : 'Come il piano di base'} · ${s.stato}</span>
+      </span>
+      <span class="go">›</span>`;
+    c.onclick = () => { pianoTab = s.id; route(); };
+    v.append(c);
   }
-  const box = el('div', 'card flat');
-  box.append(el('div', 'eyebrow', 'Cosa modifichi'));
-  box.append(seg);
-  v.append(box);
+
+  v.append(el('div', 'card flat',
+    `<div class="eyebrow">Se ti sei perso</div>
+     <div class="muted">Il caso piu’ comune sono i primi due passi e basta: metti i tuoi
+     dati e i tuoi target, e continui a usare i pasti gia’ pronti. Comporre pasti e
+     riorganizzare la settimana serve solo se il piano di partenza non ti va bene.</div>`));
+}
+
+/** Una sezione aperta, con l'intestazione che dice sempre dove sei. */
+function pianoSezione(v) {
+  const passi = pianoPassi();
+  const i = passi.findIndex(x => x.id === pianoTab);
+  const s = passi[i];
+
+  const testa = el('div', 'card');
+  const back = el('button', 'btn sm', '‹ Il piano');
+  back.onclick = () => { pianoTab = null; route(); };
+  testa.append(back);
+  testa.append(el('div', 'eyebrow', `Passo ${i + 1} di ${passi.length}`));
+  testa.lastChild.style.marginTop = '10px';
+  testa.append(el('h2', 'sec', esc(s.t)));
+  testa.lastChild.style.marginTop = '2px';
+  testa.append(el('p', 'muted', s.perche));
+  v.append(testa);
 
   ({ profilo: sezProfilo, target: sezTarget, alimenti: sezAlimenti,
      pasti: sezPasti, settimana: sezSettimana }[pianoTab])(v);
+
+  const nav = el('div', 'row between');
+  nav.style.marginTop = '4px';
+  if (i > 0) {
+    const p = el('button', 'btn sm', '‹ ' + passi[i - 1].t);
+    p.onclick = () => { pianoTab = passi[i - 1].id; route(); };
+    nav.append(p);
+  } else nav.append(el('span'));
+  if (i < passi.length - 1) {
+    const n = el('button', 'btn sm pri', passi[i + 1].t + ' ›');
+    n.onclick = () => { pianoTab = passi[i + 1].id; route(); };
+    nav.append(n);
+  } else {
+    const n = el('button', 'btn sm pri', 'Ho finito');
+    n.onclick = () => { pianoTab = null; route(); };
+    nav.append(n);
+  }
+  v.append(nav);
 }
 
 /* ------------------------------------------------------------ dati utente */
@@ -405,30 +499,61 @@ function sheetPasto(id) {
 
   const tot = el('div', 'read');
   const lista = el('div');
-  const disegna = () => {
-    lista.innerHTML = '';
-    for (const [i, ing] of stato.ing.entries()) {
-      const a = D.alimenti[ing.alimento];
-      const r = el('div', 'cmp-r');
-      r.style.cursor = 'pointer';
-      const m = a ? foodM(ing.alimento, ing.qta) : M0();
-      r.innerHTML = `<span>${esc(ing.alimento)}</span>
-        <span class="mono">${nf(ing.qta)} ${esc(a?.unita || 'g')}</span>
-        <span class="mono muted">${nf(m.kcal)} kcal</span>
-        <span class="mono">${nf(m.p, 1)}P</span>`;
-      r.onclick = () => {
-        const q = prompt(`Quanti ${a?.unita || 'g'} di ${ing.alimento}? (0 per toglierlo)`, ing.qta);
-        if (q == null) return;
-        const n = parseNum(q);
-        if (n == null) return;
-        if (n <= 0) stato.ing.splice(i, 1); else stato.ing[i].qta = n;
-        disegna();
-      };
-      lista.append(r);
-    }
+  let aperto = null;
+  const aggiornaTot = () => {
     const m = macroDaIngredienti(stato.ing);
     tot.innerHTML = `<span><b>${nf(m.kcal)} kcal</b></span><span>${nf(m.p, 1)} P</span>`
       + `<span>${nf(m.c, 1)} C</span><span>${nf(m.g, 1)} G</span><span>${nf(m.fibre, 1)} fibre</span>`;
+  };
+  const disegna = () => {
+    lista.innerHTML = '';
+    if (!stato.ing.length)
+      lista.append(el('p', 'muted', 'Nessun ingrediente. Aggiungine uno qui sotto e i macro si calcolano da soli.'));
+    for (const [i, ing] of stato.ing.entries()) {
+      const a = D.alimenti[ing.alimento];
+      const m = a ? foodM(ing.alimento, ing.qta) : M0();
+      const r = el('div', 'cmp-r');
+      r.style.cursor = 'pointer';
+      r.innerHTML = `<span>${esc(ing.alimento)}</span>
+        <span class="mono qv">${nf(ing.qta)} ${esc(a?.unita || 'g')}</span>
+        <span class="mono muted kv">${nf(m.kcal)} kcal</span>
+        <span class="mono pv">${nf(m.p, 1)}P</span>`;
+      // Tocco = apri l'editor sotto la riga. Prima c'era un prompt() del
+      // browser: fuori dal design, senza unita' di misura e senza modo di
+      // vedere l'effetto sul totale mentre si cambia la quantita'.
+      r.onclick = () => { aperto = aperto === i ? null : i; disegna(); };
+      lista.append(r);
+
+      if (aperto === i) {
+        const ed = el('div', 'qedit');
+        ed.innerHTML = `<button class="btn sm" data-d="-10">−10</button>
+          <input type="text" inputmode="decimal" value="${ing.qta}"
+                 aria-label="Quantita in ${esc(a?.unita || 'g')}">
+          <button class="btn sm" data-d="10">+10</button>
+          <button class="btn sm rm">Togli</button>`;
+        const inp = ed.querySelector('input');
+        const rinfresca = () => {
+          const mm = a ? foodM(ing.alimento, stato.ing[i].qta) : M0();
+          r.querySelector('.qv').textContent = nf(stato.ing[i].qta) + ' ' + (a?.unita || 'g');
+          r.querySelector('.kv').textContent = nf(mm.kcal) + ' kcal';
+          r.querySelector('.pv').textContent = nf(mm.p, 1) + 'P';
+          aggiornaTot();
+        };
+        ed.querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
+          const n = Math.max(0, (parseNum(inp.value) || 0) + (+b.dataset.d));
+          inp.value = n; stato.ing[i].qta = n; rinfresca();
+        });
+        inp.oninput = () => {
+          const n = parseNum(inp.value);
+          if (n != null && n >= 0) { stato.ing[i].qta = n; rinfresca(); }
+        };
+        ed.querySelector('.rm').onclick = () => {
+          stato.ing.splice(i, 1); aperto = null; disegna();
+        };
+        lista.append(ed);
+      }
+    }
+    aggiornaTot();
   };
   disegna();
   w.append(lista);

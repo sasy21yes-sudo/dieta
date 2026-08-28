@@ -5,94 +5,651 @@
   "note": "I gruppi muscolari servono alla mappa e al conteggio del volume. Un esercizio conta 1 serie piena sui primari e mezza sui secondari, che e' la convenzione usata in letteratura per il volume settimanale."
  },
  "muscoli": [
-  { "id": "trapezi",      "nome": "Trapezi",      "vista": "entrambe" },
-  { "id": "spalle",       "nome": "Spalle",       "vista": "entrambe" },
-  { "id": "petto",        "nome": "Petto",        "vista": "fronte" },
-  { "id": "bicipiti",     "nome": "Bicipiti",     "vista": "fronte" },
-  { "id": "avambracci",   "nome": "Avambracci",   "vista": "fronte" },
-  { "id": "addome",       "nome": "Addome",       "vista": "fronte" },
-  { "id": "quadricipiti", "nome": "Quadricipiti", "vista": "fronte" },
-  { "id": "dorsali",      "nome": "Dorsali",      "vista": "schiena" },
-  { "id": "tricipiti",    "nome": "Tricipiti",    "vista": "schiena" },
-  { "id": "lombari",      "nome": "Lombari",      "vista": "schiena" },
-  { "id": "glutei",       "nome": "Glutei",       "vista": "schiena" },
-  { "id": "femorali",     "nome": "Femorali",     "vista": "schiena" },
-  { "id": "polpacci",     "nome": "Polpacci",     "vista": "schiena" }
+  {
+   "id": "trapezi",
+   "nome": "Trapezi",
+   "vista": "entrambe"
+  },
+  {
+   "id": "spalle",
+   "nome": "Spalle",
+   "vista": "entrambe"
+  },
+  {
+   "id": "petto",
+   "nome": "Petto",
+   "vista": "fronte"
+  },
+  {
+   "id": "bicipiti",
+   "nome": "Bicipiti",
+   "vista": "fronte"
+  },
+  {
+   "id": "avambracci",
+   "nome": "Avambracci",
+   "vista": "fronte"
+  },
+  {
+   "id": "addome",
+   "nome": "Addome",
+   "vista": "fronte"
+  },
+  {
+   "id": "quadricipiti",
+   "nome": "Quadricipiti",
+   "vista": "fronte"
+  },
+  {
+   "id": "dorsali",
+   "nome": "Dorsali",
+   "vista": "schiena"
+  },
+  {
+   "id": "tricipiti",
+   "nome": "Tricipiti",
+   "vista": "schiena"
+  },
+  {
+   "id": "lombari",
+   "nome": "Lombari",
+   "vista": "schiena"
+  },
+  {
+   "id": "glutei",
+   "nome": "Glutei",
+   "vista": "schiena"
+  },
+  {
+   "id": "femorali",
+   "nome": "Femorali",
+   "vista": "schiena"
+  },
+  {
+   "id": "polpacci",
+   "nome": "Polpacci",
+   "vista": "schiena"
+  }
  ],
  "esercizi": [
-  { "id": "panca-piana", "nome": "Panca piana", "attrezzo": "bilanciere", "tipo": "multi",
-    "primari": ["petto"], "secondari": ["tricipiti", "spalle"], "range": [6, 10], "incremento": 2.5 },
-  { "id": "panca-manubri", "nome": "Panca con manubri", "attrezzo": "manubri", "tipo": "multi",
-    "primari": ["petto"], "secondari": ["tricipiti", "spalle"], "range": [8, 12], "incremento": 2 },
-  { "id": "panca-inclinata", "nome": "Panca inclinata", "attrezzo": "bilanciere", "tipo": "multi",
-    "primari": ["petto", "spalle"], "secondari": ["tricipiti"], "range": [6, 10], "incremento": 2.5 },
-  { "id": "croci", "nome": "Croci ai cavi", "attrezzo": "cavi", "tipo": "isolamento",
-    "primari": ["petto"], "secondari": [], "range": [10, 15], "incremento": 2.5 },
-  { "id": "piegamenti", "nome": "Piegamenti", "attrezzo": "corpo libero", "tipo": "multi",
-    "primari": ["petto"], "secondari": ["tricipiti", "spalle"], "range": [8, 20], "incremento": 0 },
-  { "id": "dip", "nome": "Dip alle parallele", "attrezzo": "corpo libero", "tipo": "multi",
-    "primari": ["petto", "tricipiti"], "secondari": ["spalle"], "range": [6, 12], "incremento": 2.5 },
-
-  { "id": "trazioni", "nome": "Trazioni", "attrezzo": "corpo libero", "tipo": "multi",
-    "primari": ["dorsali"], "secondari": ["bicipiti", "avambracci"], "range": [5, 10], "incremento": 2.5 },
-  { "id": "lat-machine", "nome": "Lat machine", "attrezzo": "macchina", "tipo": "multi",
-    "primari": ["dorsali"], "secondari": ["bicipiti"], "range": [8, 12], "incremento": 5 },
-  { "id": "rematore", "nome": "Rematore con bilanciere", "attrezzo": "bilanciere", "tipo": "multi",
-    "primari": ["dorsali"], "secondari": ["bicipiti", "trapezi", "lombari"], "range": [6, 10], "incremento": 2.5 },
-  { "id": "pulley", "nome": "Pulley basso", "attrezzo": "cavi", "tipo": "multi",
-    "primari": ["dorsali"], "secondari": ["bicipiti", "trapezi"], "range": [8, 12], "incremento": 5 },
-  { "id": "pullover", "nome": "Pullover", "attrezzo": "manubri", "tipo": "isolamento",
-    "primari": ["dorsali"], "secondari": ["petto"], "range": [10, 15], "incremento": 2 },
-
-  { "id": "military", "nome": "Lento avanti", "attrezzo": "bilanciere", "tipo": "multi",
-    "primari": ["spalle"], "secondari": ["tricipiti", "trapezi"], "range": [6, 10], "incremento": 2.5 },
-  { "id": "spinte-manubri", "nome": "Spinte con manubri", "attrezzo": "manubri", "tipo": "multi",
-    "primari": ["spalle"], "secondari": ["tricipiti"], "range": [8, 12], "incremento": 2 },
-  { "id": "alzate-laterali", "nome": "Alzate laterali", "attrezzo": "manubri", "tipo": "isolamento",
-    "primari": ["spalle"], "secondari": [], "range": [12, 20], "incremento": 1 },
-  { "id": "alzate-posteriori", "nome": "Alzate posteriori", "attrezzo": "manubri", "tipo": "isolamento",
-    "primari": ["spalle", "trapezi"], "secondari": [], "range": [12, 20], "incremento": 1 },
-  { "id": "scrollate", "nome": "Scrollate", "attrezzo": "manubri", "tipo": "isolamento",
-    "primari": ["trapezi"], "secondari": ["avambracci"], "range": [10, 15], "incremento": 2.5 },
-
-  { "id": "curl-bilanciere", "nome": "Curl con bilanciere", "attrezzo": "bilanciere", "tipo": "isolamento",
-    "primari": ["bicipiti"], "secondari": ["avambracci"], "range": [8, 12], "incremento": 2.5 },
-  { "id": "curl-manubri", "nome": "Curl con manubri", "attrezzo": "manubri", "tipo": "isolamento",
-    "primari": ["bicipiti"], "secondari": ["avambracci"], "range": [10, 14], "incremento": 1 },
-  { "id": "hammer", "nome": "Hammer curl", "attrezzo": "manubri", "tipo": "isolamento",
-    "primari": ["bicipiti", "avambracci"], "secondari": [], "range": [10, 14], "incremento": 1 },
-  { "id": "french-press", "nome": "French press", "attrezzo": "bilanciere", "tipo": "isolamento",
-    "primari": ["tricipiti"], "secondari": [], "range": [8, 12], "incremento": 2.5 },
-  { "id": "pushdown", "nome": "Push down ai cavi", "attrezzo": "cavi", "tipo": "isolamento",
-    "primari": ["tricipiti"], "secondari": [], "range": [10, 15], "incremento": 2.5 },
-
-  { "id": "squat", "nome": "Squat", "attrezzo": "bilanciere", "tipo": "multi",
-    "primari": ["quadricipiti"], "secondari": ["glutei", "lombari", "femorali"], "range": [5, 8], "incremento": 5 },
-  { "id": "leg-press", "nome": "Leg press", "attrezzo": "macchina", "tipo": "multi",
-    "primari": ["quadricipiti"], "secondari": ["glutei"], "range": [8, 12], "incremento": 10 },
-  { "id": "affondi", "nome": "Affondi", "attrezzo": "manubri", "tipo": "multi",
-    "primari": ["quadricipiti", "glutei"], "secondari": ["femorali"], "range": [8, 12], "incremento": 2 },
-  { "id": "leg-extension", "nome": "Leg extension", "attrezzo": "macchina", "tipo": "isolamento",
-    "primari": ["quadricipiti"], "secondari": [], "range": [12, 15], "incremento": 5 },
-  { "id": "stacco-rumeno", "nome": "Stacco rumeno", "attrezzo": "bilanciere", "tipo": "multi",
-    "primari": ["femorali", "glutei"], "secondari": ["lombari"], "range": [6, 10], "incremento": 5 },
-  { "id": "stacco", "nome": "Stacco da terra", "attrezzo": "bilanciere", "tipo": "multi",
-    "primari": ["femorali", "glutei", "lombari"], "secondari": ["dorsali", "trapezi", "avambracci"], "range": [3, 6], "incremento": 5 },
-  { "id": "leg-curl", "nome": "Leg curl", "attrezzo": "macchina", "tipo": "isolamento",
-    "primari": ["femorali"], "secondari": [], "range": [10, 15], "incremento": 5 },
-  { "id": "hip-thrust", "nome": "Hip thrust", "attrezzo": "bilanciere", "tipo": "multi",
-    "primari": ["glutei"], "secondari": ["femorali"], "range": [8, 12], "incremento": 5 },
-  { "id": "calf", "nome": "Calf raise", "attrezzo": "macchina", "tipo": "isolamento",
-    "primari": ["polpacci"], "secondari": [], "range": [12, 20], "incremento": 5 },
-
-  { "id": "plank", "nome": "Plank", "attrezzo": "corpo libero", "tipo": "isolamento",
-    "primari": ["addome"], "secondari": ["lombari"], "range": [30, 90], "incremento": 0, "unita": "secondi" },
-  { "id": "crunch", "nome": "Crunch ai cavi", "attrezzo": "cavi", "tipo": "isolamento",
-    "primari": ["addome"], "secondari": [], "range": [12, 20], "incremento": 2.5 },
-  { "id": "leg-raise", "nome": "Alzate delle gambe", "attrezzo": "corpo libero", "tipo": "isolamento",
-    "primari": ["addome"], "secondari": [], "range": [10, 20], "incremento": 0 },
-  { "id": "iperestensioni", "nome": "Iperestensioni", "attrezzo": "corpo libero", "tipo": "isolamento",
-    "primari": ["lombari"], "secondari": ["glutei", "femorali"], "range": [10, 15], "incremento": 0 }
+  {
+   "id": "panca-piana",
+   "nome": "Panca piana",
+   "attrezzo": "bilanciere",
+   "tipo": "multi",
+   "primari": [
+    "petto"
+   ],
+   "secondari": [
+    "tricipiti",
+    "spalle"
+   ],
+   "range": [
+    6,
+    10
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "panca-manubri",
+   "nome": "Panca con manubri",
+   "attrezzo": "manubri",
+   "tipo": "multi",
+   "primari": [
+    "petto"
+   ],
+   "secondari": [
+    "tricipiti",
+    "spalle"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 2
+  },
+  {
+   "id": "panca-inclinata",
+   "nome": "Panca inclinata",
+   "attrezzo": "bilanciere",
+   "tipo": "multi",
+   "primari": [
+    "petto",
+    "spalle"
+   ],
+   "secondari": [
+    "tricipiti"
+   ],
+   "range": [
+    6,
+    10
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "croci",
+   "nome": "Croci ai cavi",
+   "attrezzo": "cavi",
+   "tipo": "isolamento",
+   "primari": [
+    "petto"
+   ],
+   "secondari": [],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "piegamenti",
+   "nome": "Piegamenti",
+   "attrezzo": "corpo libero",
+   "tipo": "multi",
+   "primari": [
+    "petto"
+   ],
+   "secondari": [
+    "tricipiti",
+    "spalle"
+   ],
+   "range": [
+    8,
+    20
+   ],
+   "incremento": 0
+  },
+  {
+   "id": "dip",
+   "nome": "Dip alle parallele",
+   "attrezzo": "corpo libero",
+   "tipo": "multi",
+   "primari": [
+    "petto",
+    "tricipiti"
+   ],
+   "secondari": [
+    "spalle"
+   ],
+   "range": [
+    6,
+    12
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "trazioni",
+   "nome": "Trazioni",
+   "attrezzo": "corpo libero",
+   "tipo": "multi",
+   "primari": [
+    "dorsali"
+   ],
+   "secondari": [
+    "bicipiti",
+    "avambracci"
+   ],
+   "range": [
+    5,
+    10
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "lat-machine",
+   "nome": "Lat machine",
+   "attrezzo": "macchina",
+   "tipo": "multi",
+   "primari": [
+    "dorsali"
+   ],
+   "secondari": [
+    "bicipiti"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "rematore",
+   "nome": "Rematore con bilanciere",
+   "attrezzo": "bilanciere",
+   "tipo": "multi",
+   "primari": [
+    "dorsali"
+   ],
+   "secondari": [
+    "bicipiti",
+    "trapezi",
+    "lombari"
+   ],
+   "range": [
+    6,
+    10
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "pulley",
+   "nome": "Pulley basso",
+   "attrezzo": "cavi",
+   "tipo": "multi",
+   "primari": [
+    "dorsali"
+   ],
+   "secondari": [
+    "bicipiti",
+    "trapezi"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "pullover",
+   "nome": "Pullover",
+   "attrezzo": "manubri",
+   "tipo": "isolamento",
+   "primari": [
+    "dorsali"
+   ],
+   "secondari": [
+    "petto"
+   ],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 2
+  },
+  {
+   "id": "military",
+   "nome": "Lento avanti",
+   "attrezzo": "bilanciere",
+   "tipo": "multi",
+   "primari": [
+    "spalle"
+   ],
+   "secondari": [
+    "tricipiti",
+    "trapezi"
+   ],
+   "range": [
+    6,
+    10
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "spinte-manubri",
+   "nome": "Spinte con manubri",
+   "attrezzo": "manubri",
+   "tipo": "multi",
+   "primari": [
+    "spalle"
+   ],
+   "secondari": [
+    "tricipiti"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 2
+  },
+  {
+   "id": "alzate-laterali",
+   "nome": "Alzate laterali",
+   "attrezzo": "manubri",
+   "tipo": "isolamento",
+   "primari": [
+    "spalle"
+   ],
+   "secondari": [],
+   "range": [
+    12,
+    20
+   ],
+   "incremento": 1
+  },
+  {
+   "id": "alzate-posteriori",
+   "nome": "Alzate posteriori",
+   "attrezzo": "manubri",
+   "tipo": "isolamento",
+   "primari": [
+    "spalle",
+    "trapezi"
+   ],
+   "secondari": [],
+   "range": [
+    12,
+    20
+   ],
+   "incremento": 1
+  },
+  {
+   "id": "scrollate",
+   "nome": "Scrollate",
+   "attrezzo": "manubri",
+   "tipo": "isolamento",
+   "primari": [
+    "trapezi"
+   ],
+   "secondari": [
+    "avambracci"
+   ],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "curl-bilanciere",
+   "nome": "Curl con bilanciere",
+   "attrezzo": "bilanciere",
+   "tipo": "isolamento",
+   "primari": [
+    "bicipiti"
+   ],
+   "secondari": [
+    "avambracci"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "curl-manubri",
+   "nome": "Curl con manubri",
+   "attrezzo": "manubri",
+   "tipo": "isolamento",
+   "primari": [
+    "bicipiti"
+   ],
+   "secondari": [
+    "avambracci"
+   ],
+   "range": [
+    10,
+    14
+   ],
+   "incremento": 1
+  },
+  {
+   "id": "hammer",
+   "nome": "Hammer curl",
+   "attrezzo": "manubri",
+   "tipo": "isolamento",
+   "primari": [
+    "bicipiti",
+    "avambracci"
+   ],
+   "secondari": [],
+   "range": [
+    10,
+    14
+   ],
+   "incremento": 1
+  },
+  {
+   "id": "french-press",
+   "nome": "French press",
+   "attrezzo": "bilanciere",
+   "tipo": "isolamento",
+   "primari": [
+    "tricipiti"
+   ],
+   "secondari": [],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "pushdown",
+   "nome": "Push down ai cavi",
+   "attrezzo": "cavi",
+   "tipo": "isolamento",
+   "primari": [
+    "tricipiti"
+   ],
+   "secondari": [],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "squat",
+   "nome": "Squat",
+   "attrezzo": "bilanciere",
+   "tipo": "multi",
+   "primari": [
+    "quadricipiti"
+   ],
+   "secondari": [
+    "glutei",
+    "lombari",
+    "femorali"
+   ],
+   "range": [
+    5,
+    8
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "leg-press",
+   "nome": "Leg press",
+   "attrezzo": "macchina",
+   "tipo": "multi",
+   "primari": [
+    "quadricipiti"
+   ],
+   "secondari": [
+    "glutei"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 10
+  },
+  {
+   "id": "affondi",
+   "nome": "Affondi",
+   "attrezzo": "manubri",
+   "tipo": "multi",
+   "primari": [
+    "quadricipiti",
+    "glutei"
+   ],
+   "secondari": [
+    "femorali"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 2
+  },
+  {
+   "id": "leg-extension",
+   "nome": "Leg extension",
+   "attrezzo": "macchina",
+   "tipo": "isolamento",
+   "primari": [
+    "quadricipiti"
+   ],
+   "secondari": [],
+   "range": [
+    12,
+    15
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "stacco-rumeno",
+   "nome": "Stacco rumeno",
+   "attrezzo": "bilanciere",
+   "tipo": "multi",
+   "primari": [
+    "femorali",
+    "glutei"
+   ],
+   "secondari": [
+    "lombari"
+   ],
+   "range": [
+    6,
+    10
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "stacco",
+   "nome": "Stacco da terra",
+   "attrezzo": "bilanciere",
+   "tipo": "multi",
+   "primari": [
+    "femorali",
+    "glutei",
+    "lombari"
+   ],
+   "secondari": [
+    "dorsali",
+    "trapezi",
+    "avambracci"
+   ],
+   "range": [
+    3,
+    6
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "leg-curl",
+   "nome": "Leg curl",
+   "attrezzo": "macchina",
+   "tipo": "isolamento",
+   "primari": [
+    "femorali"
+   ],
+   "secondari": [],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "hip-thrust",
+   "nome": "Hip thrust",
+   "attrezzo": "bilanciere",
+   "tipo": "multi",
+   "primari": [
+    "glutei"
+   ],
+   "secondari": [
+    "femorali"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "calf",
+   "nome": "Calf raise",
+   "attrezzo": "macchina",
+   "tipo": "isolamento",
+   "primari": [
+    "polpacci"
+   ],
+   "secondari": [],
+   "range": [
+    12,
+    20
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "plank",
+   "nome": "Plank",
+   "attrezzo": "corpo libero",
+   "tipo": "isolamento",
+   "primari": [
+    "addome"
+   ],
+   "secondari": [
+    "lombari"
+   ],
+   "range": [
+    30,
+    90
+   ],
+   "incremento": 0,
+   "unita": "secondi"
+  },
+  {
+   "id": "crunch",
+   "nome": "Crunch ai cavi",
+   "attrezzo": "cavi",
+   "tipo": "isolamento",
+   "primari": [
+    "addome"
+   ],
+   "secondari": [],
+   "range": [
+    12,
+    20
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "leg-raise",
+   "nome": "Alzate delle gambe",
+   "attrezzo": "corpo libero",
+   "tipo": "isolamento",
+   "primari": [
+    "addome"
+   ],
+   "secondari": [],
+   "range": [
+    10,
+    20
+   ],
+   "incremento": 0
+  },
+  {
+   "id": "iperestensioni",
+   "nome": "Iperestensioni",
+   "attrezzo": "corpo libero",
+   "tipo": "isolamento",
+   "primari": [
+    "lombari"
+   ],
+   "secondari": [
+    "glutei",
+    "femorali"
+   ],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 0
+  }
  ],
  "volume": {
   "fonte": "stima",
@@ -112,5 +669,20 @@
  "progressione": {
   "rir_soglia": 2,
   "nota": "Doppia progressione: si sale di peso quando TUTTE le serie toccano il tetto del range con RIR minore o uguale a 2. Prima si aggiungono ripetizioni, poi carico."
+ },
+ "met": {
+  "fonte": "tabella",
+  "nota": "Equivalenti metabolici dal Compendium of Physical Activities. Sono medie di popolazione per tipo di attivita', non misure sul singolo: la spesa vera di due persone che fanno la stessa seduta puo' differire del 20-30%.",
+  "formula": "kcal = MET x 3.5 x peso_kg / 200 x minuti",
+  "pesi": 5,
+  "corsa_kcal_per_kg_km": 1.036,
+  "forza": 5,
+  "erg": 8,
+  "compromesso": 9,
+  "capacita": 7,
+  "corsa": 9.8,
+  "simulazione": 9.5,
+  "test": 8.5,
+  "minuti_per_serie": 3
  }
 }

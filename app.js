@@ -423,7 +423,9 @@ function analyse(k = today()) {
     const rate = ma - maPrev;                        // kg / settimana
     const vita = measTrend('vita', k);
     const vTrend = vita ? (vita.delta > 1 ? 'su' : vita.delta < -1 ? 'giu' : 'stabile') : 'stabile';
-    const car = S.settings.carichi || 'fermi';
+    // i carichi non si dichiarano piu' a mano: si leggono dalle schede
+    const ct = typeof caricoTrend === 'function' ? caricoTrend(k) : { stato: null };
+    const car = ct.stato || S.settings.carichi || 'fermi';
     let hit = null;
     for (const r of D.regole_calorie) {
       const [lo, hi] = r.peso_kg_sett;
@@ -1335,15 +1337,40 @@ function sheetMisura(m, k) {
 function viewAnalisi(v) {
   const c = el('div', 'card flat');
   c.append(el('div', 'eyebrow', 'Carichi in palestra'));
-  c.append(el('p', 'muted', 'Serve alla regola sulle calorie: senza questo dato peso e vita da soli non bastano a decidere.'));
-  const seg = el('div', 'seg');
-  for (const [val, lab] of [['su', 'In salita'], ['fermi', 'Fermi'], ['giu', 'In calo']]) {
-    const b = el('button', null, lab);
-    b.setAttribute('aria-pressed', (S.settings.carichi || 'fermi') === val);
-    b.onclick = () => { S.settings.carichi = val; save(); route(); };
-    seg.append(b);
+  const ct = typeof caricoTrend === 'function' ? caricoTrend() : { stato: null, n: 0 };
+  if (ct.stato) {
+    // non si dichiara piu' a mano: si legge dalle schede
+    const parola = { su: 'in salita', fermi: 'fermi', giu: 'in calo' }[ct.stato];
+    c.append(el('p', 'muted',
+      `I carichi sono <strong>${parola}</strong>: mediana ${ct.mediana >= 0 ? '+' : ''}${nf(ct.mediana, 2)}% a settimana
+       sul massimale stimato, su ${ct.n} esercizi con almeno tre sedute negli ultimi due mesi.
+       Non serve piu' dichiararlo: viene dalle serie che registri.`));
+    const tb = el('div', 'cmp');
+    tb.append(el('div', 'cmp-h', '<span></span><span>%/sett</span><span>Sedute</span><span></span>'));
+    for (const x of ct.pend.slice(0, 6))
+      tb.append(el('div', 'cmp-r',
+        `<span>${esc(x.nome)}</span>
+         <span class="mono ${x.pctSett > 0 ? 'good' : ''}">${x.pctSett >= 0 ? '+' : ''}${nf(x.pctSett, 2)}</span>
+         <span class="mono muted">${x.n}</span><span></span>`));
+    c.append(tb);
+    c.append(el('p', 'hint',
+      'Il massimale stimato mette d\'accordo "meno ripetizioni ma piu\' peso" e "stesso peso ma piu\' ripetizioni": due sedute con lo stesso valore sono progresso zero, comunque siano composte. Si usa la mediana fra esercizi perche\' un singolo record fortunato non sposti il giudizio.'));
+  } else {
+    c.append(el('p', 'muted',
+      `Servono almeno due esercizi con tre sedute ciascuno negli ultimi due mesi
+       perche\' l'app possa calcolarli da sola${ct.n ? ` (adesso ne ha ${ct.n})` : ''}.
+       Finche\' mancano, dichiaralo tu: serve alla regola sulle calorie, perche\'
+       peso e vita da soli non bastano a decidere.`));
+    const seg = el('div', 'seg');
+    for (const [val, lab] of [['su', 'In salita'], ['fermi', 'Fermi'], ['giu', 'In calo']]) {
+      const b = el('button', null, lab);
+      b.setAttribute('aria-pressed', (S.settings.carichi || 'fermi') === val);
+      b.onclick = () => { S.settings.carichi = val; save(); route(); };
+      seg.append(b);
+    }
+    c.append(seg);
   }
-  c.append(seg); v.append(c);
+  v.append(c);
 
   v.append(el('h2', 'sec', 'Cosa sto sbagliando'));
   for (const [kind, ico, title, body] of analyse()) {

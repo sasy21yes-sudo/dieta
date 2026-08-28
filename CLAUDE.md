@@ -154,7 +154,9 @@ non un dettaglio.
   Banister per muscolo, massimale stimato con Epley corretto col RIR, proiezione
   della forza per regressione lineare, doppia progressione, volume settimanale a
   barre orizzontali
-- **Piano** — profili multipli e editor: dati personali, target giornalieri,
+- **Piano** — percorso guidato in cinque passi (chi sei, quanto mangiare, cosa,
+  come lo combini, quando), ognuno con stato e spiegazione del perché; profili
+  multipli e editor: dati personali, target giornalieri,
   alimenti, composizione dei pasti con macro calcolati dagli ingredienti,
   assegnazione dei pasti alla settimana
 - **Consiglio del giorno** — su Oggi. Preferisce sempre un consiglio che nasce
@@ -162,6 +164,27 @@ non un dettaglio.
 - **Analisi** — motore a regole "cosa sto sbagliando" (vedi sotto)
 - **Spesa** — fabbisogno settimanale aggregato per categoria, con spunta
 - **Impostazioni** — generatore `.ics`, export/import backup JSON
+
+### Calorie bruciate: il punto in cui quasi tutte le app sbagliano
+
+`kcalAllenamento(k)` stima la spesa di una giornata da palestra e HYROX insieme
+(MET dal Compendium, in `data/palestra.json`; la corsa a 1,036 kcal/kg/km).
+
+**Questo numero non va MAI sommato al target né sottratto dall'introito.** Il
+dispendio del filtro di Kalman nasce dal bilancio fra quanto si mangia e come
+cambia il peso: contiene già tutto il movimento, allenamenti compresi. Sommarlo
+di nuovo sarebbe contarlo due volte. Serve a misurare il carico di lavoro nel
+tempo, non a mangiare di più — e la UI deve continuare a dirlo.
+
+### I carichi non si dichiarano più
+
+`caricoTrend()` li calcola dalle schede invece di chiederli. Il massimale
+stimato (Epley col RIR) è già la variabile che mette d'accordo "meno ripetizioni
+ma più peso" e "stesso peso ma più ripetizioni". Si prende la pendenza per ogni
+esercizio con ≥3 sedute in 8 settimane, la si normalizza sul valore corrente
+(+2,5 kg su 60 non è come su 200) e si usa la **mediana** fra esercizi, che un
+singolo record fortunato non sposta. Il selettore manuale resta solo come
+ripiego quando i dati non bastano.
 
 ### Il motore della palestra
 
@@ -282,6 +305,10 @@ In ordine di rapporto valore/sforzo.
   più file per restare modificabile dal telefono, non per essere impacchettata
 - Non far leggere a `bodyFat()` la formula maschile su un profilo femminile:
   sono due equazioni diverse e quella femminile richiede anche i fianchi
+- Non sommare le calorie bruciate al target: sono già dentro il dispendio stimato
+- Nei grafici a barre le etichette dell'asse x devono usare `g.xb` (centro della
+  barra), non `g.x` (scala delle linee): lo scarto è mezza barra, invisibile su
+  novanta giorni ed evidente su sette
 - Non usare `nf()` per riempire il valore di un `<input>`: formatta 2482 come
   "2.482" e rileggerlo dà 2,482
 - Non mettere le foto nel backup JSON: sono in IndexedDB perché in localStorage

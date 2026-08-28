@@ -133,6 +133,92 @@ function statoMuscoli(k = today()) {
   return out;
 }
 
+/* ------------------------------------------------------ spesa energetica */
+/**
+ * Calorie bruciate in una giornata di allenamento, palestra e HYROX insieme.
+ *
+ * ATTENZIONE, e' il punto dove quasi tutte le app sbagliano: questo numero NON
+ * va sommato al target ne' sottratto dall'introito. Il dispendio stimato dal
+ * filtro di Kalman nasce dal bilancio energetico osservato — introito contro
+ * variazione del peso — e quindi CONTIENE GIA' tutto quello che ti muovi,
+ * allenamenti compresi. Sommarlo di nuovo significherebbe contare due volte lo
+ * stesso lavoro e mangiare di piu' credendo di essere in pari.
+ *
+ * Serve a un'altra cosa: misurare il carico di lavoro nel tempo, vedere le
+ * settimane vuote e capire quanto pesa una seduta rispetto a un'altra.
+ */
+function kcalAllenamento(k) {
+  const M = PD?.met; if (!M) return { tot: 0, righe: [] };
+  const peso = lastWeight() ?? D.profilo.peso_iniziale_kg;
+  const met = (m, min) => m * 3.5 * peso / 200 * min;
+  const righe = [];
+
+  const ser = serieDelGiorno(k);
+  if (ser.length) {
+    const sess = P().sessioni[k];
+    // durata dichiarata se c'e', altrimenti stimata dalle serie (tempo sotto
+    // tensione piu' recupero): e' una stima, e la UI lo dice
+    const min = sess?.durata || Math.min(150, Math.max(15, ser.length * M.minuti_per_serie));
+    righe.push({ tipo: 'Pesi', min, kcal: met(M.pesi, min), stimata: !sess?.durata });
+  }
+
+  const sim = (S.hyrox?.sim || []).find(s => s.data === k && s.totale > 0);
+  if (sim) {
+    const min = sim.totale / 60;
+    const km = (sim.corse || []).filter(x => x > 0).length;
+    // la corsa si conta a chilometri, che e' piu' preciso dei MET
+    const kcalCorsa = km * peso * M.corsa_kcal_per_kg_km;
+    const minStaz = Math.max(0, min - (sim.corse || []).reduce((a, b) => a + (b || 0), 0) / 60);
+    righe.push({ tipo: 'Gara', min, kcal: kcalCorsa + met(M.simulazione, minStaz) });
+  } else {
+    const hs = S.hyrox?.sessioni?.[k];
+    if (hs && hs.fatto) {
+      const a = HX?.allenamenti.find(x => x.id === hs.id);
+      const min = hs.durata || a?.durata || 45;
+      righe.push({ tipo: 'HYROX', min, kcal: met(M[a?.tipo] ?? M.capacita, min) });
+    }
+  }
+  return { tot: righe.reduce((a, r) => a + r.kcal, 0), righe };
+}
+
+/**
+ * Tendenza dei carichi, calcolata invece che dichiarata a mano.
+ *
+ * Il massimale stimato con Epley corretto col RIR e' gia' la variabile che
+ * mette d'accordo "meno ripetizioni ma piu' peso" e "stesso peso ma piu'
+ * ripetizioni": due sedute con lo stesso e1RM sono progresso zero, comunque
+ * siano composte. Quindi si guarda la pendenza dell'e1RM esercizio per
+ * esercizio, la si normalizza sul valore corrente — un +2,5 kg su 60 non vale
+ * come su 200 — e si prende la MEDIANA fra esercizi, che un singolo record
+ * fortunato non riesce a spostare.
+ */
+function caricoTrend(k = today(), settimane = 8) {
+  const da = addDays(k, -settimane * 7);
+  const usati = [...new Set(Object.keys(P().sessioni).filter(x => x >= da && x <= k)
+    .flatMap(x => serieDelGiorno(x).map(s => s.ex)))];
+  const pend = [];
+  for (const id of usati) {
+    const serie = e1rmPerSeduta(id).filter(x => x.k >= da && x.k <= k);
+    if (serie.length < 3) continue;
+    const t0 = new Date(serie[0].k);
+    const pts = serie.map(s => ({ x: (new Date(s.k) - t0) / 864e5, y: s.v }));
+    const R = regressione(pts);
+    const base = avg(serie.map(s => s.v));
+    if (!R || !(base > 0)) continue;
+    pend.push({ id, nome: esercizio(id)?.nome || id,
+                pctSett: (R.m * 7) / base * 100, r2: R.r2, n: serie.length });
+  }
+  if (pend.length < 2) return { stato: null, n: pend.length, pend };
+  const ord = pend.map(x => x.pctSett).sort((a, b) => a - b);
+  const med = ord.length % 2 ? ord[(ord.length - 1) / 2]
+    : (ord[ord.length / 2 - 1] + ord[ord.length / 2]) / 2;
+  return {
+    stato: med > 0.3 ? 'su' : med < -0.3 ? 'giu' : 'fermi',
+    mediana: med, n: pend.length,
+    pend: pend.slice().sort((a, b) => b.pctSett - a.pctSett)
+  };
+}
+
 /* ---------------------------------------------------- progressione e forza */
 /** Tutte le serie di un esercizio, in ordine di data. */
 function serieEsercizio(id) {
