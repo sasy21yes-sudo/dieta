@@ -68,13 +68,20 @@ viz.css         tavolozza dei grafici + componenti di Dati, Prodotti, Foto
 app.js          stato, router, viste principali, motori. Caricato PER ULTIMO:
                 costruisce ROUTES e chiama init(), quindi le viste degli altri
                 file devono gia' esistere
+anim.js         toolkit di animazione (vedi sotto). Caricato PRIMA di charts.js
 charts.js       toolkit SVG dei grafici + vista Dati
+revisione.js    revisione settimanale: diagnosi, grafico a manubrio, priorita'
+cerca.js        selettore cercabile riusabile + dispensa
+peso.js         pesate anomale e ciclo mestruale: cio' che sporca la bilancia
+timer.js        timer di recupero fra le serie
+carico.js       scarico automatico + dolori e infortuni
+salute.js       import di passi e sonno da un Comando iOS
 sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
 giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
 piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
 palestra.js     registro sedute, mappa muscolare, forma-fatica, progressione
 prodotti.js     prodotti reali, codici a barre, override degli alimenti
-foto.js         foto dei progressi (IndexedDB) + timelapse
+foto.js         foto dei progressi (IndexedDB) + timelapse + confronto a cursore
 sw.js           cache offline; rete-prima su tutto, cache come riserva
 manifest.json   PWA
 data/dieta.json IL DOMINIO alimentare — vedi sotto
@@ -149,6 +156,15 @@ non un dettaglio.
 
 ## Funzionalità già implementate
 
+- **Revisione settimanale** — diagnosi pesata della settimana chiusa, grafico a
+  manubrio contro la precedente, cosa non ha funzionato, come si sistema e la
+  sola cosa da cambiare. Si propone da sola la domenica e il lunedi
+- **Timer di recupero**, **scarico automatico**, **dolori e infortuni** in Gym
+- **Dispensa** — quello che hai in casa si sottrae dalla lista della spesa
+- **Scala il pasto** — moltiplicatore da ×0,5 a ×2 su tutti gli ingredienti
+- **Confronto foto a cursore** — prima e dopo sovrapposte, con la riga che si
+  trascina
+- **Passi e sonno da un Comando iOS**, senza scriverli a mano
 - **Oggi** — giorno navigabile, barre macro consumato/target, pasti spuntabili,
   totale residuo, registrazione pasti fuori piano senza tono colpevolizzante
 - **Sostituzioni** — motore che, dato un alimento e una quantità, cerca nella stessa
@@ -351,20 +367,95 @@ mai moralizzante — è un requisito esplicito dell'utente.
 
 ---
 
+### Le animazioni
+
+`anim.js` sta su tre regole, in quest'ordine:
+
+1. **`prefers-reduced-motion` prima di tutto.** Circa una persona su tre naviga
+   con le animazioni ridotte. Quando è attivo non si anima: si salta allo stato
+   finale, che deve essere sempre leggibile da solo. Nel CSS la durata si azzera
+   a `.01ms` e non a `0`, altrimenti certi browser non emettono più gli eventi
+   di fine transizione
+2. **Si anima solo ciò che entra in vista, e una volta sola** (`osserva()`, con
+   `unobserve` immediato). Animare venti grafici al caricamento fa scattare il
+   telefono e non fa vedere niente
+3. **Solo `opacity`, `transform` e `stroke-dashoffset`**: sono le proprietà che
+   il browser compone sulla GPU. Animare `width` o `top` ricalcola il layout a
+   ogni fotogramma
+
+Il pezzo forte è `disegnaPath()`: si misura la lunghezza vera del tracciato,
+la si usa come trattino e si fa scorrere l'offset — la tecnica classica, l'unica
+che funziona senza librerie. L'offset **non** si scrive inline: la keyframe parte
+da `len` con `fill: 'backwards'`, così a riposo la linea è intera.
+
+### La revisione settimanale
+
+La settimana è l'unità giusta: il giorno è rumore, il mese arriva tardi per
+correggere. `revisione.js` confronta i sette giorni chiusi con i sette prima e
+risponde a tre domande in quest'ordine: **cosa non ha funzionato**, **come si
+sistema**, **quale una cosa cambiare**.
+
+`diagnosiSettimana()` non elenca: **pesa**. Registro 100, proteine 92, sonno 88,
+sedute 80, calorie 76/70, acqua 58, fibre 52, passi 44. Ordinare per gravità e
+non per evidenza è tutta la differenza fra un elenco e un consiglio. La priorità
+è **una sola** — cambiarne cinque insieme rende impossibile capire cosa ha
+funzionato.
+
+Il grafico è a **manubrio**, non a pendenza. La pendenza sembrava la forma ovvia
+e alla prova non reggeva: otto metriche quasi tutte vicine al target si
+accalcavano in una banda alta trenta pixel e le etichette si sovrapponevano per
+forza. Il manubrio dà a ogni voce una riga di altezza fissa — collisione
+impossibile — e mette il movimento in orizzontale. Un asse solo: la percentuale
+del proprio target, l'unico metro che tiene sulla stessa figura i passi e i litri.
+
+### Timer, scarico, acciacchi
+
+- **Timer di recupero** (`timer.js`) — sopravvive ai cambi di schermata perché
+  sta in `localStorage`, e calcola il residuo da un timestamp invece di contare
+  i tick. Il bip suona solo con l'app in primo piano, e la UI lo dice
+- **Scarico** (`carico.js`) — tre segnali indipendenti e ne servono due: carico
+  acuto contro cronico sopra 1,35, forza ferma o in calo su ≥2 esercizi,
+  ≥6 settimane di fila senza una più leggera. `traiettoriaFatica()` fa in una
+  passata quello che `formaFatica()` rifarebbe da capo quaranta volte per muscolo
+- **Acciacchi** — li dichiara l'utente. Livello 2 toglie gli esercizi dove il
+  muscolo è primario, livello 3 anche quelli dove è secondario. L'avviso compare
+  dentro la scheda, dove stai per farli
+
+### Il peso, ripulito
+
+`peso.js` toglie dalla **tendenza** (non dal diario) due cose che non sono grasso:
+
+- **Pesate anomale**, riconosciute con mediana e MAD. Misurato: un 76,4 battuto
+  in mezzo a sessanta giorni intorno ai 69 spostava la tendenza di un chilo, che
+  dentro il bilancio energetico diventava **566 kcal al giorno** di dispendio
+  inventato. Soglia minima 1,2 kg — l'oscillazione giornaliera è reale — e
+  l'ultima parola resta all'utente
+- **Ciclo mestruale**, solo sui profili femminili. In luteale la ritenzione vale
+  fino a due chili. Non si prova a sottrarla — quanta sia non lo sappiamo — si
+  allarga l'incertezza dell'osservazione sulle finestre che cambiano fase: su
+  ventotto giorni ne tocca quattro e lascia stare le altre ventiquattro
+
+### Passi e sonno senza scriverli
+
+Nessuna API web legge HealthKit. Un **Comando iOS** però ha i permessi che il
+browser non ha: legge il dato e apre `#/importa?passi=8432&sonno=7.4&data=…`,
+che `salute.js` valida e scrive. Un'automazione a ora fissa lo fa partire da
+sola. Il prezzo è che l'app va in primo piano per un attimo, e la schermata
+lo dice prima.
+
 ## Roadmap suggerita
 
-In ordine di rapporto valore/sforzo.
+I punti 1, 2 e 4 della vecchia roadmap sono fatti (revisione settimanale,
+doppia progressione, moltiplicatore sulle porzioni). Restano:
 
-1. **Revisione settimanale** — schermata domenicale con tutte le medie a
-   confronto con la settimana precedente
-2. **Log allenamento con doppia progressione** — esercizio, serie, reps, carico, RIR.
-   Quando tutte le serie toccano il tetto del range a RIR ≤2, proporre +2,5 kg (parte
-   alta) o +5 kg (parte bassa). Alimenterebbe automaticamente il campo "carichi"
-   dell'analisi, oggi manuale
-3. **Rampa fibre** — l'utente parte da ~15-20 g e il piano ne prevede 38. Avvisare se
+1. **Rampa fibre** — l'utente parte da ~15-20 g e il piano ne prevede 38. Avvisare se
    il salto settimanale supera i 5 g
-4. **Modifica porzioni** — scalare un pasto con un moltiplicatore e ricalcolare
-5. **Push reale** via Cloudflare Worker, solo se i promemoria da Calendario non bastano
+2. **Push reale** via Cloudflare Worker, solo se i promemoria da Calendario non bastano
+3. **Sostituzione automatica negli acciacchi** — oggi l'app dice "questo esercizio
+   ci va sopra"; potrebbe proporre il ricambio piu' vicino per gruppo muscolare
+4. **Dispensa che si scala da sola** mentre spunti i pasti. Attenzione: un
+   inventario che non torna e' peggio di nessun inventario, per questo oggi
+   la dispensa la aggiorni tu quando fai la spesa
 
 ## Cose da non fare
 
@@ -393,3 +484,21 @@ In ordine di rapporto valore/sforzo.
 - Non far calcolare la composizione con un collo fuori scala (32–48 cm): la formula
   si regge sulla differenza vita−collo, 7 cm di errore lì valgono 5 punti di grasso.
   Meglio rifiutare il calcolo che dare un numero falso
+- **Non far produrre a un'animazione l'unico contenuto della pagina.** Il numero
+  va scritto prima, l'anello va già riempito, la linea ha `stroke-dashoffset` zero
+  di suo. L'animazione riparte da capo e ci riarriva. Se l'IntersectionObserver
+  non scatta — scheda in secondo piano, elemento fuori vista, browser senza
+  l'API — la pagina deve essere comunque giusta. Questo errore è già stato fatto
+  due volte: i riquadri della revisione uscivano vuoti e le linee invisibili
+- Non promettere la lettura dei passi da HealthKit: **non esiste nessuna API web
+  che la faccia**, né su iOS né su Android. L'unica strada senza server è un
+  Comando che apre l'app con il valore nell'URL, ed è quella implementata
+- Non contare i tick per misurare il tempo: iOS strozza `setInterval` in secondo
+  piano. Si salva l'istante di partenza e si sottrae
+- Non confrontare la fatica di Banister con una soglia assoluta: con tau_forma 42
+  e tau_fatica 7 la prontezza di chi si allena è **sempre** positiva, per
+  costruzione. Il numero che dice qualcosa è il rapporto fatica/forma diviso il
+  suo valore di regime
+- Non usare media e deviazione standard per riconoscere una pesata sbagliata:
+  il valore anomalo alza sia la media sia lo scarto e finisce per giustificarsi
+  da solo. Servono mediana e MAD

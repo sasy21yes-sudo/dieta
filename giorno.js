@@ -41,6 +41,26 @@ function sheetPorzioni(k, code) {
   w.append(el('p', 'muted',
     'Cambia le quantita\' solo per questo giorno. Il pasto nel piano resta com\'e\': domani torna alle sue.'));
 
+  /* Scalare tutto insieme e' il caso piu' frequente — "oggi ho mangiato
+     mezza porzione" — e farlo ingrediente per ingrediente e' cinque tocchi
+     invece di uno. Il moltiplicatore parte sempre dalle quantita' del PIANO,
+     non da quelle gia' modificate: altrimenti due tocchi su ×0,5 darebbero
+     un quarto, che nessuno si aspetta. */
+  const scale = el('div', 'seg');
+  scale.style.marginBottom = '10px';
+  for (const f of [0.5, 0.75, 1, 1.25, 1.5, 2]) {
+    const b = el('button', null, f === 1 ? 'piano' : '×' + nf(f, f % 1 ? 2 : 0));
+    b.onclick = () => {
+      for (const i of (p.ingredienti || [])) {
+        const n = Math.max(0, Math.round(i.qta * f * 10) / 10);
+        if (n === i.qta) delete stato[i.alimento]; else stato[i.alimento] = n;
+      }
+      disegna();
+      if (typeof pulsa === 'function') pulsa(tot);
+    };
+    scale.append(b);
+  }
+
   const tot = el('div', 'read');
   const lista = el('div');
   const macroOra = () => {
@@ -89,6 +109,8 @@ function sheetPorzioni(k, code) {
     aggiorna();
   };
   disegna();
+  w.append(el('div', 'eyebrow', 'Scala tutto il pasto'));
+  w.append(scale);
   w.append(lista);
   w.append(tot);
 

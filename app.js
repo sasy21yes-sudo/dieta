@@ -51,7 +51,7 @@ function load() {
 /** Riempie i campi mancanti: serve all'avvio e dopo l'import di un backup
     vecchio, scritto da una versione che certe chiavi non le aveva. */
 function normalize() {
-  S.log ||= {}; S.spesa ||= {}; S.settings ||= { start: today() };
+  S.log ||= {}; S.spesa ||= {}; S.dispensa ||= {}; S.settings ||= { start: today() };
   S.model ||= {}; S.model.prev ||= []; S.prodotti ||= [];
   S.palestra ||= {}; S.palestra.sessioni ||= {}; S.palestra.esercizi ||= [];
   S.palestra.schede ||= []; S.palestra.acciacchi ||= [];
@@ -652,12 +652,13 @@ const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
                  palestra: viewPalestra, dati: viewDati, analisi: viewAnalisi,
                  spesa: viewSpesa, prodotti: viewProdotti, foto: viewFoto,
                  piano: viewPiano, hyrox: viewHyrox, benvenuto: viewBenvenuto,
-                 revisione: viewRevisione };
+                 revisione: viewRevisione, importa: viewImporta, salute: viewSalute };
 const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
                  palestra: 'Palestra', dati: 'Dati', analisi: 'Analisi',
                  spesa: 'Spesa', prodotti: 'Prodotti', foto: 'Foto',
                  piano: 'Piano', hyrox: 'Road to HYROX', benvenuto: 'Benvenuto',
-                 revisione: 'La settimana' };
+                 revisione: 'La settimana', importa: 'Importo da Salute',
+                 salute: 'Dati dal telefono' };
 
 function route() {
   let name = (location.hash.replace('#/', '') || 'oggi').split('?')[0];
@@ -1511,20 +1512,42 @@ function shoppingList() {
 }
 
 function viewSpesa(v) {
+  const conDisp = typeof fabbisognoNetto === 'function';
+  const inCasa = conDisp ? Object.keys(dispensa()).length : 0;
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Fabbisogno settimanale</div>
-     <div class="muted">Quantità totali dei 7 giorni. Arrotonda per eccesso alle confezioni intere.</div>`));
-  const byCat = shoppingList();
+     <div class="muted">Quantità totali dei 7 giorni${
+       inCasa ? ', meno quello che hai gia\' in dispensa' : ''}. Arrotonda per eccesso alle confezioni intere.</div>`));
+
+  if (conDisp) {
+    const bd = el('button', 'btn wide');
+    bd.textContent = inCasa ? `Dispensa · ${inCasa} voci in casa` : 'Cosa hai gia\' in casa';
+    bd.style.marginBottom = '12px';
+    bd.onclick = sheetDispensa;
+    v.append(bd);
+  }
+
+  const byCat = conDisp ? fabbisognoNetto() : shoppingList();
+  const qta = (n, u) => u === 'ml' ? `${nf(n)} ml`
+    : n >= 1000 ? `${nf(n / 1000, 2)} kg` : `${nf(n, n % 1 ? 1 : 0)} g`;
   for (const [cat, items] of Object.entries(byCat)) {
+    // una categoria interamente coperta dalla dispensa non va mostrata vuota:
+    // si dice che e' a posto
+    const daComprare = items.filter(it => (it.compra ?? it.q) > 0);
     v.append(el('h2', 'sec', cat[0].toUpperCase() + cat.slice(1)));
     const c = el('div', 'card');
-    for (const it of items) {
+    if (!daComprare.length) {
+      c.append(el('div', 'muted', 'Tutto gia\' in casa.'));
+      v.append(c); continue;
+    }
+    for (const it of daComprare) {
       const got = !!S.spesa[it.nome];
       const row = el('div', 'buy' + (got ? ' got' : ''));
-      const q = it.unita === 'ml' ? `${nf(it.q)} ml` :
-        it.q >= 1000 ? `${nf(it.q / 1000, 2)} kg` : `${nf(it.q, it.q % 1 ? 1 : 0)} g`;
-      row.append(el('div', 'box', '✓'), el('div', 'grow nm', esc(it.nome)),
-                 el('span', 'qt', q));
+      const nm = el('div', 'grow nm');
+      nm.innerHTML = esc(it.nome) + (it.ho > 0
+        ? `<em class="gia">serve ${qta(it.q, it.unita)}, in casa ${qta(it.ho, it.unita)}</em>` : '');
+      row.append(el('div', 'box', '✓'), nm,
+                 el('span', 'qt', qta(it.compra ?? it.q, it.unita)));
       row.onclick = () => { S.spesa[it.nome] = !got; save(); route(); };
       c.append(row);
     }
@@ -1604,6 +1627,10 @@ function sheetMenu() {
   mk('Prodotti e codici a barre',
      'Registra i prodotti che compri davvero, con i valori letti in etichetta. Collegandoli al piano, l\'app smette di usare le stime.',
      () => { closeSheet(); location.hash = '#/prodotti'; });
+
+  mk('Passi e sonno dal telefono',
+     'Nessuna pagina web puo\' leggere Salute — il permesso non esiste. Un Comando pero\' si\': legge il dato e apre l\'app col numero dentro l\'indirizzo. Qui c\'e\' la procedura.',
+     () => { closeSheet(); location.hash = '#/salute'; });
 
   mk('Foto dei progressi',
      'Uno scatto al giorno nella stessa posa. Restano sul telefono e non entrano nel backup JSON: sono troppo grandi.',

@@ -129,6 +129,7 @@ function viewFoto(v) {
         gr.append(fig);
       }
       c.append(gr);
+      c.append(sliderConfronto(a, b));
       cont.append(c);
     }
 
@@ -250,4 +251,63 @@ function sheetScatto(f, url) {
   };
   w.append(del);
   sheet(w);
+}
+
+/**
+ * Confronto a cursore: la foto di adesso sopra quella di prima, tagliata da
+ * una riga che si trascina.
+ *
+ * Perche' non due foto affiancate: affiancate se ne guarda una alla volta e
+ * il cervello non tiene a mente i contorni. Sovrapposte, con il taglio che
+ * si muove, la differenza si vede nel punto esatto in cui passa la riga —
+ * che su un mese di dieta e' l'unico modo di accorgersene.
+ *
+ * Il taglio usa clip-path e non due contenitori di larghezza variabile:
+ * cambiare la larghezza fa ricalcolare il layout a ogni pixel di
+ * trascinamento, clip-path no.
+ */
+function sliderConfronto(a, b) {
+  const ua = URL.createObjectURL(a.blob), ub = URL.createObjectURL(b.blob);
+  fotoUrls.push(ua, ub);
+  const box = el('div', 'cfr');
+  box.innerHTML = `<img class="sotto" src="${ua}" alt="prima">
+    <img class="sopra" src="${ub}" alt="dopo">
+    <span class="riga"><i></i></span>
+    <span class="tag sx">${esc(a.giorno.slice(5))}</span>
+    <span class="tag dx">${esc(b.giorno.slice(5))}</span>`;
+  const sopra = box.querySelector('.sopra'), riga = box.querySelector('.riga');
+  const metti = v => {
+    const q = Math.max(0, Math.min(1, v));
+    sopra.style.clipPath = `inset(0 0 0 ${q * 100}%)`;
+    riga.style.left = (q * 100) + '%';
+  };
+  const daEvento = e => {
+    const r = box.getBoundingClientRect();
+    metti((e.clientX - r.left) / r.width);
+  };
+  let giu = false;
+  box.addEventListener('pointerdown', e => {
+    giu = true;
+    try { box.setPointerCapture(e.pointerId); } catch {}
+    daEvento(e);
+  });
+  box.addEventListener('pointermove', e => { if (giu) { e.preventDefault(); daEvento(e); } });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave'])
+    box.addEventListener(ev, () => { giu = false; });
+  metti(.5);
+
+  /* All'entrata in vista la riga fa un giro completo. E' il modo piu' corto
+     di far capire che si trascina senza scrivere "trascina" da nessuna parte
+     — e con reduced-motion resta ferma a meta', che si capisce comunque. */
+  if (typeof osserva === 'function') osserva(box, () => {
+    if (!motionOk()) return;
+    const t0 = performance.now(), dur = 1600;
+    const passo = now => {
+      const t = Math.min(1, (now - t0) / dur);
+      metti(.5 + Math.sin(t * Math.PI * 2) * .42);
+      if (t < 1) requestAnimationFrame(passo); else metti(.5);
+    };
+    requestAnimationFrame(passo);
+  });
+  return box;
 }

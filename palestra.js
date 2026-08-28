@@ -881,21 +881,22 @@ function sheetLibero(k) {
   const box = el('div', 'card flat');
   box.style.marginTop = '12px';
   box.append(el('div', 'eyebrow', 'Aggiungi una serie'));
-  const selEx = el('select');
-  selEx.id = 's-ex';
-  selEx.style.cssText = 'width:100%;padding:9px 10px;border:1px solid var(--rule);'
-    + 'border-radius:9px;background:var(--paper);color:var(--ink);font:inherit;margin-bottom:8px';
   const ultimoEx = s.serie.length ? s.serie[s.serie.length - 1].ex : null;
-  for (const e of catalogo().slice().sort((a, b) => a.nome.localeCompare(b.nome)))
-    selEx.append(new Option(`${e.nome} — ${e.attrezzo}`, e.id, false, e.id === ultimoEx));
+  // il catalogo passa le quaranta voci: una ruota da far girare col pollice
+  // non e' un modo di scegliere un esercizio. Si scrive, si sceglie.
+  const selEx = selettoreCercabile(
+    catalogo().slice().sort((a, b) => a.nome.localeCompare(b.nome))
+      .map(e => ({ v: e.id, lab: e.nome, sub: e.attrezzo })),
+    ultimoEx, () => aggiornaAvviso(), 'Cerca un esercizio…');
+  selEx.style.marginBottom = '8px';
   box.append(selEx);
   const avv = el('div');
   const aggiornaAvviso = () => {
     avv.innerHTML = '';
-    const x = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(selEx.value, k) : null;
+    const x = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(selEx.valore(), k) : null;
     if (x) avv.append(x);
   };
-  selEx.onchange = aggiornaAvviso; aggiornaAvviso();
+  aggiornaAvviso();
   box.append(avv);
 
   const g = el('div');
@@ -913,12 +914,12 @@ function sheetLibero(k) {
     const kg = parseNum($('#s-kg').value), reps = parseNum($('#s-reps').value);
     const rir = parseNum($('#s-rir').value) ?? 2;
     if (reps == null || reps <= 0) { toast('Servono le ripetizioni'); return; }
-    s.serie.push({ ex: $('#s-ex').value, kg: kg ?? 0, reps, rir });
+    s.serie.push({ ex: selEx.valore(), kg: kg ?? 0, reps, rir });
     s.nome = $('#s-nome').value.trim();
     save(); disegna();
     // la serie e' appena finita: il recupero parte da solo, che e' il momento
     // in cui serve. Il tocco su Aggiungi e' anche il gesto che sblocca l'audio
-    const exf = esercizio($('#s-ex').value);
+    const exf = esercizio(selEx.valore());
     avviaRecupero(recupeoConsigliato(exf), exf?.nome || 'recupero');
     toast('Serie aggiunta — recupero avviato');
   };
