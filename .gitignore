@@ -10,3 +10,5 @@ desktop.ini
 # backup esportati dall'app: contengono il diario personale,
 # non vanno nel repo
 dieta-backup-*.json
+tmp-*
+tmp-prof/

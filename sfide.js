@@ -131,6 +131,10 @@ function anello(pct, etichetta, sotto, tinta) {
   t.textContent = pct;
   s.append(t);
   box.append(s);
+  if (typeof osserva === 'function') osserva(box, () => {
+    riempiAnello(s.querySelectorAll('circle')[1], pct / 100);
+    contaSu(t, pct, { dur: 900 });
+  });
   box.append(el('div', 'rl', esc(etichetta)));
   if (sotto) box.append(el('div', 'rs', esc(sotto)));
   return box;

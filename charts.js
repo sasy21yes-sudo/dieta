@@ -51,6 +51,10 @@ function card(titolo, sub) {
   const c = el('div', 'cw');
   c.append(el('h3', null, esc(titolo)));
   if (sub) c.append(el('div', 'sub', sub));
+  // l'animazione parte quando la carta entra in vista, una volta sola:
+  // animarne venti al caricamento farebbe scattare il telefono senza che
+  // nessuna si veda davvero
+  if (typeof animaCarta === 'function') setTimeout(() => animaCarta(c), 0);
   return c;
 }
 function vuoto(titolo, sub, msg) {
@@ -520,6 +524,13 @@ function viewDati(v) {
     d: vita != null ? `${nf(Math.abs(vita - D.target_fisico.misure.vita), 1)} cm dal target`
                     : 'mai misurata', dir: 'flat' }));
   v.append(kpis);
+
+  /* --- scorciatoia alla revisione --- */
+  const br = el('button', 'btn wide');
+  br.textContent = 'Apri la revisione settimanale';
+  br.style.marginBottom = '12px';
+  br.onclick = () => { location.hash = '#/revisione'; };
+  v.append(br);
 
   /* --- costanza a punteggio --- */
   if (typeof cardCostanza === 'function') v.append(cardCostanza(k, datiRange));

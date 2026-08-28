@@ -641,11 +641,13 @@ function cardConsiglio(k) {
 const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
                  palestra: viewPalestra, dati: viewDati, analisi: viewAnalisi,
                  spesa: viewSpesa, prodotti: viewProdotti, foto: viewFoto,
-                 piano: viewPiano, hyrox: viewHyrox, benvenuto: viewBenvenuto };
+                 piano: viewPiano, hyrox: viewHyrox, benvenuto: viewBenvenuto,
+                 revisione: viewRevisione };
 const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
                  palestra: 'Palestra', dati: 'Dati', analisi: 'Analisi',
                  spesa: 'Spesa', prodotti: 'Prodotti', foto: 'Foto',
-                 piano: 'Piano', hyrox: 'Road to HYROX', benvenuto: 'Benvenuto' };
+                 piano: 'Piano', hyrox: 'Road to HYROX', benvenuto: 'Benvenuto',
+                 revisione: 'La settimana' };
 
 function route() {
   let name = (location.hash.replace('#/', '') || 'oggi').split('?')[0];
@@ -682,6 +684,16 @@ function viewOggi(v) {
   nav.append(r); v.append(nav);
 
   if (k === today()) {
+    if (typeof revisionePronta === 'function' && revisionePronta(k)) {
+      const inv = el('button', 'card rev-invito');
+      inv.innerHTML = `<span class="eyebrow">La settimana e' chiusa</span>
+        <span class="t">Guarda com'e' andata</span>
+        <span class="d">Il confronto con la settimana prima, cosa non ha funzionato e la sola cosa da cambiare.</span>
+        <span class="g">Apri la revisione &rsaquo;</span>`;
+      inv.onclick = () => { location.hash = '#/revisione'; };
+      v.append(inv);
+      if (typeof pulsa === 'function') setTimeout(() => pulsa(inv), 250);
+    }
     const cc = cardConsiglio(k); if (cc) v.append(cc);
     if (typeof cardSfida === 'function') { const cs = cardSfida(k); if (cs) v.append(cs); }
   }

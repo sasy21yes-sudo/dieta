@@ -480,3 +480,81 @@
 .trofeo .nm{display:block;font-size:11px;font-weight:600;margin-top:4px;line-height:1.25}
 .trofeo .ds{display:block;font-family:var(--mono);font-size:8.5px;color:var(--ink-3);
   margin-top:3px;line-height:1.3}
+
+/* =========================================================== animazioni
+   Chi ha attivato "riduci movimento" nelle impostazioni di sistema non vede
+   niente di tutto questo: gli stati finali sono gia' leggibili da soli, le
+   animazioni aggiungono solo il tempo. */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important;animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;scroll-behavior:auto !important}
+}
+.confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.confetti i{position:absolute;top:0;width:7px;height:11px;border-radius:2px;display:block}
+
+/* ---------------- revisione settimanale ---------------- */
+.rev-hero{position:relative;background:linear-gradient(155deg,var(--pine-soft),var(--paper));
+  border:1px solid var(--pine-line);border-radius:16px;padding:20px 18px 18px;
+  margin-bottom:14px;overflow:hidden}
+.rev-kick{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--ink-3)}
+.rev-parola{max-width:calc(100% - 96px);font-family:var(--serif);font-size:34px;font-weight:700;line-height:1.05;
+  letter-spacing:-.02em;margin:4px 0 6px;color:var(--pine);transform-origin:left center}
+.rev-sotto{font-size:13.5px;color:var(--ink-2);line-height:1.5;max-width:calc(100% - 96px)}
+.rev-anello{position:absolute;top:16px;right:14px;width:86px;text-align:center}
+.rev-anello svg{width:86px;height:86px;display:block}
+.rev-anello-n{position:absolute;top:30px;left:0;right:0;font-size:22px;font-weight:600;
+  letter-spacing:-.02em}
+.rev-anello-l{font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:-2px}
+
+.rev-nums{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.rev-num{background:var(--paper);border:1px solid var(--rule);border-radius:11px;
+  padding:11px 12px}
+.rev-num .l{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3)}
+.rev-num .v{display:block;font-size:23px;font-weight:600;letter-spacing:-.02em;
+  margin-top:2px;font-variant-numeric:tabular-nums}
+.rev-num .d{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-3);
+  margin-top:2px}
+.rev-num .d.up{color:var(--pine)} .rev-num .d.dn{color:var(--amber)}
+
+.rev-err{display:grid;grid-template-columns:24px 1fr;gap:11px;padding:12px 0;
+  border-bottom:1px solid var(--rule)}
+.rev-err:last-child{border-bottom:0}
+.rev-err .n{width:22px;height:22px;border-radius:50%;background:var(--wash);
+  color:var(--ink-3);font-family:var(--mono);font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
+.rev-err.grave .n{background:var(--amber);color:#fff}
+.rev-err .t{display:block;font-weight:600;font-size:14px;margin-bottom:3px}
+.rev-err .c{display:block;font-size:13px;color:var(--ink-2);line-height:1.5}
+
+.rev-fix{padding:11px 0;border-bottom:1px solid var(--rule)}
+.rev-fix:last-child{border-bottom:0}
+.rev-fix .t{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--pine);margin-bottom:4px}
+.rev-fix .c{display:block;font-size:13.5px;color:var(--ink);line-height:1.5}
+
+.rev-prio{background:var(--ink);color:var(--paper);border-radius:14px;
+  padding:18px 16px;margin-bottom:12px}
+.rev-prio .rev-kick{color:rgba(255,255,255,.55)}
+.rev-prio-t{font-family:var(--serif);font-size:22px;font-weight:700;margin:5px 0 8px;
+  letter-spacing:-.01em}
+.rev-prio-c{font-size:14px;line-height:1.55;color:rgba(255,255,255,.9)}
+.rev-prio-n{font-size:11.5px;line-height:1.45;color:rgba(255,255,255,.5);
+  margin:12px 0 0;padding-top:11px;border-top:1px solid rgba(255,255,255,.15)}
+
+.rev-invito{display:block;width:100%;text-align:left;font:inherit;color:inherit;
+  cursor:pointer;border-left:3px solid var(--pine);
+  background:linear-gradient(140deg,var(--pine-soft),var(--paper))}
+.rev-invito .t{display:block;font-family:var(--serif);font-size:19px;font-weight:700;
+  margin:3px 0 5px;letter-spacing:-.01em}
+.rev-invito .d{display:block;font-size:13px;color:var(--ink-2);line-height:1.45}
+.rev-invito .g{display:inline-block;margin-top:9px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--pine)}
+
+/* pallino di legenda: il grafico a manubrio usa punti, non tratti */
+.legend{flex-wrap:wrap;row-gap:5px}
+.legend i.dt{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.legend i.dt.vuoto{background:var(--paper);box-shadow:inset 0 0 0 1.5px var(--ink-3)}
