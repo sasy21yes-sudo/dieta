@@ -52,6 +52,27 @@ function load() {
 function normalize() {
   S.log ||= {}; S.spesa ||= {}; S.settings ||= { start: today() };
   S.model ||= {}; S.model.prev ||= []; S.prodotti ||= [];
+  S.palestra ||= {}; S.palestra.sessioni ||= {}; S.palestra.esercizi ||= [];
+  for (const k of Object.keys(S.log)) {
+    const d = S.log[k]; if (!d || typeof d !== 'object') { delete S.log[k]; continue; }
+    d.pasti ||= {}; d.extra ||= []; d.misure ||= {}; d.integratori ||= {};
+  }
+}
+
+/**
+ * Accetta anche i backup delle versioni precedenti. Un file vecchio non ha
+ * model, prodotti o palestra, e puo' avere giornate senza le sotto-chiavi:
+ * normalize() le ricostruisce. Se il file e' direttamente la mappa dei giorni
+ * (formato piu' vecchio, senza involucro) lo si riconosce dalle chiavi-data e
+ * lo si avvolge, invece di rifiutarlo.
+ */
+function migra(o) {
+  if (!o || typeof o !== 'object') return null;
+  if (o.log && typeof o.log === 'object') return o;
+  const chiavi = Object.keys(o);
+  const sonoDate = chiavi.length && chiavi.every(x => /^\d{4}-\d{2}-\d{2}$/.test(x));
+  if (sonoDate) return { log: o, spesa: {}, settings: { start: chiavi.sort()[0] } };
+  return null;
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
@@ -127,6 +148,17 @@ function swaps(nome, qta, n = 5) {
 function lastDays(k, n) {
   const out = []; for (let i = 0; i < n; i++) out.push(addDays(k, -i)); return out;
 }
+/**
+ * Ancora delle medie: il giorno PRIMA di quello indicato.
+ * Oggi e' una giornata a meta' — i pasti non sono ancora tutti spuntati, i
+ * passi non sono ancora tutti fatti — e infilarla in una media la tira giu'
+ * sistematicamente. Le medie di comportamento e introito si fermano a ieri.
+ * Il peso fa eccezione ed e' l'unica: la pesata del mattino e' un dato
+ * completo, non un pezzo di giornata, quindi la tendenza la usa subito.
+ */
+const ieri = (k = today()) => addDays(k, -1);
+/** Finestra di n giorni che finisce ieri. */
+function windowDays(k, n) { return lastDays(ieri(k), n); }
 function avg(vals) {
   const v = vals.filter(x => typeof x === 'number' && !isNaN(x));
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
@@ -220,6 +252,7 @@ function priorTDEE() {
  */
 function observedTDEE(k, span) {
   const M = D.modello;
+  k = ieri(k);                       // l'introito di oggi e' ancora parziale
   const w1 = trendW(k), w0 = trendW(addDays(k, -span));
   if (w1 == null || w0 == null) return null;
   const ins = [];
@@ -333,7 +366,7 @@ function ledgerScore(k = today()) {
 /* ------------------------------------------------- motore "cosa sbaglio" */
 function analyse(k = today()) {
   const F = [], T = D.target;
-  const d7 = lastDays(k, 7), d14 = lastDays(k, 14);
+  const d7 = windowDays(k, 7), d14 = windowDays(k, 14);
   const logged = d7.filter(x => S.log[x]).length;
 
   if (logged < 3) {
@@ -651,8 +684,33 @@ function sheetExtra(k) {
 
 /* --------------------------------------------------------- vista DIARIO */
 function viewDiario(v) {
-  const k = today(), d = day(k);
+  const k = viewDate, d = day(k);
   const set = (id, val) => { d[id] = val; save(); };
+
+  // stesso giorno selezionato della scheda Oggi: si naviga il giorno, non la scheda
+  const nav = el('div', 'card flat');
+  nav.append(el('div', 'eyebrow', 'Giorno'));
+  const r = el('div', 'row between');
+  const nomi = ['lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato', 'domenica'];
+  r.append(el('button', 'btn sm', '‹'),
+    el('div', 'grow', `<strong style="font-family:var(--serif);font-size:17px">${nomi[dayIdx(k)].toUpperCase()}</strong>
+       <div class="muted mono" style="font-size:11px">${k}${k === today() ? ' · oggi' : ''}</div>`),
+    el('button', 'btn sm', '›'));
+  r.children[0].onclick = () => { viewDate = addDays(viewDate, -1); route(); };
+  r.children[2].onclick = () => {
+    if (viewDate >= today()) { toast('Il futuro non si registra'); return; }
+    viewDate = addDays(viewDate, 1); route();
+  };
+  r.children[1].style.textAlign = 'center';
+  nav.append(r); v.append(nav);
+
+  if (k !== today()) {
+    const t = el('button', 'btn wide');
+    t.textContent = 'Torna a oggi';
+    t.style.marginBottom = '12px';
+    t.onclick = () => { viewDate = today(); route(); };
+    v.append(t);
+  }
 
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Regola</div>
@@ -1311,12 +1369,13 @@ function sheetMenu() {
       const r = new FileReader();
       r.onload = () => {
         try {
-          const o = JSON.parse(r.result); if (!o.log) throw 0;
+          const o = migra(JSON.parse(r.result));
+          if (!o) throw new Error('formato non riconosciuto');
           const nuovi = Object.keys(o.log).length, ora = Object.keys(S.log).length;
           if (ora && !confirm('Il file contiene ' + nuovi + ' giorni e sostituira\' i '
               + ora + ' che hai adesso in memoria. Non si puo\' annullare. Procedo?')) return;
           S = o; normalize(); save(); closeSheet(); route(); toast('Backup importato');
-        } catch { toast('File non valido'); }
+        } catch (e) { toast('File non valido: ' + (e.message || 'illeggibile')); }
       };
       r.readAsText(f);
     };
@@ -1344,6 +1403,7 @@ async function init() {
     return;
   }
   $('#btn-menu').onclick = sheetMenu;
+  $('#btn-foto').onclick = () => { location.hash = '#/foto'; };
   $('#sheet-backdrop').onclick = closeSheet;
   addEventListener('hashchange', route);
   if (!location.hash) location.hash = '#/oggi';

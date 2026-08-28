@@ -404,9 +404,13 @@ function viewDati(v) {
     spark: pesi }));
 
   const cons = giorni.map(d => S.log[d] ? consumed(d) : null);
-  const kcalOk = cons.map(m => m && m.kcal > 400 ? m.kcal : null).filter(Boolean);
+  // i grafici mostrano anche oggi, ma la MEDIA no: la giornata in corso non e'
+  // finita e tirerebbe giu' il numero ogni mattina
+  const kcalOk = giorni.filter(d => d < today())
+    .map(d => S.log[d] ? consumed(d) : null)
+    .map(m => m && m.kcal > 400 ? m.kcal : null).filter(Boolean);
   kpis.append(tile({ k: 'Calorie medie', v: kcalOk.length ? nf(avg(kcalOk)) : '—', unit: 'kcal',
-    d: kcalOk.length ? `target ${nf(D.target.kcal)}` : 'nessun pasto spuntato',
+    d: kcalOk.length ? `target ${nf(D.target.kcal)} · fino a ieri` : 'nessun pasto spuntato',
     dir: 'flat', spark: cons.map(m => m && m.kcal > 400 ? m.kcal : null) }));
 
   const vita = lastMeas('vita');

@@ -42,12 +42,12 @@ function viewProdotti(v) {
   b.onclick = () => sheetProdotto(null);
   v.append(b);
 
-  if (BarcodeSupport()) {
-    const bs = el('button', 'btn wide', 'Scansiona un codice a barre');
-    bs.style.marginTop = '8px';
-    bs.onclick = () => sheetScan();
-    v.append(bs);
-  }
+  // il bottone c'e' sempre: se il browser non sa leggere i codici lo dice,
+  // invece di sparire lasciando credere che la funzione non esista
+  const bs = el('button', 'btn wide', 'Scansiona un codice a barre');
+  bs.style.marginTop = '8px';
+  bs.onclick = () => BarcodeSupport() ? sheetScan() : sheetCodiceManuale();
+  v.append(bs);
 
   v.append(el('h2', 'sec', `I tuoi prodotti (${list.length})`));
   if (!list.length) {
@@ -219,6 +219,36 @@ function sheetScan() {
         + '. Puoi registrare il prodotto a mano.';
     }
   })();
+}
+
+/**
+ * Ripiego quando il browser non ha BarcodeDetector — che oggi e' il caso di
+ * Safari su iPhone. Leggere un codice a barre dalla fotocamera senza quella
+ * API richiede una libreria di decodifica vera (ZXing e simili): e' una
+ * dipendenza esterna, e questo progetto non ne ha nessuna. Nel frattempo il
+ * codice si puo' digitare, e da li' in poi tutto funziona uguale.
+ */
+function sheetCodiceManuale() {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Codice a barre'));
+  w.append(el('h2', 'sec', 'Digita il codice'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Questo browser non sa leggere i codici dalla fotocamera: su iPhone manca '
+    + 'l\'API che serve, e per farlo davvero servirebbe una libreria esterna. '
+    + 'Il numero sotto le barre pero\' funziona allo stesso modo — e una volta '
+    + 'registrato il prodotto non serve piu\'.'));
+  w.append(el('div', 'field',
+    '<label>Numero sotto il codice</label>'
+    + '<input type="text" inputmode="numeric" id="bc-v" placeholder="8001234567890">'));
+  const go = el('button', 'btn wide pri', 'Cerca');
+  go.onclick = () => {
+    const c = $('#bc-v').value.trim();
+    if (!/^\d{6,14}$/.test(c)) { toast('Un codice a barre ha da 6 a 14 cifre'); return; }
+    trovato(c);
+  };
+  w.append(go);
+  sheet(w);
 }
 
 function trovato(code) {

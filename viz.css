@@ -107,3 +107,10 @@
 
 /* sei schede invece di cinque: il testo va stretto */
 #tabbar a{font-size:10px;letter-spacing:.02em;padding-left:0;padding-right:0}
+
+/* ---------------- azioni nella topbar ---------------- */
+#top-actions{display:flex;align-items:center;gap:2px}
+#btn-foto{background:none;border:0;color:var(--ink-3);padding:4px 6px;cursor:pointer;
+  display:flex;align-items:center}
+#btn-foto svg{width:21px;height:21px;display:block}
+#btn-foto:active{color:var(--pine)}
