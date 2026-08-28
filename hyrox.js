@@ -44,9 +44,20 @@ function HXS() {
   h.sim ||= [];
   h.sessioni ||= {};
   h.checklist ||= {};
+  // se non ha ancora detto niente, si assume palestra attrezzata: e' il caso
+  // piu' comune, e chi non ha l'attrezzo se ne accorge subito
+  h.attrezzi ||= null;
   return h;
 }
 const stazioni = () => HX?.stazioni || [];
+/** L'attrezzatura dichiarata; null = ha tutto. */
+function attrezziMiei() {
+  const a = HXS().attrezzi;
+  return a === null ? (HX?.attrezzatura || []).map(x => x.id) : a;
+}
+const hoAttrezzo = id => !id || attrezziMiei().includes(id);
+/** Un allenamento e' fattibile se hai TUTTO quello che richiede. */
+const fattibile = a => (a.richiede || []).every(hoAttrezzo);
 const stazione = id => stazioni().find(s => s.id === id) || null;
 
 /** Giorni alla gara. Un conto alla rovescia su una DATA DI GARA e' legittimo:
@@ -196,7 +207,9 @@ function degradoCorsa(sim) {
 function pianoSettimana(k = today()) {
   const fase = faseCorrente();
   const deboli = gapStazioni().filter(g => g.gap > 0).slice(0, 3).map(g => g.id);
-  const lib = HX.allenamenti;
+  // solo quello che puoi davvero fare: proporre la slitta a chi non ce l'ha
+  // non e' un programma, e' una lista della spesa
+  const lib = HX.allenamenti.filter(fattibile);
   const scelte = [];
   const seed = hashData(k.slice(0, 7));           // stabile dentro il mese
   let i = 0;
@@ -398,12 +411,18 @@ function hxPiano(w, h) {
   sc.append(el('div', 'hx-h', 'Settimana proposta'));
   for (const a of pw.sessioni) {
     const r = el('button', 'hx-sess' + (a.mirato ? ' mirato' : ''));
-    r.innerHTML = `<span class="tp">${esc(a.tipo)}</span>
+    r.innerHTML = `<span class="tp">${esc(a.tipo)}${a.ripiego ? ' · ripiego' : ''}</span>
       <span class="nm">${esc(a.nome)}</span>
       <span class="du">${a.durata}'</span>`;
     r.onclick = () => sheetAllenamento(a);
     sc.append(r);
   }
+  const mancano = HX.attrezzatura.filter(a => !hoAttrezzo(a.id));
+  if (mancano.length)
+    sc.append(el('p', 'hx-note',
+      'Non hai ' + mancano.map(a => esc(a.nome.toLowerCase())).join(', ')
+      + ': il programma sceglie solo fra gli allenamenti che puoi fare, e dove serve usa le sedute di ripiego. '
+      + esc(HX.ripiego_nota || '')));
   sc.append(el('p', 'hx-note',
     'Sette proposte per una settimana: prendine quante ne reggi, non tutte. Il volume che non recuperi non allena, affatica soltanto.'));
   w.append(sc);
@@ -627,6 +646,29 @@ function sheetGara() {
      <input type="text" inputmode="numeric" id="hx-km" value="${h.pb.corsa_km ? mmss(h.pb.corsa_km) : ''}">
      <div class="hint">Serve a montare la previsione quando non hai ancora fatto una simulazione.</div>`));
 
+  /* attrezzatura disponibile: cambia il programma, non solo un'etichetta */
+  const fa = el('div', 'field', '<label>Cosa hai a disposizione</label>');
+  const box = el('div');
+  box.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px';
+  const miei = attrezziMiei();
+  for (const at of HX.attrezzatura) {
+    const b2 = el('button', 'btn sm', at.nome);
+    const on = () => attrezziMiei().includes(at.id);
+    const dip = () => { b2.style.background = on() ? 'var(--pine)' : '';
+                        b2.style.color = on() ? '#fff' : ''; };
+    b2.onclick = () => {
+      const cur = attrezziMiei().slice();
+      const i = cur.indexOf(at.id);
+      if (i >= 0) cur.splice(i, 1); else cur.push(at.id);
+      h.attrezzi = cur; save(); dip();
+    };
+    dip(); box.append(b2);
+  }
+  fa.append(box);
+  fa.append(el('div', 'hint',
+    'Il programma settimanale propone solo allenamenti che puoi davvero fare. Per le stazioni che non puoi allenare trovi l'alternativa dentro la scheda della stazione.'));
+  w.append(fa);
+
   const b = el('button', 'btn wide pri', 'Salva');
   b.onclick = () => {
     h.profilo.data_gara = $('#hx-data').value || null;
@@ -650,6 +692,10 @@ function sheetStazione(st) {
   const std = (HX.standard[h.profilo.categoria] || HX.standard.open)[h.profilo.sesso] || {};
   if (std[st.id]) w.append(el('div', 'card flat',
     `<div class="eyebrow">Standard</div><div class="muted">${esc(std[st.id])}</div>`));
+  if (st.alternativa && !hoAttrezzo(st.richiede))
+    w.append(el('div', 'card flat',
+      `<div class="eyebrow">Non hai l'attrezzo</div>
+       <div class="muted">${esc(st.alternativa)}</div>`));
   w.append(el('div', 'field',
     `<label>Tuo tempo migliore <span class="muted">(m:ss)</span></label>
      <input type="text" inputmode="numeric" id="hx-pb" value="${h.pb[st.id] ? mmss(h.pb[st.id]) : ''}">`));
@@ -681,6 +727,11 @@ function sheetAllenamento(a) {
   if ((a.stazioni || []).length)
     w.append(el('p', 'hint', 'Stazioni allenate: '
       + a.stazioni.map(id => esc(stazione(id)?.nome || id)).join(', ')));
+  if ((a.richiede || []).length)
+    w.append(el('p', 'hint', 'Serve: '
+      + a.richiede.map(id => esc((HX.attrezzatura.find(x => x.id === id) || {}).nome || id)).join(', ')));
+  else
+    w.append(el('p', 'hint', 'Non serve nessun attrezzo.'));
   const fatto = h.sessioni[k]?.id === a.id && h.sessioni[k]?.fatto;
   const b = el('button', 'btn wide pri', fatto ? 'Segnata come fatta oggi' : 'Segna come fatta oggi');
   b.onclick = () => {

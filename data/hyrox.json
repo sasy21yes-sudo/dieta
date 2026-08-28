@@ -5,86 +5,297 @@
   "verifica": "Pesi, ripetizioni e altezze cambiano fra le stagioni e fra le sedi. Prima della gara controlla SEMPRE il regolamento ufficiale in vigore: questi valori sono quelli pubblicati piu' di frequente, non una copia certificata del rulebook.",
   "fonte": "tabella"
  },
-
  "formato": {
   "corse": 8,
   "metri_corsa": 1000,
   "totale_corsa_km": 8,
   "nota": "Otto chilometri di corsa alternati a otto stazioni. Il tempo fra la fine di una stazione e l'inizio della corsa successiva si chiama roxzone e viene cronometrato: non e' tempo morto, e' tempo di gara."
  },
-
  "sequenza": [
-  { "n": 1,  "tipo": "corsa",    "id": "run1", "nome": "Corsa 1" },
-  { "n": 2,  "tipo": "stazione", "id": "skierg" },
-  { "n": 3,  "tipo": "corsa",    "id": "run2", "nome": "Corsa 2" },
-  { "n": 4,  "tipo": "stazione", "id": "sled-push" },
-  { "n": 5,  "tipo": "corsa",    "id": "run3", "nome": "Corsa 3" },
-  { "n": 6,  "tipo": "stazione", "id": "sled-pull" },
-  { "n": 7,  "tipo": "corsa",    "id": "run4", "nome": "Corsa 4" },
-  { "n": 8,  "tipo": "stazione", "id": "burpee" },
-  { "n": 9,  "tipo": "corsa",    "id": "run5", "nome": "Corsa 5" },
-  { "n": 10, "tipo": "stazione", "id": "row" },
-  { "n": 11, "tipo": "corsa",    "id": "run6", "nome": "Corsa 6" },
-  { "n": 12, "tipo": "stazione", "id": "farmers" },
-  { "n": 13, "tipo": "corsa",    "id": "run7", "nome": "Corsa 7" },
-  { "n": 14, "tipo": "stazione", "id": "lunges" },
-  { "n": 15, "tipo": "corsa",    "id": "run8", "nome": "Corsa 8" },
-  { "n": 16, "tipo": "stazione", "id": "wallballs" }
+  {
+   "n": 1,
+   "tipo": "corsa",
+   "id": "run1",
+   "nome": "Corsa 1"
+  },
+  {
+   "n": 2,
+   "tipo": "stazione",
+   "id": "skierg"
+  },
+  {
+   "n": 3,
+   "tipo": "corsa",
+   "id": "run2",
+   "nome": "Corsa 2"
+  },
+  {
+   "n": 4,
+   "tipo": "stazione",
+   "id": "sled-push"
+  },
+  {
+   "n": 5,
+   "tipo": "corsa",
+   "id": "run3",
+   "nome": "Corsa 3"
+  },
+  {
+   "n": 6,
+   "tipo": "stazione",
+   "id": "sled-pull"
+  },
+  {
+   "n": 7,
+   "tipo": "corsa",
+   "id": "run4",
+   "nome": "Corsa 4"
+  },
+  {
+   "n": 8,
+   "tipo": "stazione",
+   "id": "burpee"
+  },
+  {
+   "n": 9,
+   "tipo": "corsa",
+   "id": "run5",
+   "nome": "Corsa 5"
+  },
+  {
+   "n": 10,
+   "tipo": "stazione",
+   "id": "row"
+  },
+  {
+   "n": 11,
+   "tipo": "corsa",
+   "id": "run6",
+   "nome": "Corsa 6"
+  },
+  {
+   "n": 12,
+   "tipo": "stazione",
+   "id": "farmers"
+  },
+  {
+   "n": 13,
+   "tipo": "corsa",
+   "id": "run7",
+   "nome": "Corsa 7"
+  },
+  {
+   "n": 14,
+   "tipo": "stazione",
+   "id": "lunges"
+  },
+  {
+   "n": 15,
+   "tipo": "corsa",
+   "id": "run8",
+   "nome": "Corsa 8"
+  },
+  {
+   "n": 16,
+   "tipo": "stazione",
+   "id": "wallballs"
+  }
  ],
-
  "stazioni": [
-  { "id": "skierg",    "nome": "SkiErg",              "breve": "Ski",     "misura": "1000 m",
-    "modalita": "erg",     "quota": 0.135, "muscoli": ["dorsali", "tricipiti", "addome"],
-    "chiave": "Parte a freddo dopo il primo chilometro. Chi spinge troppo qui paga per tutta la gara: e' la stazione dove si perde meno e si rovina di piu'." },
-  { "id": "sled-push", "nome": "Spinta della slitta", "breve": "Push",    "misura": "50 m",
-    "modalita": "slitta",  "quota": 0.100, "muscoli": ["quadricipiti", "glutei", "polpacci"],
-    "chiave": "La piu' brutale in assoluto sulle gambe. Passi corti, braccia tese, angolo basso: chi si alza perde aderenza e si ferma." },
-  { "id": "sled-pull", "nome": "Trazione della slitta","breve": "Pull",   "misura": "50 m",
-    "modalita": "slitta",  "quota": 0.115, "muscoli": ["dorsali", "bicipiti", "lombari"],
-    "chiave": "Tecnica sopra tutto: piedi larghi, corda bassa, tirare col peso del corpo e non con le braccia. Recuperare la corda in fretta vale piu' della forza." },
-  { "id": "burpee",    "nome": "Burpee broad jump",   "breve": "Burpee",  "misura": "80 m",
-    "modalita": "corpo",   "quota": 0.165, "muscoli": ["petto", "spalle", "quadricipiti", "addome"],
-    "chiave": "La stazione che manda in rosso la frequenza cardiaca. Ritmo lento e costante batte sempre partenza veloce e crollo." },
-  { "id": "row",       "nome": "Rowing",              "breve": "Row",     "misura": "1000 m",
-    "modalita": "erg",     "quota": 0.130, "muscoli": ["dorsali", "quadricipiti", "lombari"],
-    "chiave": "Arriva a meta' gara, con le gambe gia' cotte. Colpi lunghi e bassi di frequenza risparmiano le gambe per la corsa dopo." },
-  { "id": "farmers",   "nome": "Farmers carry",       "breve": "Farmers", "misura": "200 m",
-    "modalita": "carry",   "quota": 0.075, "muscoli": ["avambracci", "trapezi", "addome"],
-    "chiave": "La piu' veloce da guadagnare: si perde tempo solo se molli la presa. Allenare la presa costa poco e rende molto." },
-  { "id": "lunges",    "nome": "Affondi con sandbag", "breve": "Lunges",  "misura": "100 m",
-    "modalita": "carry",   "quota": 0.150, "muscoli": ["quadricipiti", "glutei", "femorali"],
-    "chiave": "Il ginocchio deve toccare terra a ogni passo. E' la stazione dove piu' spesso arrivano i no-rep, e ogni no-rep si paga a fine gara." },
-  { "id": "wallballs", "nome": "Wall balls",          "breve": "WallBall","misura": "100 rip",
-    "modalita": "corpo",   "quota": 0.130, "muscoli": ["quadricipiti", "spalle", "addome"],
-    "chiave": "L'ultima, con le gambe finite. Serie piccole e continue (10-15) con pause brevi battono le serie lunghe seguite da crolli." }
+  {
+   "id": "skierg",
+   "nome": "SkiErg",
+   "breve": "Ski",
+   "misura": "1000 m",
+   "modalita": "erg",
+   "quota": 0.135,
+   "muscoli": [
+    "dorsali",
+    "tricipiti",
+    "addome"
+   ],
+   "chiave": "Parte a freddo dopo il primo chilometro. Chi spinge troppo qui paga per tutta la gara: e' la stazione dove si perde meno e si rovina di piu'.",
+   "richiede": "skierg",
+   "alternativa": "Senza SkiErg: 3 giri da 15 pulldown con elastico + 15 slam ball, oppure 1 km di corsa a ritmo soglia con le braccia gia' stanche. L'obiettivo e' il debito d'ossigeno con le braccia, non il gesto."
+  },
+  {
+   "id": "sled-push",
+   "nome": "Spinta della slitta",
+   "breve": "Push",
+   "misura": "50 m",
+   "modalita": "slitta",
+   "quota": 0.1,
+   "muscoli": [
+    "quadricipiti",
+    "glutei",
+    "polpacci"
+   ],
+   "chiave": "La piu' brutale in assoluto sulle gambe. Passi corti, braccia tese, angolo basso: chi si alza perde aderenza e si ferma.",
+   "richiede": "slitta",
+   "alternativa": "Senza slitta: sprint in salita 8 x 30 m al 6-10% di pendenza, oppure leg press pesante a serie lunghe (20+ ripetizioni), oppure spinta di un'auto in folle su piazzale privato. Cerchi le gambe che bruciano, non l'attrezzo."
+  },
+  {
+   "id": "sled-pull",
+   "nome": "Trazione della slitta",
+   "breve": "Pull",
+   "misura": "50 m",
+   "modalita": "slitta",
+   "quota": 0.115,
+   "muscoli": [
+    "dorsali",
+    "bicipiti",
+    "lombari"
+   ],
+   "chiave": "Tecnica sopra tutto: piedi larghi, corda bassa, tirare col peso del corpo e non con le braccia. Recuperare la corda in fretta vale piu' della forza.",
+   "richiede": "slitta",
+   "alternativa": "Senza slitta: rematore ai cavi seduto a peso alto con recupero corto, oppure trazioni orizzontali zavorrate, oppure trascinare una borsa pesante con una corda. Serve la trazione ripetuta con presa sotto sforzo."
+  },
+  {
+   "id": "burpee",
+   "nome": "Burpee broad jump",
+   "breve": "Burpee",
+   "misura": "80 m",
+   "modalita": "corpo",
+   "quota": 0.165,
+   "muscoli": [
+    "petto",
+    "spalle",
+    "quadricipiti",
+    "addome"
+   ],
+   "chiave": "La stazione che manda in rosso la frequenza cardiaca. Ritmo lento e costante batte sempre partenza veloce e crollo.",
+   "richiede": null,
+   "alternativa": "Non serve niente: bastano 80 metri liberi. E' la stazione piu' democratica della gara."
+  },
+  {
+   "id": "row",
+   "nome": "Rowing",
+   "breve": "Row",
+   "misura": "1000 m",
+   "modalita": "erg",
+   "quota": 0.13,
+   "muscoli": [
+    "dorsali",
+    "quadricipiti",
+    "lombari"
+   ],
+   "chiave": "Arriva a meta' gara, con le gambe gia' cotte. Colpi lunghi e bassi di frequenza risparmiano le gambe per la corsa dopo.",
+   "richiede": "vogatore",
+   "alternativa": "Senza vogatore: 6 x 400 m di corsa forte con 60 secondi di recupero, oppure 5 x 20 swing con kettlebell + 20 remate con elastico. Riproduce il costo cardiaco, non la tecnica."
+  },
+  {
+   "id": "farmers",
+   "nome": "Farmers carry",
+   "breve": "Farmers",
+   "misura": "200 m",
+   "modalita": "carry",
+   "quota": 0.075,
+   "muscoli": [
+    "avambracci",
+    "trapezi",
+    "addome"
+   ],
+   "chiave": "La piu' veloce da guadagnare: si perde tempo solo se molli la presa. Allenare la presa costa poco e rende molto.",
+   "richiede": "manubri",
+   "alternativa": "Senza manubri: due borse della spesa cariche, due taniche d'acqua da 20 litri, o uno zaino per mano. La presa non distingue l'attrezzo dal peso."
+  },
+  {
+   "id": "lunges",
+   "nome": "Affondi con sandbag",
+   "breve": "Lunges",
+   "misura": "100 m",
+   "modalita": "carry",
+   "quota": 0.15,
+   "muscoli": [
+    "quadricipiti",
+    "glutei",
+    "femorali"
+   ],
+   "chiave": "Il ginocchio deve toccare terra a ogni passo. E' la stazione dove piu' spesso arrivano i no-rep, e ogni no-rep si paga a fine gara.",
+   "richiede": "sandbag",
+   "alternativa": "Senza sandbag: zaino da trekking caricato con libri o bottiglie d'acqua, tenuto sulle spalle. Il peso conta, la forma del sacco molto meno."
+  },
+  {
+   "id": "wallballs",
+   "nome": "Wall balls",
+   "breve": "WallBall",
+   "misura": "100 rip",
+   "modalita": "corpo",
+   "quota": 0.13,
+   "muscoli": [
+    "quadricipiti",
+    "spalle",
+    "addome"
+   ],
+   "chiave": "L'ultima, con le gambe finite. Serie piccole e continue (10-15) con pause brevi battono le serie lunghe seguite da crolli.",
+   "richiede": "wallball",
+   "alternativa": "Senza palla e senza muro: thruster con manubri o kettlebell allo stesso peso, oppure squat + lancio verso l'alto a corpo libero. Il gesto e' accosciata piu' spinta sopra la testa."
+  }
  ],
-
  "categorie": [
-  { "id": "open",     "nome": "Open" },
-  { "id": "pro",      "nome": "Pro" },
-  { "id": "doubles",  "nome": "Doubles" },
-  { "id": "staffetta","nome": "Staffetta" }
+  {
+   "id": "open",
+   "nome": "Open"
+  },
+  {
+   "id": "pro",
+   "nome": "Pro"
+  },
+  {
+   "id": "doubles",
+   "nome": "Doubles"
+  },
+  {
+   "id": "staffetta",
+   "nome": "Staffetta"
+  }
  ],
-
  "standard": {
   "open": {
-   "m": { "sled-push": "152 kg", "sled-pull": "103 kg", "farmers": "2 x 24 kg",
-          "lunges": "20 kg", "wallballs": "6 kg a 3,00 m", "skierg": "1000 m",
-          "row": "1000 m", "burpee": "80 m" },
-   "f": { "sled-push": "102 kg", "sled-pull": "78 kg", "farmers": "2 x 16 kg",
-          "lunges": "10 kg", "wallballs": "4 kg a 2,70 m", "skierg": "1000 m",
-          "row": "1000 m", "burpee": "80 m" }
+   "m": {
+    "sled-push": "152 kg",
+    "sled-pull": "103 kg",
+    "farmers": "2 x 24 kg",
+    "lunges": "20 kg",
+    "wallballs": "6 kg a 3,00 m",
+    "skierg": "1000 m",
+    "row": "1000 m",
+    "burpee": "80 m"
+   },
+   "f": {
+    "sled-push": "102 kg",
+    "sled-pull": "78 kg",
+    "farmers": "2 x 16 kg",
+    "lunges": "10 kg",
+    "wallballs": "4 kg a 2,70 m",
+    "skierg": "1000 m",
+    "row": "1000 m",
+    "burpee": "80 m"
+   }
   },
   "pro": {
-   "m": { "sled-push": "202 kg", "sled-pull": "153 kg", "farmers": "2 x 32 kg",
-          "lunges": "30 kg", "wallballs": "9 kg a 3,00 m", "skierg": "1000 m",
-          "row": "1000 m", "burpee": "80 m" },
-   "f": { "sled-push": "152 kg", "sled-pull": "103 kg", "farmers": "2 x 24 kg",
-          "lunges": "20 kg", "wallballs": "6 kg a 2,70 m", "skierg": "1000 m",
-          "row": "1000 m", "burpee": "80 m" }
+   "m": {
+    "sled-push": "202 kg",
+    "sled-pull": "153 kg",
+    "farmers": "2 x 32 kg",
+    "lunges": "30 kg",
+    "wallballs": "9 kg a 3,00 m",
+    "skierg": "1000 m",
+    "row": "1000 m",
+    "burpee": "80 m"
+   },
+   "f": {
+    "sled-push": "152 kg",
+    "sled-pull": "103 kg",
+    "farmers": "2 x 24 kg",
+    "lunges": "20 kg",
+    "wallballs": "6 kg a 2,70 m",
+    "skierg": "1000 m",
+    "row": "1000 m",
+    "burpee": "80 m"
+   }
   }
  },
-
  "ripartizione": {
   "fonte": "stima",
   "corsa": 0.52,
@@ -92,91 +303,470 @@
   "roxzone": 0.07,
   "nota": "Come si spartisce il tempo totale in una gara tipica. Sono proporzioni medie, non una legge: appena registri una simulazione l'app usa LA TUA ripartizione al posto di questa."
  },
-
  "livelli": [
-  { "id": "esordiente", "nome": "Prima gara",   "finish_min": 105, "km_sett": 20 },
-  { "id": "intermedio", "nome": "Intermedio",   "finish_min": 90,  "km_sett": 30 },
-  { "id": "avanzato",   "nome": "Avanzato",     "finish_min": 75,  "km_sett": 40 },
-  { "id": "elite",      "nome": "Elite",        "finish_min": 62,  "km_sett": 55 }
+  {
+   "id": "esordiente",
+   "nome": "Prima gara",
+   "finish_min": 105,
+   "km_sett": 20
+  },
+  {
+   "id": "intermedio",
+   "nome": "Intermedio",
+   "finish_min": 90,
+   "km_sett": 30
+  },
+  {
+   "id": "avanzato",
+   "nome": "Avanzato",
+   "finish_min": 75,
+   "km_sett": 40
+  },
+  {
+   "id": "elite",
+   "nome": "Elite",
+   "finish_min": 62,
+   "km_sett": 55
+  }
  ],
-
  "allenamenti": [
-  { "id": "comp-run-800", "nome": "Corsa compromessa 8x800",  "tipo": "compromesso",
-    "durata": 55, "stazioni": ["wallballs", "burpee"],
-    "descrizione": "8 x 800 m a ritmo gara, fra un ripetuta e l'altra 15 wall balls oppure 10 burpee broad jump. E' l'allenamento che riproduce meglio la gara: correre con le gambe gia' sporche." },
-  { "id": "comp-run-1000", "nome": "Simulazione 4x(1km + stazione)", "tipo": "compromesso",
-    "durata": 50, "stazioni": ["skierg", "row", "farmers", "lunges"],
-    "descrizione": "4 giri: 1 km a ritmo gara + una stazione a rotazione. Recupero solo il tempo di roxzone, 60-90 secondi." },
-  { "id": "sled-heavy", "nome": "Slitta pesante", "tipo": "forza",
-    "durata": 45, "stazioni": ["sled-push", "sled-pull"],
-    "descrizione": "6 x 25 m di spinta a peso gara +20%, recupero completo. Poi 6 x 25 m di trazione. Qui si cerca la forza, non il fiato." },
-  { "id": "sled-race", "nome": "Slitta a ritmo gara", "tipo": "compromesso",
-    "durata": 40, "stazioni": ["sled-push", "sled-pull"],
-    "descrizione": "5 giri: 400 m di corsa + 50 m di spinta a peso gara. Insegna a gestire le gambe che bruciano mentre riparti a correre." },
-  { "id": "erg-inter", "nome": "Intervalli agli ergometri", "tipo": "erg",
-    "durata": 45, "stazioni": ["skierg", "row"],
-    "descrizione": "5 x 500 m di ski + 5 x 500 m di rowing al ritmo obiettivo dei 1000 m, recupero 1 minuto. Serve a trovare il ritmo, non a spingere al massimo." },
-  { "id": "erg-1000", "nome": "Test 1000 m", "tipo": "test",
-    "durata": 30, "stazioni": ["skierg", "row"],
-    "descrizione": "1000 m di ski e 1000 m di rowing a tutta, separati da 10 minuti. Da rifare ogni 4-6 settimane per aggiornare i riferimenti." },
-  { "id": "wb-emom", "nome": "Wall ball EMOM", "tipo": "capacita",
-    "durata": 25, "stazioni": ["wallballs"],
-    "descrizione": "EMOM da 20 minuti: 12 wall balls al minuto. Costruisce la capacita' di fare 100 ripetizioni senza crollare, che e' il vero problema dell'ultima stazione." },
-  { "id": "lunges-vol", "nome": "Volume affondi", "tipo": "capacita",
-    "durata": 35, "stazioni": ["lunges"],
-    "descrizione": "4 x 50 m di affondi con sandbag a peso gara, recupero 2 minuti. Attenzione al ginocchio che tocca: allenare la ripetizione sbagliata prepara al no-rep." },
-  { "id": "grip", "nome": "Presa e trasporti", "tipo": "capacita",
-    "durata": 30, "stazioni": ["farmers", "sled-pull"],
-    "descrizione": "5 x 100 m di farmers a peso gara +10%, piu' 3 x sospensioni alla sbarra fino a cedimento. La presa e' la cosa che rende piu' in fretta." },
-  { "id": "burpee-pace", "nome": "Burpee a ritmo", "tipo": "capacita",
-    "durata": 25, "stazioni": ["burpee"],
-    "descrizione": "6 x 20 m di burpee broad jump con recupero 90 secondi, tenendo lo stesso tempo su tutte le serie. Se l'ultima e' molto piu' lenta della prima, sei partito troppo forte." },
-  { "id": "long-run", "nome": "Lungo lento", "tipo": "corsa",
-    "durata": 70, "stazioni": [],
-    "descrizione": "60-80 minuti a ritmo conversazione. E' la base aerobica che regge tutto il resto: senza, le corse degradano di gara in gara." },
-  { "id": "tempo-run", "nome": "Corsa a soglia", "tipo": "corsa",
-    "durata": 50, "stazioni": [],
-    "descrizione": "20-30 minuti a ritmo controllato ma impegnativo, poco sotto il ritmo gara. Alza il tetto senza costare troppo recupero." },
-  { "id": "run-inter", "nome": "Ripetute in pista", "tipo": "corsa",
-    "durata": 45, "stazioni": [],
-    "descrizione": "6-8 x 1000 m al ritmo gara con 2 minuti di recupero. Serve a rendere il ritmo gara comodo, non a soffrire." },
-  { "id": "forza-gambe", "nome": "Forza gambe", "tipo": "forza",
-    "durata": 55, "stazioni": ["sled-push", "lunges", "wallballs"],
-    "descrizione": "Squat o leg press pesanti, affondi camminati zavorrati, calf. Le gambe reggono cinque stazioni su otto: e' l'investimento che rende di piu'." },
-  { "id": "forza-tirate", "nome": "Forza di tirata", "tipo": "forza",
-    "durata": 50, "stazioni": ["sled-pull", "row", "skierg"],
-    "descrizione": "Trazioni, rematore, pulldown. Tre stazioni su otto sono tirate: allenarle separatamente paga." },
-  { "id": "sim-mezza", "nome": "Mezza simulazione", "tipo": "simulazione",
-    "durata": 55, "stazioni": [],
-    "descrizione": "4 corse da 1 km e 4 stazioni nell'ordine di gara. Costa poco recupero e dice quasi tutto quello che direbbe una simulazione intera." },
-  { "id": "sim-intera", "nome": "Simulazione intera", "tipo": "simulazione",
-    "durata": 100, "stazioni": [],
-    "descrizione": "Gara completa a cronometro. Da fare al massimo ogni 4-6 settimane: e' un test, non un allenamento, e va recuperata come una gara." }
+  {
+   "id": "comp-run-800",
+   "nome": "Corsa compromessa 8x800",
+   "tipo": "compromesso",
+   "durata": 55,
+   "stazioni": [
+    "wallballs",
+    "burpee"
+   ],
+   "descrizione": "8 x 800 m a ritmo gara, fra un ripetuta e l'altra 15 wall balls oppure 10 burpee broad jump. E' l'allenamento che riproduce meglio la gara: correre con le gambe gia' sporche.",
+   "richiede": [
+    "wallball"
+   ]
+  },
+  {
+   "id": "comp-run-1000",
+   "nome": "Simulazione 4x(1km + stazione)",
+   "tipo": "compromesso",
+   "durata": 50,
+   "stazioni": [
+    "skierg",
+    "row",
+    "farmers",
+    "lunges"
+   ],
+   "descrizione": "4 giri: 1 km a ritmo gara + una stazione a rotazione. Recupero solo il tempo di roxzone, 60-90 secondi.",
+   "richiede": [
+    "skierg",
+    "vogatore",
+    "manubri",
+    "sandbag"
+   ]
+  },
+  {
+   "id": "sled-heavy",
+   "nome": "Slitta pesante",
+   "tipo": "forza",
+   "durata": 45,
+   "stazioni": [
+    "sled-push",
+    "sled-pull"
+   ],
+   "descrizione": "6 x 25 m di spinta a peso gara +20%, recupero completo. Poi 6 x 25 m di trazione. Qui si cerca la forza, non il fiato.",
+   "richiede": [
+    "slitta"
+   ]
+  },
+  {
+   "id": "sled-race",
+   "nome": "Slitta a ritmo gara",
+   "tipo": "compromesso",
+   "durata": 40,
+   "stazioni": [
+    "sled-push",
+    "sled-pull"
+   ],
+   "descrizione": "5 giri: 400 m di corsa + 50 m di spinta a peso gara. Insegna a gestire le gambe che bruciano mentre riparti a correre.",
+   "richiede": [
+    "slitta"
+   ]
+  },
+  {
+   "id": "erg-inter",
+   "nome": "Intervalli agli ergometri",
+   "tipo": "erg",
+   "durata": 45,
+   "stazioni": [
+    "skierg",
+    "row"
+   ],
+   "descrizione": "5 x 500 m di ski + 5 x 500 m di rowing al ritmo obiettivo dei 1000 m, recupero 1 minuto. Serve a trovare il ritmo, non a spingere al massimo.",
+   "richiede": [
+    "skierg",
+    "vogatore"
+   ]
+  },
+  {
+   "id": "erg-1000",
+   "nome": "Test 1000 m",
+   "tipo": "test",
+   "durata": 30,
+   "stazioni": [
+    "skierg",
+    "row"
+   ],
+   "descrizione": "1000 m di ski e 1000 m di rowing a tutta, separati da 10 minuti. Da rifare ogni 4-6 settimane per aggiornare i riferimenti.",
+   "richiede": [
+    "skierg",
+    "vogatore"
+   ]
+  },
+  {
+   "id": "wb-emom",
+   "nome": "Wall ball EMOM",
+   "tipo": "capacita",
+   "durata": 25,
+   "stazioni": [
+    "wallballs"
+   ],
+   "descrizione": "EMOM da 20 minuti: 12 wall balls al minuto. Costruisce la capacita' di fare 100 ripetizioni senza crollare, che e' il vero problema dell'ultima stazione.",
+   "richiede": [
+    "wallball"
+   ]
+  },
+  {
+   "id": "lunges-vol",
+   "nome": "Volume affondi",
+   "tipo": "capacita",
+   "durata": 35,
+   "stazioni": [
+    "lunges"
+   ],
+   "descrizione": "4 x 50 m di affondi con sandbag a peso gara, recupero 2 minuti. Attenzione al ginocchio che tocca: allenare la ripetizione sbagliata prepara al no-rep.",
+   "richiede": [
+    "sandbag"
+   ]
+  },
+  {
+   "id": "grip",
+   "nome": "Presa e trasporti",
+   "tipo": "capacita",
+   "durata": 30,
+   "stazioni": [
+    "farmers",
+    "sled-pull"
+   ],
+   "descrizione": "5 x 100 m di farmers a peso gara +10%, piu' 3 x sospensioni alla sbarra fino a cedimento. La presa e' la cosa che rende piu' in fretta.",
+   "richiede": [
+    "manubri",
+    "sbarra"
+   ]
+  },
+  {
+   "id": "burpee-pace",
+   "nome": "Burpee a ritmo",
+   "tipo": "capacita",
+   "durata": 25,
+   "stazioni": [
+    "burpee"
+   ],
+   "descrizione": "6 x 20 m di burpee broad jump con recupero 90 secondi, tenendo lo stesso tempo su tutte le serie. Se l'ultima e' molto piu' lenta della prima, sei partito troppo forte.",
+   "richiede": []
+  },
+  {
+   "id": "long-run",
+   "nome": "Lungo lento",
+   "tipo": "corsa",
+   "durata": 70,
+   "stazioni": [],
+   "descrizione": "60-80 minuti a ritmo conversazione. E' la base aerobica che regge tutto il resto: senza, le corse degradano di gara in gara.",
+   "richiede": []
+  },
+  {
+   "id": "tempo-run",
+   "nome": "Corsa a soglia",
+   "tipo": "corsa",
+   "durata": 50,
+   "stazioni": [],
+   "descrizione": "20-30 minuti a ritmo controllato ma impegnativo, poco sotto il ritmo gara. Alza il tetto senza costare troppo recupero.",
+   "richiede": []
+  },
+  {
+   "id": "run-inter",
+   "nome": "Ripetute in pista",
+   "tipo": "corsa",
+   "durata": 45,
+   "stazioni": [],
+   "descrizione": "6-8 x 1000 m al ritmo gara con 2 minuti di recupero. Serve a rendere il ritmo gara comodo, non a soffrire.",
+   "richiede": []
+  },
+  {
+   "id": "forza-gambe",
+   "nome": "Forza gambe",
+   "tipo": "forza",
+   "durata": 55,
+   "stazioni": [
+    "sled-push",
+    "lunges",
+    "wallballs"
+   ],
+   "descrizione": "Squat o leg press pesanti, affondi camminati zavorrati, calf. Le gambe reggono cinque stazioni su otto: e' l'investimento che rende di piu'.",
+   "richiede": [
+    "bilanciere"
+   ]
+  },
+  {
+   "id": "forza-tirate",
+   "nome": "Forza di tirata",
+   "tipo": "forza",
+   "durata": 50,
+   "stazioni": [
+    "sled-pull",
+    "row",
+    "skierg"
+   ],
+   "descrizione": "Trazioni, rematore, pulldown. Tre stazioni su otto sono tirate: allenarle separatamente paga.",
+   "richiede": [
+    "sbarra"
+   ]
+  },
+  {
+   "id": "sim-mezza",
+   "nome": "Mezza simulazione",
+   "tipo": "simulazione",
+   "durata": 55,
+   "stazioni": [],
+   "descrizione": "4 corse da 1 km e 4 stazioni nell'ordine di gara. Costa poco recupero e dice quasi tutto quello che direbbe una simulazione intera.",
+   "richiede": [
+    "skierg",
+    "vogatore",
+    "slitta",
+    "sandbag",
+    "wallball",
+    "manubri"
+   ]
+  },
+  {
+   "id": "sim-intera",
+   "nome": "Simulazione intera",
+   "tipo": "simulazione",
+   "durata": 100,
+   "stazioni": [],
+   "descrizione": "Gara completa a cronometro. Da fare al massimo ogni 4-6 settimane: e' un test, non un allenamento, e va recuperata come una gara.",
+   "richiede": [
+    "skierg",
+    "vogatore",
+    "slitta",
+    "sandbag",
+    "wallball",
+    "manubri"
+   ]
+  },
+  {
+   "id": "wa-sled-collina",
+   "nome": "Salita al posto della slitta",
+   "tipo": "compromesso",
+   "durata": 45,
+   "stazioni": [
+    "sled-push"
+   ],
+   "richiede": [],
+   "ripiego": true,
+   "descrizione": "10 x 30 m di sprint in salita al 6-10%, discesa camminando. Poi 3 x 60 secondi di camminata in salita con uno zaino pesante. Riproduce il bruciore alle gambe della spinta senza avere una slitta."
+  },
+  {
+   "id": "wa-erg-corsa",
+   "nome": "Corsa al posto degli ergometri",
+   "tipo": "compromesso",
+   "durata": 45,
+   "stazioni": [
+    "skierg",
+    "row"
+   ],
+   "richiede": [],
+   "ripiego": true,
+   "descrizione": "5 giri: 600 m forte + 20 burpee. Gli ergometri costano fiato con le braccia dentro: senza macchine, il debito d'ossigeno si crea cosi'."
+  },
+  {
+   "id": "wa-casa-full",
+   "nome": "Simulazione da casa",
+   "tipo": "simulazione",
+   "durata": 70,
+   "stazioni": [],
+   "richiede": [],
+   "ripiego": true,
+   "descrizione": "8 x (800 m di corsa + una stazione sostitutiva): burpee broad jump, affondi con zaino, thruster con due bottiglie, camminata con borse pesanti, salita, plank, jump squat, push up. Nessun attrezzo, stesso ordine e stesso stress della gara."
+  },
+  {
+   "id": "wa-zaino",
+   "nome": "Circuito con lo zaino",
+   "tipo": "capacita",
+   "durata": 35,
+   "stazioni": [
+    "lunges",
+    "farmers"
+   ],
+   "richiede": [],
+   "ripiego": true,
+   "descrizione": "5 giri: 50 m di affondi con zaino carico + 100 m di camminata veloce tenendo lo zaino a braccia tese davanti. Sostituisce sandbag e farmers con l'unico attrezzo che tutti hanno."
+  },
+  {
+   "id": "wa-thruster",
+   "nome": "Thruster al posto dei wall ball",
+   "tipo": "capacita",
+   "durata": 25,
+   "stazioni": [
+    "wallballs"
+   ],
+   "richiede": [
+    "manubri"
+   ],
+   "ripiego": true,
+   "descrizione": "EMOM da 20 minuti: 10 thruster con manubri o kettlebell al peso della palla. Stesso gesto, stessa fatica, nessun muro."
+  },
+  {
+   "id": "wa-corpo-libero",
+   "nome": "Forza a corpo libero",
+   "tipo": "forza",
+   "durata": 40,
+   "stazioni": [
+    "sled-push",
+    "wallballs"
+   ],
+   "richiede": [],
+   "ripiego": true,
+   "descrizione": "Squat bulgaro, affondi camminati, step up su una sedia, calf in piedi: 4 serie da 15-20 per gamba. Senza bilanciere le gambe si allenano lo stesso, servono solo piu' ripetizioni."
+  }
  ],
-
  "fasi": [
-  { "id": "base", "nome": "Base", "da_settimana": 99, "a_settimana": 9,
-    "mix": { "corsa": 3, "forza": 2, "capacita": 1, "compromesso": 1, "erg": 1 },
-    "nota": "Si costruisce il motore aerobico e la forza. Poca specificita', tanto volume facile." },
-  { "id": "build", "nome": "Costruzione", "da_settimana": 8, "a_settimana": 4,
-    "mix": { "compromesso": 2, "corsa": 2, "forza": 1, "capacita": 2, "erg": 1 },
-    "nota": "Entra la corsa compromessa: e' la qualita' che decide la gara." },
-  { "id": "picco", "nome": "Picco", "da_settimana": 3, "a_settimana": 2,
-    "mix": { "compromesso": 2, "simulazione": 1, "corsa": 1, "capacita": 1 },
-    "nota": "Intensita' alta e specifica, volume in calo. Qui si prova il piano gara, non si costruisce piu' niente." },
-  { "id": "scarico", "nome": "Scarico", "da_settimana": 1, "a_settimana": 0,
-    "mix": { "corsa": 2, "capacita": 1 },
-    "nota": "Volume dimezzato, intensita' toccata appena. Non si guadagna piu' niente: si arriva riposati." }
+  {
+   "id": "base",
+   "nome": "Base",
+   "da_settimana": 99,
+   "a_settimana": 9,
+   "mix": {
+    "corsa": 3,
+    "forza": 2,
+    "capacita": 1,
+    "compromesso": 1,
+    "erg": 1
+   },
+   "nota": "Si costruisce il motore aerobico e la forza. Poca specificita', tanto volume facile."
+  },
+  {
+   "id": "build",
+   "nome": "Costruzione",
+   "da_settimana": 8,
+   "a_settimana": 4,
+   "mix": {
+    "compromesso": 2,
+    "corsa": 2,
+    "forza": 1,
+    "capacita": 2,
+    "erg": 1
+   },
+   "nota": "Entra la corsa compromessa: e' la qualita' che decide la gara."
+  },
+  {
+   "id": "picco",
+   "nome": "Picco",
+   "da_settimana": 3,
+   "a_settimana": 2,
+   "mix": {
+    "compromesso": 2,
+    "simulazione": 1,
+    "corsa": 1,
+    "capacita": 1
+   },
+   "nota": "Intensita' alta e specifica, volume in calo. Qui si prova il piano gara, non si costruisce piu' niente."
+  },
+  {
+   "id": "scarico",
+   "nome": "Scarico",
+   "da_settimana": 1,
+   "a_settimana": 0,
+   "mix": {
+    "corsa": 2,
+    "capacita": 1
+   },
+   "nota": "Volume dimezzato, intensita' toccata appena. Non si guadagna piu' niente: si arriva riposati."
+  }
  ],
-
  "checklist": [
-  { "id": "scarpe",     "t": "Scarpe da corsa asciutte", "n": "Niente chiodi. Suola che tenga sul tappeto della sled." },
-  { "id": "guanti",     "t": "Guanti da sled pull",      "n": "Ammessi e utili: la corda brucia le mani." },
-  { "id": "calze",      "t": "Calze alte",               "n": "Obbligatorie per gli affondi in molte sedi: il sandbag graffia." },
-  { "id": "gel",        "t": "Gel o carboidrati",        "n": "Uno 30-40 minuti prima. Durante la gara raramente serve." },
-  { "id": "acqua",      "t": "Idratazione",              "n": "500 ml nelle due ore prima, poi piccoli sorsi. Non arrivare gonfio." },
-  { "id": "riscaldamento", "t": "Riscaldamento",         "n": "15 minuti: corsa facile, mobilita' anche e spalle, qualche wall ball." },
-  { "id": "piano",      "t": "Piano dei passaggi",       "n": "Sapere a memoria il ritmo dei primi due chilometri: e' li' che si sbaglia la gara." },
-  { "id": "roxzone",    "t": "Strategia roxzone",        "n": "Sapere dove si entra e si esce da ogni stazione fa risparmiare minuti veri." }
- ]
+  {
+   "id": "scarpe",
+   "t": "Scarpe da corsa asciutte",
+   "n": "Niente chiodi. Suola che tenga sul tappeto della sled."
+  },
+  {
+   "id": "guanti",
+   "t": "Guanti da sled pull",
+   "n": "Ammessi e utili: la corda brucia le mani."
+  },
+  {
+   "id": "calze",
+   "t": "Calze alte",
+   "n": "Obbligatorie per gli affondi in molte sedi: il sandbag graffia."
+  },
+  {
+   "id": "gel",
+   "t": "Gel o carboidrati",
+   "n": "Uno 30-40 minuti prima. Durante la gara raramente serve."
+  },
+  {
+   "id": "acqua",
+   "t": "Idratazione",
+   "n": "500 ml nelle due ore prima, poi piccoli sorsi. Non arrivare gonfio."
+  },
+  {
+   "id": "riscaldamento",
+   "t": "Riscaldamento",
+   "n": "15 minuti: corsa facile, mobilita' anche e spalle, qualche wall ball."
+  },
+  {
+   "id": "piano",
+   "t": "Piano dei passaggi",
+   "n": "Sapere a memoria il ritmo dei primi due chilometri: e' li' che si sbaglia la gara."
+  },
+  {
+   "id": "roxzone",
+   "t": "Strategia roxzone",
+   "n": "Sapere dove si entra e si esce da ogni stazione fa risparmiare minuti veri."
+  }
+ ],
+ "attrezzatura": [
+  {
+   "id": "skierg",
+   "nome": "SkiErg"
+  },
+  {
+   "id": "vogatore",
+   "nome": "Vogatore"
+  },
+  {
+   "id": "slitta",
+   "nome": "Slitta"
+  },
+  {
+   "id": "sandbag",
+   "nome": "Sandbag"
+  },
+  {
+   "id": "wallball",
+   "nome": "Wall ball"
+  },
+  {
+   "id": "manubri",
+   "nome": "Manubri o kettlebell"
+  },
+  {
+   "id": "bilanciere",
+   "nome": "Bilanciere"
+  },
+  {
+   "id": "sbarra",
+   "nome": "Sbarra per trazioni"
+  }
+ ],
+ "ripiego_nota": "Un allenamento di ripiego non e' una versione annacquata: cerca lo stesso stimolo con quello che hai. Quello che non si puo' sostituire e' la TECNICA di slitta e wall ball: se la gara e' vicina, vale la pena trovare una palestra attrezzata almeno due o tre volte prima del giorno della corsa."
 }

@@ -302,3 +302,11 @@
 .hx-entry .d{font-size:12.5px;color:#C2CACE;line-height:1.45}
 .hx-entry .g{display:inline-block;margin-top:9px;font-family:var(--mono);font-size:10px;
   letter-spacing:.1em;text-transform:uppercase;color:#F2E205}
+
+/* ---------------- righe di serie nelle schede ---------------- */
+.setrow{display:grid;grid-template-columns:26px 1fr 1fr 1fr;gap:6px;
+  align-items:center;margin-top:6px}
+.setrow .n{font-family:var(--mono);font-size:11px;color:var(--ink-3);text-align:center}
+.setrow input{width:100%;padding:8px 6px;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper);color:var(--ink);font:inherit;font-size:14px;
+  text-align:center;font-variant-numeric:tabular-nums}

@@ -54,6 +54,11 @@ function normalize() {
   S.log ||= {}; S.spesa ||= {}; S.settings ||= { start: today() };
   S.model ||= {}; S.model.prev ||= []; S.prodotti ||= [];
   S.palestra ||= {}; S.palestra.sessioni ||= {}; S.palestra.esercizi ||= [];
+  S.palestra.schede ||= [];
+  // hyrox mancava: un backup fatto prima di questa riga si importava
+  // senza gara, record e simulazioni
+  S.hyrox ||= {}; S.hyrox.profilo ||= {}; S.hyrox.pb ||= {};
+  S.hyrox.sim ||= []; S.hyrox.sessioni ||= {}; S.hyrox.checklist ||= {};
   S.piano ||= {}; S.piano.alimenti ||= {}; S.piano.pasti ||= {};
   S.piano.target ||= {}; S.piano.profilo ||= {};
   for (const k of Object.keys(S.log)) {

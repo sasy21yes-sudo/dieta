@@ -477,6 +477,23 @@ function viewPalestra(v) {
     msg: 'Nessuna seduta registrata nel periodo.'
   }));
 
+  /* --- schede ed esercizi --- */
+  const cs = el('div', 'card');
+  cs.append(el('h2', 'sec', 'Schede ed esercizi'));
+  cs.lastChild.style.marginTop = '0';
+  cs.append(el('p', 'muted',
+    'Una scheda si crea una volta e si riusa: gli esercizi e le serie restano fissi, e a ogni seduta aggiorni solo i carichi.'));
+  const b1 = el('button', 'btn wide');
+  b1.textContent = `Le tue schede (${schede().length})`;
+  b1.onclick = () => sheetSchede();
+  cs.append(b1);
+  const b2 = el('button', 'btn wide');
+  b2.style.marginTop = '8px';
+  b2.textContent = `I tuoi esercizi (${P().esercizi.length})`;
+  b2.onclick = () => sheetEsercizi();
+  cs.append(b2);
+  v.append(cs);
+
   /* --- storico --- */
   const sedute = Object.keys(P().sessioni).sort().reverse().slice(0, 12);
   if (sedute.length) {
@@ -532,15 +549,148 @@ function cardEsercizio(id) {
 }
 
 /* --------------------------------------------------------- registrazione */
+/** Le serie dell'ultima volta che hai fatto quell'esercizio: servono a
+    precompilare, cosi' non si riparte da zero a ogni seduta. */
+function ultimoUso(exId, escludi) {
+  const giorni = Object.keys(P().sessioni).filter(k => k !== escludi).sort().reverse();
+  for (const k of giorni) {
+    const ser = serieDelGiorno(k).filter(s => s.ex === exId);
+    if (ser.length) return { k, serie: ser };
+  }
+  return null;
+}
+
+function schede() { P().schede ||= []; return P().schede; }
+function scheda(id) { return schede().find(s => s.id === id) || null; }
+
+/**
+ * Punto d'ingresso della registrazione. Se la seduta e' vuota chiede COME
+ * registrare, invece di buttare l'utente in un modulo di inserimento serie per
+ * serie: con una scheda si aggiornano solo carico e ripetizioni, che e' l'unica
+ * cosa che cambia davvero da una settimana all'altra.
+ */
 function sheetSeduta(k) {
   const p = P();
   p.sessioni[k] ||= { nome: '', serie: [] };
+  if (!p.sessioni[k].serie.length) return sheetSceltaModo(k);
+  return sheetLibero(k);
+}
+
+function sheetSceltaModo(k) {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
+  w.append(el('h2', 'sec', 'Come registri?'));
+  w.lastChild.style.marginTop = '0';
+
+  const list = schede();
+  if (list.length) {
+    w.append(el('p', 'muted', 'Con una scheda gli esercizi e il numero di serie sono gia\' fissati: tu aggiorni solo carico e ripetizioni.'));
+    for (const sc of list) {
+      const r = el('button', 'prod');
+      const nEx = sc.esercizi.length;
+      const nSer = sc.esercizi.reduce((a, e) => a + (e.serie || 0), 0);
+      r.innerHTML = `<div class="grow"><div class="nm">${esc(sc.nome)}</div>
+        <div class="mt">${nEx} esercizi · ${nSer} serie</div></div>
+        <div class="kc">usa &rsaquo;</div>`;
+      r.onclick = () => sheetDaScheda(k, sc.id);
+      w.append(r);
+    }
+  } else {
+    w.append(el('div', 'card flat',
+      `<div class="eyebrow">Non hai ancora schede</div>
+       <div class="muted">Una scheda si crea una volta e poi si riusa: gli esercizi
+       e le serie restano fissi, e a ogni seduta aggiorni solo i carichi. Puoi anche
+       registrare una seduta libera adesso e salvarla come scheda alla fine.</div>`));
+  }
+
+  const b1 = el('button', 'btn wide', 'Gestisci le schede');
+  b1.style.marginTop = '10px';
+  b1.onclick = () => sheetSchede();
+  w.append(b1);
+
+  const b2 = el('button', 'btn wide pri', 'Seduta libera, esercizio per esercizio');
+  b2.style.marginTop = '8px';
+  b2.onclick = () => sheetLibero(k);
+  w.append(b2);
+  sheet(w);
+}
+
+/** Seduta da scheda: si toccano solo carico, ripetizioni e RIR. */
+function sheetDaScheda(k, schedaId) {
+  const p = P(), sc = scheda(schedaId);
+  if (!sc) return sheetSceltaModo(k);
   const s = p.sessioni[k];
   const w = el('div');
   w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
-  w.append(el('h2', 'sec', 'Allenamento'));
+  w.append(el('h2', 'sec', esc(sc.nome)));
   w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted', 'Esercizi e serie sono quelli della scheda. Cambia solo quello che hai fatto davvero.'));
 
+  for (const [ei, riga] of sc.esercizi.entries()) {
+    const ex = esercizio(riga.ex);
+    if (!ex) continue;
+    const prec = ultimoUso(riga.ex, k);
+    const [lo, hi] = ex.range || [8, 12];
+    const box = el('div', 'card flat');
+    box.style.marginBottom = '10px';
+    box.append(el('div', 'row between',
+      `<strong>${esc(ex.nome)}</strong>
+       <span class="mono muted" style="font-size:11px">${riga.serie} serie · ${lo}–${hi} rip</span>`));
+    const pp = prossimoPasso(riga.ex);
+    if (pp) box.append(el('div', 'hint', esc(pp.testo)));
+    else if (prec) box.append(el('div', 'hint',
+      `L'ultima volta (${prec.k}): ${prec.serie.map(x => `${nf(x.kg, 1)}×${x.reps}`).join(', ')}.`));
+
+    for (let si = 0; si < riga.serie; si++) {
+      const d = prec?.serie[si] || {};
+      const kg = d.kg ?? riga.kg ?? '';
+      const rp = d.reps ?? riga.reps ?? lo;
+      const rr = d.rir ?? 2;
+      const row = el('div', 'setrow');
+      row.innerHTML = `<span class="n">${si + 1}</span>
+        <input type="text" inputmode="decimal" id="sc-${ei}-${si}-kg" value="${kg}" placeholder="kg">
+        <input type="text" inputmode="numeric" id="sc-${ei}-${si}-rp" value="${rp}" placeholder="rip">
+        <input type="text" inputmode="numeric" id="sc-${ei}-${si}-rr" value="${rr}" placeholder="RIR">`;
+      box.append(row);
+    }
+    w.append(box);
+  }
+
+  const salva = el('button', 'btn wide pri', 'Salva la seduta');
+  salva.onclick = () => {
+    const serie = [];
+    for (const [ei, riga] of sc.esercizi.entries()) {
+      if (!esercizio(riga.ex)) continue;
+      for (let si = 0; si < riga.serie; si++) {
+        const reps = parseNum(($('#sc-' + ei + '-' + si + '-rp') || {}).value);
+        if (!(reps > 0)) continue;                 // serie non fatta: si salta
+        serie.push({ ex: riga.ex,
+          kg: parseNum(($('#sc-' + ei + '-' + si + '-kg') || {}).value) ?? 0,
+          reps, rir: parseNum(($('#sc-' + ei + '-' + si + '-rr') || {}).value) ?? 2 });
+      }
+    }
+    if (!serie.length) { toast('Nessuna serie compilata'); return; }
+    s.serie = serie;
+    s.nome = sc.nome;
+    s.scheda = sc.id;
+    save(); closeSheet(); route(); toast(`${serie.length} serie registrate`);
+  };
+  w.append(salva);
+
+  const ind = el('button', 'btn wide', 'Torna indietro');
+  ind.style.marginTop = '8px';
+  ind.onclick = () => sheetSceltaModo(k);
+  w.append(ind);
+  sheet(w);
+}
+
+/** Seduta libera: esercizio per esercizio, serie per serie. */
+function sheetLibero(k) {
+  const p = P(), s = p.sessioni[k];
+  const w = el('div');
+  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
+  w.append(el('h2', 'sec', 'Seduta libera'));
+  w.lastChild.style.marginTop = '0';
   w.append(el('div', 'field',
     `<label>Nome della seduta</label>
      <input type="text" id="s-nome" placeholder="Push A" value="${esc(s.nome || '')}">`));
@@ -577,7 +727,6 @@ function sheetSeduta(k) {
   disegna();
   w.append(lista);
 
-  /* aggiunta serie */
   const box = el('div', 'card flat');
   box.style.marginTop = '12px';
   box.append(el('div', 'eyebrow', 'Aggiungi una serie'));
@@ -608,18 +757,247 @@ function sheetSeduta(k) {
     save(); disegna(); toast('Serie aggiunta');
   };
   box.append(add);
-
   const sugg = ultimoEx ? prossimoPasso(ultimoEx) : null;
   if (sugg) box.append(el('div', 'hint', esc(sugg.testo)));
   w.append(box);
 
+  if (s.serie.length) {
+    const asch = el('button', 'btn wide', 'Salva questa seduta come scheda');
+    asch.style.marginTop = '10px';
+    asch.onclick = () => {
+      const n = prompt('Nome della scheda', $('#s-nome').value.trim() || 'Nuova scheda');
+      if (!n || !n.trim()) return;
+      const per = {};
+      for (const x of s.serie) {
+        per[x.ex] ||= { ex: x.ex, serie: 0, reps: x.reps, kg: x.kg };
+        per[x.ex].serie++;
+      }
+      schede().push({ id: uid(), nome: n.trim(), esercizi: Object.values(per) });
+      save(); toast('Scheda creata');
+    };
+    w.append(asch);
+  }
+
   const fine = el('button', 'btn wide', 'Chiudi');
-  fine.style.marginTop = '10px';
+  fine.style.marginTop = '8px';
   fine.onclick = () => {
     s.nome = $('#s-nome').value.trim();
     if (!s.serie.length) delete p.sessioni[k];
     save(); closeSheet(); route();
   };
   w.append(fine);
+  sheet(w);
+}
+
+/* ------------------------------------------------------------- schede */
+function sheetSchede() {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Schede'));
+  w.append(el('h2', 'sec', 'Le tue schede'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Una scheda fissa gli esercizi e il numero di serie. Quando la usi aggiorni solo carico e ripetizioni: e\' l\'unica cosa che cambia da una settimana all\'altra.'));
+  const list = schede();
+  if (!list.length) w.append(el('p', 'hint', 'Nessuna scheda ancora.'));
+  for (const sc of list) {
+    const r = el('button', 'prod');
+    r.innerHTML = `<div class="grow"><div class="nm">${esc(sc.nome)}</div>
+      <div class="mt">${sc.esercizi.map(e => esc(esercizio(e.ex)?.nome || e.ex)).join(' · ')}</div></div>`;
+    r.onclick = () => sheetScheda(sc.id);
+    w.append(r);
+  }
+  const b = el('button', 'btn wide pri', 'Nuova scheda');
+  b.style.marginTop = '10px';
+  b.onclick = () => sheetScheda(null);
+  w.append(b);
+  sheet(w);
+}
+
+function sheetScheda(id) {
+  const sc = id ? scheda(id) : { id: uid(), nome: '', esercizi: [] };
+  const stato = { nome: sc.nome, esercizi: sc.esercizi.map(x => ({ ...x })) };
+  const w = el('div');
+  w.append(el('div', 'eyebrow', id ? 'Modifica scheda' : 'Nuova scheda'));
+  w.append(el('h2', 'sec', 'Composizione'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('div', 'field',
+    `<label>Nome</label><input type="text" id="sk-nome" value="${esc(stato.nome)}" placeholder="Push A">`));
+
+  const lista = el('div');
+  const disegna = () => {
+    lista.innerHTML = '';
+    if (!stato.esercizi.length) {
+      lista.append(el('p', 'muted', 'Nessun esercizio. Aggiungine uno qui sotto.'));
+      return;
+    }
+    stato.esercizi.forEach((riga, i) => {
+      const ex = esercizio(riga.ex);
+      const r = el('div', 'cmp-r');
+      r.style.cursor = 'pointer';
+      r.innerHTML = `<span>${esc(ex?.nome || riga.ex)}</span>
+        <span class="mono">${riga.serie} serie</span>
+        <span class="mono muted">${riga.reps} rip</span>
+        <span class="mono">${riga.kg ? nf(riga.kg, 1) + ' kg' : '—'}</span>`;
+      r.onclick = () => {
+        if (!confirm(`Togliere ${ex?.nome || riga.ex} dalla scheda?`)) return;
+        stato.esercizi.splice(i, 1); disegna();
+      };
+      lista.append(r);
+    });
+  };
+  disegna();
+  w.append(lista);
+
+  const box = el('div', 'card flat');
+  box.style.marginTop = '12px';
+  box.append(el('div', 'eyebrow', 'Aggiungi un esercizio'));
+  const sel = el('select');
+  sel.id = 'sk-ex';
+  sel.style.cssText = 'width:100%;padding:9px 10px;border:1px solid var(--rule);'
+    + 'border-radius:9px;background:var(--paper);color:var(--ink);font:inherit;margin-bottom:8px';
+  for (const e of catalogo().slice().sort((a, b) => a.nome.localeCompare(b.nome)))
+    sel.append(new Option(`${e.nome} — ${e.attrezzo}`, e.id));
+  box.append(sel);
+  const g = el('div');
+  g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px';
+  g.innerHTML = `<div class="field"><label>Serie</label>
+      <input type="text" inputmode="numeric" id="sk-serie" value="3"></div>
+    <div class="field"><label>Rip</label>
+      <input type="text" inputmode="numeric" id="sk-reps" value="8"></div>
+    <div class="field"><label>kg</label>
+      <input type="text" inputmode="decimal" id="sk-kg" value=""></div>`;
+  box.append(g);
+  const ba = el('button', 'btn wide', 'Aggiungi');
+  ba.onclick = () => {
+    const n = parseNum($('#sk-serie').value);
+    if (!(n > 0 && n <= 12)) { toast('Da 1 a 12 serie'); return; }
+    stato.esercizi.push({ ex: $('#sk-ex').value, serie: Math.round(n),
+      reps: parseNum($('#sk-reps').value) ?? 8, kg: parseNum($('#sk-kg').value) ?? 0 });
+    disegna();
+  };
+  box.append(ba);
+  w.append(box);
+
+  const salva = el('button', 'btn wide pri', 'Salva la scheda');
+  salva.style.marginTop = '10px';
+  salva.onclick = () => {
+    const nome = $('#sk-nome').value.trim();
+    if (!nome) { toast('Serve il nome'); return; }
+    if (!stato.esercizi.length) { toast('Serve almeno un esercizio'); return; }
+    const rec = { id: sc.id, nome, esercizi: stato.esercizi };
+    const L = schede();
+    const i = L.findIndex(x => x.id === rec.id);
+    if (i >= 0) L[i] = rec; else L.push(rec);
+    save(); closeSheet(); route(); toast('Scheda salvata');
+  };
+  w.append(salva);
+  if (id) {
+    const del = el('button', 'btn wide', 'Elimina la scheda');
+    del.style.marginTop = '8px';
+    del.onclick = () => {
+      if (!confirm(`Eliminare "${sc.nome}"? Le sedute gia' registrate restano.`)) return;
+      P().schede = schede().filter(x => x.id !== id);
+      save(); closeSheet(); route(); toast('Eliminata');
+    };
+    w.append(del);
+  }
+  sheet(w);
+}
+
+/* ------------------------------------------------- esercizi personalizzati */
+function sheetEsercizi() {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Esercizi'));
+  w.append(el('h2', 'sec', 'I tuoi esercizi'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Aggiungi quello che fai e non e\' in catalogo. I gruppi muscolari servono alla mappa e al conteggio del volume: senza, l\'esercizio non colora niente.'));
+  const miei = P().esercizi;
+  if (!miei.length) w.append(el('p', 'hint', 'Nessun esercizio tuo, per ora.'));
+  for (const e of miei) {
+    const r = el('button', 'prod');
+    r.innerHTML = `<div class="grow"><div class="nm">${esc(e.nome)}</div>
+      <div class="mt">${esc(e.attrezzo)} · ${(e.primari || []).join(', ')}</div></div>`;
+    r.onclick = () => sheetEsercizio(e.id);
+    w.append(r);
+  }
+  const b = el('button', 'btn wide pri', 'Nuovo esercizio');
+  b.style.marginTop = '10px';
+  b.onclick = () => sheetEsercizio(null);
+  w.append(b);
+  sheet(w);
+}
+
+function sheetEsercizio(id) {
+  const miei = P().esercizi;
+  const cur = id ? miei.find(x => x.id === id) : null;
+  const stato = { primari: [...(cur?.primari || [])], secondari: [...(cur?.secondari || [])] };
+  const w = el('div');
+  w.append(el('div', 'eyebrow', id ? 'Modifica' : 'Nuovo esercizio'));
+  w.append(el('h2', 'sec', esc(cur?.nome || 'Esercizio')));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('div', 'field',
+    `<label>Nome</label><input type="text" id="ex-nome" value="${esc(cur?.nome || '')}">`));
+  const g = el('div');
+  g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px';
+  g.innerHTML = `<div class="field"><label>Attrezzo</label>
+      <input type="text" id="ex-att" value="${esc(cur?.attrezzo || 'manubri')}"></div>
+    <div class="field"><label>Incremento (kg)</label>
+      <input type="text" inputmode="decimal" id="ex-inc" value="${cur?.incremento ?? 2.5}"></div>
+    <div class="field"><label>Rip minime</label>
+      <input type="text" inputmode="numeric" id="ex-lo" value="${cur?.range?.[0] ?? 8}"></div>
+    <div class="field"><label>Rip massime</label>
+      <input type="text" inputmode="numeric" id="ex-hi" value="${cur?.range?.[1] ?? 12}"></div>`;
+  w.append(g);
+
+  const gruppo = (titolo, chiave) => {
+    const f = el('div', 'field', `<label>${titolo}</label>`);
+    const box = el('div');
+    box.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px';
+    for (const m of muscoli()) {
+      const b = el('button', 'btn sm', m.nome);
+      const on = () => stato[chiave].includes(m.id);
+      const dip = () => { b.style.background = on() ? 'var(--pine)' : '';
+                          b.style.color = on() ? '#fff' : ''; };
+      b.onclick = () => {
+        const i = stato[chiave].indexOf(m.id);
+        if (i >= 0) stato[chiave].splice(i, 1); else stato[chiave].push(m.id);
+        dip();
+      };
+      dip(); box.append(b);
+    }
+    f.append(box);
+    return f;
+  };
+  w.append(gruppo('Muscoli primari', 'primari'));
+  w.append(gruppo('Muscoli secondari', 'secondari'));
+
+  const salva = el('button', 'btn wide pri', 'Salva');
+  salva.onclick = () => {
+    const nome = $('#ex-nome').value.trim();
+    if (!nome) { toast('Serve il nome'); return; }
+    if (!stato.primari.length) { toast('Serve almeno un muscolo primario'); return; }
+    const rec = {
+      id: cur?.id || ('mio-' + uid()), nome,
+      attrezzo: $('#ex-att').value.trim() || 'altro', tipo: 'mio',
+      primari: stato.primari, secondari: stato.secondari,
+      range: [parseNum($('#ex-lo').value) ?? 8, parseNum($('#ex-hi').value) ?? 12],
+      incremento: parseNum($('#ex-inc').value) ?? 2.5
+    };
+    const i = miei.findIndex(x => x.id === rec.id);
+    if (i >= 0) miei[i] = rec; else miei.push(rec);
+    save(); closeSheet(); route(); toast('Esercizio salvato');
+  };
+  w.append(salva);
+  if (cur) {
+    const del = el('button', 'btn wide', 'Elimina');
+    del.style.marginTop = '8px';
+    del.onclick = () => {
+      if (!confirm('Eliminare questo esercizio?')) return;
+      P().esercizi = miei.filter(x => x.id !== cur.id);
+      save(); closeSheet(); route(); toast('Eliminato');
+    };
+    w.append(del);
+  }
   sheet(w);
 }
