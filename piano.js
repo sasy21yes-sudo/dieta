@@ -721,8 +721,10 @@ function sezSettimana(v) {
   const sett = D.settimana;
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Come funziona</div>
-     <div class="muted">Ogni giorno ha degli slot (colazione, pranzo, cena…). Tocca uno
-     slot per cambiare il pasto assegnato. I totali si ricalcolano da soli.</div>`));
+     <div class="muted">Ogni giorno ha i suoi pasti. Tocca un pasto per cambiare
+     quello assegnato o per toglierlo, oppure aggiungine uno: <strong>il numero di
+     pasti puo essere diverso da un giorno all altro</strong>. I totali si
+     ricalcolano da soli.</div>`));
 
   for (const [gi, g] of sett.entries()) {
     const c = el('div', 'card');
@@ -738,6 +740,11 @@ function sezSettimana(v) {
       r.onclick = () => cambiaSlot(gi, si);
       c.append(r);
     }
+    const add = el('button', 'btn wide');
+    add.style.marginTop = '10px';
+    add.textContent = '+ Aggiungi un pasto a ' + g.giorno.toLowerCase();
+    add.onclick = () => nuovoSlot(gi);
+    c.append(add);
     v.append(c);
   }
 
@@ -751,10 +758,38 @@ function sezSettimana(v) {
   }
 }
 
+/** Aggiunge un pasto a un giorno: il numero di pasti non e' fisso. */
+function nuovoSlot(gi) {
+  const p = piano();
+  p.settimana ||= JSON.parse(JSON.stringify(
+    S.settings.pianoBase === 'esempio' ? DBASE.settimana : settimanaVuota()));
+  const g = p.settimana[gi];
+  const w = el('div');
+  w.append(el('div', 'eyebrow', esc(g.giorno)));
+  w.append(el('h2', 'sec', 'Nuovo pasto'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('div', 'field',
+    `<label>Come si chiama</label>
+     <input type="text" id="ns-slot" placeholder="Spuntino del pomeriggio">`));
+  w.append(el('div', 'field',
+    `<label>A che ora <span class="muted">(facoltativo)</span></label>
+     <input type="text" id="ns-ora" placeholder="16:30">`));
+  const b = el('button', 'btn wide pri', 'Aggiungi');
+  b.onclick = () => {
+    const nome = $('#ns-slot').value.trim();
+    if (!nome) { toast('Serve un nome'); return; }
+    g.pasti.push({ slot: nome, ora: $('#ns-ora').value.trim() || '', codice: null });
+    save(); fondiPiano(); closeSheet(); route(); toast('Pasto aggiunto');
+  };
+  w.append(b);
+  sheet(w);
+}
+
 function cambiaSlot(gi, si) {
   const p = piano();
   // la prima modifica clona la settimana di base: da li' in poi e' tua
-  p.settimana ||= JSON.parse(JSON.stringify(DBASE.settimana));
+  p.settimana ||= JSON.parse(JSON.stringify(
+    S.settings.pianoBase === 'esempio' ? DBASE.settimana : settimanaVuota()));
   const g = p.settimana[gi], s = g.pasti[si];
   const w = el('div');
   w.append(el('div', 'eyebrow', `${esc(g.giorno)} · ${esc(s.slot)}`));
@@ -771,5 +806,14 @@ function cambiaSlot(gi, si) {
     };
     w.append(r);
   }
+  const via = el('button', 'btn wide');
+  via.style.marginTop = '12px';
+  via.textContent = 'Togli questo pasto dal giorno';
+  via.onclick = () => {
+    if (!confirm(`Tolgo "${s.slot}" da ${g.giorno}?`)) return;
+    g.pasti.splice(si, 1);
+    save(); fondiPiano(); closeSheet(); route(); toast('Pasto tolto');
+  };
+  w.append(via);
   sheet(w);
 }

@@ -352,7 +352,10 @@ function chartCal(o) {
     if (sc > 0) cell.dataset.l = Math.max(1, Math.ceil(sc * 4));
     if (k === oggi) cell.dataset.today = '1';
     cell.title = k + ' — ' + o.label(k);
-    cell.onclick = () => { read.innerHTML = `<span>${k}</span><span><b>${o.label(k)}</b></span>`; };
+    cell.onclick = () => {
+      read.innerHTML = `<span>${k}</span><span><b>${o.label(k)}</b></span>`;
+      if (typeof sheetGiorno === 'function' && dayScore(k) > 0) sheetGiorno(k);
+    };
     grid2.append(cell);
   }
   c.append(grid2);
@@ -394,6 +397,50 @@ function chartHBars(o) {
   return card2;
 }
 
+/**
+ * Indicatore: una barra con sopra il segno del bersaglio.
+ * Forma giusta quando il dato e' UN numero confrontato con UN riferimento —
+ * un grafico a barre con una barra sola sarebbe solo un numero travestito.
+ * La barra dice quanto, il segno dice dove doveva arrivare, il colore dice
+ * soltanto se sei dentro o fuori: non e' un voto.
+ */
+function meter(o) {
+  const box = el('div', 'meter');
+  const max = Math.max(o.val || 0, o.tgt || 1) * 1.15;
+  const pct = v => Math.max(0, Math.min(100, (v || 0) / max * 100));
+  const dentro = o.val != null && o.tgt
+    && Math.abs(o.val - o.tgt) <= o.tgt * (o.tolleranza ?? 0.1);
+  const sotto = o.val != null && o.tgt && o.val < o.tgt;
+  box.innerHTML = `
+    <div class="mt-h"><span class="mt-l">${esc(o.lab)}</span>
+      <span class="mt-v mono">${o.val == null ? '—' : nf(o.val, o.dec ?? 0)}
+        <em>/ ${nf(o.tgt, o.dec ?? 0)} ${esc(o.unit || '')}</em></span></div>
+    <div class="mt-t">
+      <i style="width:${pct(o.val).toFixed(1)}%" class="${dentro ? 'ok' : sotto ? 'lo' : 'hi'}"></i>
+      <b style="left:${pct(o.tgt).toFixed(1)}%"></b>
+    </div>
+    <div class="mt-n">${o.val == null ? esc(o.vuoto || 'nessun dato')
+      : dentro ? 'in linea col target'
+      : `${sotto ? '−' : '+'}${nf(Math.abs(o.val - o.tgt), o.dec ?? 0)} ${esc(o.unit || '')} ${sotto ? 'sotto' : 'sopra'}`}</div>`;
+  return box;
+}
+
+/** Le medie della settimana chiusa contro i target, pronte per gli indicatori. */
+function metriche(k = today(), n = 7) {
+  const giorni = windowDays(k, n);
+  const cons = giorni.map(x => S.log[x] ? consumed(x) : null).filter(m => m && m.kcal > 400);
+  const md = id => avg(giorni.map(x => S.log[x]?.[id]));
+  const cm = id => cons.length ? avg(cons.map(m => m[id])) : null;
+  return [
+    { id: 'kcal', lab: 'Calorie', val: cm('kcal'), tgt: D.target.kcal, unit: 'kcal',
+      vuoto: 'nessun pasto spuntato' },
+    { id: 'p', lab: 'Proteine', val: cm('p'), tgt: D.target.p, unit: 'g', tolleranza: .08 },
+    { id: 'fibre', lab: 'Fibre', val: cm('fibre'), tgt: D.target.fibre, unit: 'g' },
+    { id: 'acqua', lab: 'Acqua', val: md('acqua'), tgt: D.target.acqua_l, unit: 'L', dec: 1 },
+    { id: 'sonno', lab: 'Sonno', val: md('sonno'), tgt: D.target.sonno_h, unit: 'h', dec: 1 },
+    { id: 'passi', lab: 'Passi', val: md('passi'), tgt: D.target.passi, unit: '' }
+  ];
+}
 /** Riquadro statistico: quando il dato e' un numero solo, il numero E' il grafico. */
 function tile(o) {
   const t = el('div', 'tile');

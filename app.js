@@ -65,6 +65,7 @@ function normalize() {
   for (const k of Object.keys(S.log)) {
     const d = S.log[k]; if (!d || typeof d !== 'object') { delete S.log[k]; continue; }
     d.pasti ||= {}; d.extra ||= []; d.misure ||= {}; d.integratori ||= {};
+    d.porzioni ||= {};
   }
 }
 
@@ -120,7 +121,8 @@ function mealM(code) {
 function consumed(k) {
   const d = day(k), t = M0();
   const plan = D.settimana[dayIdx(k)];
-  for (const s of plan.pasti) if (d.pasti[s.codice]) addM(t, mealM(s.codice));
+  for (const s of plan.pasti) if (d.pasti[s.codice])
+    addM(t, typeof mealMGiorno === 'function' ? mealMGiorno(s.codice, k) : mealM(s.codice));
   for (const e of d.extra) addM(t, e);
   return t;
 }
@@ -675,6 +677,8 @@ function viewOggi(v) {
   r.children[0].onclick = () => { viewDate = addDays(viewDate, -1); route(); };
   r.children[2].onclick = () => { viewDate = addDays(viewDate, 1); route(); };
   r.children[1].style.textAlign = 'center';
+  r.children[1].style.cursor = 'pointer';
+  if (typeof sheetGiorno === 'function') r.children[1].onclick = () => sheetGiorno(k);
   nav.append(r); v.append(nav);
 
   if (k === today()) {
@@ -733,10 +737,20 @@ function viewOggi(v) {
     const h = el('div', 'meal-h');
     const tick = el('button', 'tick', '✓');
     tick.onclick = () => { d.pasti[s.codice] = !done; save(); route(); };
-    h.append(tick, el('div', 'grow',
+    // toccare il nome del pasto apre le porzioni DI QUEL GIORNO: il piano dice
+    // 50 g di salsa, ma se oggi ne hai usati 100 il conto deve seguire te
+    const testa = el('div', 'grow tap',
       `<div class="meal-slot">${esc(s.slot)} · ${s.ora}</div>
-       <div class="meal-name">${esc(p.nome)}</div>`),
-      el('div', 'meal-kcal', `${nf(p.macro.kcal)}<br>${nf(p.macro.p, 1)} P`));
+       <div class="meal-name">${esc(p.nome)}${typeof porzioniCambiate === 'function'
+         && porzioniCambiate(s.codice, k)
+         ? ' <em class="mod-tag">porzioni cambiate</em>' : ''}</div>`);
+    if (typeof sheetPorzioni === 'function' && p.ingredienti)
+      testa.onclick = () => sheetPorzioni(k, s.codice);
+    h.append(tick, testa,
+      el('div', 'meal-kcal', (() => {
+        const mg = typeof mealMGiorno === 'function' ? mealMGiorno(s.codice, k) : p.macro;
+        return `${nf(mg.kcal)}<br>${nf(mg.p, 1)} P`;
+      })()));
     m.append(h);
     const ul = el('ul', 'ings');
     for (const ing of p.ingredienti) {
@@ -1377,6 +1391,7 @@ function sheetMisura(m, k) {
 
 /* -------------------------------------------------------- vista ANALISI */
 function viewAnalisi(v) {
+  const k = today();
   const c = el('div', 'card flat');
   c.append(el('div', 'eyebrow', 'Carichi in palestra'));
   const ct = typeof caricoTrend === 'function' ? caricoTrend() : { stato: null, n: 0 };
@@ -1414,8 +1429,30 @@ function viewAnalisi(v) {
   }
   v.append(c);
 
-  v.append(el('h2', 'sec', 'Cosa sto sbagliando'));
-  for (const [kind, ico, title, body] of analyse()) {
+  /* --- come sta andando la settimana, in un colpo d'occhio --- */
+  const trovati = analyse();
+  const problemi = trovati.filter(f => f[0] !== 'ok').length;
+  const buone = trovati.length - problemi;
+
+  const testa = el('div', 'cw');
+  testa.append(el('h3', null, 'La settimana in un colpo d\'occhio'));
+  testa.append(el('div', 'sub',
+    'Medie degli ultimi sette giorni chiusi, confrontate con i tuoi target. La barra dice quanto, il segno verticale dove doveva arrivare.'));
+  if (typeof costanze === 'function') {
+    const co = costanze(k, 28), liv = livelloCostanza(co.generale);
+    const r = el('div', 'an-testa');
+    r.append(anello(co.generale, 'Costanza', liv.nome));
+    r.append(el('div', 'an-conta',
+      `<div><b>${buone}</b><span>cose a posto</span></div>
+       <div class="${problemi ? 'warn' : ''}"><b>${problemi}</b><span>da sistemare</span></div>`));
+    testa.append(r);
+  }
+  if (typeof metriche === 'function')
+    for (const m of metriche(k, 7)) testa.append(meter(m));
+  v.append(testa);
+
+  v.append(el('h2', 'sec', problemi ? 'Cosa posso migliorare' : 'Tutto a posto'));
+  for (const [kind, ico, title, body] of trovati) {
     v.append(el('div', 'flag ' + kind,
       `<div class="ico">${ico}</div>
        <div class="grow"><h4>${esc(title)}</h4><p>${body}</p></div>`));
