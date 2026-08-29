@@ -86,6 +86,7 @@ function costanze(k = today(), n = 28) {
 
   const allenati = giorni.filter(g =>
     (typeof serieDelGiorno === 'function' && serieDelGiorno(g).length)
+    || (typeof cardioDi === 'function' && cardioDi(g).length)
     || S.hyrox?.sessioni?.[g]?.fatto
     || S.log[g]?.allenamento === true).length;
   // il bersaglio non e' "tutti i giorni": e' quante sedute hai detto di reggere
@@ -275,7 +276,9 @@ function cardSfida(k) {
 
   /* Il piede: la fiamma della striscia, e i punti che salgono contando. */
   const f = el('div', 'sfida-f');
-  f.append(bloccoFiamma(typeof streak === 'function' ? streak(k) : p.fila, true));
+  // la fiamma sta in Dati, sopra gli anelli: qui rubava la scena alla sfida
+  f.append(el('span', 'mono muted',
+    (typeof streak === 'function' ? streak(k) : p.fila) + ' giorni di fila'));
   const nums = el('div', 'sf-nums');
   const np = el('span', 'v'), nf2 = el('span', 'v');
   nums.append(el('span', 'l', 'punti'), np, el('span', 'l', 'fatte'), nf2);

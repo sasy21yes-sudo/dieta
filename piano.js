@@ -49,6 +49,7 @@ function piano() {
   S.piano ||= {};
   const p = S.piano;
   p.alimenti ||= {}; p.pasti ||= {}; p.target ||= {}; p.profilo ||= {};
+  p.integratori ||= {};       // nome -> voce modificata, oppure { tolto: true }
   return p;
 }
 
@@ -109,9 +110,197 @@ function fondiPiano() {
     pasti: esempio ? { ...DBASE.pasti, ...p.pasti } : { ...p.pasti },
     settimana: p.settimana || (esempio ? DBASE.settimana : settimanaVuota()),
     // i valori di partenza delle misure sono di quella persona, non di chi installa
-    misure: esempio ? DBASE.misure : DBASE.misure.map(m => ({ ...m, base: null }))
+    misure: esempio ? DBASE.misure : DBASE.misure.map(m => ({ ...m, base: null })),
+    integratori: fondiIntegratori(esempio)
   };
   D.settimana = D.settimana.map(g => ({ ...g, totali: totaliGiorno(g) }));
+}
+
+/**
+ * L'integrazione, fusa come tutto il resto.
+ *
+ * Era una lista fissa dentro data/dieta.json: cinque voci uguali per chiunque,
+ * non togliibili e non modificabili. Ma l'integrazione e' la parte piu'
+ * personale del piano — dipende da cosa mangi, da cosa ti ha detto il medico,
+ * da cosa hai in casa — e una lista che non si tocca la si smette
+ * semplicemente di guardare.
+ *
+ * Ora la base resta la base, e sopra ci va il tuo strato: modifiche, aggiunte,
+ * e rimozioni marcate come tolte invece che cancellate: cosi' se cambi idea la
+ * voce di partenza e' ancora li'.
+ *
+ * Con il piano vuoto non si eredita niente: le cinque voci sono le scelte di
+ * un'altra persona, esattamente come i pasti.
+ */
+function fondiIntegratori(esempio) {
+  const mio = piano().integratori || {};
+  const base = esempio ? DBASE.integratori : [];
+  const out = [];
+  for (const s of base) {
+    const m = mio[s.nome];
+    if (m?.tolto) continue;
+    out.push(m ? { ...s, ...m } : s);
+  }
+  for (const [nome, v] of Object.entries(mio)) {
+    if (v.tolto || base.some(s => s.nome === nome)) continue;
+    out.push({ ...v, nome, mio: true });
+  }
+  return out;
+}
+
+/** Tocca oggi? La cadenza settimanale ha il suo giorno. */
+function integratoreOggi(s, k = today()) {
+  if (s.cadenza === 'settimanale') return dayIdx(k) === (s.giorno ?? 0);
+  return true;
+}
+
+/** Quante volte l'hai preso, sui giorni in cui toccava. */
+function aderenzaIntegratore(nome, k = today(), n = 30) {
+  const s = D.integratori.find(x => x.nome === nome);
+  if (!s) return null;
+  const gg = windowDays(k, n).filter(g => integratoreOggi(s, g)
+    && (typeof inPausa !== 'function' || !inPausa(g)));
+  if (!gg.length) return null;
+  const presi = gg.filter(g => S.log[g]?.integratori?.[nome]).length;
+  return { presi, su: gg.length, pct: Math.round(presi / gg.length * 100) };
+}
+
+/* ------------------------------------------------------------- editor */
+const CADENZE = ['giornaliera', 'settimanale'];
+const PRIORITA_INT = ['obbligatorio', 'alto valore', 'consigliato', 'cibo'];
+
+function sezIntegratori(v) {
+  const p = piano();
+  v.append(el('div', 'card flat',
+    `<div class="eyebrow">Come funziona</div>
+     <div class="muted">Quello che prendi lo decidi tu: aggiungi, cambia la dose
+     o togli una voce. Le modifiche valgono solo per questo profilo, e il file di
+     partenza resta com'e'. Cambiando la lista cambiano anche i promemoria del
+     calendario, che si generano da qui.</div>`));
+
+  const c = el('div', 'card');
+  c.append(el('h2', 'sec', `In elenco (${D.integratori.length})`));
+  c.lastChild.style.marginTop = '0';
+  if (!D.integratori.length)
+    c.append(el('p', 'muted', 'Nessun integratore. Se non ne prendi, va benissimo cosi\'.'));
+  for (const s of D.integratori) {
+    const ad = aderenzaIntegratore(s.nome);
+    const r = el('button', 'prod');
+    r.innerHTML = `<div class="grow"><div class="nm">${esc(s.nome)}${
+        s.mio ? ' <span class="pill ok">tuo</span>' : ''}</div>
+      <div class="mt">${esc(s.dose || '')} · ${esc(s.cadenza || '')}${
+        s.ora ? ' · ' + esc(s.ora) : ''}</div></div>
+      ${ad ? `<div class="kc">${ad.pct}%<br><span class="mt">${ad.presi}/${ad.su}</span></div>` : ''}`;
+    r.onclick = () => sheetIntegratore(s.nome);
+    c.append(r);
+  }
+  const b = el('button', 'btn wide pri', 'Aggiungine uno');
+  b.style.marginTop = '10px';
+  b.onclick = () => sheetIntegratore(null);
+  c.append(b);
+  v.append(c);
+
+  v.append(el('div', 'card flat',
+    `<div class="eyebrow">La percentuale a destra</div>
+     <div class="muted">E' quante volte l'hai segnato sui giorni in cui toccava,
+     negli ultimi trenta — i giorni in pausa non contano. Serve a vedere quale
+     salti davvero: di solito non e' quello che credi.</div>`));
+}
+
+function sheetIntegratore(nome) {
+  const p = piano();
+  const cur = nome ? D.integratori.find(x => x.nome === nome) : null;
+  const nuovo = !cur;
+  const w = el('div');
+  w.append(el('div', 'eyebrow', nuovo ? 'Nuovo' : (cur.mio ? 'Tuo' : 'Del piano di base')));
+  w.append(el('h2', 'sec', nuovo ? 'Aggiungi' : esc(cur.nome)));
+  w.lastChild.style.marginTop = '0';
+
+  const campo = (id, lab, val, ph) => el('div', 'field',
+    `<label>${lab}</label><input type="text" id="in-${id}" value="${
+      val != null ? esc(String(val)) : ''}"${ph ? ` placeholder="${ph}"` : ''}>`);
+  if (nuovo) w.append(campo('nome', 'Nome', '', 'Magnesio bisglicinato'));
+  w.append(campo('dose', 'Dose', cur?.dose, '2000 mcg'));
+
+  let cad = cur?.cadenza || 'giornaliera';
+  w.append(el('div', 'eyebrow', 'Ogni quanto'));
+  const seg = el('div', 'seg');
+  const boxG = el('div', 'field');
+  for (const cx of CADENZE) {
+    const b = el('button', null, cx);
+    b.setAttribute('aria-pressed', cad === cx);
+    b.onclick = () => { cad = cx;
+      [...seg.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+      boxG.hidden = cad !== 'settimanale'; };
+    seg.append(b);
+  }
+  w.append(seg);
+  const NOMI = ['lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato', 'domenica'];
+  const selG = el('select');
+  selG.id = 'in-giorno';
+  selG.style.cssText = 'width:100%;padding:9px 10px;border:1px solid var(--rule);'
+    + 'border-radius:9px;background:var(--paper);color:var(--ink);font:inherit';
+  for (const [i, n] of NOMI.entries())
+    selG.append(new Option(n, i, false, i === (cur?.giorno ?? 0)));
+  boxG.innerHTML = '<label>Che giorno</label>';
+  boxG.append(selG);
+  boxG.hidden = cad !== 'settimanale';
+  w.append(boxG);
+
+  w.append(campo('ora', 'A che ora', cur?.ora || '09:30', '09:30'));
+  let pri = cur?.priorita || 'consigliato';
+  w.append(el('div', 'eyebrow', 'Quanto conta'));
+  const segP = el('div', 'seg wrap');
+  for (const px of PRIORITA_INT) {
+    const b = el('button', null, px);
+    b.setAttribute('aria-pressed', pri === px);
+    b.onclick = () => { pri = px;
+      [...segP.children].forEach(x => x.setAttribute('aria-pressed', x === b)); };
+    segP.append(b);
+  }
+  w.append(segP);
+  w.append(campo('nota', 'Nota', cur?.nota, 'Con un pasto che contiene grassi'));
+
+  const salva = el('button', 'btn wide pri', 'Salva');
+  salva.style.marginTop = '12px';
+  salva.onclick = () => {
+    const n = nuovo ? $('#in-nome').value.trim() : cur.nome;
+    if (!n) { toast('Serve il nome'); return; }
+    p.integratori[n] = {
+      dose: $('#in-dose').value.trim(), cadenza: cad,
+      giorno: cad === 'settimanale' ? +selG.value : undefined,
+      ora: $('#in-ora').value.trim() || '09:30',
+      priorita: pri, nota: $('#in-nota').value.trim() || undefined
+    };
+    save(); fondiPiano(); closeSheet(); route(); toast('Salvato');
+  };
+  w.append(salva);
+
+  if (!nuovo) {
+    const via = el('button', 'btn wide', 'Toglilo dall\'elenco');
+    via.style.marginTop = '8px';
+    via.onclick = () => {
+      // marcato, non cancellato: se cambi idea la voce di base e' ancora li'
+      p.integratori[cur.nome] = { tolto: true };
+      save(); fondiPiano(); closeSheet(); route();
+      toast('Tolto: puoi rimetterlo quando vuoi');
+    };
+    w.append(via);
+    if (!cur.mio && p.integratori[cur.nome] && !p.integratori[cur.nome].tolto) {
+      const rip = el('button', 'btn wide', 'Torna alla voce di base');
+      rip.style.marginTop = '8px';
+      rip.onclick = () => {
+        delete p.integratori[cur.nome];
+        save(); fondiPiano(); closeSheet(); route();
+      };
+      w.append(rip);
+    }
+  }
+  w.append(el('p', 'note',
+    'L\'app non sa cosa ti serve: non misura il sangue e non conosce la tua storia. '
+    + 'Tiene l\'elenco che le dai, ti ricorda quando toccano e ti mostra quali '
+    + 'salti davvero. Cosa prendere si decide altrove.'));
+  sheet(w);
 }
 
 /** Somma dei pasti previsti in un giorno del piano. */
@@ -256,6 +445,11 @@ function pianoPassi() {
       perche: 'E’ il metro con cui l’app giudica le giornate: analisi, cruscotto, consigli e previsione del peso partono tutti da qui.',
       mio: Object.keys(p.target).length > 0,
       stato: `${nf(D.target.kcal)} kcal · ${D.target.p} g di proteine` },
+    { id: 'integratori', t: 'Cosa integri',
+      d: 'Aggiungi, cambia o togli quello che prendi.',
+      perche: 'Da qui escono la checklist del diario e i promemoria del calendario. E' + '\u2019 la parte piu' + '\u2019 personale del piano: la lista di partenza vale per chi l' + '\u2019 ha scritta, non per forza per te.',
+      mio: Object.keys(p.integratori).length > 0,
+      stato: D.integratori.length ? D.integratori.length + ' voci' : 'nessuna' },
     ...(usaPiano() ? [
     { id: 'alimenti', t: 'Cosa mangi',
       d: 'Aggiungi i tuoi alimenti o correggi quelli del piano.',
@@ -394,6 +588,7 @@ function pianoSezione(v) {
   v.append(testa);
 
   ({ profilo: sezProfilo, target: sezTarget, alimenti: sezAlimenti,
+     integratori: sezIntegratori,
      pasti: sezPasti, settimana: sezSettimana }[pianoTab])(v);
 
   const nav = el('div', 'row between');

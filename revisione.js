@@ -47,6 +47,7 @@ function seduteAbituali(k = today(), settimane = 8) {
   for (let w = 1; w <= settimane; w++) {
     const gg = windowDays(addDays(k, -7 * (w - 1)), 7);
     const n = gg.filter(x => (typeof serieDelGiorno === 'function' && serieDelGiorno(x).length)
+      || (typeof cardioDi === 'function' && cardioDi(x).length)
       || S.hyrox?.sessioni?.[x]?.fatto || S.log[x]?.allenamento === true).length;
     if (n) conta.push(n);
   }
@@ -68,6 +69,7 @@ function metricheSettimana(k = today()) {
   const cm = (g, id) => { const c = cons(g); return c.length ? c.reduce((a, m) => a + m[id], 0) / c.length : null; };
   const md = (g, id) => mediaSu(g, x => S.log[x]?.[id]);
   const sed = g => contaSu2(g, x => (typeof serieDelGiorno === 'function' && serieDelGiorno(x).length)
+      || (typeof cardioDi === 'function' && cardioDi(x).length)
     || S.hyrox?.sessioni?.[x]?.fatto || S.log[x]?.allenamento === true);
   const T = D.target;
   // con HYROX spento il numero di sedute a settimana non lo dichiara nessuno:

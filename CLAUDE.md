@@ -77,6 +77,7 @@ cerca.js        selettore cercabile riusabile + dispensa
 peso.js         pesate anomale e ciclo mestruale: cio' che sporca la bilancia
 timer.js        timer di recupero fra le serie
 carico.js       scarico automatico + dolori e infortuni
+cardio.js       corsa e simili, tracciato GPS, cartolina PNG da condividere
 salute.js       import di passi e sonno da un Comando iOS
 sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
 giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
@@ -92,6 +93,7 @@ manifest.json   PWA
 data/dieta.json IL DOMINIO alimentare — vedi sotto
 data/palestra.json catalogo esercizi, gruppi muscolari, modello forma-fatica
 data/sfide.json 38 sfide giornaliere + 23 traguardi
+data/corpo.json tracciati anatomici della mappa muscolare (MIT, vedi sotto)
 icons/          180 (apple-touch), 192, 512, maskable
 ```
 
@@ -234,6 +236,9 @@ non un dettaglio.
   di target, con la matrice del piano che la corregge. Mai applicata da sola
 - **Giorni che non contano** — vacanza o influenza escono da revisione e costanza
 - **Fiamma della striscia** — i giorni di fila disegnati, non scritti
+- **Cardio** — corsa, bici, nuoto: a mano o col GPS, con la cartolina PNG da
+  condividere. Entra nel conto delle sedute e nella spesa energetica
+- **Integrazione dinamica** — l elenco lo componi tu, con l aderenza per voce
 - **Dati** — cruscotto: 4 riquadri statistici, calendario della costanza e 14
   grafici (peso, calorie, proteine, ripartizione dei macro, fibre, passi, sonno,
   acqua, Coca Zero, fame/energia, misure, composizione, dispendio stimato,
@@ -326,6 +331,71 @@ scarico, la vigilia è riposo, l'ultimo giorno è la gara.
 HYROX ha **tre sezioni**, non sei: il conto alla rovescia sta sempre in testa,
 il piano dice cosa fare, le stazioni dicono a che punto sei e da lì parte la
 simulazione. Tutto il resto era navigazione in più.
+
+### La mappa muscolare è anatomica
+
+Prima era la figura parametrica con sopra dodici ellissi. Diceva *dove*, ma
+un'ellisse sul petto non è un petto, e non si capiva mai se una zona era accesa
+perché l'avevi allenata o perché la macchia era grande.
+
+I tracciati ora vengono da
+[react-native-body-highlighter](https://github.com/HichamELBSI/react-native-body-highlighter)
+di ELABBASSI Hicham, **licenza MIT**, estratti in `data/corpo.json` con la nota
+di licenza dentro il file. Quattro viste: maschile e femminile, fronte e retro —
+e si sceglie dal profilo, perché mostrare a una donna una silhouette maschile è
+il dettaglio che fa sembrare l'app scritta per qualcun altro.
+
+Quello che è **nostro** è la mappatura: i 19 slug della sorgente ricondotti ai
+13 muscoli del modello. `adductors`, `tibialis`, collo, mani, piedi e ginocchia
+restano **sagoma neutra** — esistono nel disegno ma non fra i gruppi che l'app
+conta, e colorarli vorrebbe dire inventarsi un dato. Stessa scelta già fatta
+con free-exercise-db.
+
+### Cardio, e perché il GPS ha un asterisco
+
+**Su iPhone una pagina web non può registrare un percorso con lo schermo
+spento.** Appena l'app va in secondo piano iOS la sospende e il GPS smette di
+arrivare. Non è un limite dell'implementazione: le app che lo fanno sono native
+e chiedono un permesso "sempre" che al web non esiste. `cardio.js` tiene acceso
+lo schermo con la Wake Lock API e **lo dice prima di partire**, invece di far
+scoprire a fine corsa che mancano otto chilometri. Chi non vuole tenere il
+telefono in mano registra a mano: i conti vengono identici.
+
+Due filtri sui punti, o la distanza si gonfia: si scartano le letture con
+`accuracy > 35 m` e gli spostamenti sotto i 2 m (rumore del ricevitore, non
+movimento). Le calorie della corsa usano il costo per chilometro
+(`corsa_kcal_per_kg_km`) e non il MET, che sull'andatura sbaglia molto di più.
+
+**La cartolina** è un canvas 1080×1350 generato sul telefono — la posizione non
+esce dall'app. Niente mappa di sfondo: i tile OSM *mandano* CORS (verificato, si
+potrebbero disegnare senza sporcare il canvas), ma la loro usage policy chiede
+di non appoggiarsi al server pubblico per traffico applicativo, e da un browser
+non si può nemmeno mandare uno User-Agent che identifichi l'app. Il tracciato si
+proietta in equirettangolare **corretta sulla latitudine** — senza il coseno un
+percorso a Milano si schiaccerebbe di un terzo — e si scala con lo stesso fattore
+sui due assi, altrimenti un fuori-e-torna dritto diventerebbe un cerchio.
+
+### L'integrazione è tua
+
+Era una lista fissa in `data/dieta.json`: cinque voci uguali per chiunque, non
+togliibili. Ma l'integrazione è la parte più personale del piano, e una lista
+che non si tocca la si smette di guardare.
+
+Ora `S.piano.integratori` è uno strato come `alimenti` e `pasti`: modifiche,
+aggiunte, e rimozioni marcate `tolto` invece che cancellate — se cambi idea la
+voce di base è ancora lì. Con il piano vuoto non si eredita niente: quelle
+cinque voci sono le scelte di un'altra persona, come i pasti.
+
+Due conseguenze utili: la checklist mostra **solo quello che tocca oggi** (la
+B12 settimanale in mezzo agli altri sei giorni era una riga da ignorare, e a
+furia di ignorarla si ignorano anche le altre), e ogni voce porta la sua
+**aderenza a 30 giorni** — serve a vedere quale salti davvero, che di solito non
+è quella che credi. Il generatore `.ics` legge `D.integratori`, quindi cambiare
+la lista cambia anche i promemoria del calendario.
+
+Il limite, detto nella UI: l'app non misura il sangue e non conosce la tua
+storia. Tiene l'elenco che le dai, ricorda quando tocca, e mostra cosa salti.
+Cosa prendere si decide altrove.
 
 ### Il motore della palestra
 
@@ -748,6 +818,13 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 
 ## Cose da non fare
 
+- Non promettere il tracciamento GPS in background: su iOS una PWA viene
+  sospesa appena esce dal primo piano e il GPS smette. Si tiene acceso lo
+  schermo con la Wake Lock e lo si dice PRIMA, non a corsa finita
+- Non dichiarare due volte lo stesso nome al livello superiore di due file:
+  sono tutti nello stesso scope globale, e un `const` duplicato uccide l'intera
+  app all'avvio senza dire niente. E' successo con PRIORITA fra hyrox.js e
+  piano.js: la pagina restava bianca e nessun `node --check` lo vedeva
 - Non aggiungere un framework né una libreria di grafici: i grafici sono SVG
   costruito a mano proprio per non introdurre un build step. L'app è divisa in
   più file per restare modificabile dal telefono, non per essere impacchettata

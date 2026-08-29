@@ -88,7 +88,7 @@ function normalize() {
   S.model ||= {}; S.model.prev ||= []; S.prodotti ||= [];
   S.palestra ||= {}; S.palestra.sessioni ||= {}; S.palestra.esercizi ||= [];
   S.palestra.schede ||= []; S.palestra.acciacchi ||= [];
-  S.palestra.esec ||= {};   // esercizio -> esecuzione nel catalogo pubblico
+  S.palestra.esec ||= {}; S.palestra.cardio ||= {};   // esercizio -> esecuzione nel catalogo pubblico
   // dedotto dai dati la prima volta, poi e' una scelta dell'utente
   if (!S.settings.moduli) S.settings.moduli = modulliDaStato();
   // hyrox mancava: un backup fatto prima di questa riga si importava
@@ -1235,16 +1235,39 @@ function viewDiario(v) {
   const c3 = el('div', 'card');
   c3.append(el('h2', 'sec', 'Integrazione'));
   c3.lastChild.style.marginTop = '0';
-  for (const s of D.integratori) {
+  // solo quello che tocca oggi: la B12 settimanale in mezzo agli altri sei
+  // giorni su sette era una riga da ignorare, e a furia di ignorarla si
+  // finisce per ignorare anche le altre
+  const oggiInt = typeof integratoreOggi === 'function'
+    ? D.integratori.filter(s => integratoreOggi(s, k)) : D.integratori;
+  if (!D.integratori.length) {
+    c3.append(el('p', 'muted',
+      'Nessun integratore in elenco. Se ne prendi, aggiungili dal piano: da li\' '
+      + 'escono questa checklist e i promemoria del calendario.'));
+  } else if (!oggiInt.length) {
+    c3.append(el('p', 'muted', 'Oggi non tocca niente.'));
+  }
+  for (const s of oggiInt) {
     const on = !!d.integratori[s.nome];
+    const ad = typeof aderenzaIntegratore === 'function' ? aderenzaIntegratore(s.nome, k) : null;
     const row = el('div', 'buy' + (on ? ' got' : ''));
     row.append(el('div', 'box', '✓'),
       el('div', 'grow', `<div><strong>${esc(s.nome)}</strong></div>
-        <div class="muted" style="font-size:12px">${esc(s.dose)} · ${esc(s.cadenza)}${s.nota ? ' · ' + esc(s.nota) : ''}</div>`),
-      el('span', 'pill' + (s.priorita === 'obbligatorio' ? ' bad' : ''), esc(s.priorita)));
-    row.onclick = () => { d.integratori[s.nome] = !on; save(); route(); };
+        <div class="muted" style="font-size:12px">${esc(s.dose || '')} · ${esc(s.cadenza || '')}${s.nota ? ' · ' + esc(s.nota) : ''}${
+          ad && ad.su >= 5 ? ` · <span class="mono">${ad.pct}% negli ultimi 30</span>` : ''}</div>`),
+      el('span', 'pill' + (s.priorita === 'obbligatorio' ? ' bad' : ''), esc(s.priorita || '')));
+    row.onclick = () => {
+      if (!on && typeof pulsa === 'function') pulsa(row.firstChild, { scala: 1.3, dur: 300 });
+      d.integratori[s.nome] = !on; save();
+      setTimeout(route, on ? 0 : 120);
+    };
     c3.append(row);
   }
+  const bi = el('button', 'btn wide', 'Modifica cosa prendi');
+  bi.style.marginTop = '10px';
+  bi.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'integratori';
+    location.hash = '#/piano'; };
+  c3.append(bi);
   v.append(c3);
 }
 
@@ -2220,6 +2243,8 @@ async function init() {
     catch { PD = null; }
     try { HX = await (await fetch('data/hyrox.json', { cache: 'no-cache' })).json(); }
     catch { HX = null; }
+    try { CORPO = await (await fetch('data/corpo.json', { cache: 'no-cache' })).json(); }
+    catch { CORPO = null; }
     try { SF = await (await fetch('data/sfide.json', { cache: 'no-cache' })).json(); }
     catch { SF = null; }
   } catch {

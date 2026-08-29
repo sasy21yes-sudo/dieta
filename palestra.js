@@ -1,3 +1,4 @@
+let CORPO = null;                                 // data/corpo.json
 /* Palestra: registro delle sedute, mappa muscolare, progressione, previsione.
    Il catalogo degli esercizi sta in data/palestra.json, non qui: stessa regola
    di dieta.json — il dominio e' dato, non codice. */
@@ -203,6 +204,12 @@ function kcalAllenamento(k) {
       righe.push({ tipo: 'HYROX', min, kcal: met(M[a?.tipo] ?? M.capacita, min) });
     }
   }
+  // il cardio ha il suo conto — sulla corsa a chilometri, sul resto a MET —
+  // e finisce nello stesso totale: e' sempre lavoro fatto
+  if (typeof cardioDi === 'function') for (const c of cardioDi(k))
+    righe.push({ tipo: cardioTipo(c.tipo).n, min: Math.round((c.durata_s || 0) / 60),
+                 kcal: c.kcal ?? kcalCardio(c) });
+
   return { tot: righe.reduce((a, r) => a + r.kcal, 0), righe };
 }
 
@@ -335,90 +342,86 @@ function prossimoPasso(id) {
     testo: `Resta a ${nf(kg, 1)} kg e porta la serie piu' bassa a ${(+piuBassa.reps || 0) + 1} ripetizioni (il range e' ${lo}–${hi}).` };
 }
 
-/* ============================================================ mappa muscolare */
-/**
- * Muscoli disegnati sulla stessa figura parametrica della scheda Corpo, cosi'
- * la mappa ha le proporzioni delle misure registrate. La silhouette di schiena
- * e' la stessa di fronte: e' schematica, serve a dire DOVE, non a fare
- * anatomia.
+/* ============================================================ mappa muscolare
+ *
+ * Prima era una figura parametrica con sopra dodici ellissi: diceva DOVE, ma
+ * un'ellisse sul petto non e' un petto, e a colpo d'occhio non si capiva mai
+ * se una zona era accesa perche' l'avevi allenata o perche' la macchia era
+ * grande. Ora i tracciati sono anatomici — ogni ventre muscolare ha la sua
+ * forma — e il colore riempie esattamente il muscolo.
+ *
+ * I tracciati vengono da react-native-body-highlighter di ELABBASSI Hicham,
+ * licenza MIT, e stanno in data/corpo.json insieme alla nota di licenza.
+ * Quello che e' nostro e' la MAPPATURA: i 19 slug della sorgente ricondotti ai
+ * 13 muscoli del modello di questa app. Adduttori, tibiale, collo, mani, piedi
+ * e ginocchia restano sagoma neutra — non perche' non contino, ma perche' nel
+ * modello di questa app non esistono come gruppi, e colorarli vorrebbe dire
+ * inventarsi un dato. E' la stessa scelta gia' fatta con free-exercise-db.
+ *
+ * La figura maschile e quella femminile sono due disegni diversi, e si sceglie
+ * dal profilo: mostrare a una donna una silhouette maschile e' il tipo di
+ * dettaglio che fa sembrare l'app scritta per qualcun altro.
  */
-function regioniMuscolari(m, vista) {
-  const F = FIG, cx = F.CX, W = widths(m);
-  const nw = W.collo, cw = W.torace, ww = W.vita, hw = W.fianchi;
-  const tw = W.coscia, aw = W.braccio, sw = W.spalla;
-  const ax = Math.max(hw * 0.52, tw + 4);
-  const E = (id, x, y, rx, ry, rot) => ({ id, tag: 'ellipse', x, y, rx, ry, rot: rot || 0 });
-  const R = (id, x, y, w2, h2, r) => ({ id, tag: 'rect', x: x - w2, y: y - h2,
-    w: w2 * 2, h: h2 * 2, r: r || 6 });
-
-  if (vista === 'fronte') return [
-    E('trapezi', cx - nw * 1.5, F.yNeck + 7, nw * 0.85, 7, -18),
-    E('trapezi', cx + nw * 1.5, F.yNeck + 7, nw * 0.85, 7, 18),
-    E('spalle', cx - sw * 0.78, F.ySh + 12, sw * 0.20, 13),
-    E('spalle', cx + sw * 0.78, F.ySh + 12, sw * 0.20, 13),
-    E('petto', cx - cw * 0.44, F.yPit - 6, cw * 0.40, 15, -8),
-    E('petto', cx + cw * 0.44, F.yPit - 6, cw * 0.40, 15, 8),
-    E('bicipiti', cx - cw * 1.00, F.yPit + 28, aw * 0.70, 19),
-    E('bicipiti', cx + cw * 1.00, F.yPit + 28, aw * 0.70, 19),
-    E('avambracci', cx - cw * 1.10, F.yElbow + 32, aw * 0.55, 21),
-    E('avambracci', cx + cw * 1.10, F.yElbow + 32, aw * 0.55, 21),
-    R('addome', cx, (F.yPit + F.yWaist) / 2 + 12, ww * 0.30, 26, 9),
-    E('quadricipiti', cx - ax * 0.92, F.yCrotch + 58, tw * 0.62, 42),
-    E('quadricipiti', cx + ax * 0.92, F.yCrotch + 58, tw * 0.62, 42)
-  ];
-  return [
-    R('trapezi', cx, F.yPit - 18, cw * 0.52, 24, 12),
-    E('spalle', cx - sw * 0.78, F.ySh + 12, sw * 0.20, 13),
-    E('spalle', cx + sw * 0.78, F.ySh + 12, sw * 0.20, 13),
-    E('dorsali', cx - cw * 0.50, F.yPit + 22, cw * 0.46, 27, 12),
-    E('dorsali', cx + cw * 0.50, F.yPit + 22, cw * 0.46, 27, -12),
-    E('tricipiti', cx - cw * 1.00, F.yPit + 28, aw * 0.70, 19),
-    E('tricipiti', cx + cw * 1.00, F.yPit + 28, aw * 0.70, 19),
-    R('lombari', cx, F.yWaist + 8, ww * 0.34, 15, 7),
-    E('glutei', cx - hw * 0.40, F.yHip + 8, hw * 0.36, 16),
-    E('glutei', cx + hw * 0.40, F.yHip + 8, hw * 0.36, 16),
-    E('femorali', cx - ax * 0.92, F.yCrotch + 62, tw * 0.58, 42),
-    E('femorali', cx + ax * 0.92, F.yCrotch + 62, tw * 0.58, 42),
-    E('polpacci', cx - ax * 0.84, F.yCalf + 2, tw * 0.48, 26),
-    E('polpacci', cx + ax * 0.84, F.yCalf + 2, tw * 0.48, 26)
-  ];
-}
 
 /** Un livello 0–4 della rampa sequenziale gia' validata. */
 function livello(v) { return v <= 0.02 ? 0 : Math.max(1, Math.min(4, Math.ceil(v * 4))); }
 
-function mappaSVG(vista, stato, modo, onTap) {
-  const cur = figMeas(Object.fromEntries(D.misure.map(m => [m.id, lastMeas(m.id)])));
-  const f = figure(cur);
-  const s = mk('svg', { viewBox: `0 0 ${FIG.W} ${FIG.H}`, role: 'img',
-    'aria-label': `Mappa muscolare, vista ${vista}` });
-  const sagoma = d => mk('path', { d, fill: 'var(--wash)', stroke: 'var(--rule)',
-    'stroke-width': 1.6, 'stroke-linejoin': 'round' });
-  s.append(sagoma(f.corpo));
-  f.braccia.forEach(d => s.append(sagoma(d)));
-  s.append(mk('ellipse', { cx: f.testa.cx, cy: f.testa.cy.toFixed(1),
-    rx: f.testa.rx.toFixed(1), ry: f.testa.ry.toFixed(1),
-    fill: 'var(--wash)', stroke: 'var(--rule)', 'stroke-width': 1.6 }));
+/** La vista giusta per profilo e lato. */
+function vistaCorpo(vista) {
+  if (!CORPO) return null;
+  const sesso = D.profilo?.sesso === 'f' ? 'f' : 'm';
+  return CORPO.viste[sesso + '-' + vista] || CORPO.viste['m-' + vista] || null;
+}
 
-  for (const r of regioniMuscolari(cur, vista)) {
-    const st = stato[r.id]; if (!st) continue;
-    const v = modo === 'fatica' ? st.nFatica : modo === 'forma' ? st.nForma : st.nVolume;
-    const l = livello(v);
-    const attr = { fill: l ? `var(--s${l})` : 'var(--paper)',
-      stroke: 'var(--pine)', 'stroke-width': .8, opacity: l ? .92 : .5,
-      style: 'cursor:pointer' };
-    let e;
-    if (r.tag === 'ellipse') {
-      e = mk('ellipse', { cx: r.x.toFixed(1), cy: r.y.toFixed(1),
-        rx: r.rx.toFixed(1), ry: r.ry.toFixed(1), ...attr });
-      if (r.rot) e.setAttribute('transform', `rotate(${r.rot} ${r.x.toFixed(1)} ${r.y.toFixed(1)})`);
-    } else {
-      e = mk('rect', { x: r.x.toFixed(1), y: r.y.toFixed(1),
-        width: r.w.toFixed(1), height: r.h.toFixed(1), rx: r.r, ...attr });
-    }
-    e.addEventListener('pointerdown', () => onTap(st));
-    s.append(e);
+function mappaSVG(vista, stato, modo, onTap) {
+  const V = vistaCorpo(vista);
+  if (!V) {
+    const box = el('div', 'muted');
+    box.textContent = 'Sagoma non caricata: serve data/corpo.json.';
+    return box;
   }
+  const s = mk('svg', { viewBox: V.viewBox, role: 'img',
+    'aria-label': `Mappa muscolare, vista ${vista}` });
+
+  /* la sagoma neutra sotto: da' la figura senza chiedere attenzione */
+  const g0 = mk('g', { fill: 'var(--wash)', stroke: 'var(--rule)',
+    'stroke-width': 1.2, 'stroke-linejoin': 'round' });
+  for (const d of V.neutri) g0.append(mk('path', { d }));
+  s.append(g0);
+
+  /* i muscoli sopra, ognuno un gruppo cliccabile */
+  for (const [id, paths] of Object.entries(V.muscoli)) {
+    const st = stato[id];
+    const v = !st ? 0
+      : modo === 'fatica' ? st.nFatica : modo === 'forma' ? st.nForma : st.nVolume;
+    const l = livello(v || 0);
+    const g = mk('g', {
+      fill: l ? `var(--s${l})` : 'var(--paper)',
+      stroke: 'var(--pine)', 'stroke-width': 1.1,
+      'stroke-linejoin': 'round',
+      opacity: l ? .95 : .55,
+      style: 'cursor:pointer', class: 'mus' + (l ? ' on' : '')
+    });
+    g.setAttribute('data-mus', id);
+    for (const d of paths) g.append(mk('path', { d }));
+    if (st) {
+      const t = mk('title');
+      t.textContent = st.nome;
+      g.append(t);
+      g.addEventListener('pointerdown', () => onTap(st));
+    }
+    s.append(g);
+  }
+
+  /* i muscoli accesi entrano uno dopo l'altro, dal piu' caldo: e' l'ordine in
+     cui li leggeresti comunque */
+  if (typeof osserva === 'function') osserva(s, () => {
+    if (!motionOk()) return;
+    const acc = [...s.querySelectorAll('.mus.on')];
+    acc.forEach((g, i) => g.animate(
+      [{ opacity: 0 }, { opacity: g.getAttribute('opacity') || 1 }],
+      { duration: 320, delay: 60 + i * 70, fill: 'backwards' }));
+  });
   return s;
 }
 
@@ -460,6 +463,8 @@ function viewPalestra(v) {
   bReg.onclick = () => sheetSeduta(k);
   testa.append(bReg);
   v.append(testa);
+
+  if (typeof cardCardio === 'function') v.append(cardCardio(k));
 
   const cScar = typeof cardScarico === 'function' ? cardScarico(k) : null;
   if (cScar) v.append(cScar);
@@ -506,7 +511,11 @@ function viewPalestra(v) {
     '<span>poco</span>' + [1, 2, 3, 4].map(n => `<i style="background:var(--s${n})"></i>`).join('')
     + '<span>molto</span>'));
   cm.append(el('p', 'note',
-    'La silhouette di schiena e’ la stessa di fronte: e’ schematica, serve a dire dove, non a fare anatomia. Le proporzioni pero’ sono le tue, prese dalle misure registrate.'));
+    'I tracciati sono anatomici: ogni ventre muscolare ha la sua forma, e il colore '
+    + 'riempie il muscolo vero. La figura segue il sesso del profilo. Adduttori, '
+    + 'tibiale e collo restano grigi: esistono nel disegno ma non fra i tredici '
+    + 'gruppi che questa app conta, e colorarli vorrebbe dire inventarsi un dato. '
+    + 'La silhouette non e’ in scala sulle tue misure — per quella c’e’ la scheda Corpo.'));
   v.append(cm);
 
   /* --- prontezza --- */
