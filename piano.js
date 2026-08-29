@@ -515,17 +515,60 @@ function sezAlimenti(v) {
   v.append(c2);
 }
 
-function sheetAlimento(nome) {
+/**
+ * L'editor di un alimento.
+ * `pre` arriva dalla ricerca su Open Food Facts e riempie i campi; resta un
+ * modulo normale, perche' i valori dell'archivio vanno guardati prima di
+ * essere accettati, non solo importati.
+ */
+function sheetAlimento(nome, pre) {
   const p = piano();
-  const cur = nome ? D.alimenti[nome] : null;
+  const cur = nome ? D.alimenti[nome] : (pre || null);
   const w = el('div');
-  w.append(el('div', 'eyebrow', nome ? 'Alimento' : 'Nuovo alimento'));
-  w.append(el('h2', 'sec', nome ? esc(nome) : 'Valori per 100 g'));
+  w.append(el('div', 'eyebrow', nome ? 'Alimento' : pre ? 'Da Open Food Facts' : 'Nuovo alimento'));
+  w.append(el('h2', 'sec', nome ? esc(nome) : 'Valori per 100 ' + (cur?.unita || 'g')));
   w.lastChild.style.marginTop = '0';
+
+  /* Quello che c'e' scritto nel modulo adesso. Serve a una cosa sola: se apri
+     la ricerca e poi torni indietro, i campi devono essere ancora pieni. Un
+     foglio che si riapre vuoto fa perdere il lavoro, ed e' un errore gia'
+     fatto una volta con l'editor delle schede. */
+  const compilato = () => {
+    const v = id => ($('#al-' + id)?.value ?? '').trim();
+    if (!$('#al-kcal')) return pre;                 // il modulo non c'e' ancora
+    return { ...(pre || {}), nome: v('nome'), categoria: v('categoria'),
+      kcal: v('kcal'), p: v('p'), c: v('c'), g: v('g'), fibre: v('fibre') };
+  };
+
+  /* la ricerca online: solo sui nuovi, e solo se il file c'e' */
+  if (!nome && typeof sheetCercaAlimento === 'function') {
+    const cerca = el('button', 'btn wide');
+    cerca.textContent = pre ? 'Cerca un altro prodotto' : 'Cerca su internet';
+    cerca.style.marginBottom = '12px';
+    cerca.onclick = () => {
+      const indietro = compilato();
+      const q = ($('#al-nome')?.value || '').trim();   // parte da cio' che hai scritto
+      sheetCercaAlimento(a => {
+        if (!a) { sheetAlimento(null, indietro); return; }
+        sheetAlimento(null, {
+          nome: [a.nome, a.marca].filter(Boolean).join(' — ').slice(0, 60),
+          kcal: a.kcal, p: a.p, c: a.c, g: a.g, fibre: a.fibre,
+          unita: a.unita, categoria: indietro?.categoria || '', fonte: 'stima',
+          origine: 'openfoodfacts', barcode: a.codice, avviso: a.coerenza
+        });
+      }, q);
+    };
+    w.append(cerca);
+  }
+  if (pre?.avviso && pre.avviso.d) {
+    const av = el('div', 'hint' + (pre.avviso.stato === 'incoerente' ? ' acciacco' : ''));
+    av.innerHTML = '<strong>Controlla questi numeri.</strong> ' + esc(pre.avviso.d);
+    w.append(av);
+  }
   const campo = (id, lab, val, mode) => el('div', 'field',
     `<label>${lab}</label><input type="text" inputmode="${mode || 'decimal'}"
       id="al-${id}" value="${val != null ? esc(String(val)) : ''}">`);
-  if (!nome) w.append(campo('nome', 'Nome', '', 'text'));
+  if (!nome) w.append(campo('nome', 'Nome', pre?.nome, 'text'));
   const g = el('div');
   g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px';
   g.append(campo('kcal', 'Calorie', cur?.kcal), campo('p', 'Proteine (g)', cur?.p),
@@ -533,10 +576,37 @@ function sheetAlimento(nome) {
            campo('fibre', 'Fibre (g)', cur?.fibre),
            campo('categoria', 'Categoria', cur?.categoria, 'text'));
   w.append(g);
+  // le categorie gia' in uso come suggerimento: il motore delle sostituzioni
+  // confronta stringhe, e "legumi" contro "Legumi" sarebbero due mondi separati
+  const dl = el('datalist'); dl.id = 'al-cats';
+  for (const cx of [...new Set(Object.values(D.alimenti).map(x => x.categoria).filter(Boolean))].sort())
+    dl.append(new Option(cx));
+  w.append(dl);
+  g.querySelector('#al-categoria')?.setAttribute('list', 'al-cats');
   w.append(el('div', 'hint',
     'La categoria serve al motore delle sostituzioni: cerca alternative solo dentro la stessa categoria.'));
 
+  let confermato = false;
+  if (pre?.origine) {
+    const ck = el('button', 'btn wide');
+    ck.textContent = 'Li ho controllati sulla confezione';
+    ck.setAttribute('aria-pressed', 'false');
+    ck.onclick = () => {
+      confermato = !confermato;
+      ck.setAttribute('aria-pressed', String(confermato));
+      ck.classList.toggle('pri', confermato);
+      ck.textContent = confermato ? '✓ Controllati sulla confezione'
+                                  : 'Li ho controllati sulla confezione';
+    };
+    w.append(ck);
+    w.append(el('div', 'hint',
+      'Senza questa conferma l\'alimento resta marcato <strong>stima</strong>, e l\'app '
+      + 'lo dice ovunque compaia. Non e\' una formalita\': i valori stimati vanno letti '
+      + 'come un ordine di grandezza.'));
+  }
+
   const b = el('button', 'btn wide pri', 'Salva');
+  b.style.marginTop = '10px';
   b.onclick = () => {
     const n = nome || $('#al-nome').value.trim();
     if (!n) { toast('Serve il nome'); return; }
@@ -544,8 +614,13 @@ function sheetAlimento(nome) {
     p.alimenti[n] = {
       kcal: num('kcal'), p: num('p'), c: num('c'), g: num('g'), fibre: num('fibre'),
       categoria: $('#al-categoria').value.trim() || 'altro',
-      unita: cur?.unita || 'g', fonte: 'verificato'
+      unita: cur?.unita || 'g',
+      // un valore preso da un archivio collaborativo non e' "letto in etichetta":
+      // resta stima finche' non lo confermi tu sulla confezione
+      fonte: pre?.origine && !confermato ? 'stima' : 'verificato'
     };
+    if (pre?.barcode) p.alimenti[n].barcode = pre.barcode;
+    if (pre?.origine && !confermato) p.alimenti[n].origine = pre.origine;
     if (p.alimenti[n].kcal <= 0) { toast('Le calorie non possono essere zero'); return; }
     save(); fondiPiano(); closeSheet(); route(); toast('Alimento salvato');
   };

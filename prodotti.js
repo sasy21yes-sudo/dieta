@@ -296,3 +296,178 @@ function trovato(code) {
   w.append(online);
   sheet(w);
 }
+
+/* ============================================ ricerca per nome su Open Food Facts
+
+   Tutto il dialogo con Open Food Facts sta in questo file, codice a barre e
+   ricerca per nome insieme: e' l'unico posto da cui esce una richiesta di rete.
+
+   Perche' proprio /cgi/search.pl e non gli altri due:
+   - /api/v2/search accetta search_terms ma non li usa davvero per ordinare —
+     provato con "fagioli borlotti" e torna un formaggio marocchino su quattro
+     milioni di risultati;
+   - search.openfoodfacts.org (il motore nuovo) cerca benissimo ma NON manda
+     Access-Control-Allow-Origin, quindi dal browser la risposta e' inagibile;
+   - /cgi/search.pl cerca bene, manda ACAO *, e il preflight con X-User-Agent
+     passa (e resta in cache venti giorni). E' l'unico dei tre utilizzabile.
+
+   L'archivio e' collaborativo: i valori li inseriscono le persone, e sbagliano.
+   Per questo ogni risultato passa da coerenza() prima di essere mostrato. */
+
+const OFF_UA = 'Dieta-PWA/1.0 (app personale, nessuna raccolta dati)';
+
+/**
+ * I macro tornano con le calorie dichiarate?
+ * 4 kcal al grammo per proteine e carboidrati, 9 per i grassi, 2 per le fibre
+ * (in etichetta UE le fibre sono fuori dai carboidrati). Uno scarto sotto il
+ * 15% e' normale — sono valori di tabella su alimenti reali. Sopra il 30%
+ * qualcuno ha sbagliato a digitare, ed e' giusto dirlo prima che quel numero
+ * finisca dentro il bilancio energetico.
+ */
+function coerenza(a) {
+  if (!(a.kcal > 0)) return { stato: 'no-kcal', d: 'Calorie mancanti nell\'archivio.' };
+  const teor = 4 * (a.p || 0) + 4 * (a.c || 0) + 9 * (a.g || 0) + 2 * (a.fibre || 0);
+  if (!teor) return { stato: 'no-macro', d: 'Macro mancanti: ci sono solo le calorie.' };
+  const scarto = Math.abs(teor - a.kcal) / a.kcal;
+  if (scarto <= .15) return { stato: 'ok', scarto };
+  if (scarto <= .30) return { stato: 'dubbio', scarto,
+    d: `I macro darebbero ${nf(teor)} kcal invece di ${nf(a.kcal)}. Puo' starci, ma controlla.` };
+  return { stato: 'incoerente', scarto,
+    d: `I macro darebbero ${nf(teor)} kcal contro le ${nf(a.kcal)} dichiarate. Qualcuno ha sbagliato a inserirli.` };
+}
+
+/** Da record grezzo di Open Food Facts a un alimento come lo vuole il piano. */
+function daOFF(p) {
+  const n = p.nutriments || {};
+  const num = x => (typeof x === 'number' && isFinite(x)) ? x : null;
+  let kcal = num(n['energy-kcal_100g']);
+  if (!(kcal > 0)) {
+    // certi prodotti hanno solo i kilojoule
+    const kj = num(n['energy-kj_100g']) ?? (n.energy_unit === 'kJ' ? num(n.energy_100g) : null);
+    if (kj > 0) kcal = kj / 4.184;
+    else if (n.energy_unit === 'kcal') kcal = num(n.energy_100g);
+  }
+  const q = (p.quantity || '').toLowerCase();
+  const liquido = /\d\s*(ml|cl)\b/.test(q) || /\d\s*l\b/.test(q);
+  const a = {
+    codice: p.code,
+    nome: (p.product_name || '').trim(),
+    marca: (p.brands || '').split(',')[0].trim(),
+    quantita: p.quantity || '',
+    unita: liquido ? 'ml' : 'g',
+    kcal: kcal != null ? Math.round(kcal) : 0,
+    p: num(n.proteins_100g) ?? 0,
+    c: num(n.carbohydrates_100g) ?? 0,
+    g: num(n.fat_100g) ?? 0,
+    fibre: num(n.fiber_100g) ?? 0
+  };
+  a.coerenza = coerenza(a);
+  return a;
+}
+
+/**
+ * Cerca per nome. Si interroga solo su richiesta esplicita, mai a ogni tasto:
+ * Open Food Facts chiede di stare sotto le dieci ricerche al minuto, e un
+ * autocomplete le brucerebbe in cinque secondi di digitazione.
+ */
+async function cercaAlimentiOFF(q, { segnale } = {}) {
+  const url = 'https://world.openfoodfacts.org/cgi/search.pl'
+    + '?search_simple=1&action=process&json=1&page_size=20'
+    + '&fields=code,product_name,brands,quantity,nutriments'
+    + '&search_terms=' + encodeURIComponent(q);
+  // il User-Agent vero il browser non lo lascia impostare; Open Food Facts
+  // accetta X-User-Agent proprio per questo, e il preflight lo consente
+  const r = await fetch(url, { signal: segnale,
+    headers: { Accept: 'application/json', 'X-User-Agent': OFF_UA } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  return (j.products || []).map(daOFF)
+    .filter(a => a.nome && a.kcal > 0)
+    // i pasticci veri in fondo: restano visibili, ma non per primi
+    .sort((x, y) => (x.coerenza.stato === 'incoerente') - (y.coerenza.stato === 'incoerente'));
+}
+
+/**
+ * Il foglio di ricerca. onScegli riceve l'alimento normalizzato.
+ * Non salva niente da solo: porta i valori nel modulo, dove si controllano.
+ */
+function sheetCercaAlimento(onScegli, iniziale = '') {
+  let ctrl = null;
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Open Food Facts'));
+  w.append(el('h2', 'sec', 'Cerca un alimento'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Archivio pubblico e collaborativo, oltre tre milioni di prodotti. '
+    + 'Scrivi il nome come sta sulla confezione — marca compresa, se ce l\'ha.'));
+
+  const riga = el('div', 'off-cerca');
+  const inp = el('input');
+  inp.type = 'search'; inp.className = 'sel-i'; inp.placeholder = 'Fagioli borlotti…';
+  inp.value = iniziale; inp.autocomplete = 'off';
+  const go = el('button', 'btn pri', 'Cerca');
+  riga.append(inp, go);
+  w.append(riga);
+
+  const esiti = el('div');
+  w.append(esiti);
+
+  const mostra = lista => {
+    esiti.innerHTML = '';
+    if (!lista.length) {
+      esiti.append(el('p', 'muted',
+        'Nessun prodotto con quel nome, o nessuno con i valori nutrizionali compilati. '
+        + 'Prova con meno parole, oppure inseriscilo a mano: e\' sempre il modo piu\' affidabile.'));
+      return;
+    }
+    esiti.append(el('div', 'eyebrow', `${lista.length} risultati`));
+    for (const a of lista) {
+      const r = el('button', 'off-r' + (a.coerenza.stato === 'incoerente' ? ' sos' : ''));
+      const badge = a.coerenza.stato === 'incoerente' ? '<span class="pill no">non torna</span>'
+        : a.coerenza.stato === 'dubbio' ? '<span class="pill">da controllare</span>' : '';
+      r.innerHTML = `<span class="nm">${esc(a.nome)} ${badge}</span>
+        <span class="mt">${esc([a.marca, a.quantita].filter(Boolean).join(' · ')) || '&nbsp;'}</span>
+        <span class="mc">${nf(a.kcal)} kcal · ${nf(a.p, 1)}P ${nf(a.c, 1)}C ${nf(a.g, 1)}G${
+          a.fibre ? ' ' + nf(a.fibre, 1) + 'F' : ''} <em>per 100 ${a.unita}</em></span>`;
+      r.onclick = () => { ctrl?.abort(); onScegli(a); };
+      esiti.append(r);
+    }
+    if (typeof osserva === 'function')
+      osserva(esiti, () => entrata([...esiti.children], { passo: 35 }));
+  };
+
+  const cerca = async () => {
+    const q = inp.value.trim();
+    if (q.length < 2) { toast('Scrivi almeno due lettere'); return; }
+    ctrl?.abort(); ctrl = new AbortController();
+    go.disabled = true; go.textContent = '…';
+    esiti.innerHTML = '';
+    esiti.append(el('p', 'muted', 'Cerco su openfoodfacts.org…'));
+    try {
+      mostra(await cercaAlimentiOFF(q, { segnale: ctrl.signal }));
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      esiti.innerHTML = '';
+      esiti.append(el('p', 'muted',
+        'Non riesco a raggiungere l\'archivio. Serve la rete: offline questa ricerca non '
+        + 'funziona, ma tutto il resto dell\'app si\'.'));
+    } finally { go.disabled = false; go.textContent = 'Cerca'; }
+  };
+  go.onclick = cerca;
+  inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); cerca(); } };
+
+  w.append(el('p', 'hint',
+    'Esce dal telefono solo il testo che scrivi qui, verso openfoodfacts.org. '
+    + 'Nessun tuo dato personale, nessun peso, nessun diario.'));
+  w.append(el('p', 'note',
+    'I valori li inseriscono gli utenti dell\'archivio e possono essere sbagliati: '
+    + 'l\'app controlla che i macro tornino con le calorie e segnala quelli che non '
+    + 'quadrano, ma l\'etichetta sulla confezione resta l\'unica fonte sicura. '
+    + 'Per questo un alimento importato da qui nasce marcato <strong>stima</strong>.'));
+
+  const ind = el('button', 'btn wide', 'Torna indietro');
+  ind.onclick = () => { ctrl?.abort(); onScegli(null); };
+  w.append(ind);
+  sheet(w);
+  if (iniziale) cerca();
+}

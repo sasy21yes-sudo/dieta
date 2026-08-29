@@ -80,7 +80,8 @@ sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
 giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
 piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
 palestra.js     registro sedute, mappa muscolare, forma-fatica, progressione
-prodotti.js     prodotti reali, codici a barre, override degli alimenti
+prodotti.js     prodotti reali, codici a barre, ricerca alimenti su Open Food
+                Facts, override degli alimenti
 foto.js         foto dei progressi (IndexedDB) + timelapse + confronto a cursore
 sw.js           cache offline; rete-prima su tutto, cache come riserva
 manifest.json   PWA
@@ -161,6 +162,8 @@ non un dettaglio.
   sola cosa da cambiare. Si propone da sola la domenica e il lunedi
 - **Timer di recupero**, **scarico automatico**, **dolori e infortuni** in Gym
 - **Dispensa** — quello che hai in casa si sottrae dalla lista della spesa
+- **Cerca un alimento su internet** — Open Food Facts per nome, con il
+  controllo che i macro tornino con le calorie dichiarate
 - **Scala il pasto** — moltiplicatore da ×0,5 a ×2 su tutti gli ingredienti
 - **Confronto foto a cursore** — prima e dopo sovrapposte, con la riga che si
   trascina
@@ -435,6 +438,36 @@ del proprio target, l'unico metro che tiene sulla stessa figura i passi e i litr
   allarga l'incertezza dell'osservazione sulle finestre che cambiano fase: su
   ventotto giorni ne tocca quattro e lascia stare le altre ventiquattro
 
+### Cercare un alimento su internet
+
+Il bottone sta in **Piano → Cosa mangi → Aggiungi un alimento**, e interroga
+Open Food Facts. Tutto il dialogo con quell'archivio — codice a barre e ricerca
+per nome — sta in `prodotti.js`: è l'unico punto da cui esce una richiesta di rete.
+
+**L'endpoint non è intercambiabile**, e la scelta va rispettata:
+
+| Endpoint | Verdetto |
+|---|---|
+| `/api/v2/search` | accetta `search_terms` ma non ordina davvero: cercando "fagioli borlotti" torna un formaggio marocchino su 4,7 milioni di risultati |
+| `search.openfoodfacts.org` | il motore nuovo, cerca benissimo, ma **non manda `Access-Control-Allow-Origin`**: dal browser la risposta è inagibile |
+| `/cgi/search.pl` | cerca bene, manda `ACAO: *`, e il preflight con `X-User-Agent` passa e resta in cache venti giorni. **L'unico dei tre utilizzabile** |
+
+`X-User-Agent` perché il `User-Agent` vero il browser non lo lascia impostare, e
+Open Food Facts chiede alle app di identificarsi. La ricerca parte solo su
+richiesta esplicita, mai a ogni tasto: l'archivio chiede di stare sotto le dieci
+ricerche al minuto e un autocomplete le brucerebbe in cinque secondi.
+
+**`coerenza()` è la parte che conta.** I valori li inseriscono le persone e
+sbagliano: nei test un petto di pollo dichiarava 30 kcal con 20 g di proteine.
+Si ricalcolano le calorie dai macro (4/4/9, più 2 per le fibre, che in etichetta
+UE stanno fuori dai carboidrati) e si confronta: sotto il 15% è normale, sopra
+il 30% qualcuno ha sbagliato a digitare. Quelli incoerenti restano visibili ma
+con l'etichetta "non torna" e ordinati in fondo — non si nascondono, si segnalano.
+
+Un alimento importato da lì nasce `fonte: "stima"`, non `verificato`: un archivio
+collaborativo non è l'etichetta sulla confezione. Diventa `verificato` solo se
+l'utente tocca "li ho controllati sulla confezione".
+
 ### Passi e sonno senza scriverli
 
 Nessuna API web legge HealthKit. Un **Comando iOS** però ha i permessi che il
@@ -499,6 +532,12 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   e tau_fatica 7 la prontezza di chi si allena è **sempre** positiva, per
   costruzione. Il numero che dice qualcosa è il rapporto fatica/forma diviso il
   suo valore di regime
+- Non sostituire `/cgi/search.pl` con `search.openfoodfacts.org` perché è più
+  moderno: quel dominio non manda `Access-Control-Allow-Origin` e dal browser la
+  richiesta viene bloccata. È stato verificato con i header alla mano, non supposto
+- Non marcare `verificato` un alimento che arriva da Open Food Facts: quei valori
+  li inseriscono gli utenti dell'archivio. Nasce `stima` e lo diventa solo se
+  qualcuno conferma di averlo letto sulla confezione
 - Non usare media e deviazione standard per riconoscere una pesata sbagliata:
   il valore anomalo alza sia la media sia lo scarto e finisce per giustificarsi
   da solo. Servono mediana e MAD
