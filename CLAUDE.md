@@ -79,7 +79,8 @@ salute.js       import di passi e sonno da un Comando iOS
 sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
 giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
 piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
-palestra.js     registro sedute, mappa muscolare, forma-fatica, progressione
+palestra.js     registro sedute, mappa muscolare, forma-fatica, progressione,
+                catalogo esercizi da internet
 prodotti.js     prodotti reali, codici a barre, ricerca alimenti su Open Food
                 Facts, override degli alimenti
 foto.js         foto dei progressi (IndexedDB) + timelapse + confronto a cursore
@@ -162,6 +163,8 @@ non un dettaglio.
   sola cosa da cambiare. Si propone da sola la domenica e il lunedi
 - **Timer di recupero**, **scarico automatico**, **dolori e infortuni** in Gym
 - **Dispensa** — quello che hai in casa si sottrae dalla lista della spesa
+- **Cerca un esercizio su internet** — catalogo pubblico di 873 esercizi con
+  i gruppi muscolari gia assegnati, scaricato una volta e poi offline
 - **Cerca un alimento su internet** — Open Food Facts per nome, con il
   controllo che i macro tornino con le calorie dichiarate
 - **Scala il pasto** — moltiplicatore da ×0,5 a ×2 su tutti gli ingredienti
@@ -468,6 +471,47 @@ Un alimento importato da lì nasce `fonte: "stima"`, non `verificato`: un archiv
 collaborativo non è l'etichetta sulla confezione. Diventa `verificato` solo se
 l'utente tocca "li ho controllati sulla confezione".
 
+### Cercare un esercizio su internet
+
+Il bottone sta in **Gym → I tuoi esercizi**. La fonte è
+[free-exercise-db](https://github.com/yuhonas/free-exercise-db) (Unlicense,
+pubblico dominio), un JSON statico su jsDelivr. Il client sta in `palestra.js`,
+accanto all'editor che riempie, come quello di Open Food Facts sta in `prodotti.js`.
+
+**Perché un file statico e non una API.** Provate tutte e tre prima di scegliere:
+
+| Fonte | Verdetto |
+|---|---|
+| wger.de | API REST vera, muscoli strutturati, pure l'italiano. Ma `/exercise/search/` oggi risponde 404 (l'hanno tolto) e `?search=` viene ignorato: torna comunque tutti e 862. Senza ricerca lato server resta scaricare l'intero catalogo, che con descrizioni, immagini e traduzioni pesa **5,5 MB** |
+| ExerciseDB, API Ninjas | Vogliono una chiave. Qui non c'è un server dove nasconderla, e una chiave nel codice della pagina è una chiave regalata |
+| free-exercise-db | 873 esercizi, `ACAO: *`, **168 KB compressi**. Nessuna API da farsi deprecare sotto i piedi |
+
+E soprattutto ha i due campi che servono a *questa* app: i muscoli primari e
+secondari, che alimentano mappa muscolare, volume, forma-fatica e il filtro
+degli acciacchi; e `mechanic` (compound/isolation), da cui esce il `tipo` e
+quindi il recupero consigliato. **wger il secondo non ce l'ha.**
+
+Si scarica una volta, si buttano istruzioni e immagini (il 90% del peso:
+da 1 MB a 89 KB) e si tiene in `localStorage` sotto `dieta.exdb`. Da lì in poi
+la ricerca è locale — filtra mentre scrivi, e funziona offline.
+
+**I due gruppi senza casa.** La fonte ha 17 muscoli, il modello di questa app
+ne ha 13: `adductors` e `neck` non hanno corrispondenza. Non vanno infilati a
+forza dentro glutei o trapezi — sporcherebbero la mappa e il conteggio del
+volume, che sono la ragione per cui i muscoli esistono qui dentro. Si segnala
+e si fa scegliere; il salvataggio pretende già almeno un primario, quindi non
+si può salvare un esercizio che non colora niente.
+
+Serie e incrementi **non sono nella fonte**: escono da attrezzo e `mechanic`
+(multi 6–10, isolamento 10–15; bilanciere +2,5, manubri +2, macchina +5),
+in linea con i valori già in `data/palestra.json`. Sono valori di partenza,
+e la UI lo dice.
+
+Nel farlo è saltato fuori un bug vecchio: gli esercizi tuoi nascevano con
+`tipo: 'mio'`, che nessuna parte del codice sa leggere — `recupeoConsigliato()`
+li trattava perciò **sempre da isolamento**, 75 secondi anche su uno stacco.
+Ora l'editor ha il selettore multi/isolamento e il tipo si salva davvero.
+
 ### Passi e sonno senza scriverli
 
 Nessuna API web legge HealthKit. Un **Comando iOS** però ha i permessi che il
@@ -538,6 +582,10 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non marcare `verificato` un alimento che arriva da Open Food Facts: quei valori
   li inseriscono gli utenti dell'archivio. Nasce `stima` e lo diventa solo se
   qualcuno conferma di averlo letto sulla confezione
+- Non mappare `adductors` e `neck` di free-exercise-db dentro glutei o trapezi
+  per far quadrare i conti: la mappa muscolare, il volume e la forma-fatica si
+  reggono su quei gruppi. Un muscolo senza corrispondenza va dichiarato, non
+  indovinato
 - Non usare media e deviazione standard per riconoscere una pesata sbagliata:
   il valore anomalo alza sia la media sia lo scarto e finisce per giustificarsi
   da solo. Servono mediana e MAD

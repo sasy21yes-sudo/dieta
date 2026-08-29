@@ -1244,6 +1244,203 @@ function sheetRigaScheda(stato, idx, onChiudi) {
   sheet(w);
 }
 
+/* ============================================ catalogo esercizi da internet
+
+   Perche' un file statico e non una API. Sono state provate tutte e tre le
+   strade prima di scegliere:
+
+   - wger.de ha una bella API REST, muscoli e attrezzi strutturati, e pure
+     l'italiano. Ma l'endpoint di ricerca /exercise/search/ oggi risponde 404 —
+     l'hanno tolto — e il parametro ?search= viene ignorato: torna comunque
+     tutti e 862 gli esercizi. Senza ricerca lato server resterebbe scaricare
+     l'intero catalogo, che con descrizioni, immagini e traduzioni pesa 5,5 MB.
+   - ExerciseDB e API Ninjas vogliono una chiave. Qui non c'e' nessun server
+     dove nasconderla, e una chiave dentro il codice della pagina e' una
+     chiave regalata.
+   - free-exercise-db e' un JSON statico su jsDelivr: 873 esercizi, ACAO *,
+     168 KB compressi. Nessuna API da farsi deprecare sotto i piedi.
+
+   E soprattutto ha i due campi che servono davvero a QUESTA app: i muscoli
+   primari e secondari, che alimentano mappa muscolare, volume, forma-fatica e
+   il filtro degli acciacchi; e mechanic (compound/isolation), da cui esce il
+   tipo dell'esercizio e quindi il recupero consigliato. wger il secondo non
+   ce l'ha proprio.
+
+   Il prezzo, che la UI dice: i nomi sono in inglese. */
+
+const EXDB_URL = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/dist/exercises.json';
+const EXDB_KEY = 'dieta.exdb';
+
+/* I 17 gruppi della fonte contro i 13 del modello di questa app.
+   adductors e neck restano SENZA corrispondenza di proposito: infilarli a
+   forza dentro glutei o trapezi sporcherebbe la mappa muscolare e il conteggio
+   del volume, che sono la ragione per cui i muscoli esistono qui dentro.
+   Meglio dirlo e far scegliere. */
+const MUSC_EXDB = {
+  abdominals: 'addome', abductors: 'glutei', biceps: 'bicipiti',
+  calves: 'polpacci', chest: 'petto', forearms: 'avambracci', glutes: 'glutei',
+  hamstrings: 'femorali', lats: 'dorsali', 'lower back': 'lombari',
+  'middle back': 'dorsali', quadriceps: 'quadricipiti', shoulders: 'spalle',
+  traps: 'trapezi', triceps: 'tricipiti'
+};
+/* Gli attrezzi vanno ricondotti alle cinque parole che l'app gia' usa: un
+   sesto valore inventato qui non comparirebbe da nessuna parte. */
+const ATTR_EXDB = {
+  barbell: 'bilanciere', 'e-z curl bar': 'bilanciere', dumbbell: 'manubri',
+  kettlebells: 'manubri', 'medicine ball': 'manubri', cable: 'cavi',
+  bands: 'cavi', machine: 'macchina', 'body only': 'corpo libero',
+  'exercise ball': 'corpo libero', 'foam roll': 'corpo libero', other: 'corpo libero'
+};
+const INCR_ATTR = { bilanciere: 2.5, manubri: 2, cavi: 2.5, macchina: 5, 'corpo libero': 0 };
+
+/** Da record della fonte a esercizio come lo vuole questa app. */
+function daExdb(x) {
+  const map = l => {
+    const dentro = [], fuori = [];
+    for (const m of [].concat(l || [])) {
+      const id = MUSC_EXDB[m];
+      if (id) { if (!dentro.includes(id)) dentro.push(id); } else fuori.push(m);
+    }
+    return { dentro, fuori };
+  };
+  const P1 = map(x.p), P2 = map(x.s);
+  const attrezzo = ATTR_EXDB[x.e] || 'corpo libero';
+  const multi = x.m !== 'isolation';           // in dubbio si tratta da multi
+  return {
+    nome: x.n, attrezzo, tipo: multi ? 'multi' : 'isolamento',
+    primari: P1.dentro,
+    // un muscolo primario che finisce secondario altrove sarebbe contato due volte
+    secondari: P2.dentro.filter(m => !P1.dentro.includes(m)),
+    range: multi ? [6, 10] : [10, 15],
+    incremento: INCR_ATTR[attrezzo] ?? 2.5,
+    nonMappati: [...new Set([...P1.fuori, ...P2.fuori])],
+    origine: 'free-exercise-db'
+  };
+}
+
+/**
+ * Il catalogo, scaricato una volta e tenuto da parte.
+ * La versione salvata butta istruzioni e immagini — il 90% del peso — e
+ * scende da 1 MB a 90 KB, che stanno in localStorage senza dare fastidio al
+ * diario. Da li' in poi la ricerca funziona anche senza rete.
+ */
+let _exdb = null;
+async function catalogoOnline({ forza = false } = {}) {
+  if (_exdb && !forza) return _exdb;
+  if (!forza) {
+    try {
+      const c = JSON.parse(localStorage.getItem(EXDB_KEY) || 'null');
+      if (c && c.v === 1 && Array.isArray(c.dati) && c.dati.length) return (_exdb = c.dati);
+    } catch {}
+  }
+  const r = await fetch(EXDB_URL, { headers: { Accept: 'application/json' } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const grezzo = await r.json();
+  const dati = grezzo.filter(x => x.name && (x.primaryMuscles || []).length)
+    .map(x => ({ n: x.name, p: x.primaryMuscles, s: x.secondaryMuscles,
+                 e: x.equipment, m: x.mechanic }));
+  _exdb = dati;
+  // se la memoria e' piena non e' un errore: si continua senza salvarlo
+  try { localStorage.setItem(EXDB_KEY, JSON.stringify({ v: 1, quando: today(), dati })); }
+  catch {}
+  return dati;
+}
+const catalogoScaricato = () => {
+  try { return !!JSON.parse(localStorage.getItem(EXDB_KEY) || 'null')?.dati?.length; }
+  catch { return false; }
+};
+
+/**
+ * Ricerca nel catalogo. Il filtro e' locale, non una chiamata per tasto: il
+ * file e' gia' tutto qui, quindi si puo' cercare mentre si scrive senza
+ * mandare niente a nessuno.
+ */
+function sheetCercaEsercizio(onScegli) {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Catalogo pubblico'));
+  w.append(el('h2', 'sec', 'Cerca un esercizio'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    '873 esercizi con i gruppi muscolari gia' + '\u2019 assegnati. I nomi sono in '
+    + 'inglese: quando lo salvi puoi riscriverlo come lo chiami tu.'));
+
+  const inp = el('input');
+  inp.type = 'search'; inp.className = 'sel-i'; inp.placeholder = 'squat, row, curl…';
+  inp.autocomplete = 'off';
+  w.append(inp);
+  const esiti = el('div');
+  w.append(esiti);
+
+  const disegna = lista => {
+    esiti.innerHTML = '';
+    if (!lista.length) {
+      esiti.append(el('p', 'muted', 'Niente che corrisponda. I nomi sono in inglese: '
+        + 'per il rematore prova "row", per lo stacco "deadlift".'));
+      return;
+    }
+    esiti.append(el('div', 'eyebrow', lista.length + ' risultati'));
+    for (const e of lista.slice(0, 30)) {
+      const r = el('button', 'off-r');
+      const nomi = ids => ids.map(i => muscolo(i)?.nome || i).join(', ');
+      r.innerHTML = '<span class="nm">' + esc(e.nome)
+        + (e.nonMappati.length ? ' <span class="pill">gruppo da scegliere</span>' : '')
+        + '</span><span class="mt">' + esc(e.attrezzo) + ' · '
+        + (e.tipo === 'multi' ? 'multiarticolare' : 'isolamento') + '</span>'
+        + '<span class="mc">' + esc(nomi(e.primari))
+        + (e.secondari.length ? ' <em>+ ' + esc(nomi(e.secondari)) + '</em>' : '') + '</span>';
+      r.onclick = () => onScegli(e);
+      esiti.append(r);
+    }
+    if (lista.length > 30)
+      esiti.append(el('div', 'sel-vuoto', 'e altri ' + (lista.length - 30)
+        + '. Scrivi qualche lettera in piu' + '\u2019.'));
+  };
+
+  const cerca = () => {
+    const q = inp.value.trim();
+    if (!_exdb) return;
+    if (q.length < 2) { esiti.innerHTML = ''; return; }
+    const opz = _exdb.map(x => ({ v: x, lab: x.n, sub: ATTR_EXDB[x.e] || '' }));
+    disegna(filtraOpzioni(opz, q).map(o => daExdb(o.v)));
+  };
+  inp.oninput = cerca;
+
+  const stato = el('p', 'muted', 'Carico il catalogo…');
+  esiti.append(stato);
+  catalogoOnline().then(() => {
+    stato.remove();
+    inp.focus(); cerca();
+    if (!inp.value) esiti.append(el('p', 'hint', 'Scrivi almeno due lettere.'));
+  }).catch(() => {
+    stato.textContent = '';
+    stato.className = 'muted';
+    stato.append(document.createTextNode(
+      'Non riesco a scaricare il catalogo. La prima volta servono la rete e circa '
+      + '170 KB; dopo resta salvato e funziona anche offline.'));
+  });
+
+  w.append(el('p', 'note',
+    'La fonte e' + '\u2019 free-exercise-db, di pubblico dominio. I muscoli vengono '
+    + 'ricondotti ai tredici di questa app; due gruppi della fonte — adduttori e '
+    + 'collo — qui non esistono, e in quel caso il muscolo lo scegli tu invece di '
+    + 'vederlo infilato a forza nel gruppo sbagliato. Serie e incrementi non ci '
+    + 'sono nella fonte: sono valori di partenza ricavati da attrezzo e tipo.'));
+
+  const agg = el('button', 'btn wide');
+  agg.textContent = 'Riscarica il catalogo';
+  agg.onclick = () => {
+    agg.disabled = true; agg.textContent = 'Scarico…';
+    catalogoOnline({ forza: true }).then(() => { agg.textContent = 'Aggiornato'; cerca(); })
+      .catch(() => { agg.disabled = false; agg.textContent = 'Non riesco: serve la rete'; });
+  };
+  w.append(agg);
+  const ind = el('button', 'btn wide', 'Torna indietro');
+  ind.style.marginTop = '8px';
+  ind.onclick = () => onScegli(null);
+  w.append(ind);
+  sheet(w);
+}
+
 /* ------------------------------------------------- esercizi personalizzati */
 function sheetEsercizi() {
   const w = el('div');
@@ -1261,33 +1458,72 @@ function sheetEsercizi() {
     r.onclick = () => sheetEsercizio(e.id);
     w.append(r);
   }
+  const cerca = el('button', 'btn wide');
+  cerca.style.marginTop = '10px';
+  cerca.textContent = catalogoScaricato() ? 'Cerca nel catalogo online'
+                                          : 'Cerca in un catalogo online';
+  cerca.onclick = () => sheetCercaEsercizio(e => {
+    if (!e) { sheetEsercizi(); return; }
+    sheetEsercizio(null, e);
+  });
+  w.append(cerca);
+
   const b = el('button', 'btn wide pri', 'Nuovo esercizio');
-  b.style.marginTop = '10px';
+  b.style.marginTop = '8px';
   b.onclick = () => sheetEsercizio(null);
   w.append(b);
   sheet(w);
 }
 
-function sheetEsercizio(id) {
+/**
+ * L'editor di un esercizio tuo.
+ * `pre` arriva dal catalogo online e riempie i campi: resta un modulo, perche'
+ * i gruppi muscolari li deve poter correggere chi lo fa, non chi lo importa.
+ */
+function sheetEsercizio(id, pre) {
   const miei = P().esercizi;
-  const cur = id ? miei.find(x => x.id === id) : null;
-  const stato = { primari: [...(cur?.primari || [])], secondari: [...(cur?.secondari || [])] };
+  const cur = id ? miei.find(x => x.id === id) : (pre || null);
+  const stato = { primari: [...(cur?.primari || [])], secondari: [...(cur?.secondari || [])],
+                  tipo: cur?.tipo === 'isolamento' ? 'isolamento' : 'multi' };
   const w = el('div');
-  w.append(el('div', 'eyebrow', id ? 'Modifica' : 'Nuovo esercizio'));
+  w.append(el('div', 'eyebrow', id ? 'Modifica' : pre ? 'Dal catalogo' : 'Nuovo esercizio'));
   w.append(el('h2', 'sec', esc(cur?.nome || 'Esercizio')));
   w.lastChild.style.marginTop = '0';
+
+  if (!id && typeof sheetCercaEsercizio === 'function') {
+    const cb = el('button', 'btn wide');
+    cb.textContent = pre ? 'Cerca un altro esercizio' : 'Cerca in un catalogo online';
+    cb.style.marginBottom = '12px';
+    cb.onclick = () => sheetCercaEsercizio(e => sheetEsercizio(null, e || pre));
+    w.append(cb);
+  }
+  if (pre?.nonMappati?.length) {
+    const av = el('div', 'hint acciacco');
+    av.innerHTML = '<strong>Un gruppo non ha corrispondenza qui.</strong> Nella fonte '
+      + 'questo esercizio lavora anche ' + esc(pre.nonMappati.join(', '))
+      + ', che nel modello di questa app non esiste. Scegli tu se aggiungerlo a un '
+      + 'altro gruppo o lasciarlo perdere: non lo indovino al posto tuo.';
+    w.append(av);
+  }
   w.append(el('div', 'field',
     `<label>Nome</label><input type="text" id="ex-nome" value="${esc(cur?.nome || '')}">`));
+  if (pre) w.append(el('div', 'hint',
+    'Il nome arriva dalla fonte ed e' + '\u2019 in inglese: riscrivilo come lo chiami tu, '
+    + 'sara' + '\u2019 quello che vedrai nelle schede.'));
   const g = el('div');
   g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px';
   g.innerHTML = `<div class="field"><label>Attrezzo</label>
-      <input type="text" id="ex-att" value="${esc(cur?.attrezzo || 'manubri')}"></div>
+      <input type="text" id="ex-att" value="${esc(cur?.attrezzo || 'manubri')}" list="ex-atts"></div>
     <div class="field"><label>Incremento (kg)</label>
       <input type="text" inputmode="decimal" id="ex-inc" value="${cur?.incremento ?? 2.5}"></div>
     <div class="field"><label>Rip minime</label>
       <input type="text" inputmode="numeric" id="ex-lo" value="${cur?.range?.[0] ?? 8}"></div>
     <div class="field"><label>Rip massime</label>
       <input type="text" inputmode="numeric" id="ex-hi" value="${cur?.range?.[1] ?? 12}"></div>`;
+  const dlA = el('datalist'); dlA.id = 'ex-atts';
+  for (const a of ['bilanciere', 'manubri', 'cavi', 'macchina', 'corpo libero'])
+    dlA.append(new Option(a));
+  w.append(dlA);
   w.append(g);
 
   const gruppo = (titolo, chiave) => {
@@ -1312,6 +1548,30 @@ function sheetEsercizio(id) {
   w.append(gruppo('Muscoli primari', 'primari'));
   w.append(gruppo('Muscoli secondari', 'secondari'));
 
+  /* Prima gli esercizi tuoi nascevano tutti con tipo 'mio', che nessuna parte
+     del codice sa leggere: il timer di recupero li trattava percio' sempre da
+     isolamento, 75 secondi anche su uno stacco. */
+  const ft = el('div', 'field', '<label>Tipo</label>');
+  const segT = el('div', 'seg');
+  for (const [v, lab, d] of [['multi', 'Multiarticolare', 'piu' + '\u2019 articolazioni: stacco, panca, squat'],
+                             ['isolamento', 'Isolamento', 'una sola: curl, alzate, estensioni']]) {
+    const b = el('button', null, lab);
+    b.setAttribute('aria-pressed', stato.tipo === v);
+    b.onclick = () => {
+      stato.tipo = v;
+      [...segT.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+      notaT.textContent = d;
+    };
+    segT.append(b);
+  }
+  const notaT = el('div', 'hint', stato.tipo === 'multi'
+    ? 'piu' + '\u2019 articolazioni: stacco, panca, squat' : 'una sola: curl, alzate, estensioni');
+  ft.append(segT); ft.append(notaT);
+  w.append(ft);
+  w.append(el('div', 'hint',
+    'Serve al recupero consigliato dal timer: un multiarticolare pesante chiede tre '
+    + 'minuti, un isolamento poco piu' + '\u2019 di uno.'));
+
   const salva = el('button', 'btn wide pri', 'Salva');
   salva.onclick = () => {
     const nome = $('#ex-nome').value.trim();
@@ -1319,11 +1579,12 @@ function sheetEsercizio(id) {
     if (!stato.primari.length) { toast('Serve almeno un muscolo primario'); return; }
     const rec = {
       id: cur?.id || ('mio-' + uid()), nome,
-      attrezzo: $('#ex-att').value.trim() || 'altro', tipo: 'mio',
+      attrezzo: $('#ex-att').value.trim() || 'altro', tipo: stato.tipo,
       primari: stato.primari, secondari: stato.secondari,
       range: [parseNum($('#ex-lo').value) ?? 8, parseNum($('#ex-hi').value) ?? 12],
       incremento: parseNum($('#ex-inc').value) ?? 2.5
     };
+    if (pre?.origine) rec.origine = pre.origine;
     const i = miei.findIndex(x => x.id === rec.id);
     if (i >= 0) miei[i] = rec; else miei.push(rec);
     save(); closeSheet(); route(); toast('Esercizio salvato');
