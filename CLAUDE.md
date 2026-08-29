@@ -71,6 +71,7 @@ app.js          stato, router, viste principali, motori. Caricato PER ULTIMO:
 anim.js         toolkit di animazione (vedi sotto). Caricato PRIMA di charts.js
 charts.js       toolkit SVG dei grafici + vista Dati
 revisione.js    revisione settimanale: diagnosi, grafico a manubrio, priorita'
+previsioni.js   proiezioni di misure, composizione e forza a 28 giorni
 cerca.js        selettore cercabile riusabile + dispensa
 peso.js         pesate anomale e ciclo mestruale: cio' che sporca la bilancia
 timer.js        timer di recupero fra le serie
@@ -226,6 +227,8 @@ non un dettaglio.
   target si sovrappone tratteggiata); tabelle ora/target/manca; grafico peso con
   media mobile a 7 giorni e previsione tratteggiata
 - **Previsione** — motore adattivo del dispendio (vedi sotto)
+- **Dove stai andando** — proiezioni a 28 giorni con banda su misure, grasso e
+  massa magra, forza. Mai una data di arrivo: la forbice e il target dentro o fuori
 - **Dati** — cruscotto: 4 riquadri statistici, calendario della costanza e 14
   grafici (peso, calorie, proteine, ripartizione dei macro, fibre, passi, sonno,
   acqua, Coca Zero, fame/energia, misure, composizione, dispendio stimato,
@@ -391,6 +394,37 @@ grande di qualsiasi segnale reale. Il motore quindi prevede la **linea di tenden
 su orizzonti di 7 e 28 giorni con banda al 95%, e mostra separatamente la forbice della
 bilancia di domani per far vedere perché il numero del mattino non va letto. Nessuna
 proiezione a data fissa: sarebbe un conto alla rovescia, che questo file vieta.
+
+### Le altre proiezioni
+
+`previsioni.js` estende alle misure, alla composizione e alla forza la regola
+che governa già il peso: **si proietta la tendenza a un orizzonte fisso con una
+banda, mai una data di arrivo.** "Il target lo raggiungi il 14 marzo" è un conto
+alla rovescia travestito da previsione — presuppone che il ritmo di oggi valga
+per mesi, cosa che non succede mai. Quello che si può dire è: fra 28 giorni sarai
+in questo intervallo, e il target ci sta dentro **oppure no**.
+
+Qui non c'è un filtro di Kalman ma una **retta ai minimi quadrati**, per lo
+stesso motivo per cui la proiezione della forza in palestra la usa: le
+osservazioni sono poche e distanti, e il segnale è più grande del rumore. R² è
+sempre mostrato — una retta si tira anche dentro una nuvola che non dice niente.
+
+Due dettagli imparati alla prova, entrambi contro la **falsa precisione**:
+
+- la banda ha un **pavimento** — 0,5 cm sulle misure (la risoluzione vera di un
+  metro da sarto), 2,5 kg sulla forza (il disco più piccolo). Qualche punto
+  quasi allineato fa collassare i residui a zero, e un "±0,0 cm" sarebbe una
+  precisione che nessuno possiede;
+- una serie **piatta** (stesso valore ogni volta) dà R² = 0 per costruzione,
+  perché non c'è varianza da spiegare. Mostrarlo come "la retta non spiega
+  niente" direbbe il contrario di quello che è successo: si scrive "ferma", e si
+  fa notare che capita anche riscrivendo il valore della volta prima invece di
+  rimisurare.
+
+La composizione proiettata è una stima costruita su **altre due stime** — peso
+previsto e vita prevista — dentro una formula che già sbaglia di 3–4 punti. Non
+è un motivo per non mostrarla, è un motivo per ripetere ogni volta che serve a
+vedere la direzione (grasso giù, massa magra che tiene) e non il numero.
 
 ### Il motore di analisi
 
@@ -655,6 +689,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non spostare i dati nutrizionali dentro il codice
 - Non introdurre un punteggio "cibo buono / cibo cattivo"
 - Non aggiungere obiettivi di peso a scadenza né conti alla rovescia
+- Non far collassare a zero la banda di una proiezione: va messo un pavimento
+  alla risoluzione dello strumento (0,5 cm sul metro, 2,5 kg sui dischi).
+  Una forbice di ±0,0 è precisione che nessuno possiede
+- Non estendere le proiezioni fino a dire una data di arrivo: la regola del
+  peso vale per tutte — orizzonte fisso, banda, e il target dentro o fuori
 - Non presentare come misurato ciò che è stimato. Il grasso corporeo esce da una
   formula su vita, collo e altezza e sbaglia di ±3–4 punti; le misure di Brad Pitt
   sono dichiarazioni di stampa (`fonte: "stima"`). Servono a dare una direzione,

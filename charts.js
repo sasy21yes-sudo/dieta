@@ -525,12 +525,17 @@ function viewDati(v) {
                     : 'mai misurata', dir: 'flat' }));
   v.append(kpis);
 
-  /* --- scorciatoia alla revisione --- */
+  /* --- scorciatoie --- */
   const br = el('button', 'btn wide');
   br.textContent = 'Apri la revisione settimanale';
-  br.style.marginBottom = '12px';
+  br.style.marginBottom = '8px';
   br.onclick = () => { location.hash = '#/revisione'; };
   v.append(br);
+  const bp = el('button', 'btn wide');
+  bp.textContent = 'Dove stai andando · proiezioni';
+  bp.style.marginBottom = '12px';
+  bp.onclick = () => { location.hash = '#/previsioni'; };
+  v.append(bp);
 
   /* --- costanza a punteggio --- */
   if (typeof cardCostanza === 'function') v.append(cardCostanza(k, datiRange));

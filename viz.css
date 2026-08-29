@@ -737,3 +737,10 @@
   border-radius:7px;font-family:var(--mono);font-size:11px;padding:4px 7px;
   cursor:pointer;flex:none;margin-right:6px}
 @media (prefers-reduced-motion: reduce){ .esec img{transition:none} }
+
+/* ---------------- proiezioni ---------------- */
+.cmp-r .pm{display:inline-block;font-style:normal;font-size:9.5px;color:var(--ink-3);
+  margin-left:3px}
+.cmp-r em.up,.cmp-r em.dn{display:block;font-family:var(--mono);font-size:9.5px;
+  font-style:normal;margin-top:1px}
+.cmp-r em.up{color:var(--pine)} .cmp-r em.dn{color:var(--amber)}

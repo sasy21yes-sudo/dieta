@@ -280,7 +280,9 @@ function previsioneForza(id, orizzonte = 28) {
   return {
     serie, kgSettimana: R.m * 7, r2: R.r2, sd: R.sd, n: R.n,
     ora: serie[serie.length - 1].v, fra, orizzonte,
-    banda: 1.96 * R.sd * Math.sqrt(1 + 1 / R.n)
+    // pavimento a 2,5 kg, il disco piu' piccolo: sotto quella soglia la
+    // forbice sarebbe piu' fine di quanto si possa caricare
+    banda: Math.max(2.5, 1.96 * R.sd * Math.sqrt(1 + 1 / R.n))
   };
 }
 

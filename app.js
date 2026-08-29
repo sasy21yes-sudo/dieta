@@ -687,13 +687,14 @@ const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
                  palestra: viewPalestra, dati: viewDati, analisi: viewAnalisi,
                  spesa: viewSpesa, prodotti: viewProdotti, foto: viewFoto,
                  piano: viewPiano, hyrox: viewHyrox, benvenuto: viewBenvenuto,
-                 revisione: viewRevisione, importa: viewImporta, salute: viewSalute };
+                 revisione: viewRevisione, importa: viewImporta, salute: viewSalute,
+                 previsioni: viewPrevisioni };
 const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
                  palestra: 'Palestra', dati: 'Dati', analisi: 'Analisi',
                  spesa: 'Spesa', prodotti: 'Prodotti', foto: 'Foto',
                  piano: 'Piano', hyrox: 'Road to HYROX', benvenuto: 'Benvenuto',
                  revisione: 'La settimana', importa: 'Importo da Salute',
-                 salute: 'Dati dal telefono' };
+                 salute: 'Dati dal telefono', previsioni: 'Dove stai andando' };
 
 function route() {
   let name = (location.hash.replace('#/', '') || 'oggi').split('?')[0];
@@ -1386,6 +1387,18 @@ function viewCorpo(v) {
 
   /* --- grafico peso --- */
   v.append(weightCard(k));
+
+  /* --- le altre proiezioni --- */
+  if (typeof viewPrevisioni === 'function') {
+    const b = el('button', 'card rev-invito');
+    b.innerHTML = `<span class="eyebrow">Non solo il peso</span>
+      <span class="t">Dove stai andando</span>
+      <span class="d">Misure, grasso e massa magra, forza: dove ti porta il ritmo
+      delle ultime settimane, con la forbice dentro cui starai.</span>
+      <span class="g">Apri le proiezioni &rsaquo;</span>`;
+    b.onclick = () => { location.hash = '#/previsioni'; };
+    v.append(b);
+  }
 }
 
 /* ------------------------------------------------------- previsione */
