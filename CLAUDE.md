@@ -332,6 +332,32 @@ HYROX ha **tre sezioni**, non sei: il conto alla rovescia sta sempre in testa,
 il piano dice cosa fare, le stazioni dicono a che punto sei e da lì parte la
 simulazione. Tutto il resto era navigazione in più.
 
+### Gym è un ingresso, non una colonna
+
+Erano dodici carte una sotto l'altra — mappa, prontezza, volume, forma-fatica,
+progressione, tonnellaggio, schede, storico. Tutto utile e tutto sempre in
+mezzo: per registrare una serie si scorreva mezzo schermo, per rivedere il
+volume l'altro mezzo.
+
+Ora: **cosa fai oggi** in cima, **gli avvisi che non possono aspettare** subito
+sotto (scarico consigliato, dolori in corso), e il resto in **riquadri con
+icona e stato** — `gymTab`, lo stesso schema dei cinque passi del Piano, che
+già funziona. La pagina passa da una colonna lunghissima a ~800 px.
+
+La regola per decidere cosa sta fuori e cosa dentro: **in cima ci va quello che
+cambia oggi e chiede un'azione.** Tutto quello che si guarda ogni tanto è una
+sezione. Gli avvisi non sono sezioni: sono eccezioni, e spariscono da sole.
+
+Le otto icone sono disegnate in `iconaGym()` — sette tratti l'una, non vale una
+libreria. Stesso riquadro 24×24, stesso spessore, stesso arrotondamento: è
+quello che le fa sembrare una famiglia invece di otto disegni. La prima
+versione della mappa era una sagoma piena e a 23 px diventava una macchia:
+pochi tratti netti si leggono, il dettaglio no.
+
+Il contenuto delle sezioni è quello di prima **parola per parola**: è cambiato
+dove sta, non cosa dice. Spostare e riscrivere insieme è il modo migliore di
+introdurre un bug senza accorgersene.
+
 ### La mappa muscolare è anatomica
 
 Prima era la figura parametrica con sopra dodici ellissi. Diceva *dove*, ma

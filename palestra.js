@@ -425,51 +425,195 @@ function mappaSVG(vista, stato, modo, onTap) {
   return s;
 }
 
-/* ==================================================================== viste */
-let gymVista = 'fronte', gymModo = 'volume', gymEx = null;
+/* ==================================================================== viste
+ *
+ * Gym era una colonna di dodici carte una sotto l'altra: mappa, prontezza,
+ * volume, forma-fatica, progressione, tonnellaggio, schede, storico. Tutto
+ * utile e tutto sempre in mezzo, per cui per registrare una serie si scorreva
+ * mezzo schermo e per rivedere il volume si scorreva l'altro mezzo.
+ *
+ * Ora e' un ingresso: cosa fai oggi in cima, gli avvisi che non possono
+ * aspettare subito sotto, e il resto dentro riquadri con icona e stato — si
+ * apre quello che serve. E' lo stesso schema dei cinque passi del Piano, che
+ * gia' funziona, non un'invenzione nuova.
+ *
+ * Regola per decidere cosa sta in cima e cosa dentro un riquadro: in cima ci
+ * va quello che cambia oggi e che richiede un'azione. Tutto quello che si
+ * guarda ogni tanto e' una sezione.
+ */
+let gymVista = 'fronte', gymModo = 'volume', gymEx = null, gymTab = null;
+
+/* Icone di sistema, disegnate qui: sono sette tratti, non vale una libreria.
+   Tutte sullo stesso riquadro 24x24, stesso spessore, stesso arrotondamento —
+   e' quello che le fa sembrare una famiglia invece di sette disegni. */
+function iconaGym(id) {
+  const P = {
+    mappa: 'M12 2.8a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6M8.2 9.4h7.6M8.2 9.4 6.5 15M15.8 9.4 17.5 15M10.3 9.4v11.8M13.7 9.4v11.8',
+    progressi: 'M4 18.5 9 12l3.6 3.2L20 6M20 6h-4.6M20 6v4.4',
+    cardio: 'M12 20.2S4.2 15 4.2 9.9A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7.8 1.9c0 5.1-7.8 10.3-7.8 10.3z',
+    schede: 'M5 5h14M5 10h14M5 15h9M5 20h9',
+    esercizi: 'M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10',
+    carico: 'M12 20a8 8 0 1 1 0-16 8 8 0 0 1 0 16M12 12l4-3',
+    storico: 'M12 7v5l3.2 2M21 12a9 9 0 1 1-9-9',
+    hyrox: 'M6 4v16M18 4v16M6 12h12M3 8h3M18 8h3M3 16h3M18 16h3'
+  };
+  const s = mk('svg', { viewBox: '0 0 24 24', class: 'ic-g', 'aria-hidden': 'true' });
+  s.append(mk('path', { d: P[id] || P.schede, fill: 'none', stroke: 'currentColor',
+    'stroke-width': 1.7, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+  return s;
+}
+
+/** Un riquadro dell'ingresso: icona, titolo, e una riga che dice a che punto sei. */
+function riquadroGym(id, titolo, stato, fn, acceso) {
+  const b = el('button', 'gym-t' + (acceso ? ' on' : ''));
+  b.append(iconaGym(id));
+  const t = el('span', 'body');
+  t.append(el('span', 't', esc(titolo)));
+  t.append(el('span', 's', stato));
+  b.append(t);
+  b.onclick = fn;
+  return b;
+}
 
 function viewPalestra(v) {
   if (!PD) { v.append(el('div', 'card', '<p class="muted">Catalogo esercizi non caricato.</p>')); return; }
-  const k = today(), st = statoMuscoli(k);
-  const V = PD.volume;
+  const k = today();
+  if (gymTab) return sezioneGym(v, k);
+  const st = statoMuscoli(k);
 
-  /* --- ingresso a Road to HYROX: solo se il modulo e' acceso --- */
-  if (HX && usaHyrox()) {
-    const hxb = el('button', 'hx-entry');
-    const gg = giorniAllaGara();
-    const hp = S.hyrox?.profilo;
-    hxb.innerHTML = `<span class="k">Road to</span><span class="l">HYROX</span>
-      <span class="d">${gg != null
-        ? `${gg > 0 ? gg + ' giorni alla gara' : gg === 0 ? 'Oggi si corre' : 'Gara passata da ' + (-gg) + ' giorni'} · obiettivo ${hms((hp?.target_min || 90) * 60)}`
-        : '8 km di corsa e 8 stazioni. Piano dei passaggi, simulazioni, punti deboli e programma settimanale.'}</span>
-      <span class="g">Apri &rsaquo;</span>`;
-    hxb.onclick = () => { location.hash = '#/hyrox'; };
-    v.append(hxb);
-  }
-
-  /* --- seduta di oggi --- */
+  /* --- cosa hai fatto oggi, e il bottone per farne --- */
   const oggi = P().sessioni[k];
+  const card2 = typeof cardioDi === 'function' ? cardioDi(k) : [];
   const testa = el('div', 'card');
   testa.append(el('div', 'eyebrow', 'Oggi'));
-  if (oggi) {
-    const n = oggi.serie.length, ton = oggi.serie.reduce((a, s) => a + (+s.kg || 0) * (+s.reps || 0), 0);
-    testa.append(el('div', 'muted',
-      `<strong>${esc(oggi.nome || 'Seduta')}</strong> — ${n} serie, ${nf(ton)} kg di tonnellaggio.`));
+  if (oggi || card2.length) {
+    const parti = [];
+    if (oggi) {
+      const ton = oggi.serie.reduce((a, s) => a + (+s.kg || 0) * (+s.reps || 0), 0);
+      parti.push(`<strong>${esc(oggi.nome || 'Seduta')}</strong> — ${oggi.serie.length} serie, ${nf(ton)} kg`);
+    }
+    for (const c of card2)
+      parti.push(`<strong>${esc(cardioTipo(c.tipo).n)}</strong> — ${hms2(c.durata_s || 0)}${
+        c.distanza_m ? ', ' + nf(c.distanza_m / 1000, 2) + ' km' : ''}`);
+    testa.append(el('div', 'muted', parti.join('<br>')));
   } else {
-    testa.append(el('div', 'muted', 'Nessuna seduta registrata oggi.'));
+    testa.append(el('div', 'muted', 'Niente registrato oggi.'));
   }
-  const bReg = el('button', 'btn wide pri', oggi ? 'Continua la seduta' : 'Registra un allenamento');
-  bReg.style.marginTop = '10px';
+  const rr = el('div', 'row');
+  rr.style.cssText = 'gap:8px;margin-top:10px';
+  const bReg = el('button', 'btn pri grow', oggi ? 'Continua la seduta' : 'Registra pesi');
   bReg.onclick = () => sheetSeduta(k);
-  testa.append(bReg);
+  const bCar = el('button', 'btn grow', 'Cardio');
+  bCar.onclick = () => { gymTab = 'cardio'; route(); };
+  rr.append(bReg, bCar);
+  testa.append(rr);
   v.append(testa);
 
-  if (typeof cardCardio === 'function') v.append(cardCardio(k));
+  /* --- solo cio' che non puo' aspettare: uno scarico consigliato, un dolore
+         in corso. Il resto sta dentro i riquadri. --- */
+  if (typeof scaricoConsigliato === 'function') {
+    const sc = scaricoConsigliato(k);
+    if (sc.serve) {
+      const a = el('button', 'gym-avv');
+      a.innerHTML = '<span class="t">Conviene scaricare</span>'
+        + `<span class="d">${esc(sc.motivi.map(m => m.t).slice(0, 2).join('. '))}.</span>`;
+      a.onclick = () => { gymTab = 'carico'; route(); };
+      v.append(a);
+    }
+  }
+  const acc = typeof acciacchiAttivi === 'function' ? acciacchiAttivi(k) : [];
+  if (acc.length) {
+    const a = el('button', 'gym-avv');
+    a.innerHTML = `<span class="t">${acc.length === 1 ? 'Un dolore in corso' : acc.length + ' dolori in corso'}</span>`
+      + `<span class="d">${esc(acc.map(x => muscolo(x.mus)?.nome || x.mus).join(', '))}. `
+      + 'Gli esercizi che ci vanno sopra sono nascosti dalle schede.</span>';
+    a.onclick = () => { gymTab = 'carico'; route(); };
+    v.append(a);
+  }
 
-  const cScar = typeof cardScarico === 'function' ? cardScarico(k) : null;
-  if (cScar) v.append(cScar);
-  if (typeof cardAcciacchi === 'function') v.append(cardAcciacchi(k));
+  /* --- i riquadri --- */
+  const g = el('div', 'gym-grid');
+  const piuCarichi = Object.values(st).filter(s => s.serie > 0)
+    .sort((a, b) => b.serie - a.serie).slice(0, 2).map(s => s.nome.toLowerCase());
+  g.append(riquadroGym('mappa', 'Mappa muscolare',
+    piuCarichi.length ? esc(piuCarichi.join(' e ')) + ' i piu\' caricati'
+                      : 'nessuna serie questa settimana',
+    () => { gymTab = 'mappa'; route(); }));
 
+  const usati = [...new Set(Object.keys(P().sessioni)
+    .flatMap(kk => serieDelGiorno(kk).map(s => s.ex)))];
+  const migl = usati.map(id => ({ id, p: previsioneForza(id) })).filter(x => x.p)
+    .sort((a, b) => b.p.kgSettimana - a.p.kgSettimana)[0];
+  g.append(riquadroGym('progressi', 'Progressi',
+    migl ? `${esc(esercizio(migl.id)?.nome || '')} ${migl.p.kgSettimana >= 0 ? '+' : ''}${nf(migl.p.kgSettimana, 2)} kg/sett`
+         : 'servono tre sedute per esercizio',
+    () => { gymTab = 'progressi'; route(); }));
+
+  const sett = windowDays(k, 7);
+  const nCard = typeof cardioDi === 'function'
+    ? sett.reduce((a, d) => a + cardioDi(d).length, 0) : 0;
+  const kmCard = typeof cardioDi === 'function'
+    ? sett.reduce((a, d) => a + cardioDi(d).reduce((x, c) => x + (c.distanza_m || 0), 0), 0) / 1000 : 0;
+  g.append(riquadroGym('cardio', 'Cardio',
+    nCard ? `${nCard} questa settimana${kmCard ? ' · ' + nf(kmCard, 1) + ' km' : ''}`
+          : 'niente questa settimana',
+    () => { gymTab = 'cardio'; route(); }));
+
+  g.append(riquadroGym('schede', 'Schede',
+    schede().length ? schede().length + (schede().length === 1 ? ' scheda' : ' schede')
+                    : 'nessuna, per ora',
+    () => sheetSchede()));
+
+  g.append(riquadroGym('esercizi', 'Esercizi',
+    `${P().esercizi.length} tuoi · ${catalogo().length} in tutto`,
+    () => sheetEsercizi()));
+
+  const sc2 = typeof scaricoConsigliato === 'function' ? scaricoConsigliato(k) : { dati: false };
+  g.append(riquadroGym('carico', 'Carico e acciacchi',
+    !sc2.dati ? 'servono nove sedute'
+      : sc2.serve ? 'conviene scaricare'
+      : acc.length ? acc.length + ' in corso' : 'sotto controllo',
+    () => { gymTab = 'carico'; route(); }, sc2.serve || acc.length));
+
+  const nSed = Object.keys(P().sessioni).length;
+  g.append(riquadroGym('storico', 'Storico',
+    nSed ? nSed + (nSed === 1 ? ' seduta' : ' sedute') : 'ancora niente',
+    () => { gymTab = 'storico'; route(); }));
+
+  if (HX && usaHyrox()) {
+    const gg = giorniAllaGara();
+    g.append(riquadroGym('hyrox', 'Road to HYROX',
+      gg != null ? (gg > 0 ? gg + ' giorni alla gara' : gg === 0 ? 'oggi si corre' : 'gara passata')
+                 : '8 km e 8 stazioni',
+      () => { location.hash = '#/hyrox'; }));
+  }
+  v.append(g);
+  if (typeof osserva === 'function')
+    osserva(g, () => entrata([...g.children], { passo: 40, su: 8 }));
+}
+
+/** Torna all'ingresso. Ogni sezione ne ha uno in cima. */
+function indietroGym() {
+  const b = el('button', 'btn sm', '‹ Gym');
+  b.style.marginBottom = '10px';
+  b.onclick = () => { gymTab = null; gymEx = null; route(); };
+  return b;
+}
+
+function sezioneGym(v, k) {
+  v.append(indietroGym());
+  const st = statoMuscoli(k);
+  ({ mappa: sezGymMappa, progressi: sezGymProgressi, cardio: sezGymCardio,
+     carico: sezGymCarico, storico: sezGymStorico }[gymTab] || sezGymMappa)(v, k, st);
+}
+
+/* -------------------------------------------------------- le sezioni
+   Il contenuto e' quello di prima, parola per parola: e' cambiato dove sta,
+   non cosa dice. Spostare e riscrivere insieme e' il modo migliore di
+   introdurre un bug e non accorgersene. */
+
+function sezGymMappa(v, k, st) {
+  const V = PD.volume;
   /* --- mappa muscolare --- */
   const cm = el('div', 'cw');
   cm.append(el('h3', null, 'Mappa muscolare'));
@@ -566,6 +710,9 @@ function viewPalestra(v) {
     }));
   }
 
+}
+
+function sezGymProgressi(v, k, st) {
   /* --- progressione per esercizio --- */
   const usati = [...new Set(Object.keys(P().sessioni)
     .flatMap(kk => serieDelGiorno(kk).map(s => s.ex)))];
@@ -603,25 +750,40 @@ function viewPalestra(v) {
     msg: 'Nessuna seduta registrata nel periodo.'
   }));
 
-  /* --- schede ed esercizi --- */
-  const cs = el('div', 'card');
-  cs.append(el('h2', 'sec', 'Schede ed esercizi'));
-  cs.lastChild.style.marginTop = '0';
-  cs.append(el('p', 'muted',
-    'Una scheda si crea una volta e si riusa: gli esercizi e le serie restano fissi, e a ogni seduta aggiorni solo i carichi.'));
-  const b1 = el('button', 'btn wide');
-  b1.textContent = `Le tue schede (${schede().length})`;
-  b1.onclick = () => sheetSchede();
-  cs.append(b1);
-  const b2 = el('button', 'btn wide');
-  b2.style.marginTop = '8px';
-  b2.textContent = `I tuoi esercizi (${P().esercizi.length})`;
-  b2.onclick = () => sheetEsercizi();
-  cs.append(b2);
-  v.append(cs);
+}
 
+function sezGymCardio(v, k) {
+  if (typeof cardCardio === 'function') v.append(cardCardio(k));
+  /* tutte le sessioni, non solo quelle di oggi */
+  const giorni = Object.keys(cardioTutti()).filter(x => x <= k).sort().reverse().slice(0, 20);
+  if (!giorni.length) return;
+  const c = el('div', 'card');
+  c.append(el('h2', 'sec', 'Le ultime'));
+  c.lastChild.style.marginTop = '0';
+  for (const g of giorni) for (const [i, r] of cardioDi(g).entries()) {
+    const t = cardioTipo(r.tipo), an = andatura(r);
+    const row = el('button', 'prod');
+    row.innerHTML = `<div class="grow"><div class="nm">${esc(t.n)}${
+        r.punti?.length ? ' <span class="pill">tracciato</span>' : ''}</div>
+      <div class="mt">${g} · ${hms2(r.durata_s || 0)}${r.distanza_m
+        ? ' · ' + nf(r.distanza_m / 1000, 2) + ' km' : ''}${an ? ' · ' + an.v + ' ' + an.u : ''}</div></div>
+      <div class="kc">${nf(r.kcal ?? kcalCardio(r))}<br><span class="mt">kcal</span></div>`;
+    row.onclick = () => sheetCardioRec(g, i);
+    c.append(row);
+  }
+  v.append(c);
+}
+
+function sezGymCarico(v, k) {
+  const cs = typeof cardScarico === 'function' ? cardScarico(k) : null;
+  if (cs) v.append(cs);
+  if (typeof cardAcciacchi === 'function') v.append(cardAcciacchi(k));
+}
+
+function sezGymStorico(v, k) {
   /* --- storico --- */
-  const sedute = Object.keys(P().sessioni).sort().reverse().slice(0, 12);
+  // qui c'e' spazio: prima erano dodici perche' stavano in coda a tutto il resto
+  const sedute = Object.keys(P().sessioni).sort().reverse().slice(0, 60);
   if (sedute.length) {
     const c = el('div', 'card');
     c.append(el('h2', 'sec', 'Ultime sedute'));
