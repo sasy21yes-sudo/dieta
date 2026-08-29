@@ -956,6 +956,9 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   sono tutti nello stesso scope globale, e un `const` duplicato uccide l'intera
   app all'avvio senza dire niente. E' successo con PRIORITA fra hyrox.js e
   piano.js: la pagina restava bianca e nessun `node --check` lo vedeva
+- Non provare solo il piano di esempio: il percorso consigliato a chi installa
+  e "comincio da zero", e li D.pasti e D.alimenti sono VUOTI. Un elenco vuoto
+  va detto, e esc(null) stampa la parola "null"
 - Non aggiungere un framework né una libreria di grafici: i grafici sono SVG
   costruito a mano proprio per non introdurre un build step. L'app è divisa in
   più file per restare modificabile dal telefono, non per essere impacchettata

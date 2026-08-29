@@ -477,12 +477,21 @@ function pianoPassi() {
       d: 'Nome, età, altezza, peso di partenza, sesso.',
       perche: 'Servono a stimare il dispendio a riposo e a disegnare in scala la figura della scheda Corpo. Senza, l’app usa i dati di esempio.',
       mio: Object.keys(p.profilo).length > 0,
-      stato: `${esc(D.profilo.nome)}, ${D.profilo.eta} anni, ${D.profilo.altezza_cm} cm` },
+      // con il piano vuoto nome, eta' e altezza sono nulli: usciva
+      // ", null anni, null cm"
+      stato: [D.profilo.nome ? esc(D.profilo.nome) : null,
+              D.profilo.eta ? D.profilo.eta + ' anni' : null,
+              D.profilo.altezza_cm ? D.profilo.altezza_cm + ' cm' : null]
+        .filter(Boolean).join(', ') || 'ancora da compilare' },
     { id: 'target', t: 'Quanto mangiare',
       d: 'Calorie e macro da centrare ogni giorno.',
       perche: 'E’ il metro con cui l’app giudica le giornate: analisi, cruscotto, consigli e previsione del peso partono tutti da qui.',
       mio: Object.keys(p.target).length > 0,
-      stato: `${nf(D.target.kcal)} kcal · ${D.target.p} g di proteine` },
+      // a zero i target non sono target: targetNeutro() non puo' calcolarli
+      // finche' non c'e' il profilo, e dirlo e' piu' utile di "0 kcal"
+      stato: D.target.kcal > 0
+        ? `${nf(D.target.kcal)} kcal · ${D.target.p} g di proteine`
+        : 'si calcolano appena metti peso, altezza ed eta\'' },
     { id: 'integratori', t: 'Cosa integri',
       d: 'Aggiungi, cambia o togli quello che prendi.',
       perche: 'Da qui escono la checklist del diario e i promemoria del calendario. E' + '\u2019 la parte piu' + '\u2019 personale del piano: la lista di partenza vale per chi l' + '\u2019 ha scritta, non per forza per te.',
@@ -948,7 +957,12 @@ function sezPasti(v) {
     c.lastChild.style.marginTop = '0';
     if (sub) c.append(el('p', 'muted', sub));
     for (const id of ids.sort()) {
-      const pa = D.pasti[id];
+      /* Con il piano vuoto D.pasti contiene SOLO i pasti tuoi: i ventiquattro
+         di base non sono fusi dentro. Cercarli li' dava undefined e il passo
+         "Come li combini" andava in crash all'apertura — cioe' esattamente
+         sul percorso consigliato a chi comincia da zero. */
+      const pa = D.pasti[id] || DBASE.pasti[id];
+      if (!pa) continue;
       const r = el('button', 'prod');
       r.innerHTML = `<div class="grow"><div class="nm">${esc(pa.nome || id)}</div>
         <div class="mt">${(pa.ingredienti || []).length} ingredienti · ${nf(pa.macro.p, 0)}P</div></div>
@@ -965,7 +979,8 @@ function sezPasti(v) {
 
 function sheetPasto(id) {
   const p = piano();
-  const base = id ? D.pasti[id] : null;
+  // come sopra: un pasto di base va cercato anche nel file di partenza
+  const base = id ? (D.pasti[id] || DBASE.pasti[id]) : null;
   const stato = {
     codice: id && p.pasti[id] ? id : (id ? id + '-mio' : 'pasto-' + uid().slice(0, 5)),
     nome: base?.nome || '',
@@ -1091,6 +1106,20 @@ function sheetPasto(id) {
 function sezSettimana(v) {
   const p = piano();
   const sett = D.settimana;
+  // meglio dirlo prima che dopo aver toccato uno slot a vuoto
+  if (!Object.keys(D.pasti).length) {
+    const av = el('div', 'card');
+    av.append(el('div', 'eyebrow', 'Prima i pasti'));
+    av.append(el('div', 'muted',
+      'La settimana e\' l\'ultimo passo: assegna ai giorni i pasti che hai composto. '
+      + 'Non ne hai ancora nessuno, quindi qui per ora c\'e\' solo la struttura degli '
+      + 'orari.'));
+    const b = el('button', 'btn wide pri', 'Vai a comporre un pasto');
+    b.style.marginTop = '10px';
+    b.onclick = () => { pianoTab = 'pasti'; route(); };
+    av.append(b);
+    v.append(av);
+  }
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Come funziona</div>
      <div class="muted">Ogni giorno ha i suoi pasti. Tocca un pasto per cambiare
@@ -1105,10 +1134,12 @@ function sezSettimana(v) {
        <span class="mono muted" style="font-size:11px">${nf(g.totali.kcal)} kcal · ${nf(g.totali.p, 0)} P</span>`));
     for (const [si, s] of (g.pasti || []).entries()) {
       const pa = D.pasti[s.codice];
-      const r = el('button', 'prod');
+      // s.codice e' null finche' non assegni, ed esc(null) stampava "null":
+      // con il piano vuoto erano sette giorni di righe che dicevano "null"
+      const r = el('button', 'prod' + (pa ? '' : ' vuoto'));
       r.innerHTML = `<div class="grow"><div class="mt">${esc(s.slot)}${s.ora ? ' · ' + esc(s.ora) : ''}</div>
-        <div class="nm">${esc(pa?.nome || s.codice)}</div></div>
-        <div class="kc">${pa ? nf(pa.macro.kcal) : '—'}</div>`;
+        <div class="nm">${pa ? esc(pa.nome || s.codice) : 'Da assegnare'}</div></div>
+        <div class="kc">${pa ? nf(pa.macro.kcal) : '+'}</div>`;
       r.onclick = () => cambiaSlot(gi, si);
       c.append(r);
     }
@@ -1167,6 +1198,32 @@ function cambiaSlot(gi, si) {
   w.append(el('div', 'eyebrow', `${esc(g.giorno)} · ${esc(s.slot)}`));
   w.append(el('h2', 'sec', 'Scegli il pasto'));
   w.lastChild.style.marginTop = '0';
+
+  /* Con il piano vuoto D.pasti e' vuoto, e questo foglio mostrava il titolo,
+     un vuoto, e il bottone per togliere lo slot: sembrava rotto, e in pratica
+     lo era — non c'era nessuna strada da qui in avanti. Un elenco vuoto va
+     detto, e va detto DOVE si va a riempirlo. */
+  const quanti = Object.keys(D.pasti).length;
+  if (!quanti) {
+    w.append(el('p', 'muted',
+      'Non hai ancora composto nessun pasto, quindi non c\'e\' niente da assegnare a '
+      + 'questo slot. I pasti si costruiscono nel passo <strong>"Come li combini"</strong>: '
+      + 'scegli gli alimenti e le quantita\', i macro si calcolano da soli, e da li\' in '
+      + 'poi quel pasto lo metti in qualunque giorno.'));
+    const vai = el('button', 'btn wide pri', 'Vai a comporre un pasto');
+    vai.onclick = () => { pianoTab = 'pasti'; closeSheet(); route(); };
+    w.append(vai);
+    const ind = el('button', 'btn wide', 'Torna alla settimana');
+    ind.style.marginTop = '8px';
+    ind.onclick = closeSheet;
+    w.append(ind);
+    w.append(el('p', 'note',
+      'Lo slot resta dov\'e\': un giorno con gli orari gia\' impostati e i pasti ancora '
+      + 'da scegliere e\' un piano a meta\', non un piano rotto.'));
+    sheet(w);
+    return;
+  }
+
   for (const [code, pa] of Object.entries(D.pasti)
       .sort((a, b) => (a[1].nome || '').localeCompare(b[1].nome || ''))) {
     const r = el('button', 'prod');
@@ -1178,8 +1235,22 @@ function cambiaSlot(gi, si) {
     };
     w.append(r);
   }
+  /* Svuotare l'assegnazione e togliere lo slot sono due cose diverse, e prima
+     c'era solo la seconda: chi voleva solo cambiare idea si ritrovava senza
+     la colazione del martedi'. */
+  if (s.codice) {
+    const sv = el('button', 'btn wide');
+    sv.style.marginTop = '12px';
+    sv.textContent = 'Lascia lo slot vuoto';
+    sv.onclick = () => {
+      s.codice = null; save(); fondiPiano(); closeSheet(); route();
+      toast('Slot svuotato: l\'orario resta');
+    };
+    w.append(sv);
+  }
+
   const via = el('button', 'btn wide');
-  via.style.marginTop = '12px';
+  via.style.marginTop = '8px';
   via.textContent = 'Togli questo pasto dal giorno';
   via.onclick = () => {
     if (!confirm(`Tolgo "${s.slot}" da ${g.giorno}?`)) return;
