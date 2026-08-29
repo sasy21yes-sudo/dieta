@@ -469,6 +469,12 @@ colori. #B9C4CC porta la coppia peggiore a 17,0 normale e 12,5 in protanopia.
 Nessuno lo aveva notato a occhio in mesi: e il motivo per cui il colore si
 calcola invece di sceglierlo.
 
+Le etichette delle due righe stavano sempre a destra, e a destra c e l ultimo
+dato: sui grafici a barre finivano regolarmente sopra le barre. Ora si guarda
+da che parte i dati sono piu lontani da quella riga e l etichetta va li, dove
+c e aria; sotto ci resta comunque una piastrina del colore del fondo, perche
+dove i dati riempiono tutto il riquadro un lato libero non esiste.
+
 E quando target e media quasi coincidono — proprio il caso in cui fa piacere
 vederlo — le due etichette finivano una sopra l altra: con target 2482 e media
 2488 usciva "tmegaea". Ora la piu bassa va sotto la sua riga.

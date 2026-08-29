@@ -88,12 +88,37 @@ function mediaPeriodo(days, vals) {
  * tratteggio lungo il target, corto la media — perche' l'identita' non deve
  * mai stare solo nel colore.
  */
-function righeRiferimento(s, g, o, media) {
+/**
+ * Le righe di riferimento: target e media.
+ *
+ * Non sono serie, sono annotazioni, e si distinguono anche senza colore —
+ * tratteggio lungo il target, corto la media — perche' l'identita' non deve
+ * mai stare solo nel colore.
+ *
+ * Il punto difficile e' DOVE mettere le etichette. Stavano sempre a destra, e
+ * a destra c'e' l'ultimo dato: sui grafici a barre finivano regolarmente sopra
+ * le barre verdi. Adesso si guarda da che parte i dati sono piu' lontani da
+ * quella riga e l'etichetta va li', dove c'e' aria. Sotto ci resta comunque
+ * una piastrina del colore del fondo: dove i dati riempiono tutto il riquadro
+ * non esiste un lato libero, e almeno la scritta si legge.
+ */
+function righeRiferimento(s, g, o, media, vals) {
   const righe = [
     { v: o.target, col: 'var(--rif)', dash: '5 4', t: 'target' },
     { v: media, col: 'var(--media)', dash: '2 4', t: 'media' }
   ].filter(r => r.v != null && r.v >= g.lo && r.v <= g.hi)
     .map(r => ({ ...r, y: g.y(r.v) }));
+  if (!righe.length) return;
+
+  /** Quanto i dati di un lato stanno lontani dal valore v. */
+  const distanza = (v, da, a) => {
+    if (!vals || !vals.length) return 0;
+    const n = vals.length;
+    const q = vals.slice(Math.floor(n * da), Math.max(1, Math.ceil(n * a)))
+      .filter(x => x != null && !isNaN(x));
+    if (!q.length) return Infinity;          // nessun dato di qua: tutto libero
+    return q.reduce((acc, x) => acc + Math.abs(x - v), 0) / q.length;
+  };
 
   /* Quando target e media quasi coincidono — ed e' proprio il caso in cui fa
      piacere vederlo — le due etichette finiscono una sopra l'altra e si
@@ -101,12 +126,23 @@ function righeRiferimento(s, g, o, media) {
      usciva "tmegaea". Si allontanano di quel tanto che basta, sopra e sotto. */
   const vicine = righe.length === 2 && Math.abs(righe[0].y - righe[1].y) < 11;
   righe.sort((a, b) => a.y - b.y);
+
   for (const [n, r] of righe.entries()) {
     s.append(mk('line', { x1: g.l, x2: g.l + g.w, y1: r.y, y2: r.y,
       stroke: r.col, 'stroke-width': 1.5, 'stroke-dasharray': r.dash }));
+
+    // il lato con piu' aria fra il dato e la riga
+    const sinistra = distanza(r.v, 0, .34) > distanza(r.v, .66, 1);
     // sopra la riga di norma; con due righe attaccate, la piu' bassa va sotto
     const dy = vicine && n === 1 ? 10 : -4;
-    const t = mk('text', { x: g.l + g.w, y: r.y + dy, 'text-anchor': 'end',
+    const y = r.y + dy;
+    const larg = r.t.length * 5.2 + 7;
+    const x = sinistra ? g.l + 3 : g.l + g.w - 2;
+
+    // la piastrina: il fondo della carta, non un colore nuovo
+    s.append(mk('rect', { x: sinistra ? x - 3 : x - larg + 3, y: y - 8,
+      width: larg, height: 11, rx: 3, fill: 'var(--paper)', opacity: .88 }));
+    const t = mk('text', { x, y, 'text-anchor': sinistra ? 'start' : 'end',
       'font-size': 8.5, 'font-family': 'var(--mono)', fill: r.col });
     t.textContent = r.t;
     s.append(t);
@@ -266,7 +302,7 @@ function chartLine(o) {
   // le righe di riferimento vanno sotto la serie: sono lo sfondo su cui si
   // legge, non qualcosa che le passa davanti
   const mediaL = mediaPeriodo(o.days, o.ma || o.vals);
-  righeRiferimento(s, g, o, mediaL);
+  righeRiferimento(s, g, o, mediaL, o.ma || o.vals);
 
   if (o.band) {
     const su = o.band.map(b => `${g.x(b.i)},${g.y(b.hi)}`).join(' ');
@@ -341,7 +377,7 @@ function chartBars(o) {
       fill: o.colore || 'var(--pine)',
       opacity: o.target && v < o.target * .8 ? .45 : 1 }));
   });
-  righeRiferimento(s, g, o, mediaB);
+  righeRiferimento(s, g, o, mediaB, o.vals);
   s.append(xLabels(g, o.days, true));
   c.append(s);
   c.append(legenda([{ n: o.serieNome || o.titolo.toLowerCase(), col: 'var(--pine)' }]
@@ -438,7 +474,7 @@ function chartEmphasis(o) {
   s.append(grid(g));
   // la media della serie in evidenza: sulle altre sarebbe una riga per serie,
   // e tre righe orizzontali su un grafico a tre linee non le legge nessuno
-  righeRiferimento(s, g, o, mediaE);
+  righeRiferimento(s, g, o, mediaE, forteE.vals);
   for (const se of usabili) {
     const p = se.vals.map((v, i) => v == null ? null : { i, v }).filter(Boolean);
     if (p.length < 2) continue;
