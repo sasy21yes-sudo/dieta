@@ -471,6 +471,12 @@ Regole che il toolkit applica e che non vanno violate:
   composizione). Tutto il resto e' a serie singola e usa `--pine`
 - **Piu' serie con una sola che conta** -> evidenza (una in accento, le altre
   grigie) piu' etichetta diritta, non tre colori
+- **Sotto ogni grafico la stessa riga**: ultimo valore, media del periodo,
+  target, scarto. La media si ferma a IERI — la giornata in corso non e finita
+  e la tira giu ogni mattina. La funzione e una sola (`riepilogo()`): quando
+  ognuno se la costruiva, chi diceva il target e chi no e nessuno la media
+- **Legenda su tutti**, anche con una serie sola: senza, il verde pieno e il
+  tratteggio grigio sono due cose che il lettore deve indovinare
 - **Valori di scala tondi** via `niceTicks()`: dividere l'intervallo in parti
   uguali produce due etichette "2" per numeri diversi
 - **La lettura e' al tocco**, non al passaggio del mouse: su un telefono non

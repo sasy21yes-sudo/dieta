@@ -69,6 +69,49 @@ function vuoto(titolo, sub, msg) {
  * volte "2": numeri diversi con la stessa etichetta, che e' peggio di nessuna
  * etichetta.
  */
+/**
+ * Il riepilogo sotto ogni grafico: ultimo valore, media del periodo, target.
+ *
+ * La media si ferma a IERI. La giornata in corso non e' finita — i pasti non
+ * sono tutti spuntati, i passi non tutti fatti — e infilarla in una media la
+ * tira giu' sistematicamente ogni mattina.
+ */
+function riepilogo(o) {
+  const { days, vals, dec = 0, unit = '', target = null } = o;
+  const oggi = today();
+  const buoni = vals.map((v, i) => ({ v, k: days[i] }))
+    .filter(x => x.v != null && !isNaN(x.v));
+  if (!buoni.length) return null;
+  const chiusi = buoni.filter(x => x.k < oggi);
+  const media = chiusi.length ? avg(chiusi.map(x => x.v)) : null;
+  const ultimo = buoni[buoni.length - 1];
+  const pezzi = [
+    `<span><b>${nf(ultimo.v, dec)}</b>${unit ? ' ' + esc(unit) : ''} ${
+      ultimo.k === oggi ? 'oggi' : 'l\'ultimo'}</span>`
+  ];
+  if (media != null) pezzi.push(`<span>media ${nf(media, dec)}${
+    chiusi.length < buoni.length ? ' <em class="fino">fino a ieri</em>' : ''}</span>`);
+  if (target != null) {
+    pezzi.push(`<span>target ${nf(target, dec)}</span>`);
+    if (media != null) {
+      const d = media - target;
+      pezzi.push(`<span class="${Math.abs(d) < Math.max(1, target * .04) ? 'good' : ''}">${
+        d > 0 ? '+' : ''}${nf(d, dec)} sul target</span>`);
+    }
+  }
+  const r = el('div', 'riep');
+  r.innerHTML = pezzi.join('');
+  return r;
+}
+
+/** Legenda uniforme: un pallino e un nome. Mai due serie senza. */
+function legenda(voci) {
+  const l = el('div', 'leg');
+  l.innerHTML = voci.map(v => `<span><i style="background:${v.col}${
+    v.vuoto ? ';box-shadow:inset 0 0 0 1.5px var(--ink-3)' : ''}"></i>${esc(v.n)}</span>`).join('');
+  return l;
+}
+
 function niceTicks(lo, hi, n = 4) {
   const grezzo = (hi - lo) / n;
   if (!(grezzo > 0)) return [lo];
@@ -205,11 +248,20 @@ function chartLine(o) {
   c.append(s);
   // due serie sul grafico = legenda obbligatoria, altrimenti l'identita' e'
   // affidata solo al colore e la distanza fra punti e linea sembra un errore
-  if (o.ma)
-    c.append(el('div', 'leg',
-      `<span><i style="background:var(--ink-3)"></i>${esc(o.puntiNome || 'valore del giorno')}</span>`
-      + `<span><i style="background:var(--pine)"></i>${esc(o.maNome || 'media mobile a 7 giorni')}</span>`
-      + (o.target != null ? `<span><i style="background:var(--ink-2)"></i>target</span>` : '')));
+  // la legenda c'e' sempre, anche con una serie sola: senza, la linea verde e
+  // il tratteggio grigio sono due cose che il lettore deve indovinare
+  {
+    const voci = o.ma
+      ? [{ n: o.puntiNome || 'valore del giorno', col: 'var(--ink-3)' },
+         { n: o.maNome || 'media mobile a 7 giorni', col: 'var(--pine)' }]
+      : [{ n: o.serieNome || 'valore registrato', col: 'var(--pine)' }];
+    if (o.target != null) voci.push({ n: 'target', col: 'var(--ink-2)' });
+    if (o.band) voci.push({ n: 'previsione con banda al 95%', col: 'var(--pine-soft)' });
+    c.append(legenda(voci));
+  }
+  const rp = riepilogo({ days: o.days, vals: o.ma || o.vals, dec: o.dec,
+    unit: o.unit, target: o.target });
+  if (rp) c.append(rp);
   const read = el('div', 'read', `<span class="ph">Tocca il grafico per leggere un giorno</span>`);
   c.append(read);
   tappable(s, read, g, o.days, i => {
@@ -245,6 +297,11 @@ function chartBars(o) {
       stroke: 'var(--ink-2)', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }));
   s.append(xLabels(g, o.days, true));
   c.append(s);
+  c.append(legenda([{ n: o.serieNome || o.titolo.toLowerCase(), col: 'var(--pine)' }]
+    .concat(o.target != null ? [{ n: 'target', col: 'var(--ink-2)' }] : [])));
+  const rp = riepilogo({ days: o.days, vals: o.vals, dec: o.dec, unit: o.unit,
+    target: o.target });
+  if (rp) c.append(rp);
   const read = el('div', 'read', `<span class="ph">Tocca una barra</span>`);
   c.append(read);
   tappable(s, read, g, o.days, i => {
@@ -287,6 +344,22 @@ function chartStack(o) {
   const leg = el('div', 'leg', o.serie.map((se, j) =>
     `<span><i style="background:var(--c${j + 1})"></i>${esc(se.nome)}</span>`).join(''));
   c.append(leg);
+  /* In un'area impilata l'occhio legge le proporzioni, non i valori: la media
+     di ogni fascia e' il numero che poi si va comunque a cercare. */
+  {
+    const oggi2 = today();
+    const pezzi = o.serie.map(se => {
+      const vv = se.vals.map((x, n) => ({ x, k: o.days[n] }))
+        .filter(y => y.x != null && !isNaN(y.x) && y.k < oggi2).map(y => y.x);
+      return vv.length
+        ? '<span>' + esc(se.nome) + ' <b>' + nf(avg(vv), o.dec ?? 0) + '</b></span>' : '';
+    }).filter(Boolean);
+    if (pezzi.length) {
+      const r = el('div', 'riep');
+      r.innerHTML = '<span class="fino">media fino a ieri</span>' + pezzi.join('');
+      c.append(r);
+    }
+  }
   const read = el('div', 'read', `<span class="ph">Tocca una barra</span>`);
   c.append(read);
   tappable(s, read, g, o.days, i =>
@@ -329,6 +402,21 @@ function chartEmphasis(o) {
   }
   s.append(xLabels(g, o.days));
   c.append(s);
+  /* Questo grafico era l'unico senza legenda ne' riga di lettura, e in mezzo
+     agli altri sembrava disallineato — perche' lo era: gli mancavano due righe
+     che tutti gli altri hanno. */
+  c.append(legenda(usabili.map(se => ({
+    n: se.nome, col: se.forte ? 'var(--pine)' : 'var(--ink-3)' }))));
+  const forte = usabili.find(se => se.forte) || usabili[0];
+  const rp = riepilogo({ days: o.days, vals: forte.vals, dec: o.dec,
+    unit: o.unit, target: o.target });
+  if (rp) c.append(rp);
+  const read = el('div', 'read',
+    `<span class="ph">Tocca il grafico per leggere un giorno</span>`);
+  c.append(read);
+  tappable(s, read, g, o.days, i => usabili
+    .map(se => se.vals[i] == null ? null : `<span>${esc(se.nome)} <b>${nf(se.vals[i], o.dec ?? 0)}</b></span>`)
+    .filter(Boolean).join('') || '<span>niente registrato</span>');
   if (o.note) c.append(el('p', 'note', o.note));
   return c;
 }
@@ -363,10 +451,14 @@ function chartCal(o) {
     grid2.append(cell);
   }
   c.append(grid2);
-  c.append(el('div', 'calscale',
-    `<span>meno</span><i style="background:var(--wash);border:1px solid var(--rule)"></i>`
+  /* La rampa e' la legenda del calendario. C'era gia', ma diceva "meno / piu'",
+     che non dice quanto: ora dice cosa significano davvero i quattro toni. */
+  const sc = el('div', 'calscale');
+  sc.innerHTML = '<span>niente</span>'
+    + '<i style="background:var(--wash);border:1px solid var(--rule)"></i>'
     + [1, 2, 3, 4].map(n => `<i style="background:var(--s${n})"></i>`).join('')
-    + `<span>piu'</span>`));
+    + '<span>5 voci su 5</span>';
+  c.append(sc);
   const read = el('div', 'read', `<span class="ph">Tocca un giorno</span>`);
   c.append(read);
   if (o.note) c.append(el('p', 'note', o.note));
@@ -495,8 +587,14 @@ function viewDati(v) {
   const C = composition(k);
   const pesi = giorni.map(d => val(d, x => x.peso));
 
-  kpis.append(tile({ k: 'Giorni di fila', v: st, unit: st === 1 ? 'giorno' : 'giorni',
-    d: `${registrati} su ${datiRange} nel periodo`, dir: 'flat' }));
+  /* Qui c'era "giorni di fila", che e' esattamente il numero della fiamma piu'
+     sotto: due volte lo stesso dato a due dita di distanza. Al suo posto un
+     numero che nessun altro riquadro dava — quanto hai registrato nel periodo,
+     che e' la premessa perche' tutti gli altri valgano qualcosa. */
+  kpis.append(tile({ k: 'Giornate registrate', v: registrati, unit: 'su ' + datiRange,
+    d: registrati ? `${Math.round(registrati / datiRange * 100)}% del periodo`
+                  : 'niente in questo periodo', dir: 'flat' }));
+  void st;
   kpis.append(tile({ k: 'Peso di tendenza', v: ma ? nf(ma, 2) : '—', unit: 'kg',
     d: ma && maPrev ? `${ma - maPrev >= 0 ? '+' : ''}${nf(ma - maPrev, 2)} in 7 giorni` : 'servono piu\' pesate',
     dir: !ma || !maPrev ? 'flat' : Math.abs(ma - maPrev) < .35 ? 'flat' : (ma > maPrev ? 'up' : 'dn'),
@@ -525,24 +623,35 @@ function viewDati(v) {
                     : 'mai misurata', dir: 'flat' }));
   v.append(kpis);
 
-  /* --- scorciatoie --- */
-  const br = el('button', 'btn wide');
-  br.textContent = 'Apri la revisione settimanale';
-  br.style.marginBottom = '8px';
-  br.onclick = () => { location.hash = '#/revisione'; };
-  v.append(br);
-  const bp = el('button', 'btn wide');
-  bp.textContent = 'Dove stai andando · proiezioni';
-  bp.style.marginBottom = '12px';
-  bp.onclick = () => { location.hash = '#/previsioni'; };
-  v.append(bp);
+  /* --- le due schermate che nascono da questi numeri ---
+     Erano due bottoni larghi identici a tutti gli altri bottoni dell'app, e
+     nessuno li leggeva come "vai in un'altra schermata". Ora sono due righe di
+     navigazione: titolo, una riga che dice cosa ci trovi, e la freccia. */
+  const nav = el('div', 'card');
+  nav.append(el('div', 'eyebrow', 'Da questi numeri'));
+  const vai = (t, d, hash) => {
+    const b = el('button', 'nav-r');
+    b.innerHTML = `<span class="body"><span class="t">${esc(t)}</span>
+      <span class="d">${esc(d)}</span></span><span class="go">›</span>`;
+    b.onclick = () => { location.hash = hash; };
+    nav.append(b);
+  };
+  vai('La revisione settimanale',
+      'Cosa non ha funzionato negli ultimi sette giorni, come si sistema, e la sola cosa da cambiare.',
+      '#/revisione');
+  vai('Dove stai andando',
+      'Misure, grasso e massa magra, forza: dove ti porta il ritmo attuale fra quattro settimane.',
+      '#/previsioni');
+  v.append(nav);
 
   /* --- costanza a punteggio --- */
   if (typeof cardCostanza === 'function') v.append(cardCostanza(k, datiRange));
 
   /* --- calendario --- */
   v.append(chartCal({
-    titolo: 'Costanza',
+    // si chiamava anche questa "Costanza", come la carta degli anelli due dita
+    // piu' su: due titoli identici che dicono cose diverse
+    titolo: 'Il registro, giorno per giorno',
     sub: 'Quanto e\' completa ogni giornata: peso, pasti spuntati, acqua, passi, sonno.',
     days: span(Math.min(datiRange, 182), k),
     level: dayScore,
@@ -648,7 +757,8 @@ function viewDati(v) {
 
   /* --- come stai --- */
   v.append(chartEmphasis({
-    titolo: 'Fame ed energia', sub: 'Se la fame sale mentre l\'energia scende, il deficit e\' troppo aggressivo.',
+    titolo: 'Fame ed energia',
+    sub: 'Da 1 a 5, come le hai dichiarate nel diario. Se la fame sale mentre l\'energia scende, il deficit e\' troppo aggressivo.',
     days: giorni, dec: 0,
     serie: [
       { nome: 'energia', vals: giorni.map(d => val(d, x => x.energia)), forte: true },
