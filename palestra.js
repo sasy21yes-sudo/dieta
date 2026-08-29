@@ -407,8 +407,8 @@ function viewPalestra(v) {
   const k = today(), st = statoMuscoli(k);
   const V = PD.volume;
 
-  /* --- ingresso a Road to HYROX --- */
-  if (HX) {
+  /* --- ingresso a Road to HYROX: solo se il modulo e' acceso --- */
+  if (HX && usaHyrox()) {
     const hxb = el('button', 'hx-entry');
     const gg = giorniAllaGara();
     const hp = S.hyrox?.profilo;

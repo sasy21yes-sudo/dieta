@@ -48,6 +48,38 @@ function load() {
   if (!S) S = { log: {}, spesa: {}, settings: { start: today() } };
   normalize();
 }
+/* ============================================================== moduli
+
+   Non tutti vogliono la stessa app. C'e' chi si costruisce il piano
+   settimanale e ci si attiene, e c'e' chi vuole solo scrivere cosa ha mangiato
+   oggi e vedere se torna con i target. Allo stesso modo HYROX interessa a
+   pochi, e a chi non gara e' solo una sezione in piu' da ignorare.
+
+   Spegnere un modulo NON cancella niente: i dati restano dove sono e
+   riaccendendolo tornano tutti. Nasconde soltanto le parti di interfaccia che
+   non servono, e con esse i conti che ne dipendono.
+
+   Se il modulo non c'e' — backup vecchio, o profilo nato prima di questa
+   modifica — vale la regola di prima: il piano c'era sempre, quindi resta
+   acceso. HYROX invece si accende solo se ci sono dati veri dentro, perche'
+   accenderlo a tutti riproporrebbe a tutti una sezione che quasi nessuno usa.
+   In nessuno dei due casi si perde un dato: si perde al massimo una voce di
+   menu, che si riaccende con un tocco. */
+function modulliDaStato() {
+  const h = S.hyrox || {};
+  const usati = !!(h.profilo?.gara || Object.keys(h.pb || {}).length
+    || (h.sim || []).length || Object.keys(h.sessioni || {}).length
+    || Object.keys(h.checklist || {}).length);
+  return { piano: true, hyrox: usati };
+}
+function moduli() {
+  S.settings ||= {};
+  if (!S.settings.moduli) S.settings.moduli = modulliDaStato();
+  return S.settings.moduli;
+}
+const usaPiano = () => moduli().piano !== false;
+const usaHyrox = () => moduli().hyrox === true;
+
 /** Riempie i campi mancanti: serve all'avvio e dopo l'import di un backup
     vecchio, scritto da una versione che certe chiavi non le aveva. */
 function normalize() {
@@ -55,6 +87,8 @@ function normalize() {
   S.model ||= {}; S.model.prev ||= []; S.prodotti ||= [];
   S.palestra ||= {}; S.palestra.sessioni ||= {}; S.palestra.esercizi ||= [];
   S.palestra.schede ||= []; S.palestra.acciacchi ||= [];
+  // dedotto dai dati la prima volta, poi e' una scelta dell'utente
+  if (!S.settings.moduli) S.settings.moduli = modulliDaStato();
   // hyrox mancava: un backup fatto prima di questa riga si importava
   // senza gara, record e simulazioni
   S.sfide ||= {}; S.sfide.log ||= {};
@@ -668,6 +702,9 @@ function route() {
   $('#top-title').textContent = TITLES[name] || 'Oggi';
   document.querySelectorAll('#tabbar a').forEach(a =>
     a.toggleAttribute('aria-current', a.dataset.tab === name));
+  // la spesa nasce dal piano settimanale: senza piano non ha di che parlare
+  const tabSpesa = document.querySelector('#tabbar a[data-tab="spesa"]');
+  if (tabSpesa) tabSpesa.hidden = !usaPiano();
   const v = $('#view'); v.innerHTML = '';
   if (name === 'oggi') backupBanner(v);
   fn(v); window.scrollTo(0, 0);
@@ -733,7 +770,11 @@ function viewOggi(v) {
   box.lastChild.style.marginTop = '10px';
   v.append(box);
 
-  // pasti
+  // pasti — solo se il piano e' acceso
+  if (!usaPiano()) {
+    v.append(cardGiornoLibero(k, d));
+    return;
+  }
   if (!plan.pasti.some(s => D.pasti[s.codice])) {
     const av = el('div', 'card flat');
     av.append(el('div', 'eyebrow', 'Giornata da comporre'));
@@ -790,9 +831,22 @@ function viewOggi(v) {
   }
 
   // fuori piano
+  v.append(listaExtra(k, d, true));
+}
+
+/**
+ * L'elenco di quello che hai mangiato scrivendolo a mano.
+ * Con il piano acceso e' il "fuori piano", l'eccezione. Con il piano spento
+ * e' l'unico registro che c'e', e allora cambia nome e tono: non c'e' niente
+ * da cui essere fuori.
+ */
+function listaExtra(k, d, conPiano) {
   const ex = el('div', 'card');
-  ex.append(el('h2', 'sec', 'Fuori piano'));
-  ex.append(el('p', 'muted', 'Registralo e basta. Non serve compensare: il bilancio è settimanale.'));
+  ex.append(el('h2', 'sec', conPiano ? 'Fuori piano' : 'Cosa hai mangiato'));
+  ex.lastChild.style.marginTop = conPiano ? '' : '0';
+  ex.append(el('p', 'muted', conPiano
+    ? 'Registralo e basta. Non serve compensare: il bilancio è settimanale.'
+    : 'Aggiungi quello che mangi durante la giornata. Cercando un alimento i macro li calcola lui; altrimenti scrivi tu calorie e proteine.'));
   for (const [i, e] of d.extra.entries()) {
     const row = el('div', 'row between');
     row.style.cssText = 'padding:8px 0;border-top:1px solid var(--rule)';
@@ -802,10 +856,35 @@ function viewOggi(v) {
     del.onclick = () => { d.extra.splice(i, 1); save(); route(); };
     row.append(del); ex.append(row);
   }
-  const add = el('button', 'btn wide', '+ Aggiungi pasto fuori piano');
+  if (!d.extra.length) ex.append(el('p', 'hint', conPiano
+    ? 'Niente fuori piano oggi.' : 'Ancora niente registrato oggi.'));
+  const add = el('button', 'btn wide' + (conPiano ? '' : ' pri'),
+    conPiano ? '+ Aggiungi pasto fuori piano' : '+ Aggiungi quello che hai mangiato');
   add.style.marginTop = '10px';
   add.onclick = () => sheetExtra(k);
-  ex.append(add); v.append(ex);
+  ex.append(add);
+  return ex;
+}
+
+/** La scheda Oggi quando il piano e' spento: solo il registro del giorno. */
+function cardGiornoLibero(k, d) {
+  const box = el('div');
+  box.append(listaExtra(k, d, false));
+  const c = el('div', 'card flat');
+  c.append(el('div', 'eyebrow', 'Stai andando a mano libera'));
+  c.append(el('div', 'muted',
+    'Il piano alimentare e\' spento: nessun pasto assegnato ai giorni, nessuna lista '
+    + 'della spesa. Le barre qui sopra misurano quello che registri contro i target '
+    + 'della scheda "Quanto mangiare", e tutto il resto — peso, previsione, palestra, '
+    + 'revisione settimanale — funziona esattamente come prima.'));
+  const b = el('button', 'btn wide');
+  b.style.marginTop = '10px';
+  b.textContent = 'Accendi il piano alimentare';
+  b.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'profilo';
+    location.hash = '#/piano'; };
+  c.append(b);
+  box.append(c);
+  return box;
 }
 
 /* ------------------------------------------------------ sheet: swap */
@@ -852,20 +931,71 @@ function sheetSwap(nome, qta) {
 
 function sheetExtra(k) {
   const w = el('div');
-  w.append(el('div', 'eyebrow', 'Fuori piano'));
+  w.append(el('div', 'eyebrow', usaPiano() ? 'Fuori piano' : 'Registro del giorno'));
   w.append(el('h2', 'sec', 'Cosa hai mangiato'));
   w.lastChild.style.marginTop = '0';
+
+  /* Scrivere kcal e proteine a mano per ogni cosa e' sopportabile finche' e'
+     l'eccezione. Con il piano spento diventa l'unico modo di usare l'app, e
+     allora non lo e' piu': si sceglie l'alimento e la quantita', e i macro —
+     tutti e cinque, non solo due — li fa lui. */
+  let scelto = null;
+  if (typeof selettoreCercabile === 'function') {
+    const f = el('div', 'field', '<label>Cerca un alimento</label>');
+    const opz = Object.keys(D.alimenti).sort().map(n => {
+      const al = alimento(n);
+      return { v: n, lab: n, sub: `${nf(al.kcal)} kcal · ${nf(al.p, 1)} P per 100 ${al.unita || 'g'}` };
+    });
+    const selA = selettoreCercabile(opz, null, n => { scelto = n; aggiorna(); },
+      'pane, tofu, banana…');
+    f.append(selA);
+    w.append(f);
+  }
+  const fq = el('div', 'field',
+    '<label>Quantita (g o ml)</label><input type="text" inputmode="decimal" id="x-q" value="100">');
+  fq.hidden = true;
+  w.append(fq);
+  const anteprima = el('div', 'read');
+  anteprima.hidden = true;
+  w.append(anteprima);
+
   w.append(el('div', 'field',
-    `<label>Descrizione</label><input type="text" id="x-n" placeholder="Es. cornetto al bar">`));
+    `<label>Oppure scrivilo tu</label><input type="text" id="x-n" placeholder="Es. cornetto al bar">`));
   const g = el('div'); g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px';
   g.append(el('div', 'field', `<label>kcal</label><input type="text" id="x-k" inputmode="numeric">`),
            el('div', 'field', `<label>Proteine (g)</label><input type="text" id="x-p" inputmode="decimal">`));
   w.append(g);
+
+  const macroScelti = () => {
+    if (!scelto) return null;
+    const q = parseNum($('#x-q')?.value) ?? 100;
+    return { nome: scelto, q, m: foodM(scelto, q) };
+  };
+  const aggiorna = () => {
+    const s = macroScelti();
+    fq.hidden = !s; anteprima.hidden = !s;
+    if (!s) return;
+    anteprima.innerHTML = `<span><b>${nf(s.m.kcal)} kcal</b></span><span>${nf(s.m.p, 1)} P</span>`
+      + `<span>${nf(s.m.c, 1)} C</span><span>${nf(s.m.g, 1)} G</span><span>${nf(s.m.fibre, 1)} fibre</span>`;
+    const al = alimento(scelto);
+    if (al?.fonte === 'stima')
+      anteprima.innerHTML += '<span class="mono muted">valore stimato</span>';
+  };
+  w.addEventListener('input', e => { if (e.target.id === 'x-q') aggiorna(); });
+
   const b = el('button', 'btn wide pri', 'Registra');
   b.onclick = () => {
-    const n = $('#x-n').value.trim() || 'Fuori piano';
-    day(k).extra.push({ nome: n, kcal: parseNum($('#x-k').value) || 0, p: parseNum($('#x-p').value) || 0,
-                        c: 0, g: 0, fibre: 0 });
+    const s = macroScelti();
+    if (s) {
+      day(k).extra.push({ nome: `${s.nome} · ${nf(s.q)} ${alimento(s.nome)?.unita || 'g'}`,
+        ...s.m });
+    } else {
+      const n = $('#x-n').value.trim();
+      const kc = parseNum($('#x-k').value) || 0;
+      if (!n && !kc) { toast('Scegli un alimento o scrivi cosa hai mangiato'); return; }
+      day(k).extra.push({ nome: n || 'Fuori piano', kcal: kc,
+        p: parseNum($('#x-p').value) || 0, c: 0, g: 0, fibre: 0 });
+    }
     save(); closeSheet(); route(); toast('Registrato');
   };
   w.append(b); sheet(w);
@@ -1512,6 +1642,21 @@ function shoppingList() {
 }
 
 function viewSpesa(v) {
+  if (!usaPiano()) {
+    const c = el('div', 'card');
+    c.append(el('div', 'eyebrow', 'Serve il piano'));
+    c.append(el('div', 'muted',
+      'La lista della spesa e\' la somma degli ingredienti dei pasti assegnati ai sette '
+      + 'giorni. Con il piano alimentare spento quei pasti non esistono, e non c\'e\' niente '
+      + 'da sommare.'));
+    const b = el('button', 'btn wide pri', 'Accendi il piano alimentare');
+    b.style.marginTop = '10px';
+    b.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'profilo';
+      location.hash = '#/piano'; };
+    c.append(b);
+    v.append(c);
+    return;
+  }
   const conDisp = typeof fabbisognoNetto === 'function';
   const inCasa = conDisp ? Object.keys(dispensa()).length : 0;
   v.append(el('div', 'card flat',
@@ -1576,7 +1721,7 @@ function icsFile() {
       `DESCRIPTION:${title}`, 'END:VALARM', 'END:VEVENT');
   };
   const slots = {};
-  for (const [i, g] of D.settimana.entries())
+  if (usaPiano()) for (const [i, g] of D.settimana.entries())
     for (const s of g.pasti) (slots[`${s.slot}|${s.ora}`] ||= []).push(DAYS[i]);
   let n = 0;
   for (const [key, days] of Object.entries(slots)) {

@@ -141,6 +141,52 @@ function macroDaIngredienti(ing) {
  */
 function pianoScelto() { return !!S.settings?.pianoBase; }
 
+/**
+ * Gli interruttori dei moduli.
+ * Sta al primo avvio e dentro il passo "Chi sei", perche' e' li' che si decide
+ * che app si vuole. Spegnere non cancella: i dati restano e riaccendendo
+ * tornano, e la carta lo dice invece di lasciarlo temere.
+ */
+function cardModuli() {
+  const c = el('div', 'card');
+  c.append(el('div', 'eyebrow', 'Cosa ti serve'));
+  c.append(el('p', 'muted',
+    'Due parti dell\'app si possono spegnere. Spegnerle non cancella niente: '
+    + 'quello che hai gia\' scritto resta dov\'e\' e riaccendendole torna tutto.'));
+
+  const M = moduli();
+  const voce = (chiave, tit, acceso, spento) => {
+    const on = M[chiave] === true || (chiave === 'piano' && M[chiave] !== false);
+    const r = el('button', 'mod-r' + (on ? ' on' : ''));
+    r.innerHTML = '<span class="mod-sw" aria-hidden="true"><i></i></span>'
+      + '<span class="body"><span class="t">' + esc(tit) + '</span>'
+      + '<span class="d">' + (on ? acceso : spento) + '</span></span>';
+    r.setAttribute('role', 'switch');
+    r.setAttribute('aria-checked', String(on));
+    r.onclick = () => {
+      M[chiave] = !on;
+      save();
+      // il piano cambia le barre e la tab bar: si ridisegna tutto
+      if (typeof fondiPiano === 'function') fondiPiano();
+      route();
+      toast(!on ? 'Acceso' : 'Spento: i dati restano dove sono');
+    };
+    c.append(r);
+  };
+
+  voce('piano', 'Piano alimentare',
+    'Pasti assegnati ai sette giorni, lista della spesa, sostituzioni. La scheda Oggi ti dice cosa mangiare.',
+    'Nessun pasto assegnato: scrivi giorno per giorno quello che mangi e l\'app lo confronta con i tuoi target. Niente lista della spesa.');
+  voce('hyrox', 'Road to HYROX',
+    'Conto alla rovescia, programma fino alla gara, stazioni e simulazioni dentro la scheda Gym.',
+    'La sezione non compare in Gym. La palestra funziona lo stesso, con tutto il resto.');
+
+  c.append(el('p', 'note',
+    'I target giornalieri, il peso, la previsione, la palestra, le foto e la revisione '
+    + 'settimanale funzionano in tutti e due i casi: non dipendono dal piano.'));
+  return c;
+}
+
 function viewBenvenuto(v) {
   const c = el('div', 'card');
   c.append(el('div', 'eyebrow', 'Primo avvio'));
@@ -175,10 +221,14 @@ function viewBenvenuto(v) {
   };
   v.append(esempio);
 
+  v.append(cardModuli());
+
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Si puo' cambiare idea</div>
      <div class="muted">Da Impostazioni puoi caricare l'esempio anche dopo, o
-     ricominciare da zero. Quello che hai gia' scritto tu non viene toccato.</div>`));
+     ricominciare da zero. Quello che hai gia' scritto tu non viene toccato.
+     Anche gli interruttori qui sopra si spostano quando vuoi, dal passo
+     "Chi sei".</div>`));
 }
 
 /* =============================================================== vista */
@@ -206,6 +256,7 @@ function pianoPassi() {
       perche: 'E’ il metro con cui l’app giudica le giornate: analisi, cruscotto, consigli e previsione del peso partono tutti da qui.',
       mio: Object.keys(p.target).length > 0,
       stato: `${nf(D.target.kcal)} kcal · ${D.target.p} g di proteine` },
+    ...(usaPiano() ? [
     { id: 'alimenti', t: 'Cosa mangi',
       d: 'Aggiungi i tuoi alimenti o correggi quelli del piano.',
       perche: 'Sono i mattoni dei pasti. Puoi saltare questo passo: i ' + baseAli + ' del piano di partenza bastano per cominciare.',
@@ -221,6 +272,7 @@ function pianoPassi() {
       perche: 'E’ quello che vedi nella scheda Oggi: da qui escono le barre dei macro, il totale residuo e la lista della spesa.',
       mio: !!p.settimana,
       stato: p.settimana ? 'riorganizzata da te' : 'quella del piano di partenza' }
+    ] : [])
   ];
 }
 
@@ -265,16 +317,22 @@ function viewPiano(v) {
   /* --- che cos'e' un piano --- */
   const passi = pianoPassi();
   const miei = passi.filter(x => x.mio).length;
+  // con il piano spento le domande sono due, non cinque: dirne cinque e
+  // mostrarne due sembrerebbe un pezzo mancante
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Come funziona</div>
-     <div class="muted">Un piano risponde a cinque domande, in quest’ordine:
-     <strong>chi sei</strong>, <strong>quanto mangiare</strong>, <strong>cosa</strong>,
-     <strong>come lo combini</strong>, <strong>quando</strong>.
+     <div class="muted">${usaPiano()
+       ? `Un piano risponde a cinque domande, in quest’ordine:
+          <strong>chi sei</strong>, <strong>quanto mangiare</strong>, <strong>cosa</strong>,
+          <strong>come lo combini</strong>, <strong>quando</strong>.`
+       : `Con il piano alimentare spento restano le due domande che contano comunque:
+          <strong>chi sei</strong> e <strong>quanto mangiare</strong>. Da lì escono i
+          target contro cui l’app misura quello che registri ogni giorno.`}
      Puoi fermarti a qualsiasi punto: quello che non tocchi resta come nel piano
      di partenza, e l’app continua a funzionare.</div>
      <div class="hint" style="margin-top:8px">Hai personalizzato ${miei} passi su ${passi.length}.</div>`));
 
-  /* --- i cinque passi --- */
+  /* --- i passi --- */
   for (const [i, s] of passi.entries()) {
     const c = el('button', 'step' + (s.mio ? ' mio' : ''));
     c.innerHTML = `<span class="n">${i + 1}</span>
@@ -357,6 +415,7 @@ function pianoSezione(v) {
 /* ------------------------------------------------------------ dati utente */
 function sezProfilo(v) {
   const p = piano();
+  v.append(cardModuli());
   const c = el('div', 'card');
   c.append(el('h2', 'sec', 'Chi sei'));
   c.lastChild.style.marginTop = '0';

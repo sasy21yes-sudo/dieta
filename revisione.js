@@ -29,6 +29,25 @@ function contaSu2(giorni, fn) { return giorni.filter(fn).length; }
  * prima e il bersaglio. `verso` dice in che direzione e' un miglioramento:
  * serve a colorare il delta senza doverlo decidere ogni volta a mano.
  */
+/**
+ * Quante sedute a settimana fai di solito.
+ * Serve come metro quando non c'e' un obiettivo dichiarato: confrontarti con
+ * un 4 tirato fuori dal nulla direbbe "sotto" a chi si allena tre volte per
+ * scelta, il che e' un giudizio e non una misura.
+ */
+function seduteAbituali(k = today(), settimane = 8) {
+  const conta = [];
+  for (let w = 1; w <= settimane; w++) {
+    const gg = windowDays(addDays(k, -7 * (w - 1)), 7);
+    const n = gg.filter(x => (typeof serieDelGiorno === 'function' && serieDelGiorno(x).length)
+      || S.hyrox?.sessioni?.[x]?.fatto || S.log[x]?.allenamento === true).length;
+    if (n) conta.push(n);
+  }
+  if (!conta.length) return 0;
+  conta.sort((a, b) => a - b);
+  return Math.max(1, Math.round(conta[Math.floor(conta.length / 2)]));
+}
+
 function metricheSettimana(k = today()) {
   const { questa, prima } = settimane(k);
   const cons = g => g.map(x => S.log[x] ? consumed(x) : null).filter(m => m && m.kcal > 400);
@@ -37,7 +56,10 @@ function metricheSettimana(k = today()) {
   const sed = g => contaSu2(g, x => (typeof serieDelGiorno === 'function' && serieDelGiorno(x).length)
     || S.hyrox?.sessioni?.[x]?.fatto || S.log[x]?.allenamento === true);
   const T = D.target;
-  const seduteObiettivo = S.hyrox?.profilo?.sedute || 4;
+  // con HYROX spento il numero di sedute a settimana non lo dichiara nessuno:
+  // si prende il ritmo abituale delle ultime otto settimane, non una costante
+  const seduteObiettivo = (typeof usaHyrox === 'function' && usaHyrox()
+    && S.hyrox?.profilo?.sedute) || seduteAbituali(k) || 3;
 
   return [
     { id: 'kcal', lab: 'Calorie', ora: cm(questa, 'kcal'), pre: cm(prima, 'kcal'),

@@ -410,6 +410,29 @@ function etichettaGiorno(k, i) {
 let hxTab = 'piano';
 
 function viewHyrox(v) {
+  /* Si puo' arrivarci da un vecchio segnalibro anche con il modulo spento.
+     Non e' un errore: e' una sezione che hai deciso di non usare, e la si
+     riaccende da qui senza dover andare a cercare l'interruttore. */
+  if (typeof usaHyrox === 'function' && !usaHyrox()) {
+    const c = el('div', 'card');
+    c.append(el('div', 'eyebrow', 'Sezione spenta'));
+    c.append(el('h2', 'sec', 'Road to HYROX'));
+    c.lastChild.style.marginTop = '0';
+    c.append(el('div', 'muted',
+      'Otto chilometri di corsa e otto stazioni. L\'hai lasciata spenta perche\' non '
+      + 'gareggi: se cambi idea si riaccende qui, e quello che avevi gia\' registrato '
+      + 'e\' rimasto dov\'era.'));
+    const b = el('button', 'btn wide pri', 'Accendi Road to HYROX');
+    b.style.marginTop = '10px';
+    b.onclick = () => { moduli().hyrox = true; save(); route(); toast('Acceso'); };
+    c.append(b);
+    const i = el('button', 'btn wide', 'Torna in palestra');
+    i.style.marginTop = '8px';
+    i.onclick = () => { location.hash = '#/palestra'; };
+    c.append(i);
+    v.append(c);
+    return;
+  }
   if (!HX) { v.append(el('div', 'card', '<p class="muted">Dati HYROX non caricati.</p>')); return; }
   const h = HXS();
   const wrap = el('div', 'hx');

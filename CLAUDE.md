@@ -112,6 +112,41 @@ Conseguenza da non dimenticare: con il piano vuoto `D.pasti[s.codice]` è
 `undefined` per ogni slot. Ogni punto che legge un pasto dalla settimana deve
 reggerlo — Oggi, la spesa e l'analisi lo fanno.
 
+### I moduli si spengono
+
+Non tutti vogliono la stessa app. C'è chi si costruisce il piano settimanale e
+ci si attiene, e c'è chi vuole solo scrivere cosa ha mangiato oggi e vedere se
+torna con i target. HYROX allo stesso modo interessa a pochi.
+
+`S.settings.moduli = { piano, hyrox }`, con gli interruttori in `cardModuli()`
+— al primo avvio e nel passo "Chi sei". **Spegnere non cancella niente:**
+i dati restano dove sono e riaccendendo tornano tutti. Sparisce solo
+l'interfaccia, e con essa i conti che ne dipendono.
+
+Con `piano` spento: niente slot dei pasti su Oggi, niente "Da assegnare",
+la tab **Spesa si nasconde** (`route()` la toglie: la lista nasce dalla somma
+dei pasti assegnati, e senza pasti non c'è niente da sommare), i cinque passi
+del piano diventano due, e il `.ics` non genera più i promemoria dei pasti.
+Le barre macro reggono da sole perché `dayTarget()` ripiega già su `D.target`
+quando il giorno non ha totali, e `consumed()` somma solo gli `extra`.
+
+Con `hyrox` spento: via il riquadro d'ingresso in Gym; la rotta `#/hyrox`
+resta raggiungibile da un vecchio segnalibro e mostra come riaccenderla.
+
+**La migrazione dei backup vecchi** sta in `modulliDaStato()`, chiamata da
+`normalize()` — quindi vale sia all'avvio sia dopo un import. Un file senza
+`moduli` non è ambiguo: `piano: true`, perché è come si comportava l'app prima;
+`hyrox` acceso **solo se ci sono dati veri dentro** (gara, record, simulazioni,
+sedute, checklist), perché accenderlo a tutti riproporrebbe a tutti una sezione
+che quasi nessuno usa. In nessuno dei due casi si perde un dato: al massimo una
+voce di menu, che torna con un tocco.
+
+Effetto collaterale utile: senza HYROX nessuno dichiara più quante sedute a
+settimana fa, e la revisione settimanale non può più usare quel numero come
+metro. `seduteAbituali()` prende la **mediana delle ultime otto settimane** —
+confrontarti con un 4 tirato fuori dal nulla direbbe "sotto" a chi si allena
+tre volte per scelta, che è un giudizio e non una misura.
+
 ### Profili e piano personalizzato
 
 `data/dieta.json` è la fonte di verità **di base**, e non va mai modificata dal
@@ -158,6 +193,8 @@ non un dettaglio.
 
 ## Funzionalità già implementate
 
+- **Moduli accendibili** — piano alimentare e Road to HYROX si spengono dal
+  passo "Chi sei". Spegnere non cancella: nasconde
 - **Revisione settimanale** — diagnosi pesata della settimana chiusa, grafico a
   manubrio contro la precedente, cosa non ha funzionato, come si sistema e la
   sola cosa da cambiare. Si propone da sola la domenica e il lunedi
@@ -582,6 +619,9 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non marcare `verificato` un alimento che arriva da Open Food Facts: quei valori
   li inseriscono gli utenti dell'archivio. Nasce `stima` e lo diventa solo se
   qualcuno conferma di averlo letto sulla confezione
+- Non far cancellare dati a un interruttore di modulo: spegnere nasconde, non
+  distrugge. E non dare per scontato che `S.settings.moduli` esista — un backup
+  scritto prima non ce l'ha, e `modulliDaStato()` lo deduce
 - Non mappare `adductors` e `neck` di free-exercise-db dentro glutei o trapezi
   per far quadrare i conti: la mappa muscolare, il volume e la forma-fatica si
   reggono su quei gruppi. Un muscolo senza corrispondenza va dichiarato, non
