@@ -78,10 +78,165 @@ function comprimi(file, lato = 1280, q = .82) {
      mezzo rovinerebbe il confronto a cursore.
 */
 
+/* ====================================================== guide di inquadratura
+
+   Il problema delle foto dei progressi non e' la qualita' dello scatto: e' che
+   fra una e l'altra cambia la distanza, l'altezza del telefono e l'angolo, e
+   allora due foto a due mesi di distanza non sono confrontabili. Il confronto
+   a cursore lo rende evidente: se l'inquadratura balla, sembra che sia
+   cambiato il corpo quando e' cambiato il fotografo.
+
+   Tre guide, in ordine di quanto servono davvero:
+
+   1. FANTASMA — l'ultimo scatto di quella posa in trasparenza sopra
+      l'anteprima. E' quello che conta: allinei te stesso alla foto di prima e
+      l'inquadratura torna identica senza dover ricordare niente. Le app
+      dedicate all'allineamento fanno esattamente questo.
+   2. SAGOMA — una figura di riferimento, per il primo scatto quando un
+      fantasma non c'e' ancora. Si riusa la silhouette neutra di
+      data/corpo.json: serve a dire "stai a questa distanza", non a fare
+      anatomia.
+   3. GRIGLIA — i terzi. Aiuta a tenere il telefono dritto e il corpo
+      centrato, ed e' la guida piu' leggera quando le altre due danno fastidio.
+
+   L'opacita' si regola perche' con una foto scura il fantasma sparisce e con
+   una chiara copre l'anteprima. */
+
+const GUIDE_FOTO = [
+  { id: 'nessuna', n: 'Niente' },
+  { id: 'griglia', n: 'Griglia' },
+  { id: 'sagoma', n: 'Sagoma' },
+  { id: 'fantasma', n: 'Ultimo scatto' }
+];
+
+/** La griglia dei terzi, piu' due tacche per testa e piedi. */
+function svgGriglia() {
+  const s = mk('svg', { viewBox: '0 0 100 133', preserveAspectRatio: 'none',
+    class: 'gd-svg', 'aria-hidden': 'true' });
+  const linea = (x1, y1, x2, y2, forte) => s.append(mk('line', { x1, y1, x2, y2,
+    stroke: '#fff', 'stroke-width': forte ? .7 : .4,
+    opacity: forte ? .85 : .5, 'vector-effect': 'non-scaling-stroke' }));
+  for (const f of [1 / 3, 2 / 3]) {
+    linea(f * 100, 0, f * 100, 133);
+    linea(0, f * 133, 100, f * 133);
+  }
+  // le due tacche dove dovrebbero cadere testa e piedi: e' la distanza dal
+  // telefono che cambia di piu' fra uno scatto e l'altro
+  for (const y of [10, 123]) {
+    linea(6, y, 20, y, true);
+    linea(80, y, 94, y, true);
+  }
+  return s;
+}
+
+/** La sagoma neutra, presa dalla stessa figura della mappa muscolare. */
+function svgSagoma(posa) {
+  if (typeof CORPO === 'undefined' || !CORPO) return null;
+  const sesso = D.profilo?.sesso === 'f' ? 'f' : 'm';
+  const lato = posa === 'schiena' ? 'schiena' : 'fronte';
+  const V = CORPO.viste[sesso + '-' + lato] || CORPO.viste['m-' + lato];
+  if (!V) return null;
+  const s = mk('svg', { viewBox: V.viewBox, class: 'gd-svg gd-sag', 'aria-hidden': 'true' });
+  const g = mk('g', { fill: 'none', stroke: '#fff', 'stroke-width': 2.2,
+    'stroke-linejoin': 'round', opacity: .9 });
+  for (const d of V.neutri) g.append(mk('path', { d }));
+  for (const paths of Object.values(V.muscoli))
+    for (const d of paths) g.append(mk('path', { d }));
+  s.append(g);
+  return s;
+}
+
+/**
+ * Il pannello delle guide, da attaccare sotto l'anteprima.
+ * `box` e' il contenitore .cam su cui si sovrappongono.
+ */
+function pannelloGuide(box, posa) {
+  let scelta = S.settings?.guidaFoto || 'fantasma';
+  let opacita = +(S.settings?.guidaOpacita ?? 45);
+  const strato = el('div', 'gd-strato');
+  box.append(strato);
+
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Guida per inquadrare'));
+  const seg = el('div', 'seg wrap');
+  const slider = el('div', 'gd-op');
+  const rng = el('input');
+  rng.type = 'range'; rng.min = 10; rng.max = 90; rng.value = opacita;
+  slider.append(el('span', 'l', 'trasparenza'), rng);
+  const nota = el('p', 'hint');
+
+  let urlFantasma = null;
+  const disegna = () => {
+    strato.innerHTML = '';
+    if (urlFantasma) { URL.revokeObjectURL(urlFantasma); urlFantasma = null; }
+    slider.hidden = scelta === 'nessuna' || scelta === 'griglia';
+    nota.textContent = '';
+    if (scelta === 'griglia') {
+      strato.append(svgGriglia());
+      nota.textContent = 'I terzi, piu\' due tacche dove far cadere testa e piedi: '
+        + 'la distanza dal telefono e\' quello che cambia di piu\' fra uno scatto e l\'altro.';
+    } else if (scelta === 'sagoma') {
+      const s = svgSagoma(posa);
+      if (s) { s.style.opacity = opacita / 100; strato.append(s); }
+      // la sorgente non ha una figura di profilo: dirlo invece di far combaciare
+      // una posa di fronte con una foto di lato
+      nota.textContent = posa === 'lato'
+        ? 'Attenzione: questa e\' la figura di fronte, non di profilo — una sagoma '
+          + 'laterale non esiste. Di lato usala solo per l\'altezza e la distanza, '
+          + 'o passa alla griglia.'
+        : 'Una figura di riferimento per la distanza e l\'altezza del telefono. '
+          + 'Non devi combaciarci: serve a non cambiare inquadratura.';
+    } else if (scelta === 'fantasma') {
+      strato.append(el('div', 'gd-att', 'cerco l\'ultimo scatto…'));
+      fotoTutte().then(tutte => {
+        const mie = tutte.filter(f => f.posa === posa);
+        const ult = mie[mie.length - 1];
+        strato.innerHTML = '';
+        if (!ult) {
+          nota.textContent = 'Non c\'e\' ancora uno scatto in questa posa: il fantasma '
+            + 'compare dalla seconda volta. Per la prima usa la sagoma o la griglia.';
+          const s = svgGriglia(); strato.append(s);
+          return;
+        }
+        urlFantasma = URL.createObjectURL(ult.blob);
+        const img = el('img', 'gd-ghost');
+        img.src = urlFantasma;
+        img.style.opacity = opacita / 100;
+        strato.append(img);
+        nota.textContent = `Sopra c'e' lo scatto del ${ult.giorno}. Muoviti finche' non `
+          + 'ci combaci: e\' l\'unico modo perche\' il confronto a cursore mostri il '
+          + 'corpo e non il fotografo.';
+      }).catch(() => { strato.innerHTML = ''; });
+    }
+  };
+
+  for (const g of GUIDE_FOTO) {
+    const b = el('button', null, g.n);
+    b.setAttribute('aria-pressed', scelta === g.id);
+    b.onclick = () => {
+      scelta = g.id;
+      S.settings.guidaFoto = g.id; save();
+      [...seg.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+      disegna();
+    };
+    seg.append(b);
+  }
+  rng.oninput = () => {
+    opacita = +rng.value;
+    S.settings.guidaOpacita = opacita; save();
+    const t = strato.querySelector('.gd-ghost, .gd-sag');
+    if (t) t.style.opacity = opacita / 100;
+  };
+  w.append(seg, slider, nota);
+  disegna();
+  return { pannello: w, pulisci: () => { if (urlFantasma) URL.revokeObjectURL(urlFantasma); } };
+}
+
 const CAM_ATTESE = [3, 5, 10, 15];
-let camStream = null, camTimer = null;
+let camStream = null, camTimer = null, camPulisci = null;
 
 function camChiudi() {
+  camPulisci?.(); camPulisci = null;
   if (camTimer) { clearInterval(camTimer); camTimer = null; }
   if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
 }
@@ -115,6 +270,10 @@ function sheetFotocamera(posa) {
 
   const stato = el('p', 'muted', 'Accendo la fotocamera…');
   w.append(stato);
+
+  const G = pannelloGuide(box, posa);
+  camPulisci = G.pulisci;
+  w.append(G.pannello);
 
   /* --- scelta dell'attesa --- */
   w.append(el('div', 'eyebrow', 'Quanti secondi'));

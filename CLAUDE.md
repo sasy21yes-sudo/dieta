@@ -212,6 +212,8 @@ non un dettaglio.
 - **Scala il pasto** — moltiplicatore da ×0,5 a ×2 su tutti gli ingredienti
 - **Autoscatto** — fotocamera dentro l app con conto alla rovescia: le foto dei
   progressi si fanno da soli, e con <input capture> non si poteva
+- **Guide di inquadratura** — griglia, sagoma, e il fantasma dello scatto
+  precedente in trasparenza: e quello che rende confrontabili due foto
 - **Misure guidate** — una alla volta, con dove passare il metro disegnato sulla
   sagoma e il controllo dei valori fuori scala
 - **Come si esegue** — due fotogrammi per esercizio dal catalogo pubblico
@@ -412,11 +414,22 @@ aggiunte, e rimozioni marcate `tolto` invece che cancellate — se cambi idea la
 voce di base è ancora lì. Con il piano vuoto non si eredita niente: quelle
 cinque voci sono le scelte di un'altra persona, come i pasti.
 
-Due conseguenze utili: la checklist mostra **solo quello che tocca oggi** (la
-B12 settimanale in mezzo agli altri sei giorni era una riga da ignorare, e a
-furia di ignorarla si ignorano anche le altre), e ogni voce porta la sua
-**aderenza a 30 giorni** — serve a vedere quale salti davvero, che di solito non
-è quella che credi. Il generatore `.ics` legge `D.integratori`, quindi cambiare
+La checklist mostra **solo quello che tocca oggi** — la B12 settimanale in mezzo
+agli altri sei giorni era una riga da ignorare, e a furia di ignorarla si
+ignorano anche le altre. **Ma quel filtro va applicato solo ai giornalieri**, ed
+è un errore già fatto una volta: applicato anche ai settimanali, la B12 spariva
+sei giorni su sette e chi se la dimenticava il lunedì non poteva più segnarla
+da nessuna parte. Una B12 presa di martedì è comunque presa.
+
+I settimanali stanno quindi in un blocco **"questa settimana"** con lo stato
+della settimana, non del giorno: se è già stata presa la riga dice quando ed è
+chiusa, se no resta lì finché non la segni, in qualunque giorno — e si segna sul
+giorno in cui l'hai presa davvero, non su quello previsto. Anche l'aderenza dei
+settimanali si conta **a settimane**: contare i giorni darebbe 4 su 30 anche a
+chi non ne ha saltata nemmeno una.
+
+Ogni voce porta la sua **aderenza a 30 giorni** — serve a vedere quale salti
+davvero, che di solito non è quella che credi. Il generatore `.ics` legge `D.integratori`, quindi cambiare
 la lista cambia anche i promemoria del calendario.
 
 Il limite, detto nella UI: l'app non misura il sangue e non conosce la tua
@@ -783,6 +796,30 @@ Tre dettagli che su iPhone non sono facoltativi:
 
 Il conto alla rovescia riusa `recBip()` di `timer.js`, e come quello suona solo
 con l'app in primo piano — la UI lo dice.
+
+### Le guide di inquadratura
+
+Il problema delle foto dei progressi non è la qualità dello scatto: è che fra
+una e l'altra cambia la distanza, l'altezza del telefono e l'angolo. Il
+confronto a cursore lo rende impietoso — se l'inquadratura balla sembra
+cambiato il corpo quando è cambiato il fotografo.
+
+Tre guide sopra l'anteprima, in ordine di quanto servono:
+
+1. **Fantasma** — l'ultimo scatto di quella posa in trasparenza. È quello che
+   conta: ti allinei alla foto di prima e l'inquadratura torna identica senza
+   ricordare niente. È quello che fanno le app dedicate all'allineamento, ed è
+   il default
+2. **Sagoma** — la silhouette di `data/corpo.json`, per il primo scatto quando
+   un fantasma non c'è ancora. Sulla posa **di lato** la nota avvisa che quella
+   figura è di fronte: una sagoma laterale non esiste nella sorgente, e far
+   combaciare una posa di profilo con una figura frontale sarebbe peggio che
+   niente
+3. **Griglia** — i terzi, più due tacche dove far cadere testa e piedi: la
+   distanza dal telefono è ciò che cambia di più
+
+L'opacità è regolabile perché su una foto scura il fantasma sparisce e su una
+chiara copre l'anteprima.
 
 ### Prendere le misure
 

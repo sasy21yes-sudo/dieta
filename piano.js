@@ -148,21 +148,59 @@ function fondiIntegratori(esempio) {
   return out;
 }
 
-/** Tocca oggi? La cadenza settimanale ha il suo giorno. */
+/** Tocca oggi? Vale per i giornalieri; i settimanali hanno una logica loro. */
 function integratoreOggi(s, k = today()) {
-  if (s.cadenza === 'settimanale') return dayIdx(k) === (s.giorno ?? 0);
-  return true;
+  return s.cadenza !== 'settimanale';
+}
+
+/**
+ * Lo stato SETTIMANALE di un integratore a cadenza settimanale.
+ *
+ * Il filtro "mostra solo quello che tocca oggi" era giusto per i giornalieri
+ * e sbagliato per questi: la B12 spariva sei giorni su sette, e chi se la
+ * dimenticava il lunedi non poteva piu' segnarla da nessuna parte. Ma una B12
+ * presa di martedi e' comunque presa — quello che conta e' che nella settimana
+ * ci sia, non il giorno esatto.
+ *
+ * Quindi si guarda la settimana intera: se e' gia' stata presa la riga dice
+ * quando ed e' chiusa, se non ancora resta li' finche' non la segni, in
+ * qualunque giorno.
+ */
+function settimanaDi(k = today()) {
+  const gi = dayIdx(k);
+  const lun = addDays(k, -gi);
+  return Array.from({ length: 7 }, (_, i) => addDays(lun, i));
+}
+function statoSettimanale(s, k = today()) {
+  const gg = settimanaDi(k);
+  const preso = gg.find(g => S.log[g]?.integratori?.[s.nome]);
+  return { preso: preso || null, giorni: gg,
+           toccava: gg[Math.min(6, Math.max(0, s.giorno ?? 0))],
+           passato: dayIdx(k) >= (s.giorno ?? 0) };
 }
 
 /** Quante volte l'hai preso, sui giorni in cui toccava. */
 function aderenzaIntegratore(nome, k = today(), n = 30) {
   const s = D.integratori.find(x => x.nome === nome);
   if (!s) return null;
-  const gg = windowDays(k, n).filter(g => integratoreOggi(s, g)
-    && (typeof inPausa !== 'function' || !inPausa(g)));
+  if (s.cadenza === 'settimanale') {
+    // su quattro settimane, in quante c'e' almeno una presa: contare i giorni
+    // darebbe 4 su 30 anche a chi non ne ha saltata nemmeno una
+    const sett = [];
+    for (let w = 0; w < Math.round(n / 7); w++) {
+      const gg = settimanaDi(addDays(k, -7 * w))
+        .filter(g => g <= k && (typeof inPausa !== 'function' || !inPausa(g)));
+      if (gg.length) sett.push(gg.some(g => S.log[g]?.integratori?.[nome]));
+    }
+    if (!sett.length) return null;
+    const presi = sett.filter(Boolean).length;
+    return { presi, su: sett.length, pct: Math.round(presi / sett.length * 100),
+             unita: 'settimane' };
+  }
+  const gg = windowDays(k, n).filter(g => (typeof inPausa !== 'function' || !inPausa(g)));
   if (!gg.length) return null;
   const presi = gg.filter(g => S.log[g]?.integratori?.[nome]).length;
-  return { presi, su: gg.length, pct: Math.round(presi / gg.length * 100) };
+  return { presi, su: gg.length, pct: Math.round(presi / gg.length * 100), unita: 'giorni' };
 }
 
 /* ------------------------------------------------------------- editor */
@@ -190,7 +228,7 @@ function sezIntegratori(v) {
         s.mio ? ' <span class="pill ok">tuo</span>' : ''}</div>
       <div class="mt">${esc(s.dose || '')} · ${esc(s.cadenza || '')}${
         s.ora ? ' · ' + esc(s.ora) : ''}</div></div>
-      ${ad ? `<div class="kc">${ad.pct}%<br><span class="mt">${ad.presi}/${ad.su}</span></div>` : ''}`;
+      ${ad ? `<div class="kc">${ad.pct}%<br><span class="mt">${ad.presi}/${ad.su} ${esc(ad.unita || '')}</span></div>` : ''}`;
     r.onclick = () => sheetIntegratore(s.nome);
     c.append(r);
   }

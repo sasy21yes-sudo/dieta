@@ -1244,8 +1244,6 @@ function viewDiario(v) {
     c3.append(el('p', 'muted',
       'Nessun integratore in elenco. Se ne prendi, aggiungili dal piano: da li\' '
       + 'escono questa checklist e i promemoria del calendario.'));
-  } else if (!oggiInt.length) {
-    c3.append(el('p', 'muted', 'Oggi non tocca niente.'));
   }
   for (const s of oggiInt) {
     const on = !!d.integratori[s.nome];
@@ -1254,7 +1252,7 @@ function viewDiario(v) {
     row.append(el('div', 'box', '✓'),
       el('div', 'grow', `<div><strong>${esc(s.nome)}</strong></div>
         <div class="muted" style="font-size:12px">${esc(s.dose || '')} · ${esc(s.cadenza || '')}${s.nota ? ' · ' + esc(s.nota) : ''}${
-          ad && ad.su >= 5 ? ` · <span class="mono">${ad.pct}% negli ultimi 30</span>` : ''}</div>`),
+          ad && ad.su >= 5 ? ` · <span class="mono">${ad.pct}% su ${ad.su} ${ad.unita || 'giorni'}</span>` : ''}</div>`),
       el('span', 'pill' + (s.priorita === 'obbligatorio' ? ' bad' : ''), esc(s.priorita || '')));
     row.onclick = () => {
       if (!on && typeof pulsa === 'function') pulsa(row.firstChild, { scala: 1.3, dur: 300 });
@@ -1263,6 +1261,40 @@ function viewDiario(v) {
     };
     c3.append(row);
   }
+  /* I settimanali stanno in un blocco loro, con lo stato della SETTIMANA:
+     restano segnabili in qualunque giorno finche' non li segni. */
+  const sett = D.integratori.filter(s => s.cadenza === 'settimanale');
+  if (sett.length && typeof statoSettimanale === 'function') {
+    const NOMI = ['lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato', 'domenica'];
+    c3.append(el('div', 'eyebrow', 'Questa settimana'));
+    for (const s of sett) {
+      const stw = statoSettimanale(s, k);
+      const on = !!stw.preso;
+      const row = el('div', 'buy' + (on ? ' got' : ''));
+      const giornoIdx = Math.min(6, Math.max(0, s.giorno ?? 0));
+      const quando = on
+        ? `presa ${stw.preso === k ? 'oggi' : NOMI[dayIdx(stw.preso)]}`
+        : stw.passato
+          ? `toccava ${NOMI[giornoIdx]}, non ancora segnata`
+          : `tocca ${NOMI[giornoIdx]}`;
+      row.append(el('div', 'box', '✓'),
+        el('div', 'grow', `<div><strong>${esc(s.nome)}</strong></div>
+          <div class="muted" style="font-size:12px">${esc(s.dose || '')} · ${quando}</div>`),
+        el('span', 'pill' + (s.priorita === 'obbligatorio' && !on ? ' bad' : ''),
+           esc(s.priorita || '')));
+      row.onclick = () => {
+        // si segna sul giorno in cui l'hai presa davvero, non su quello previsto
+        if (on) delete day(stw.preso).integratori[s.nome];
+        else {
+          if (!on && typeof pulsa === 'function') pulsa(row.firstChild, { scala: 1.3, dur: 300 });
+          day(k).integratori[s.nome] = true;
+        }
+        save(); setTimeout(route, on ? 0 : 120);
+      };
+      c3.append(row);
+    }
+  }
+
   const bi = el('button', 'btn wide', 'Modifica cosa prendi');
   bi.style.marginTop = '10px';
   bi.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'integratori';
