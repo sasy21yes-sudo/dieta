@@ -103,6 +103,120 @@ function proiezioniForza(orizzonte = ORIZZONTE, quanti = 5) {
   }).filter(Boolean).sort((a, b) => b.n - a.n).slice(0, quanti);
 }
 
+/* ============================================== quanto manca, in tempo
+ *
+ * Per molto tempo qui non c'e' stato niente del genere, e la regola era netta:
+ * niente date di arrivo. La ragione non era filosofica, era aritmetica — il
+ * tempo e' distanza diviso ritmo, e quando il ritmo si avvicina a zero
+ * l'errore relativo esplode. Un contatore che dice "fra 15 mesi" mentre
+ * l'intervallo vero va da sette mesi a MAI non e' una previsione, e' una
+ * rassicurazione inventata.
+ *
+ * Ma il conto, fatto per bene, non e' sempre inutile: propagando la banda che
+ * il motore gia' calcola si vede che con un ritmo netto l'intervallo e'
+ * stretto — 66-102 giorni su un punto di 80 — e li' il numero vale.
+ *
+ * Quindi non un contatore, ma una risposta che sa in quale dei quattro casi
+ * si trova e si rifiuta quando deve:
+ *
+ *   ci sei             — la differenza e' dentro la forbice
+ *   stretto            — "fra 2 e 3 mesi"
+ *   largo              — "fra 4 mesi e un anno", detto con l'avvertenza
+ *   indistinguibile    — il ritmo non e' diverso da zero: non si dice niente
+ *   lontano            — ti stai muovendo dall'altra parte
+ *
+ * E non e' un conto alla rovescia: si ricalcola ogni volta sul ritmo di
+ * adesso, quindi puo' anche allungarsi. Un conto alla rovescia scende e
+ * basta, e diventa una scadenza da mancare.
+ */
+function tempoAlTarget(p, target) {
+  if (target == null || !p || !p.ok) return null;
+  const dist = target - p.ora;
+  const oriz = p.orizzonte;
+
+  // se il target e' gia' dentro la forbice della proiezione, ci sei
+  if (Math.abs(dist) <= p.banda) return { stato: 'ci-sei' };
+
+  /* Il ritmo e i suoi estremi, ricavati dalla banda a fine orizzonte: sono
+     gli stessi numeri che la scheda mostra gia', non un secondo calcolo che
+     un giorno direbbe qualcosa di diverso. */
+  const r = (p.fra - p.ora) / oriz;
+  const rA = ((p.fra - p.banda) - p.ora) / oriz;
+  const rB = ((p.fra + p.banda) - p.ora) / oriz;
+  const lo = Math.min(rA, rB), hi = Math.max(rA, rB);
+
+  const verso = Math.sign(dist);
+  // entrambi gli estremi vanno dalla parte sbagliata: ti stai allontanando
+  if (Math.sign(lo) === -verso && Math.sign(hi) === -verso)
+    return { stato: 'lontano', ritmo: r };
+  // gli estremi stanno a cavallo dello zero: "mai" e' dentro l'intervallo
+  if (Math.sign(lo) !== Math.sign(hi) || lo === 0 || hi === 0)
+    return { stato: 'incerto', ritmo: r };
+
+  const utili = [lo, hi].filter(x => Math.sign(x) === verso).map(x => dist / x);
+  const tLo = Math.min(...utili), tHi = Math.max(...utili);
+  if (!isFinite(tLo) || tLo <= 0) return { stato: 'incerto', ritmo: r };
+  return {
+    stato: tHi > tLo * 2.2 ? 'largo' : 'stretto',
+    giorniLo: tLo, giorniHi: tHi, punto: dist / r, ritmo: r
+  };
+}
+
+/** Giorni in una durata leggibile: sotto i due mesi in giorni, poi in mesi. */
+function durata(g) {
+  if (g < 14) return Math.round(g) + ' giorni';
+  if (g < 70) return Math.round(g / 7) + ' settimane';
+  if (g < 730) return Math.round(g / 30.4) + ' mesi';
+  return nf(g / 365, 1) + ' anni';
+}
+
+/**
+ * Un intervallo di tempo, con l'unita' detta una volta sola.
+ * "fra 5 mesi e 8 mesi" e' scritto male: l'unita' va in fondo, e si sceglie
+ * quella che rende leggibile l'estremo piu' grande.
+ */
+function intervalloDurata(lo, hi) {
+  const U = [[14, 1, 'giorni'], [70, 7, 'settimane'], [730, 30.4, 'mesi'], [Infinity, 365, 'anni']];
+  const [, div, nome] = U.find(u => hi < u[0]) || U[3];
+  const dec = div >= 365 ? 1 : 0;
+  const a = nf(lo / div, dec), b = nf(hi / div, dec);
+  return a === b ? `circa ${b} ${nome}` : `fra ${a} e ${b} ${nome}`;
+}
+
+/** La frase da mettere sotto il grafico, o null se non c'e' niente da dire. */
+function frasiTempo(t, nome) {
+  if (!t) return null;
+  if (t.stato === 'ci-sei')
+    return { t: 'Ci sei', d: `${nome} e' dentro la forbice del target. Non c'e' un tempo `
+      + 'da aspettare: c\'e\' da restarci.' };
+  if (t.stato === 'lontano')
+    return { t: 'Ti stai allontanando', d: 'Al ritmo delle ultime settimane la distanza dal '
+      + 'target cresce invece di scendere. Non e\' un giudizio sulla settimana: e\' la '
+      + 'direzione della retta, e una retta si raddrizza.' };
+  if (t.stato === 'incerto')
+    return { t: 'Troppo presto per dirlo', d: 'Il ritmo attuale non e\' abbastanza diverso '
+      + 'da zero: dentro la forbice ci sta anche "non ci arrivi". Qualsiasi numero '
+      + 'metterei qui sarebbe inventato. Servono altre rilevazioni.' };
+  const R = intervalloDurata(t.giorniLo, t.giorniHi);
+  if (t.stato === 'largo')
+    return { t: 'A questo ritmo, ' + R,
+      d: 'L\'intervallo e\' largo perche\' il ritmo varia parecchio: il numero da tenere '
+       + 'e\' quello alto, non quello basso. Si stringe da solo man mano che registri.' };
+  return { t: 'A questo ritmo, ' + R,
+    d: 'Il ritmo delle ultime settimane e\' abbastanza costante da rendere sensato questo '
+     + 'intervallo. Si ricalcola ogni volta: se rallenti si allunga, e va bene cosi\'.' };
+}
+
+/** Il blocco, con la sua classe secondo quanto e' affidabile. */
+function cardTempo(t, nome) {
+  const f = frasiTempo(t, nome);
+  if (!f) return null;
+  const cls = { 'ci-sei': ' ok', lontano: ' no', incerto: ' ni', largo: ' ni' }[t.stato] || '';
+  const c = el('div', 'tempo' + cls);
+  c.innerHTML = `<span class="t">${esc(f.t)}</span><span class="d">${esc(f.d)}</span>`;
+  return c;
+}
+
 /* ============================================================== grafico */
 /**
  * Storia piena, proiezione tratteggiata, banda intorno.
@@ -253,6 +367,9 @@ function viewPrevisioni(v) {
       + `<span>±${nf(p.banda, 1)}</span>`
       + `<span>${p.n} rilevazioni</span>`
       + (p.piatta ? `<span>ferma</span>` : `<span>R² ${nf(p.r2, 2)}</span>`)));
+    // quanto manca, in tempo: si rifiuta da solo quando non ha senso
+    const ct = cardTempo(tempoAlTarget(p, scelta.m.target), scelta.m.label);
+    if (ct) c.append(ct);
     c.append(el('p', 'note', p.piatta
       ? 'Questa misura non si e\' mossa di un millimetro fra una rilevazione e '
         + 'l\'altra. Puo\' essere vero, ma capita anche quando si riscrive il valore '

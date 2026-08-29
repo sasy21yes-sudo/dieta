@@ -232,6 +232,8 @@ non un dettaglio.
   target si sovrappone tratteggiata); tabelle ora/target/manca; grafico peso con
   media mobile a 7 giorni e previsione tratteggiata
 - **Previsione** — motore adattivo del dispendio (vedi sotto)
+- **Quanto manca in tempo** — un intervallo, non una data, e si rifiuta quando
+  il ritmo non e distinguibile da zero
 - **Dove stai andando** — proiezioni a 28 giorni con banda su misure, grasso e
   massa magra, forza. Mai una data di arrivo: la forbice e il target dentro o fuori
 - **Target ricalibrato** — il dispendio misurato dal filtro diventa una proposta
@@ -600,6 +602,39 @@ Con una cautela: se una settimana è interamente in pausa non si filtra a zero,
 si lascia com'è. Altrimenti la revisione direbbe "nessun dato" quando i dati ci
 sono, sono solo da non giudicare.
 
+### Quanto manca, in tempo
+
+Per molto tempo qui non c'è stato niente del genere, e la regola era netta:
+niente date di arrivo. La ragione non era filosofica, era **aritmetica** — il
+tempo è distanza ÷ ritmo, e quando il ritmo si avvicina a zero l'errore
+relativo esplode.
+
+Fatto il conto propagando la banda che il motore già calcola (su 9 cm di vita
+da togliere, orizzonte 28 giorni, banda ±0,3):
+
+| Ritmo su 28 gg | Punto | Intervallo vero al 95% |
+|---|---|---|
+| −1,4 | 80 giorni | 66–102 giorni — **usabile** |
+| −0,6 | 6 mesi | 4 mesi – 1 anno |
+| −0,25 | 15 mesi | 7 mesi – **mai** |
+| quasi fermo | 3 anni | 9 mesi – **mai** |
+
+Quindi non un contatore, ma `tempoAlTarget()`, che sa in quale dei cinque casi
+si trova: **ci sei** (la differenza è già dentro la forbice), **stretto**,
+**largo** (con l'avvertenza che il numero da tenere è quello alto),
+**incerto** — l'intervallo del ritmo contiene lo zero, quindi "non ci arrivi" è
+dentro le possibilità e non si scrive nessun numero — e **lontano**, quando ti
+stai muovendo dall'altra parte.
+
+Tre cose lo distinguono da un conto alla rovescia, e sono quelle che lo rendono
+onesto: è un **intervallo**, si **ricalcola** ogni volta sul ritmo di adesso —
+verificato: rallentando da −1,4 a −0,8 il numero *sale* da 148–229 a 229–504
+giorni — e **si rifiuta** invece di inventare.
+
+Sta sotto il grafico della misura scelta in *Dove stai andando*. Non c'è sul
+peso, perché il peso in quest'app **non ha un target**: quello è ancora un
+obiettivo a scadenza, e resta fuori.
+
 ### Le altre proiezioni
 
 `previsioni.js` estende alle misure, alla composizione e alla forza la regola
@@ -939,6 +974,7 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non spostare i dati nutrizionali dentro il codice
 - Non introdurre un punteggio "cibo buono / cibo cattivo"
 - Non aggiungere obiettivi di peso a scadenza né conti alla rovescia
+  (vedi però "Quanto manca, in tempo": un intervallo non è un conto alla rovescia)
 - Non far applicare da sola una modifica al target: cambia il metro con cui
   l app giudica ogni giornata registrata, e un giorno buono diventerebbe storto
   senza che l utente abbia fatto niente di diverso
@@ -950,8 +986,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non far collassare a zero la banda di una proiezione: va messo un pavimento
   alla risoluzione dello strumento (0,5 cm sul metro, 2,5 kg sui dischi).
   Una forbice di ±0,0 è precisione che nessuno possiede
-- Non estendere le proiezioni fino a dire una data di arrivo: la regola del
-  peso vale per tutte — orizzonte fisso, banda, e il target dentro o fuori
+- Non dire mai una **data** di arrivo, e non far scendere un contatore giorno
+  dopo giorno: quello diventa una scadenza da mancare. Un **intervallo** che si
+  ricalcola sul ritmo di adesso — e che quindi può anche allungarsi — è un'altra
+  cosa, ed è quello che fa `tempoAlTarget()`. Con una regola sopra tutte: quando
+  l'intervallo del ritmo contiene lo zero, non si scrive un numero
 - Non presentare come misurato ciò che è stimato. Il grasso corporeo esce da una
   formula su vita, collo e altezza e sbaglia di ±3–4 punti; le misure di Brad Pitt
   sono dichiarazioni di stampa (`fonte: "stima"`). Servono a dare una direzione,
