@@ -55,6 +55,176 @@ function comprimi(file, lato = 1280, q = .82) {
   });
 }
 
+/* ====================================================== autoscatto
+
+   Il problema e' banale e blocca tutto: le foto dei progressi si fanno da
+   soli, in casa, e con <input capture> si finisce nella fotocamera di
+   sistema — dove il timer c'e', ma bisogna trovarlo, e a ogni scatto si
+   ripassa da li'. Serve un autoscatto dentro l'app.
+
+   Percio' qui la fotocamera e' nostra: getUserMedia per l'anteprima dal vivo,
+   un conto alla rovescia, e il fotogramma catturato su canvas che poi passa
+   per la stessa compressione di prima. Il file picker resta: serve per le
+   foto che hai gia' in galleria, e come riserva dove getUserMedia non parte.
+
+   Tre dettagli che su iPhone non sono facoltativi:
+   - playsinline, altrimenti Safari apre il video a schermo intero e
+     l'anteprima sparisce dietro il player;
+   - le tracce vanno fermate a mano quando si chiude, o la spia della
+     fotocamera resta accesa;
+   - l'anteprima frontale si specchia in CSS perche' e' cosi' che ci si
+     aspetta di vedersi, ma lo scatto si salva NON specchiato: due foto a
+     mesi di distanza devono essere confrontabili, e un ribaltamento in
+     mezzo rovinerebbe il confronto a cursore.
+*/
+
+const CAM_ATTESE = [3, 5, 10, 15];
+let camStream = null, camTimer = null;
+
+function camChiudi() {
+  if (camTimer) { clearInterval(camTimer); camTimer = null; }
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+}
+
+/** Il fotogramma corrente del video, come Blob JPEG. */
+function camScatta(video) {
+  const cv = document.createElement('canvas');
+  cv.width = video.videoWidth || 720;
+  cv.height = video.videoHeight || 960;
+  cv.getContext('2d').drawImage(video, 0, 0, cv.width, cv.height);
+  return new Promise((ok, no) => cv.toBlob(
+    b => b ? ok(b) : no(new Error('cattura fallita')), 'image/jpeg', .92));
+}
+
+function sheetFotocamera(posa) {
+  let fronte = false;                       // di norma la posteriore: e' migliore
+  let attesa = +(S.settings?.autoscatto ?? 10);
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Autoscatto · ' + esc(posa)));
+  w.append(el('h2', 'sec', 'Mettiti in posa'));
+  w.lastChild.style.marginTop = '0';
+
+  const box = el('div', 'cam');
+  const video = el('video');
+  video.autoplay = true; video.muted = true; video.playsInline = true;
+  video.setAttribute('playsinline', '');    // iOS vuole anche l'attributo
+  const conto = el('div', 'cam-n');
+  conto.hidden = true;
+  box.append(video, conto);
+  w.append(box);
+
+  const stato = el('p', 'muted', 'Accendo la fotocamera…');
+  w.append(stato);
+
+  /* --- scelta dell'attesa --- */
+  w.append(el('div', 'eyebrow', 'Quanti secondi'));
+  const seg = el('div', 'seg');
+  for (const s of CAM_ATTESE) {
+    const b = el('button', null, s + '″');
+    b.setAttribute('aria-pressed', attesa === s);
+    b.onclick = () => {
+      attesa = s;
+      S.settings.autoscatto = s; save();
+      [...seg.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+    };
+    seg.append(b);
+  }
+  w.append(seg);
+
+  const via = el('button', 'btn wide pri', 'Avvia l\'autoscatto');
+  via.disabled = true;
+  w.append(via);
+
+  const gira = el('button', 'btn wide', 'Gira la fotocamera');
+  gira.style.marginTop = '8px';
+  gira.disabled = true;
+  w.append(gira);
+
+  w.append(el('p', 'note',
+    'Il conto alla rovescia si vede sullo schermo e si sente, ma solo con l\'app '
+    + 'in primo piano: una pagina web non puo\' suonare da spenta. Appoggia il '
+    + 'telefono, torna al tuo posto e aspetta i tre bip finali.'));
+
+  const ind = el('button', 'btn wide', 'Scegli una foto dalla galleria');
+  ind.style.marginTop = '8px';
+  ind.onclick = () => { camChiudi(); closeSheet(); document.getElementById('foto-file')?.click(); };
+  w.append(ind);
+
+  async function accendi() {
+    camChiudi();
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: fronte ? 'user' : 'environment',
+                 width: { ideal: 1280 }, height: { ideal: 1706 } },
+        audio: false
+      });
+      video.srcObject = camStream;
+      box.classList.toggle('specchio', fronte);
+      stato.textContent = fronte
+        ? 'Fotocamera frontale: ti vedi come allo specchio, ma lo scatto viene salvato dritto.'
+        : 'Fotocamera posteriore. Appoggia il telefono contro qualcosa di stabile.';
+      via.disabled = false; gira.disabled = false;
+    } catch (e) {
+      stato.innerHTML = 'Non riesco ad accendere la fotocamera. Su iPhone succede se '
+        + 'hai negato il permesso — si rimette da <em>Impostazioni &rsaquo; Safari</em> — '
+        + 'oppure se stai aprendo l\'app da un indirizzo non sicuro. '
+        + 'Intanto puoi usare la galleria qui sotto.';
+      via.disabled = true; gira.disabled = true;
+    }
+  }
+  gira.onclick = () => { fronte = !fronte; accendi(); };
+
+  via.onclick = () => {
+    if (camTimer) return;
+    if (typeof recSbloccaAudio === 'function') recSbloccaAudio();
+    let n = attesa;
+    conto.hidden = false; conto.textContent = n;
+    via.disabled = true; gira.disabled = true; via.textContent = 'Conto alla rovescia…';
+    // si conta sui secondi veri, non sui tick: se il telefono strozza il timer
+    // il conto resta onesto
+    const fine = Date.now() + attesa * 1000;
+    camTimer = setInterval(async () => {
+      const r = Math.ceil((fine - Date.now()) / 1000);
+      if (r === n) return;
+      n = r;
+      if (n > 0) {
+        conto.textContent = n;
+        if (typeof pulsa === 'function') pulsa(conto, { scala: 1.25, dur: 320 });
+        if (n <= 3 && typeof recBip === 'function') recBip(1);
+        return;
+      }
+      clearInterval(camTimer); camTimer = null;
+      conto.textContent = '';
+      box.classList.add('flash');
+      if (typeof recBip === 'function') recBip(2);
+      try {
+        const blob = await camScatta(video);
+        camChiudi();
+        await salvaScatto(blob, posa);
+      } catch (err) {
+        box.classList.remove('flash');
+        stato.textContent = 'Lo scatto non e\' riuscito: riprova.';
+        via.disabled = false; gira.disabled = false; via.textContent = 'Avvia l\'autoscatto';
+      }
+    }, 120);
+  };
+
+  sheet(w);
+  accendi();
+}
+
+/** Comprime, salva, aggiorna. Unico punto in cui una foto entra in archivio. */
+async function salvaScatto(fileOBlob, posa) {
+  toast('Elaboro…');
+  const { blob, w: bw, h: bh } = await comprimi(fileOBlob);
+  await fotoSalva({ id: uid(), giorno: today(), posa, blob, w: bw, h: bh,
+                    peso: S.log[today()]?.peso ?? null });
+  // contatore per i traguardi: le foto stanno in IndexedDB e i traguardi
+  // si calcolano su S, che e' sincrono
+  S.settings.nFoto = (S.settings.nFoto || 0) + 1; save();
+  closeSheet(); route(); toast('Scatto salvato');
+}
+
 /* ---------------------------------------------------------------- vista */
 let fotoPosa = 'fronte';
 const fotoUrls = [];
@@ -80,25 +250,27 @@ function viewFoto(v) {
   v.append(bar);
 
   const inp = el('input');
-  inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
+  inp.id = 'foto-file';
+  inp.type = 'file'; inp.accept = 'image/*';
   inp.style.display = 'none';
   inp.onchange = async () => {
-    const f = inp.files[0]; if (!f) return;
-    toast('Elaboro…');
-    try {
-      const { blob, w, h } = await comprimi(f);
-      await fotoSalva({ id: uid(), giorno: today(), posa: fotoPosa, blob, w, h,
-                        peso: S.log[today()]?.peso ?? null });
-      // contatore per i traguardi: le foto stanno in IndexedDB e i traguardi
-      // si calcolano su S, che e' sincrono
-      S.settings.nFoto = (S.settings.nFoto || 0) + 1; save();
-      route(); toast('Scatto salvato');
-    } catch (e) { toast('Non riesco a leggere l\'immagine'); }
+    const file = inp.files[0]; if (!file) return;
+    try { await salvaScatto(file, fotoPosa); }
+    catch (e) { toast('Non riesco a leggere l\'immagine'); }
   };
   v.append(inp);
-  const scatta = el('button', 'btn wide pri', 'Scatta o scegli una foto');
-  scatta.onclick = () => inp.click();
-  v.append(scatta);
+
+  const auto = el('button', 'btn wide pri', 'Autoscatto');
+  auto.onclick = () => sheetFotocamera(fotoPosa);
+  v.append(auto);
+  v.append(el('p', 'hint',
+    'Appoggia il telefono, avvia il conto alla rovescia e mettiti in posa. '
+    + 'Da soli non si scatta in nessun altro modo.'));
+
+  const scegli = el('button', 'btn wide', 'Scegli una foto che hai gia\'');
+  scegli.style.marginTop = '4px';
+  scegli.onclick = () => inp.click();
+  v.append(scegli);
 
   const cont = el('div');
   v.append(cont);

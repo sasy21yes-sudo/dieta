@@ -87,6 +87,7 @@ function normalize() {
   S.model ||= {}; S.model.prev ||= []; S.prodotti ||= [];
   S.palestra ||= {}; S.palestra.sessioni ||= {}; S.palestra.esercizi ||= [];
   S.palestra.schede ||= []; S.palestra.acciacchi ||= [];
+  S.palestra.esec ||= {};   // esercizio -> esecuzione nel catalogo pubblico
   // dedotto dai dati la prima volta, poi e' una scelta dell'utente
   if (!S.settings.moduli) S.settings.moduli = modulliDaStato();
   // hyrox mancava: un backup fatto prima di questa riga si importava
@@ -1345,7 +1346,16 @@ function viewCorpo(v) {
   const cm = el('div', 'card');
   cm.append(el('h2', 'sec', 'Misure'));
   cm.lastChild.style.marginTop = '0';
-  cm.append(el('p', 'muted', 'Al mattino, a digiuno, senza trattenere il respiro. Tocca una riga per registrarla.'));
+  cm.append(el('p', 'muted', 'Al mattino, a digiuno, prima di bere. Sempre allo stesso modo: '
+    + 'la costanza del punto conta piu' + '\u2019 della precisione del metro.'));
+  const fatteOggi = D.misure.filter(m => day(k).misure[m.id] != null).length;
+  const giro = el('button', 'btn wide' + (fatteOggi ? '' : ' pri'));
+  giro.style.marginBottom = '10px';
+  giro.textContent = fatteOggi
+    ? `Rifai il giro · ${fatteOggi} su ${D.misure.length} gia\u2019 prese oggi`
+    : 'Prendi le misure · una alla volta';
+  giro.onclick = () => sheetMisura(D.misure[0], k, D.misure);
+  cm.append(giro);
   const tb = el('div', 'cmp');
   tb.append(el('div', 'cmp-h', '<span></span><span>Ora</span><span>Target</span><span>Manca</span>'));
   for (const m of D.misure) {
@@ -1363,7 +1373,7 @@ function viewCorpo(v) {
        <span class="mono muted">${m.target != null ? nf(m.target, 1) : '—'}</span>
        <span class="mono ${vicino ? 'good' : ''}">${d == null ? '—' :
          vicino ? '✓' : (d > 0 ? '+' : '') + nf(d, 1)}</span>`);
-    r.onclick = () => sheetMisura(m, k);
+    r.onclick = () => sheetMisura(m, k);   // una sola, fuori dal giro
     tb.append(r);
   }
   cm.append(tb);
@@ -1517,24 +1527,115 @@ function weightCard(k) {
   return c;
 }
 
-function sheetMisura(m, k) {
+/**
+ * Una sagoma neutra con il metro disegnato dove va messo.
+ * Le coordinate x e y sono gia' in data/dieta.json su ogni misura, in
+ * percentuale del riquadro: finora non le usava nessuno.
+ */
+function figuraPunto(m) {
+  const W = 120, H = 260;
+  const y = (m.y / 100 * H).toFixed(1);
+  const box = el('div', 'mis-fig');
+  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" '
+    + 'xmlns="http://www.w3.org/2000/svg" role="img" '
+    + 'aria-label="Dove passare il metro per ' + esc(m.label) + '">'
+    // una sagoma di riferimento, non una figura in scala: quella sta in Corpo,
+    // e qui distrarrebbe da quello che si deve guardare, cioe' la riga
+    + '<g fill="none" stroke="var(--rule)" stroke-width="2.4" '
+    + 'stroke-linejoin="round" stroke-linecap="round">'
+    + '<circle cx="60" cy="21" r="13"/>'
+    + '<path d="M60,34 L60,43"/>'
+    + '<path d="M42,49 Q60,43 78,49 L84,97 Q80,123 76,151 L44,151 Q40,123 36,97 Z"/>'
+    + '<path d="M42,51 L26,105 L22,141"/><path d="M78,51 L94,105 L98,141"/>'
+    + '<path d="M48,151 L44,207 L42,247"/><path d="M72,151 L76,207 L78,247"/>'
+    + '</g>'
+    + '<line x1="14" x2="106" y1="' + y + '" y2="' + y + '" '
+    + 'stroke="var(--pine)" stroke-width="2.4" stroke-dasharray="5 4"/>'
+    + '<circle cx="' + (m.x / 100 * W).toFixed(1) + '" cy="' + y + '" r="6" '
+    + 'fill="var(--pine)"/></svg>';
+  return box;
+}
+
+/**
+ * Il foglio di una misura.
+ *
+ * Il problema delle circonferenze non e' scrivere il numero: e' prenderlo
+ * sempre nello stesso punto. Due centimetri di scarto fra una volta e l'altra
+ * sono piu' grandi di qualunque cambiamento reale in un mese, e il grafico
+ * delle misure diventa rumore. Per questo qui viene prima COME si misura e
+ * dove, e solo dopo il campo.
+ *
+ * `seq` fa il giro completo: si prendono tutte di fila, senza tornare indietro
+ * al menu ogni volta.
+ */
+function sheetMisura(m, k, seq) {
   const w = el('div'), d = day(k);
-  w.append(el('div', 'eyebrow', 'Misura'));
+  const i = seq ? seq.findIndex(x => x.id === m.id) : -1;
+  w.append(el('div', 'eyebrow', seq ? `Misura ${i + 1} di ${seq.length}` : 'Misura'));
   w.append(el('h2', 'sec', esc(m.label)));
   w.lastChild.style.marginTop = '0';
-  if (m.target != null) {
-    const cur = lastMeas(m.id);
-    w.append(el('p', 'muted', `Target ${nf(m.target, 1)} cm${cur != null
-      ? ` · ora ${nf(cur, 1)} · ${Math.abs(m.target - cur) <= 1 ? 'ci sei'
-        : `${nf(Math.abs(m.target - cur), 1)} cm ${m.target > cur ? 'da mettere' : 'da togliere'}`}` : ''}.`));
-  }
-  w.append(el('div', 'field',
-    `<label>Centimetri</label><input type="text" inputmode="decimal"
-      id="m-v" value="${d.misure[m.id] ?? lastMeas(m.id) ?? ''}">
-     ${m.nota ? `<div class="hint">${esc(m.nota)}</div>` : ''}`));
-  const b = el('button', 'btn wide pri', 'Salva');
-  b.onclick = () => {
-    const raw = $('#m-v').value.trim(), val = parseNum(raw);
+
+  if (m.come) w.append(el('p', 'muted', esc(m.come)));
+  if (m.x != null && m.y != null) w.append(figuraPunto(m));
+
+  /* --- a che punto sei --- */
+  const cur = lastMeas(m.id);
+  const giorni = Object.keys(S.log).filter(x => S.log[x]?.misure?.[m.id] != null).sort();
+  const ultima = giorni[giorni.length - 1];
+  const info = el('div', 'read');
+  info.innerHTML = (cur != null
+      ? `<span><b>${nf(cur, 1)} cm</b> l'ultima volta</span>`
+        + (ultima && ultima !== k ? `<span>${ultima}</span>` : '')
+      : '<span>Mai presa</span>')
+    + (m.target != null ? `<span>target ${nf(m.target, 1)}</span>` : '')
+    + (cur != null && m.target != null
+      ? `<span>${Math.abs(m.target - cur) <= 1 ? 'ci sei'
+        : nf(Math.abs(m.target - cur), 1) + ' cm ' + (m.target > cur ? 'da mettere' : 'da togliere')}</span>`
+      : '');
+  w.append(info);
+
+  /* --- il campo, con i mezzi centimetri a portata di pollice --- */
+  const riga = el('div', 'mis-in');
+  const meno = el('button', 'btn', '−');
+  const inp = el('input');
+  inp.type = 'text'; inp.inputMode = 'decimal'; inp.id = 'm-v';
+  inp.value = d.misure[m.id] ?? cur ?? '';
+  const piu = el('button', 'btn', '+');
+  const passo = v => {
+    const n = (parseNum(inp.value) ?? cur ?? 0) + v;
+    inp.value = Math.max(0, Math.round(n * 10) / 10);
+    controlla();
+  };
+  meno.onclick = () => passo(-0.5);
+  piu.onclick = () => passo(0.5);
+  riga.append(meno, inp, el('span', 'u', 'cm'), piu);
+  w.append(riga);
+
+  /* Un valore fuori scala e' quasi sempre un metro letto male o una cifra
+     saltata, non un corpo cambiato. Non si rifiuta — magari e' vero — ma si
+     dice, perche' una misura sbagliata resta nei grafici per mesi e sposta
+     anche la stima del grasso. */
+  const av = el('div', 'hint');
+  w.append(av);
+  const controlla = () => {
+    const val = parseNum(inp.value);
+    const fuori = val != null && m.min != null && (val < m.min || val > m.max);
+    if (fuori) {
+      av.hidden = false;
+      av.innerHTML = `<strong>${nf(val, 1)} cm e' fuori scala</strong> per `
+        + `${esc(m.label.toLowerCase())}: di solito sta fra ${m.min} e ${m.max} cm. `
+        + 'Ricontrolla il metro. Se e\' giusto, salvalo pure.';
+    } else if (m.nota) {
+      av.hidden = false; av.textContent = m.nota + '.';
+    } else {
+      av.hidden = true; av.textContent = '';
+    }
+  };
+  inp.oninput = controlla;
+  controlla();
+
+  const salva = poi => {
+    const raw = inp.value.trim(), val = parseNum(raw);
     // campo vuoto = cancella; numero valido = salva; scritto male = fermati e
     // dillo, invece di azzerare in silenzio una misura che l'utente credeva
     // di aver aggiornato
@@ -1542,9 +1643,26 @@ function sheetMisura(m, k) {
     else if (val > 0 && val < 300) d.misure[m.id] = val;
     else { toast('Valore non valido'); return; }
     S.model ||= {}; S.model.rev = (S.model.rev || 0) + 1;
-    save(); closeSheet(); route(); toast('Misura salvata');
+    save();
+    if (poi) { sheetMisura(poi, k, seq); return; }
+    closeSheet(); route();
+    toast(seq ? 'Misure aggiornate' : 'Misura salvata');
   };
-  w.append(b); sheet(w);
+
+  if (seq && i >= 0 && i < seq.length - 1) {
+    const avanti = el('button', 'btn wide pri', 'Avanti · ' + esc(seq[i + 1].label));
+    avanti.onclick = () => salva(seq[i + 1]);
+    w.append(avanti);
+    const salta = el('button', 'btn wide', 'Salta questa');
+    salta.style.marginTop = '8px';
+    salta.onclick = () => sheetMisura(seq[i + 1], k, seq);
+    w.append(salta);
+  } else {
+    const b = el('button', 'btn wide pri', seq ? 'Finito' : 'Salva');
+    b.onclick = () => salva(null);
+    w.append(b);
+  }
+  sheet(w);
 }
 
 /* -------------------------------------------------------- vista ANALISI */

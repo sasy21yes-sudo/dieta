@@ -83,7 +83,8 @@ palestra.js     registro sedute, mappa muscolare, forma-fatica, progressione,
                 catalogo esercizi da internet
 prodotti.js     prodotti reali, codici a barre, ricerca alimenti su Open Food
                 Facts, override degli alimenti
-foto.js         foto dei progressi (IndexedDB) + timelapse + confronto a cursore
+foto.js         foto dei progressi (IndexedDB) + autoscatto + timelapse +
+                confronto a cursore
 sw.js           cache offline; rete-prima su tutto, cache come riserva
 manifest.json   PWA
 data/dieta.json IL DOMINIO alimentare — vedi sotto
@@ -205,6 +206,11 @@ non un dettaglio.
 - **Cerca un alimento su internet** — Open Food Facts per nome, con il
   controllo che i macro tornino con le calorie dichiarate
 - **Scala il pasto** — moltiplicatore da ×0,5 a ×2 su tutti gli ingredienti
+- **Autoscatto** — fotocamera dentro l app con conto alla rovescia: le foto dei
+  progressi si fanno da soli, e con <input capture> non si poteva
+- **Misure guidate** — una alla volta, con dove passare il metro disegnato sulla
+  sagoma e il controllo dei valori fuori scala
+- **Come si esegue** — due fotogrammi per esercizio dal catalogo pubblico
 - **Confronto foto a cursore** — prima e dopo sovrapposte, con la riga che si
   trascina
 - **Passi e sonno da un Comando iOS**, senza scriverli a mano
@@ -549,6 +555,64 @@ Nel farlo è saltato fuori un bug vecchio: gli esercizi tuoi nascevano con
 li trattava perciò **sempre da isolamento**, 75 secondi anche su uno stacco.
 Ora l'editor ha il selettore multi/isolamento e il tipo si salva davvero.
 
+### L'autoscatto, e perché serviva
+
+Le foto dei progressi si fanno **da soli**, in casa. Con `<input capture>` si
+finisce nella fotocamera di sistema: il timer c'è, ma va trovato, e a ogni
+scatto si ripassa da lì. Quindi la fotocamera è nostra — `getUserMedia` per
+l'anteprima, conto alla rovescia, fotogramma su canvas, poi la stessa
+`comprimi()` di prima. Il file picker resta per la galleria e come riserva.
+
+Tre dettagli che su iPhone non sono facoltativi:
+
+- **`playsinline`** (attributo *e* proprietà), o Safari apre il video a schermo
+  intero e l'anteprima sparisce dietro il player
+- le tracce vanno **fermate a mano** alla chiusura, o la spia della fotocamera
+  resta accesa
+- l'anteprima frontale si specchia in CSS perché è così che ci si aspetta di
+  vedersi, ma **lo scatto si salva non specchiato**: due foto a mesi di distanza
+  devono essere confrontabili, e un ribaltamento in mezzo rovinerebbe il
+  confronto a cursore
+
+Il conto alla rovescia riusa `recBip()` di `timer.js`, e come quello suona solo
+con l'app in primo piano — la UI lo dice.
+
+### Prendere le misure
+
+Il problema delle circonferenze non è scrivere il numero: è prenderlo **sempre
+nello stesso punto**. Due centimetri di scarto fra una volta e l'altra sono più
+grandi di qualunque cambiamento reale in un mese, e il grafico diventa rumore.
+
+Perciò `sheetMisura()` mette prima **come** si misura e **dove**, e solo dopo il
+campo. Le istruzioni stanno in `data/dieta.json` (`come`, `min`, `max` su ogni
+voce di `misure`): sono contenuto di dominio come i 44 alimenti, non copy della
+UI. `figuraPunto()` disegna una sagoma neutra con il metro tratteggiato alla
+quota giusta — le coordinate `x`/`y` erano già nel file e non le usava nessuno.
+
+`seq` fa il giro completo di tutte e sei senza tornare al menu ogni volta, con
+±0,5 cm a portata di pollice. Un valore fuori dall'intervallo plausibile non
+viene rifiutato — magari è vero — ma viene detto, perché una misura sbagliata
+resta nei grafici per mesi e sposta anche la stima del grasso.
+
+### "Il video dell'esecuzione" — cosa esiste davvero
+
+**Non esiste una fonte di video usabile.** Verificato prima di rinunciarci:
+wger ha 78 video su 862 esercizi (il 9%), e sono `.MOV` da 34–60 MB l'uno.
+Sessanta megabyte per guardare come si fa uno stacco, su rete dati, non è una
+funzionalità. Le librerie a pagamento vogliono una chiave, e non c'è un server
+dove nasconderla.
+
+Quello che c'è, e per **tutti e 873** gli esercizi, sono due fotogrammi —
+partenza e arrivo, ~70 KB l'uno — dallo stesso `free-exercise-db` del catalogo.
+Alternati ogni 900 ms fanno vedere il movimento. Non è un video, e la UI **non
+lo chiama così**: lo dice, e offre un link a YouTube che apre fuori dall'app.
+
+Il collegamento esercizio → fotogrammi sta in `S.palestra.esec` e si fa una
+volta. Gli esercizi del catalogo di base hanno nomi italiani: indovinare
+l'accoppiamento a tentativi produrrebbe l'esecuzione **sbagliata**, che è peggio
+di nessuna esecuzione. Chi importa dal catalogo online se lo porta dietro da
+solo (`exdbId`).
+
 ### Passi e sonno senza scriverli
 
 Nessuna API web legge HealthKit. Un **Comando iOS** però ha i permessi che il
@@ -619,6 +683,12 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non marcare `verificato` un alimento che arriva da Open Food Facts: quei valori
   li inseriscono gli utenti dell'archivio. Nasce `stima` e lo diventa solo se
   qualcuno conferma di averlo letto sulla confezione
+- Non chiamare "video" i due fotogrammi dell'esecuzione, e non indovinare a
+  quale esercizio del catalogo pubblico corrisponde un esercizio italiano:
+  mostrare l'esecuzione sbagliata è peggio che non mostrarne nessuna
+- Non salvare specchiato lo scatto della fotocamera frontale: l'anteprima sì
+  (è come ci si aspetta di vedersi), il file no, o il confronto a cursore fra
+  due foto a mesi di distanza si ribalta a metà
 - Non far cancellare dati a un interruttore di modulo: spegnere nasconde, non
   distrugge. E non dare per scontato che `S.settings.moduli` esista — un backup
   scritto prima non ce l'ha, e `modulliDaStato()` lo deduce

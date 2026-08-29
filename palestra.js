@@ -764,6 +764,7 @@ function sheetDaScheda(k, schedaId) {
     // se la riga dopo e' attaccata a questa, qui il timer non ci va
     if (!sc.esercizi[ei + 1]?.superserie)
       cap.querySelector('span:last-child').before(bottoneRecupero(ex, riga));
+    cap.querySelector('span:last-child').before(bottoneEsecuzione(riga.ex));
     const av = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(riga.ex, k) : null;
     if (av) box.append(av);
     if (riga.tecnica && riga.tecnica !== 'normale')
@@ -895,6 +896,10 @@ function sheetLibero(k) {
     avv.innerHTML = '';
     const x = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(selEx.valore(), k) : null;
     if (x) avv.append(x);
+    const r = el('div', 'row');
+    r.style.margin = '2px 0 8px';
+    r.append(bottoneEsecuzione(selEx.valore()));
+    avv.append(r);
   };
   aggiornaAvviso();
   box.append(avv);
@@ -1313,6 +1318,7 @@ function daExdb(x) {
     secondari: P2.dentro.filter(m => !P1.dentro.includes(m)),
     range: multi ? [6, 10] : [10, 15],
     incremento: INCR_ATTR[attrezzo] ?? 2.5,
+    exdbId: exdbCartella(x.n),           // i due fotogrammi dell'esecuzione
     nonMappati: [...new Set([...P1.fuori, ...P2.fuori])],
     origine: 'free-exercise-db'
   };
@@ -1439,6 +1445,145 @@ function sheetCercaEsercizio(onScegli) {
   ind.onclick = () => onScegli(null);
   w.append(ind);
   sheet(w);
+}
+
+/* ================================================ come si esegue
+
+   Sul video, la risposta onesta e' che non esiste una fonte usabile.
+   Verificato prima di rinunciarci: wger ha 78 video su 862 esercizi — il 9% —
+   e sono file .MOV da 34 a 60 MB l'uno. Sessanta megabyte per guardare come si
+   fa uno stacco, su una connessione dati, non e' una funzionalita': e' un
+   dispetto. Le librerie a pagamento vogliono una chiave, e qui non c'e' nessun
+   server dove nasconderla.
+
+   Quello che c'e' davvero, e per TUTTI e 873 gli esercizi, sono due
+   fotogrammi: posizione di partenza e di arrivo, circa 70 KB l'uno. Alternati
+   in loop fanno vedere il movimento — non e' un video e la UI non lo chiama
+   cosi', ma per capire dove va il bilanciere e fin dove si scende e' quello
+   che serve. Chi vuole il video vero ha il collegamento a YouTube, che apre
+   fuori dall'app.
+
+   Il collegamento fra un esercizio e i suoi fotogrammi si fa una volta e resta
+   in S.palestra.esec: gli esercizi del catalogo di base hanno nomi italiani e
+   indovinare l'accoppiamento a tentativi produrrebbe l'esecuzione sbagliata,
+   che e' peggio di nessuna esecuzione. */
+
+const EXDB_IMG = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/';
+
+function esecMappa() { P().esec ||= {}; return P().esec; }
+
+/** L'id nel catalogo pubblico: dall'import, o dal collegamento fatto a mano. */
+function esecDi(exId) {
+  const e = esercizio(exId);
+  return e?.exdbId || esecMappa()[exId] || null;
+}
+
+/** Dal nome del catalogo alla cartella delle immagini: "Barbell Squat" -> "Barbell_Squat". */
+const exdbCartella = nome => (nome || '').trim().replace(/\s+/g, '_');
+
+/**
+ * I due fotogrammi che si alternano.
+ * Il cambio e' un semplice toggle di opacita' ogni 900 ms — abbastanza lento
+ * da leggere la posizione, abbastanza veloce da far capire che sono due
+ * momenti dello stesso gesto. Con reduced-motion non si alterna: si mettono
+ * affiancati, che e' lo stesso contenuto senza il movimento.
+ */
+function cardEsecuzione(cartella, nome) {
+  const box = el('div');
+  const url = i => EXDB_IMG + encodeURIComponent(cartella) + '/' + i + '.jpg';
+  const anima = typeof motionOk === 'function' ? motionOk() : true;
+
+  if (!anima) {
+    const g = el('div', 'esec-due');
+    g.innerHTML = `<figure><img src="${url(0)}" alt="Posizione di partenza"><figcaption>partenza</figcaption></figure>`
+      + `<figure><img src="${url(1)}" alt="Posizione di arrivo"><figcaption>arrivo</figcaption></figure>`;
+    box.append(g);
+  } else {
+    const g = el('div', 'esec');
+    g.innerHTML = `<img class="a" src="${url(0)}" alt="Esecuzione di ${esc(nome)}">`
+      + `<img class="b" src="${url(1)}" alt="">`
+      + '<span class="esec-t">partenza</span>';
+    box.append(g);
+    let su = false;
+    const et = g.querySelector('.esec-t');
+    const t = setInterval(() => {
+      if (!g.isConnected) { clearInterval(t); return; }
+      su = !su;
+      g.classList.toggle('fine', su);
+      et.textContent = su ? 'arrivo' : 'partenza';
+    }, 900);
+  }
+
+  const err = el('p', 'hint');
+  err.hidden = true;
+  err.textContent = 'Le immagini non si caricano: la prima volta serve la rete.';
+  box.querySelectorAll('img').forEach(i => i.onerror = () => { err.hidden = false; });
+  box.append(err);
+
+  box.append(el('p', 'note',
+    'Due fotogrammi, partenza e arrivo, dallo stesso catalogo pubblico degli '
+    + 'esercizi. Non e' + '’ un video: nessun archivio libero ne ha uno per tutti '
+    + 'gli esercizi, e quelli che esistono pesano decine di megabyte l\'uno.'));
+
+  const yt = el('button', 'btn wide');
+  yt.textContent = 'Cerca il video su YouTube';
+  yt.onclick = () => window.open(
+    'https://www.youtube.com/results?search_query='
+    + encodeURIComponent(nome + ' proper form'), '_blank', 'noopener');
+  box.append(yt);
+  return box;
+}
+
+/** Il foglio: l'esecuzione se c'e', altrimenti come collegarla. */
+function sheetEsecuzione(exId) {
+  const e = esercizio(exId);
+  const cart = esecDi(exId);
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Come si esegue'));
+  w.append(el('h2', 'sec', esc(e?.nome || 'Esercizio')));
+  w.lastChild.style.marginTop = '0';
+
+  if (cart) {
+    w.append(cardEsecuzione(cart, e?.nome || cart.replace(/_/g, ' ')));
+    const cambia = el('button', 'btn wide');
+    cambia.style.marginTop = '8px';
+    cambia.textContent = 'Non e’ questo: collegane un altro';
+    cambia.onclick = () => collegaEsecuzione(exId);
+    w.append(cambia);
+  } else {
+    w.append(el('p', 'muted',
+      'Questo esercizio non e’ collegato al catalogo pubblico, quindi non so quale '
+      + 'sia. Cercalo una volta e da qui in poi l\'esecuzione compare da sola, anche '
+      + 'dentro la scheda mentre ti alleni.'));
+    const b = el('button', 'btn wide pri', 'Collega l\'esecuzione');
+    b.onclick = () => collegaEsecuzione(exId);
+    w.append(b);
+  }
+  sheet(w);
+}
+
+/** Si sceglie dal catalogo pubblico, e la scelta resta. */
+function collegaEsecuzione(exId) {
+  sheetCercaEsercizio(scelto => {
+    if (!scelto) { sheetEsecuzione(exId); return; }
+    esecMappa()[exId] = exdbCartella(scelto.nome);
+    save();
+    sheetEsecuzione(exId);
+    toast('Collegato');
+  });
+}
+
+/** Il bottoncino da mettere accanto al nome di un esercizio. */
+function bottoneEsecuzione(exId) {
+  const b = el('button', 'esec-go');
+  b.type = 'button';
+  b.textContent = esecDi(exId) ? '▶ esecuzione' : '? esecuzione';
+  b.title = 'Come si esegue';
+  b.onclick = ev => {
+    ev.preventDefault(); ev.stopPropagation();
+    sheetEsecuzione(exId);
+  };
+  return b;
 }
 
 /* ------------------------------------------------- esercizi personalizzati */
@@ -1585,6 +1730,7 @@ function sheetEsercizio(id, pre) {
       incremento: parseNum($('#ex-inc').value) ?? 2.5
     };
     if (pre?.origine) rec.origine = pre.origine;
+    if (pre?.exdbId) rec.exdbId = pre.exdbId;
     const i = miei.findIndex(x => x.id === rec.id);
     if (i >= 0) miei[i] = rec; else miei.push(rec);
     save(); closeSheet(); route(); toast('Esercizio salvato');

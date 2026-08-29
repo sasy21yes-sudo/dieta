@@ -1524,7 +1524,10 @@
    "chiave": true,
    "x": 50,
    "y": 46,
-   "target": 79
+   "target": 79,
+   "come": "In piedi, rilassato, il metro all'altezza dell'ombelico e parallelo al pavimento. Espira normalmente e misura senza trattenere il respiro e senza tirare in dentro: e' il punto in cui si bara di piu', e barare qui falsa anche la stima del grasso.",
+   "min": 50,
+   "max": 170
   },
   {
    "id": "torace",
@@ -1532,7 +1535,10 @@
    "base": 91,
    "x": 50,
    "y": 33,
-   "target": 99
+   "target": 99,
+   "come": "Metro sotto le ascelle e sopra i capezzoli, braccia lungo i fianchi. A fine espirazione normale, non a polmoni pieni.",
+   "min": 60,
+   "max": 170
   },
   {
    "id": "collo",
@@ -1541,7 +1547,10 @@
    "x": 50,
    "y": 17,
    "nota": "Rimisura: 30 cm è anomalo, la media è 37–39",
-   "target": 38
+   "target": 38,
+   "come": "Appena sotto il pomo d'Adamo, metro leggermente inclinato in avanti, spalle rilassate. Non contrarre e non stringere: la formula del grasso si regge sulla differenza vita meno collo, e un centimetro qui ne vale quasi due di risultato.",
+   "min": 28,
+   "max": 55
   },
   {
    "id": "braccio",
@@ -1549,7 +1558,10 @@
    "base": null,
    "x": 22,
    "y": 36,
-   "target": 36
+   "target": 36,
+   "come": "Braccio piegato a 90 gradi e bicipite contratto, nel punto piu' largo. Usa sempre lo stesso braccio, altrimenti confronti due cose diverse.",
+   "min": 20,
+   "max": 60
   },
   {
    "id": "coscia",
@@ -1557,7 +1569,10 @@
    "base": null,
    "x": 38,
    "y": 66,
-   "target": 55
+   "target": 55,
+   "come": "A meta' fra la piega dell'inguine e il ginocchio, in piedi con il peso su tutte e due le gambe. Segna mentalmente il punto: e' quello che va ritrovato la volta dopo.",
+   "min": 30,
+   "max": 95
   },
   {
    "id": "fianchi",
@@ -1565,7 +1580,10 @@
    "base": null,
    "x": 50,
    "y": 54,
-   "target": 92
+   "target": 92,
+   "come": "Nel punto piu' largo dei glutei, piedi uniti, metro parallelo al pavimento.",
+   "min": 60,
+   "max": 170
   }
  ],
  "regole_calorie": [
