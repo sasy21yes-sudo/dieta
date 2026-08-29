@@ -19,7 +19,17 @@
  * avere lo storico servirebbero quaranta chiamate per muscolo, cioe' migliaia
  * di scansioni dello stesso registro. Qui si scorre una volta e si annota.
  */
+const _trCache = new Map();
 function traiettoriaFatica(mus, fino = today(), giorni = 120) {
+  const key = mus + '|' + fino + '|' + giorni + '|'
+    + Object.keys(P().sessioni || {}).length;
+  if (_trCache.has(key)) return _trCache.get(key);
+  const out = traiettoriaFaticaCalc(mus, fino, giorni);
+  if (_trCache.size > 120) _trCache.clear();
+  _trCache.set(key, out);
+  return out;
+}
+function traiettoriaFaticaCalc(mus, fino, giorni) {
   const M = PD?.modello || { tau_forma: 42, tau_fatica: 7, k_forma: 1, k_fatica: 2 };
   const df = Math.exp(-1 / M.tau_forma), dt = Math.exp(-1 / M.tau_fatica);
   let forma = 0, fatica = 0;

@@ -70,7 +70,8 @@ app.js          stato, router, viste principali, motori. Caricato PER ULTIMO:
                 file devono gia' esistere
 anim.js         toolkit di animazione (vedi sotto). Caricato PRIMA di charts.js
 charts.js       toolkit SVG dei grafici + vista Dati
-revisione.js    revisione settimanale: diagnosi, grafico a manubrio, priorita'
+revisione.js    revisione settimanale: diagnosi, leve, impegno, priorita'
+target.js       il target che si ricalibra sul dispendio + rampa fibre
 previsioni.js   proiezioni di misure, composizione e forza a 28 giorni
 cerca.js        selettore cercabile riusabile + dispensa
 peso.js         pesate anomale e ciclo mestruale: cio' che sporca la bilancia
@@ -229,6 +230,10 @@ non un dettaglio.
 - **Previsione** — motore adattivo del dispendio (vedi sotto)
 - **Dove stai andando** — proiezioni a 28 giorni con banda su misure, grasso e
   massa magra, forza. Mai una data di arrivo: la forbice e il target dentro o fuori
+- **Target ricalibrato** — il dispendio misurato dal filtro diventa una proposta
+  di target, con la matrice del piano che la corregge. Mai applicata da sola
+- **Giorni che non contano** — vacanza o influenza escono da revisione e costanza
+- **Fiamma della striscia** — i giorni di fila disegnati, non scritti
 - **Dati** — cruscotto: 4 riquadri statistici, calendario della costanza e 14
   grafici (peso, calorie, proteine, ripartizione dei macro, fibre, passi, sonno,
   acqua, Coca Zero, fame/energia, misure, composizione, dispendio stimato,
@@ -395,6 +400,64 @@ su orizzonti di 7 e 28 giorni con banda al 95%, e mostra separatamente la forbic
 bilancia di domani per far vedere perché il numero del mattino non va letto. Nessuna
 proiezione a data fissa: sarebbe un conto alla rovescia, che questo file vieta.
 
+### Il target che si ricalibra
+
+Per molto tempo l'app ha avuto **due metà che non si parlavano**. Da una parte un
+filtro di Kalman che dopo qualche settimana sa quanto consumi meglio di
+qualsiasi formula; dall'altra `D.target.kcal`, un numero messo a mano una volta
+e mai più toccato. Quella conoscenza finiva in un grafico e moriva lì.
+
+`target.js` chiude l'anello, con tre regole:
+
+1. **Non si applica da sola.** Cambiare di nascosto il metro con cui l'app
+   giudica le giornate significa che un giorno "buono" diventa "storto" senza
+   che tu abbia fatto niente di diverso. La proposta si accetta, e la conferma
+   mostra il confronto macro per macro.
+2. **La correzione viene dalla matrice**, non da un'opinione nuova.
+   `regole_calorie` è già la decisione del piano su peso × vita × carichi e
+   l'analisi la applica già: qui si aggiunge solo il bottone che la esegue.
+3. **Niente deficit da fame.** Pavimento a BMR × 1,1, e la UI dice qual è.
+
+Le proteine **non scalano** con le calorie: restano ancorate al peso corporeo
+(`p_per_kg`), perché sono la variabile che protegge la massa magra. Grassi al
+25%, carboidrati a residuo.
+
+E come tutto il resto: si sceglie un **ritmo**, non una scadenza.
+
+**Rampa fibre** (stessa file): il piano ne prevede 38 g e chi arriva da
+un'alimentazione normale sta a 15–20. Il salto in un colpo non è pericoloso ma
+produce una settimana di gonfiore che fa mollare un piano che funzionava. Cinque
+grammi a settimana, e la carta nomina anche l'acqua — le fibre senza acqua
+peggiorano le cose invece di migliorarle.
+
+### La revisione chiude il cerchio
+
+`data/dieta.json` conteneva `leve` — quattro mosse concrete da ±150 kcal scritte
+a mano da chi ha costruito il piano — e **non le leggeva nessuno** dalla prima
+versione. Erano esattamente la risposta alla domanda che la revisione lasciava
+aperta. Ora `levaPerPriorita()` le propone, scegliendo per segno, e **solo** sulle
+priorità caloriche: infilare una leva da 150 kcal sotto "dormi troppo poco"
+sarebbe un consiglio a caso.
+
+Poi l'**impegno**: la priorità della settimana si può prendere come impegno, e
+domenica prossima `esitoImpegno()` guarda se quella voce è ancora fra gli errori.
+Non chiede "ce l'hai fatta?" — a quella domanda si può rispondere di sì senza che
+sia vero. Guarda i numeri, e distingue tre casi: sparito, ancora primo (la mossa
+era troppo grande), ancora presente ma meno grave.
+
+### Giorni che non contano
+
+Vacanza, influenza, trasferta. Una settimana d'ospedale giudicata col metro di
+una normale non misura niente: dice che è andata male, cosa che sapevi.
+`S.settings.pause` **non cancella niente** — i dati restano e si vedono ovunque —
+ma `costanze()` e `metricheSettimana()` saltano quei giorni, e il denominatore
+scende con loro (dividere per 28 invece che per 21 misurerebbe che ti sei
+ammalato, non la tua costanza).
+
+Con una cautela: se una settimana è interamente in pausa non si filtra a zero,
+si lascia com'è. Altrimenti la revisione direbbe "nessun dato" quando i dati ci
+sono, sono solo da non giudicare.
+
 ### Le altre proiezioni
 
 `previsioni.js` estende alle misure, alla composizione e alla forza la regola
@@ -465,6 +528,20 @@ mai moralizzante — è un requisito esplicito dell'utente.
 3. **Solo `opacity`, `transform` e `stroke-dashoffset`**: sono le proprietà che
    il browser compone sulla GPU. Animare `width` o `top` ricalcola il layout a
    ogni fotogramma
+
+**La fiamma della striscia** è l'unica animazione infinita di tutta l'app, e ci
+sta perché non è decorazione: il riempimento interno viene dal numero di giorni
+(sei stadi, non un continuo — a occhio la differenza fra 14 e 15 giorni non si
+vede comunque). Lo sfarfallio muove solo `transform` e con `reduced-motion`
+sparisce: la fiamma resta piena allo stesso modo, perché è il **riempimento** a
+portare il dato, non il moto.
+
+Le altre piccolezze seguono la stessa regola — animare solo dove il movimento
+*dice* qualcosa: la spunta della sfida che si disegna (l'hai fatta tu, non era
+già così), le barre macro che crescono da sinistra con `scaleX` e non con
+`width`, il rimbalzo sul tick del pasto che conferma il tocco prima che la
+pagina si ridisegni, i coriandoli su una sfida completata e su un impegno
+mantenuto.
 
 Il pezzo forte è `disegnaPath()`: si misura la lunghezza vera del tracciato,
 la si usa come trattino e si fa scorrere l'offset — la tecnica classica, l'unica
@@ -689,6 +766,14 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non spostare i dati nutrizionali dentro il codice
 - Non introdurre un punteggio "cibo buono / cibo cattivo"
 - Non aggiungere obiettivi di peso a scadenza né conti alla rovescia
+- Non far applicare da sola una modifica al target: cambia il metro con cui
+  l app giudica ogni giornata registrata, e un giorno buono diventerebbe storto
+  senza che l utente abbia fatto niente di diverso
+- Non scalare le proteine insieme alle calorie quando si ricalibra il target:
+  restano ancorate al peso corporeo, sono la variabile che protegge la massa magra
+- Non usare una pausa per nascondere le settimane storte: quelle servono, ed e
+  da quelle che la revisione impara. La pausa e per i giorni in cui il piano
+  non era nemmeno in gioco
 - Non far collassare a zero la banda di una proiezione: va messo un pavimento
   alla risoluzione dello strumento (0,5 cm sul metro, 2,5 kg sui dischi).
   Una forbice di ±0,0 è precisione che nessuno possiede

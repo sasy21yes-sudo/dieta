@@ -345,6 +345,9 @@ function viewPiano(v) {
     c.onclick = () => { pianoTab = s.id; route(); };
     v.append(c);
   }
+  if (typeof osserva === 'function' && v.querySelector('.step'))
+    osserva(v.querySelector('.step'),
+      () => entrata([...v.querySelectorAll('.step')], { passo: 55, su: 10 }));
 
   const base = el('div', 'card flat');
   base.append(el('div', 'eyebrow', 'Piano di partenza'));
@@ -460,6 +463,8 @@ function sezProfilo(v) {
 /* ---------------------------------------------------------------- target */
 function sezTarget(v) {
   const p = piano();
+  if (typeof cardTarget === 'function') v.append(cardTarget());
+  if (typeof cardRampaFibre === 'function') { const rf = cardRampaFibre(); if (rf) v.append(rf); }
   const c = el('div', 'card');
   c.append(el('h2', 'sec', 'Target giornalieri'));
   c.lastChild.style.marginTop = '0';

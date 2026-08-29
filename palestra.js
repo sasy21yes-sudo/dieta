@@ -108,6 +108,27 @@ function serieFormaFatica(mus, days) {
   return days.map(k => ({ k, ...formaFatica(mus, k, 90) }));
 }
 
+/* Memoria di una passata sola.
+   Misurato: statoMuscoli() chiama formaFatica() per tutti e tredici i muscoli,
+   e ognuna riscorre 121 giorni di registro — 1573 giorni scanditi a ogni
+   apertura della scheda Gym. Subito dopo scaricoConsigliato() ne rifa'
+   altrettanti. Con pochi dati non si nota; con due anni di sedute su un
+   telefono vecchio si notera'. La chiave e' il giorno piu' la revisione dello
+   stato, la stessa che usa gia' il motore di previsione: se registri una serie
+   il numero cambia e la cache cade da sola. */
+const _ffCache = new Map();
+function ffKey(k) {
+  return k + '|' + Object.keys(P().sessioni || {}).length + '|' + (S.model?.rev || 0);
+}
+function formaFaticaCache(mus, fino) {
+  const key = ffKey(fino) + '|' + mus;
+  if (_ffCache.has(key)) return _ffCache.get(key);
+  if (_ffCache.size > 200) _ffCache.clear();     // non e' un archivio, e' un respiro
+  const v = formaFatica(mus, fino);
+  _ffCache.set(key, v);
+  return v;
+}
+
 /** Stato di ogni muscolo: volume settimanale + forma/fatica. */
 function statoMuscoli(k = today()) {
   const sett = windowDays(k, 7);
@@ -116,7 +137,7 @@ function statoMuscoli(k = today()) {
   // scala comune per la mappa: il massimo corrente, altrimenti i colori
   // di due muscoli non sarebbero confrontabili fra loro
   const ff = {};
-  for (const m of muscoli()) ff[m.id] = formaFatica(m.id, k);
+  for (const m of muscoli()) ff[m.id] = formaFaticaCache(m.id, k);
   const maxFat = Math.max(0.001, ...Object.values(ff).map(x => x.fatica));
   const maxForma = Math.max(0.001, ...Object.values(ff).map(x => x.forma));
   const out = {};

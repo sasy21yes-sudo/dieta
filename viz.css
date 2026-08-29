@@ -744,3 +744,86 @@
 .cmp-r em.up,.cmp-r em.dn{display:block;font-family:var(--mono);font-size:9.5px;
   font-style:normal;margin-top:1px}
 .cmp-r em.up{color:var(--pine)} .cmp-r em.dn{color:var(--amber)}
+
+/* ---------------- leve e impegno ---------------- */
+.rev-leve{margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,255,255,.15)}
+.rev-prio .rev-leve .rev-kick{color:rgba(255,255,255,.55)}
+.rev-leva{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:center;
+  padding:7px 0}
+.rev-leva .k{font-family:var(--mono);font-size:12px;font-weight:700;text-align:center;
+  background:rgba(255,255,255,.14);border-radius:7px;padding:5px 0}
+.rev-leva .a{font-size:13.5px;line-height:1.4}
+.rev-imp{margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,255,255,.15)}
+.rev-imp .t{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:rgba(255,255,255,.55)}
+.rev-imp .d{display:block;font-size:14px;font-weight:600;margin:3px 0 9px}
+.card.imp-esito{border-left:3px solid var(--amber);overflow:hidden}
+.card.imp-esito.ok{border-left-color:var(--pine)}
+.imp-t{font-family:var(--serif);font-size:19px;font-weight:700;margin:3px 0 6px;
+  letter-spacing:-.01em}
+
+/* ---------------- scorciatoie di registrazione ---------------- */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.chip{display:flex;flex-direction:column;align-items:flex-start;gap:1px;
+  background:var(--wash);border:1px solid var(--rule);border-radius:9px;
+  padding:7px 10px;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.chip .n{font-size:13px;font-weight:600;max-width:42vw;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.chip .k{font-family:var(--mono);font-size:10px;color:var(--ink-3)}
+
+/* ---------------- anteprima del backup ---------------- */
+.imp-riga{padding:10px 0;border-top:1px solid var(--rule)}
+.imp-riga .n{display:block;font-weight:600;font-size:14px}
+.imp-riga .d{display:block;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);
+  margin-top:1px}
+
+/* ---------------- ricalibrazione del target ---------------- */
+.tg-reg{margin:12px 0;padding:12px;border-radius:11px;background:var(--pine-soft);
+  border:1px solid var(--pine-line)}
+.tg-reg .t{display:block;font-weight:600;font-size:14.5px;margin-bottom:4px}
+.tg-reg .d{display:block;font-size:13px;color:var(--ink-2);line-height:1.5}
+.tg-r{display:grid;grid-template-columns:64px 1fr;gap:11px;align-items:center;
+  width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;
+  border-top:1px solid var(--rule);padding:12px 0;cursor:pointer}
+.tg-r.on{opacity:.55}
+.tg-r .k{font-family:var(--mono);font-size:15px;font-weight:700;text-align:center;
+  background:var(--wash);border-radius:8px;padding:7px 0}
+.tg-r.on .k{background:var(--pine);color:#fff}
+.tg-r .t{display:block;font-weight:600;font-size:14px}
+.tg-r .d{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.45;margin-top:1px}
+.tg-r .d em{font-style:normal;color:var(--amber)}
+
+/* ---------------- la fiamma della striscia ---------------- */
+.fiamma{display:inline-block;width:var(--f,34px);height:calc(var(--f,34px) * 1.08);
+  flex:none;line-height:0}
+.fiamma svg{width:100%;height:100%;display:block;overflow:visible}
+.fiamma .cont{fill:none;stroke:var(--rule);stroke-width:1.6;stroke-linejoin:round}
+.fiamma .pieno{fill:var(--amber);opacity:.92}
+.fiamma.off .pieno{display:none}
+/* l'unica animazione infinita dell'app: solo transform, e sparisce con
+   reduced-motion perche' e' il riempimento a portare il dato, non il moto */
+@media (prefers-reduced-motion: no-preference){
+  .fiamma .pieno{transform-origin:12px 21px;animation:fiammella 2.4s ease-in-out infinite}
+}
+@keyframes fiammella{
+  0%,100%{transform:scaleY(1) scaleX(1)}
+  35%{transform:scaleY(1.06) scaleX(.97)}
+  70%{transform:scaleY(.97) scaleX(1.03)}
+}
+.fi-blocco{display:flex;align-items:center;gap:10px}
+.fi-t{display:flex;flex-direction:column;line-height:1.15}
+.fi-n{font-size:26px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.fi-blocco.cp .fi-n{font-size:18px}
+.fi-l{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink-3)}
+.fi-s{font-size:12px;color:var(--ink-2);margin-top:2px}
+
+/* ---------------- la sfida ---------------- */
+.sf-tick{width:19px;height:19px;vertical-align:-3px;margin-right:5px}
+.sfida-f{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin-top:12px;padding-top:11px;border-top:1px solid var(--rule)}
+.sf-nums{display:grid;grid-template-columns:auto auto;gap:1px 8px;text-align:right}
+.sf-nums .l{font-family:var(--mono);font-size:9px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink-3);align-self:center}
+.sf-nums .v{font-family:var(--mono);font-size:14px;font-weight:600;
+  font-variant-numeric:tabular-nums}

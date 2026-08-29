@@ -13,9 +13,16 @@
 
 /** I sette giorni chiusi, e i sette prima di quelli. */
 function settimane(k = today()) {
+  // le pause non si tolgono qui: la settimana resta di sette giorni per le
+  // date in testata. Si tolgono nel conteggio, dove falserebbero le medie
   const questa = windowDays(k, 7);
   const prima = windowDays(addDays(k, -7), 7);
   return { questa, prima };
+}
+
+/** Quanti giorni di questa settimana erano in pausa. */
+function pausaSettimana(giorni) {
+  return typeof inPausa === 'function' ? giorni.filter(inPausa).length : 0;
 }
 
 function mediaSu(giorni, fn) {
@@ -49,7 +56,14 @@ function seduteAbituali(k = today(), settimane = 8) {
 }
 
 function metricheSettimana(k = today()) {
-  const { questa, prima } = settimane(k);
+  const s0 = settimane(k);
+  const filtra = g => typeof senzaPause === 'function' ? senzaPause(g) : g;
+  // una settimana interamente in pausa non si filtra a zero: si lascia com'e',
+  // altrimenti non resterebbe niente da confrontare e la revisione direbbe
+  // "nessun dato" quando invece i dati ci sono, sono solo da non giudicare
+  const q = filtra(s0.questa), p0 = filtra(s0.prima);
+  const questa = q.length ? q : s0.questa;
+  const prima = p0.length ? p0 : s0.prima;
   const cons = g => g.map(x => S.log[x] ? consumed(x) : null).filter(m => m && m.kcal > 400);
   const cm = (g, id) => { const c = cons(g); return c.length ? c.reduce((a, m) => a + m[id], 0) / c.length : null; };
   const md = (g, id) => mediaSu(g, x => S.log[x]?.[id]);
@@ -157,6 +171,49 @@ function verdettoSettimana(diag) {
   return { parola: 'Settimana storta', d: 'Piu\' di una cosa importante e\' saltata. Non e\' il momento di cambiare il piano: e\' il momento di tornare a registrare.' };
 }
 
+/**
+ * La leva giusta per la priorita' della settimana.
+ *
+ * Il file data/dieta.json contiene una chiave leve: quattro mosse da +/-150
+ * kcal scritte a mano da chi ha costruito il piano — "+25 g di burro
+ * d'arachidi a colazione". Erano li' dalla prima versione e non le leggeva
+ * nessuno. Sono esattamente la risposta alla domanda che la revisione
+ * lasciava aperta.
+ *
+ * Si sceglie per SEGNO: se mangi meno del piano servono le leve che aggiungono,
+ * se mangi di piu' quelle che tolgono. Sulle altre priorita' — sonno, passi,
+ * acqua — non si propone niente: le calorie non c'entrano, e infilarcele
+ * sarebbe un consiglio a caso.
+ */
+function levaPerPriorita(p) {
+  const leve = D.leve || [];
+  if (!leve.length || !p) return [];
+  const su = /sotto il target|mangi meno|proteine/i.test(p.t);
+  const giu = /sopra il target|mangi piu/i.test(p.t);
+  if (!su && !giu) return [];
+  return leve.filter(l => su ? l.delta_kcal > 0 : l.delta_kcal < 0).slice(0, 2);
+}
+
+/** L'impegno in corso, se e' di questa settimana o della precedente. */
+function impegno() { return S.settings?.impegno || null; }
+
+/**
+ * L'impegno della settimana scorsa e' stato mantenuto?
+ * Non lo chiede all'utente e basta: guarda se la metrica che aveva generato la
+ * priorita' e' migliorata davvero. Una domanda a cui si puo' rispondere "si'"
+ * senza che sia vero non serve a niente.
+ */
+function esitoImpegno(k = today()) {
+  const imp = impegno();
+  if (!imp) return null;
+  const { questa } = settimane(k);
+  if (imp.settimana === questa[0]) return null;      // e' quello in corso
+  const ora = diagnosiSettimana(k);
+  const ancora = ora.errori.find(e => e.t === imp.cosa);
+  return { imp, risolto: !ancora, gravita: ancora ? ancora.peso : 0,
+           priorita: ora.priorita && ora.priorita.t === imp.cosa };
+}
+
 /* ================================================================= vista */
 function viewRevisione(v) {
   const k = today();
@@ -196,6 +253,31 @@ function viewRevisione(v) {
   }
   v.append(testa);
   osserva(parola, () => pulsa(parola, { scala: 1.05, dur: 620 }));
+
+  /* --- l'impegno della settimana scorsa --- */
+  const es = esitoImpegno(k);
+  if (es) {
+    const ci = el('div', 'card imp-esito' + (es.risolto ? ' ok' : ''));
+    ci.append(el('div', 'eyebrow', 'L\'impegno della settimana scorsa'));
+    ci.append(el('div', 'imp-t', esc(es.imp.cosa)));
+    ci.append(el('div', 'muted', es.risolto
+      ? 'Non compare piu\' fra le cose che non hanno funzionato. Non e\' una tua '
+        + 'impressione: e\' sparito dai numeri. Tienilo, e passa al prossimo.'
+      : es.priorita
+        ? 'E\' ancora la prima cosa che non funziona. Non e\' un rimprovero: vuol dire '
+          + 'che la mossa scelta era troppo grande, o che non era quella giusta. '
+          + 'Prova a spezzarla in qualcosa di piu\' piccolo.'
+        : 'C\'e\' ancora, ma pesa meno di prima: qualcosa si e\' mosso. Vale la pena '
+          + 'tenerlo un\'altra settimana.'));
+    const b = el('button', 'btn wide');
+    b.style.marginTop = '10px';
+    b.textContent = es.risolto ? 'Chiudilo' : 'Lo lascio perdere';
+    b.onclick = () => { delete S.settings.impegno; save(); route(); };
+    ci.append(b);
+    v.append(ci);
+    if (es.risolto) osserva(ci, () => { pulsa(ci); coriandoli(ci); });
+    ci.style.position = 'relative';
+  }
 
   /* --- i numeri, con il confronto --- */
   const cn = el('div', 'cw');
@@ -261,12 +343,58 @@ function viewRevisione(v) {
     v.append(cm);
   }
 
-  /* --- la priorita' --- */
+  /* --- la priorita', e l'impegno che ne nasce --- */
   if (diag.priorita) {
     const cp = el('div', 'rev-prio');
     cp.append(el('div', 'rev-kick', 'Se cambi una cosa sola'));
     cp.append(el('div', 'rev-prio-t', esc(diag.priorita.t)));
     cp.append(el('div', 'rev-prio-c', diag.priorita.come));
+
+    /* La leva concreta, se ce n'e' una che c'entra.
+       In data/dieta.json c'e' `leve`: quattro mosse da 150 kcal scritte a mano
+       da chi il piano l'ha costruito. Fino a ieri quel campo non lo leggeva
+       nessuno — la revisione diceva "mangi meno del piano" e poi ti lasciava
+       li' a inventarti come rimediare. */
+    const lv = levaPerPriorita(diag.priorita);
+    if (lv.length) {
+      const box = el('div', 'rev-leve');
+      box.append(el('div', 'rev-kick', 'Una mossa gia\' pronta'));
+      for (const l of lv) {
+        const r = el('div', 'rev-leva');
+        r.innerHTML = `<span class="k">${l.delta_kcal > 0 ? '+' : ''}${l.delta_kcal}</span>`
+          + `<span class="a">${esc(l.azione)}</span>`;
+        box.append(r);
+      }
+      cp.append(box);
+    }
+
+    /* L'impegno. Una diagnosi che nessuno ricorda la settimana dopo e' un
+       elenco, non un ciclo: qui si prende nota di UNA cosa e domenica
+       prossima l'app chiede se e' andata. */
+    const imp = impegno();
+    const sett = questa[0];
+    if (imp && imp.settimana === sett) {
+      const g = el('div', 'rev-imp preso');
+      g.innerHTML = `<span class="t">Impegno preso</span>`
+        + `<span class="d">${esc(imp.cosa)}</span>`;
+      const via = el('button', 'btn wide');
+      via.textContent = 'Ci ho ripensato, toglilo';
+      via.onclick = () => { delete S.settings.impegno; save(); route(); };
+      g.append(via);
+      cp.append(g);
+    } else {
+      const b = el('button', 'btn wide pri');
+      b.style.marginTop = '12px';
+      b.textContent = 'Prendo questo impegno per la settimana';
+      b.onclick = () => {
+        S.settings.impegno = { settimana: sett, cosa: diag.priorita.t,
+                               come: diag.priorita.come, preso: today() };
+        save(); route();
+        toast('Domenica prossima ti chiedo com\'e\' andata');
+      };
+      cp.append(b);
+    }
+
     cp.append(el('p', 'rev-prio-n',
       'Una alla volta, non tutte. Cambiare cinque cose insieme rende impossibile capire quale ha funzionato, e la settimana prossima saresti al punto di prima con piu\' confusione.'));
     v.append(cp);

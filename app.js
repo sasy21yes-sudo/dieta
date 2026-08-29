@@ -84,6 +84,7 @@ const usaHyrox = () => moduli().hyrox === true;
     vecchio, scritto da una versione che certe chiavi non le aveva. */
 function normalize() {
   S.log ||= {}; S.spesa ||= {}; S.dispensa ||= {}; S.settings ||= { start: today() };
+  S.settings.pause ||= [];
   S.model ||= {}; S.model.prev ||= []; S.prodotti ||= [];
   S.palestra ||= {}; S.palestra.sessioni ||= {}; S.palestra.esercizi ||= [];
   S.palestra.schede ||= []; S.palestra.acciacchi ||= [];
@@ -439,6 +440,52 @@ function ledgerScore(k = today()) {
            ultime: done.slice(-6) };
 }
 
+/* --------------------------------------------- quello che registri spesso
+
+   Con il piano spento il registro a mano e' l'unico modo di usare l'app, e si
+   rifanno gli stessi cinque alimenti ogni giorno. Cercarli ogni volta e' il
+   costo piu' alto e piu' stupido dell'intera applicazione.
+
+   Si contano le voci gia' registrate e si ordinano per un misto di quante
+   volte e quanto di recente: la sola frequenza terrebbe in cima per settimane
+   una cosa mangiata tutti i giorni del mese scorso e mai piu'. */
+function extraFrequenti(k = today(), quanti = 6) {
+  const conti = new Map();
+  for (const g of Object.keys(S.log)) {
+    if (g > k) continue;
+    const eta = Math.round((new Date(k) - new Date(g)) / 864e5);
+    if (eta > 60) continue;
+    // meta' peso ogni tre settimane: quello di ieri conta piu' di quello di un mese fa
+    const peso = Math.pow(0.5, eta / 21);
+    for (const e of (S.log[g].extra || [])) {
+      if (!e.nome) continue;
+      const c = conti.get(e.nome) || { ...e, n: 0, punti: 0, ultimo: g };
+      c.n++; c.punti += peso;
+      if (g > c.ultimo) { c.ultimo = g; Object.assign(c, e, { n: c.n, punti: c.punti, ultimo: g }); }
+      conti.set(e.nome, c);
+    }
+  }
+  return [...conti.values()].sort((x, y) => y.punti - x.punti).slice(0, quanti);
+}
+
+/* ------------------------------------------------------- giorni in pausa
+
+   Vacanza, influenza, trasferta. Fino a ieri quella settimana entrava nella
+   diagnosi e ti diceva che avevi sbagliato tutto — che e' vero e inutile
+   insieme. Marcare una pausa NON cancella niente: i dati restano e si vedono
+   ovunque, ma la revisione e i punteggi di costanza saltano quei giorni,
+   perche' giudicare una settimana d'ospedale col metro di una normale non
+   misura niente. */
+function pause() { S.settings.pause ||= []; return S.settings.pause; }
+function inPausa(k) {
+  return pause().some(p => k >= p.dal && k <= (p.al || '9999'));
+}
+function pausaDi(k) {
+  return pause().find(p => k >= p.dal && k <= (p.al || '9999')) || null;
+}
+/** Toglie dai giorni di una finestra quelli in pausa. */
+function senzaPause(giorni) { return giorni.filter(g => !inPausa(g)); }
+
 /* ------------------------------------------------- motore "cosa sbaglio" */
 function analyse(k = today()) {
   const F = [], T = D.target;
@@ -574,10 +621,54 @@ function backupDue() {
   return nuovi >= 20 ? nuovi : 0;
 }
 
+/**
+ * Il backup di TUTTI i profili, non solo di quello aperto.
+ *
+ * Prima si esportava JSON.stringify(S), cioe' il profilo attivo e basta: chi
+ * ne aveva un secondo si portava a casa mezzo archivio senza accorgersene,
+ * perche' il file sembrava completo. Ora il formato ha una busta con dentro
+ * ogni profilo, e resta capace di rileggere i file vecchi — che sono
+ * esattamente lo stato nudo, e vengono trattati come un profilo solo.
+ */
+function esportabile() {
+  const P = profili();
+  const stati = {};
+  for (const x of P.lista) {
+    const chiave = x.id === 'principale' ? KEY : KEY + ':' + x.id;
+    // il profilo attivo si prende dalla memoria, non dal disco: potrebbe
+    // esserci qualcosa non ancora salvato
+    if (x.id === P.attivo) { stati[x.id] = S; continue; }
+    try { stati[x.id] = JSON.parse(localStorage.getItem(chiave) || 'null'); } catch {}
+  }
+  return { formato: 2, app: 'dieta', quando: today(),
+           profili: P, stati };
+}
+
+/** Cosa c'e' dentro un file, in una riga leggibile prima di sovrascrivere. */
+function riassuntoBackup(o) {
+  const righe = [];
+  const conta = (nome, st) => {
+    if (!st || !st.log) return;
+    const gg = Object.keys(st.log).sort();
+    const pesate = gg.filter(g => st.log[g]?.peso != null).length;
+    const sedute = Object.keys(st.palestra?.sessioni || {}).length;
+    righe.push({ nome, giorni: gg.length, da: gg[0], a: gg[gg.length - 1], pesate, sedute });
+  };
+  if (o.formato === 2) {
+    for (const p of o.profili.lista) conta(p.nome, o.stati[p.id]);
+  } else {
+    conta('Profilo unico', o);
+  }
+  return righe;
+}
+
 function exportBackup() {
-  download('dieta-backup-' + today() + '.json', JSON.stringify(S, null, 1),
+  const o = esportabile();
+  const n = Object.keys(o.stati).length;
+  download('dieta-backup-' + today() + '.json', JSON.stringify(o, null, 1),
            'application/json');
   S.settings.backup = today(); save();
+  return n;
 }
 
 /** Promemoria in cima a Oggi, solo quando serve davvero. */
@@ -759,10 +850,21 @@ function viewOggi(v) {
                                 ['c', 'carb', 0], ['g', 'gras', 0]]) {
     const pc = tgt[id] ? cons[id] / tgt[id] : 0;
     const cls = pc > 1.15 ? 'way' : pc > 1.02 ? 'over' : '';
-    g.append(el('div', 'macro',
+    const mb = el('div', 'macro',
       `<div class="lab">${lab}</div><div class="val">${nf(cons[id], dec)}</div>
        <div class="of">/ ${nf(tgt[id], dec)}</div>
-       <div class="bar"><i class="${cls}" style="width:${Math.min(pc * 100, 100)}%"></i></div>`));
+       <div class="bar"><i class="${cls}" style="width:${Math.min(pc * 100, 100)}%"></i></div>`);
+    g.append(mb);
+    // la barra cresce da sinistra con scaleX: animare width farebbe ricalcolare
+    // il layout a ogni fotogramma, e la larghezza e' gia' quella giusta
+    if (typeof osserva === 'function') osserva(mb, () => {
+      if (!motionOk()) return;
+      const i = mb.querySelector('.bar i');
+      i.style.transformOrigin = 'left center';
+      i.animate([{ transform: 'scaleX(0)' }, { transform: 'none' }],
+        { duration: 620, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'backwards' });
+      contaSu(mb.querySelector('.val'), cons[id], { dec, dur: 700 });
+    });
   }
   box.append(g);
   const rest = tgt.kcal - cons.kcal;
@@ -805,7 +907,13 @@ function viewOggi(v) {
     const m = el('div', 'meal' + (done ? ' done' : ''));
     const h = el('div', 'meal-h');
     const tick = el('button', 'tick', '✓');
-    tick.onclick = () => { d.pasti[s.codice] = !done; save(); route(); };
+    tick.onclick = () => {
+      // il rimbalzo conferma il tocco prima che la pagina si ridisegni: senza,
+      // su un telefono lento sembra che non sia successo niente
+      if (!done && typeof pulsa === 'function') pulsa(tick, { scala: 1.35, dur: 320 });
+      d.pasti[s.codice] = !done; save();
+      setTimeout(route, done ? 0 : 130);
+    };
     // toccare il nome del pasto apre le porzioni DI QUEL GIORNO: il piano dice
     // 50 g di salsa, ma se oggi ne hai usati 100 il conto deve seguire te
     const testa = el('div', 'grow tap',
@@ -936,6 +1044,27 @@ function sheetExtra(k) {
   w.append(el('div', 'eyebrow', usaPiano() ? 'Fuori piano' : 'Registro del giorno'));
   w.append(el('h2', 'sec', 'Cosa hai mangiato'));
   w.lastChild.style.marginTop = '0';
+
+  /* Le cose che registri spesso, a portata di un tocco solo. */
+  const freq = extraFrequenti(k);
+  if (freq.length) {
+    w.append(el('div', 'eyebrow', 'Di solito registri'));
+    const chips = el('div', 'chips');
+    for (const f of freq) {
+      const b = el('button', 'chip');
+      b.innerHTML = `<span class="n">${esc(f.nome)}</span>`
+        + `<span class="k">${nf(f.kcal)} kcal</span>`;
+      b.onclick = () => {
+        const { nome, kcal, p, c, g: gr, fibre } = f;
+        day(k).extra.push({ nome, kcal, p, c: c || 0, g: gr || 0, fibre: fibre || 0 });
+        save(); closeSheet(); route(); toast('Registrato');
+      };
+      chips.append(b);
+    }
+    w.append(chips);
+    if (typeof osserva === 'function')
+      osserva(chips, () => entrata([...chips.children], { passo: 40, su: 6 }));
+  }
 
   /* Scrivere kcal e proteine a mano per ogni cosa e' sopportabile finche' e'
      l'eccezione. Con il piano spento diventa l'unico modo di usare l'app, e
@@ -1878,6 +2007,134 @@ function download(name, text, type = 'text/plain') {
   a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
+/**
+ * L'anteprima di un backup prima di applicarlo.
+ *
+ * L'import sostituisce tutto e non si annulla. Chiedere "procedo?" mostrando
+ * solo un numero di giorni non basta: due file si assomigliano, e quello
+ * sbagliato cancella l'archivio buono. Qui si vede cosa c'e' dentro — profili,
+ * intervallo di date, pesate, sedute — e solo dopo si decide.
+ */
+function sheetImport(grezzo) {
+  const v2 = grezzo && grezzo.formato === 2 && grezzo.stati;
+  const o = v2 ? grezzo : migra(grezzo);
+  if (!o) { toast('Formato non riconosciuto'); return; }
+  const righe = riassuntoBackup(v2 ? grezzo : o);
+  if (!righe.length) { toast('Il file non contiene nessun diario'); return; }
+
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Cosa c\'e\' nel file'));
+  w.append(el('h2', 'sec', v2 ? righe.length + ' profili' : 'Backup di un profilo'));
+  w.lastChild.style.marginTop = '0';
+  if (grezzo.quando) w.append(el('p', 'muted', 'Esportato il ' + esc(grezzo.quando) + '.'));
+  else w.append(el('p', 'muted',
+    'Formato vecchio, di prima che il backup portasse tutti i profili: '
+    + 'lo leggo lo stesso e lo tratto come un profilo solo.'));
+
+  for (const r of righe) {
+    const b = el('div', 'imp-riga');
+    b.innerHTML = `<span class="n">${esc(r.nome)}</span>`
+      + `<span class="d">${r.giorni} giorni · dal ${esc(r.da || '?')} al ${esc(r.a || '?')}</span>`
+      + `<span class="d">${r.pesate} pesate · ${r.sedute} sedute</span>`;
+    w.append(b);
+  }
+
+  /* --- cosa c'e' adesso, per il confronto --- */
+  const ora = Object.keys(S.log).length;
+  w.append(el('div', 'hint', ora
+    ? `Adesso in memoria hai <strong>${ora} giorni</strong> nel profilo aperto. `
+      + 'Importare li sostituisce, e non si torna indietro.'
+    : 'Adesso non hai nessun giorno registrato: non c\'e\' niente da perdere.'));
+
+  if (ora) {
+    const salva = el('button', 'btn wide');
+    salva.textContent = 'Prima esporta quello che ho adesso';
+    salva.onclick = () => { exportBackup(); toast('Esportato: ora puoi importare'); };
+    w.append(salva);
+  }
+
+  const ok = el('button', 'btn wide pri', 'Importa e sostituisci');
+  ok.style.marginTop = '8px';
+  ok.onclick = () => {
+    if (v2) {
+      // ogni profilo torna nella sua chiave, poi si ricarica: stato, piano e
+      // indice dei profili devono cambiare insieme
+      for (const p of grezzo.profili.lista) {
+        const st = grezzo.stati[p.id];
+        if (!st) continue;
+        const chiave = p.id === 'principale' ? KEY : KEY + ':' + p.id;
+        localStorage.setItem(chiave, JSON.stringify(st));
+      }
+      salvaProfili(grezzo.profili);
+      toast('Importato: ricarico');
+      setTimeout(() => location.reload(), 400);
+      return;
+    }
+    S = o; normalize(); fondiPiano(); save(); closeSheet(); route();
+    toast('Backup importato');
+  };
+  w.append(ok);
+  const no = el('button', 'btn wide', 'Annulla');
+  no.style.marginTop = '8px';
+  no.onclick = closeSheet;
+  w.append(no);
+
+  w.append(el('p', 'note',
+    'Le foto non sono nel file: stanno in IndexedDB perche\' in localStorage non '
+    + 'ci starebbero, e vanno salvate a parte dalla scheda Foto.'));
+  sheet(w);
+}
+
+/* --------------------------------------------------------------- pause */
+/** Il foglio dei periodi in pausa. */
+function sheetPause() {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Vacanza, influenza, trasferta'));
+  w.append(el('h2', 'sec', 'Giorni che non contano'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Una settimana d\'ospedale giudicata col metro di una normale non misura '
+    + 'niente: dice solo che e\' andata male, cosa che sapevi. Marcando una pausa '
+    + 'i dati restano tutti — si vedono nei grafici e nel diario — ma la revisione '
+    + 'settimanale e i punteggi di costanza saltano quei giorni.'));
+
+  const L = pause();
+  if (!L.length) w.append(el('p', 'hint', 'Nessuna pausa segnata.'));
+  for (const [i, p] of L.entries()) {
+    const r = el('div', 'row between');
+    r.style.cssText = 'padding:10px 0;border-top:1px solid var(--rule)';
+    r.append(el('div', 'grow',
+      `<strong>${esc(p.nota || 'Pausa')}</strong>
+       <div class="mono muted" style="font-size:11px">dal ${esc(p.dal)}${
+         p.al ? ' al ' + esc(p.al) : ' — ancora aperta'}</div>`));
+    const x = el('button', 'btn sm', '×');
+    x.onclick = () => { L.splice(i, 1); save(); closeSheet(); sheetPause(); };
+    r.append(x);
+    w.append(r);
+  }
+
+  w.append(el('div', 'field',
+    `<label>Dal</label><input type="date" id="pa-dal" value="${today()}">`));
+  w.append(el('div', 'field',
+    `<label>Al (vuoto = ancora in corso)</label><input type="date" id="pa-al">`));
+  w.append(el('div', 'field',
+    `<label>Cosa</label><input type="text" id="pa-n" placeholder="Vacanza, influenza…">`));
+  const b = el('button', 'btn wide pri', 'Aggiungi');
+  b.onclick = () => {
+    const dal = $('#pa-dal').value, al = $('#pa-al').value || null;
+    if (!dal) { toast('Serve almeno la data di inizio'); return; }
+    if (al && al < dal) { toast('La fine viene prima dell\'inizio'); return; }
+    L.push({ dal, al, nota: $('#pa-n').value.trim() });
+    save(); closeSheet(); route(); toast('Segnata');
+  };
+  w.append(b);
+  w.append(el('p', 'note',
+    'Non e\' un modo di nascondere le settimane storte: quelle servono, ed e\' da '
+    + 'quelle che la revisione impara. E\' per i giorni in cui il piano non era '
+    + 'nemmeno in gioco.'));
+  sheet(w);
+}
+
 /* --------------------------------------------------------------- menu */
 function sheetMenu() {
   const w = el('div');
@@ -1912,25 +2169,27 @@ function sheetMenu() {
      'Uno scatto al giorno nella stessa posa. Restano sul telefono e non entrano nel backup JSON: sono troppo grandi.',
      () => { closeSheet(); location.hash = '#/foto'; });
 
-  mk('Esporta backup', 'La memoria del browser può essere svuotata, e non esiste '
+  mk('Giorni che non contano',
+     'Vacanza, influenza, trasferta: i dati restano tutti, ma la revisione settimanale e i punteggi di costanza saltano quei giorni.',
+     () => sheetPause());
+
+  mk('Esporta backup', 'Tutti i profili in un file solo. La memoria del browser può essere svuotata, e non esiste '
      + 'copia altrove. È l\'unico modo per non perdere lo storico.'
      + (S.settings.backup ? ' Ultimo backup: ' + S.settings.backup + '.'
                           : ' Non ne hai ancora fatto nessuno.'),
-     () => { exportBackup(); toast('Backup scaricato'); });
+     () => { const n = exportBackup(); toast(n > 1 ? n + ' profili esportati' : 'Backup scaricato'); });
 
-  mk('Importa backup', 'Sostituisce i dati attuali con quelli del file.', () => {
+  mk('Importa backup', 'Prima ti mostra cosa contiene il file, poi chiede conferma.', () => {
     const i = el('input'); i.type = 'file'; i.accept = '.json,application/json';
     i.onchange = () => {
       const f = i.files[0]; if (!f) return;
       const r = new FileReader();
       r.onload = () => {
         try {
-          const o = migra(JSON.parse(r.result));
-          if (!o) throw new Error('formato non riconosciuto');
-          const nuovi = Object.keys(o.log).length, ora = Object.keys(S.log).length;
-          if (ora && !confirm('Il file contiene ' + nuovi + ' giorni e sostituira\' i '
-              + ora + ' che hai adesso in memoria. Non si puo\' annullare. Procedo?')) return;
-          S = o; normalize(); fondiPiano(); save(); closeSheet(); route(); toast('Backup importato');
+          const grezzo = JSON.parse(r.result);
+          // sovrascrivere tutto alla cieca e' il modo piu' rapido di perdere
+          // l'archivio: prima si guarda cosa c'e' nel file
+          sheetImport(grezzo);
         } catch (e) { toast('File non valido: ' + (e.message || 'illeggibile')); }
       };
       r.readAsText(f);

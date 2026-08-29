@@ -72,7 +72,11 @@ function puntiSfide(k = today(), n = 365) {
  * e' l'unica cosa che rende affidabile tutto il resto dell'app.
  */
 function costanze(k = today(), n = 28) {
-  const giorni = windowDays(k, n);
+  // i giorni marcati in pausa escono dal conto: se sei stato una settimana con
+  // l'influenza, dividere per 28 invece che per 21 non misura la tua costanza,
+  // misura che ti sei ammalato
+  const giorni = typeof senzaPause === 'function'
+    ? senzaPause(windowDays(k, n)) : windowDays(k, n);
   const st = SFS();
 
   const nutr = giorni.filter(g => {
@@ -85,22 +89,27 @@ function costanze(k = today(), n = 28) {
     || S.hyrox?.sessioni?.[g]?.fatto
     || S.log[g]?.allenamento === true).length;
   // il bersaglio non e' "tutti i giorni": e' quante sedute hai detto di reggere
-  const attese = Math.max(1, Math.round(n / 7 * (S.hyrox?.profilo?.sedute || 4)));
+  const seduteObiettivo = (typeof usaHyrox === 'function' && usaHyrox()
+    && S.hyrox?.profilo?.sedute)
+    || (typeof seduteAbituali === 'function' && seduteAbituali(k)) || 3;
+  const attese = Math.max(1, Math.round(giorni.length / 7 * seduteObiettivo));
 
   const sfideViste = giorni.filter(g => st.log[g]).length;
   const sfideFatte = giorni.filter(g => st.log[g]?.fatta).length;
 
   const pesate = giorni.filter(g => S.log[g]?.peso != null).length;
 
+  const N = Math.max(1, giorni.length);      // il denominatore vero, pause escluse
   const pct = x => Math.round(Math.max(0, Math.min(1, x)) * 100);
-  const nutrizione = pct(nutr / n);
+  const nutrizione = pct(nutr / N);
   const allenamento = pct(allenati / attese);
-  const sfide = pct(sfideFatte / n);
-  const registro = pct(pesate / n);
+  const sfide = pct(sfideFatte / N);
+  const registro = pct(pesate / N);
   // il generale pesa di piu' quello che rende affidabili gli altri numeri
   const generale = pct((nutrizione * 0.35 + allenamento * 0.3
                       + registro * 0.2 + sfide * 0.15) / 100);
-  return { n, nutrizione, allenamento, sfide, registro, generale,
+  return { n, giorni: giorni.length, saltati: n - giorni.length,
+           nutrizione, allenamento, sfide, registro, generale,
            dettaglio: { nutr, allenati, attese, sfideFatte, sfideViste, pesate } };
 }
 
@@ -112,6 +121,82 @@ const LIVELLI_COSTANZA = [
   { min: 0,  nome: 'Da riprendere', d: 'Ricomincia da una cosa sola: la pesata del mattino. Il resto viene dietro.' }
 ];
 const livelloCostanza = v => LIVELLI_COSTANZA.find(l => v >= l.min) || LIVELLI_COSTANZA[4];
+
+/* ====================================================== la fiamma
+
+   La striscia di giorni era una riga di testo in fondo a una carta, e una riga
+   di testo non si guarda. Qui diventa una fiamma che CRESCE davvero con i
+   giorni: non e' decorazione, e' la stessa informazione disegnata invece che
+   scritta — l'altezza del riempimento interno viene dal numero.
+
+   Sei stadi, non un continuo: a occhio nudo la differenza fra 14 e 15 giorni
+   non si vede comunque, e fingere una precisione che l'occhio non coglie
+   sarebbe come mettere due decimali su una stima.
+
+   Lo sfarfallio e' l'unica animazione infinita di tutta l'app, dura 2,4 s e
+   muove solo transform. Con reduced-motion la fiamma sta ferma: resta piena
+   allo stesso modo, perche' e' il riempimento a portare il dato. */
+
+const STADI_FIAMMA = [
+  { min: 60, q: 1,   n: 'Fuoco vivo',   d: 'Due mesi. A questo punto non e\' piu\' disciplina, e\' abitudine.' },
+  { min: 21, q: .82, n: 'Fiamma alta',  d: 'Tre settimane: la soglia oltre la quale saltare un giorno costa fatica.' },
+  { min: 7,  q: .62, n: 'Fiamma',       d: 'Una settimana piena. Il registro comincia a essere affidabile.' },
+  { min: 3,  q: .42, n: 'Presa',        d: 'Tre giorni. E\' il tratto in cui di solito si molla: tienila.' },
+  { min: 1,  q: .24, n: 'Scintilla',    d: 'Cominciato. Domani vale piu\' di oggi.' },
+  { min: 0,  q: 0,   n: 'Spenta',       d: 'Basta registrare qualcosa — anche solo la pesata — per riaccenderla.' }
+];
+const stadioFiamma = n => STADI_FIAMMA.find(s => n >= s.min) || STADI_FIAMMA[5];
+
+/**
+ * La fiamma. `dim` e' il lato in pixel; il numero sta accanto, non dentro:
+ * dentro sarebbe illeggibile sotto i quaranta pixel.
+ */
+function fiamma(giorni, dim = 34) {
+  const st = stadioFiamma(giorni);
+  const box = el('span', 'fiamma' + (giorni ? '' : ' off'));
+  box.style.setProperty('--f', dim + 'px');
+  // il riempimento parte dal basso: clip a una frazione dell'altezza
+  const y = (1 - st.q) * 24;
+  box.innerHTML = '<svg viewBox="0 0 24 26" aria-hidden="true">'
+    + '<defs><clipPath id="fc' + Math.round(st.q * 100) + '">'
+    + '<rect x="0" y="' + y.toFixed(1) + '" width="24" height="26"/>'
+    + '</clipPath></defs>'
+    + '<path class="cont" d="M12,1.5 C13.4,6.4 18.5,8.2 18.5,14.2 '
+    + 'a6.5,6.5 0 0 1 -13,0 C5.5,10.6 8.2,9.6 9.2,6.4 '
+    + 'c1.6,1.4 1.9,3 1.6,4.6 C12.6,9.4 12.9,5.4 12,1.5 Z"/>'
+    + (st.q > 0
+      ? '<path class="pieno" clip-path="url(#fc' + Math.round(st.q * 100) + ')" '
+        + 'd="M12,1.5 C13.4,6.4 18.5,8.2 18.5,14.2 '
+        + 'a6.5,6.5 0 0 1 -13,0 C5.5,10.6 8.2,9.6 9.2,6.4 '
+        + 'c1.6,1.4 1.9,3 1.6,4.6 C12.6,9.4 12.9,5.4 12,1.5 Z"/>'
+      : '')
+    + '</svg>';
+  box.setAttribute('role', 'img');
+  box.setAttribute('aria-label', giorni + ' giorni di fila');
+  return box;
+}
+
+/** Fiamma + numero + nome dello stadio: il blocco completo. */
+function bloccoFiamma(giorni, compatto) {
+  const st = stadioFiamma(giorni);
+  const b = el('div', 'fi-blocco' + (compatto ? ' cp' : ''));
+  b.append(fiamma(giorni, compatto ? 28 : 44));
+  const t = el('span', 'fi-t');
+  const num = el('span', 'fi-n', String(giorni));
+  t.append(num);
+  const lab = el('span', 'fi-l');
+  lab.textContent = giorni === 1 ? 'giorno di fila' : 'giorni di fila';
+  t.append(lab);
+  if (!compatto) {
+    const s = el('span', 'fi-s');
+    s.textContent = st.n;
+    t.append(s);
+  }
+  b.append(t);
+  if (typeof osserva === 'function')
+    osserva(b, () => contaSu(num, giorni, { dur: 700 }));
+  return b;
+}
 
 /* ---------------------------------------------------------- componenti */
 /** Anello di punteggio: un numero solo merita una forma sola, non un grafico. */
@@ -152,14 +237,32 @@ function cardSfida(k) {
   c.append(el('div', 'row between',
     `<span class="eyebrow">Sfida di oggi · ${esc(cat.nome)}</span>
      <span class="mono sf-p">+${s.punti}</span>`));
-  c.append(el('h3', 'sfida-t', (fatta ? '✓ ' : '') + esc(s.t)));
+  /* Il segno di spunta si disegna invece di comparire: e' un fotogramma solo
+     ma e' quello che fa sentire che l'hai fatta tu, non che era gia' cosi'. */
+  const tit = el('h3', 'sfida-t');
+  if (fatta) {
+    const sv = mk('svg', { viewBox: '0 0 24 24', class: 'sf-tick' });
+    sv.append(mk('path', { d: 'M4,13 L9.5,18.5 L20,6', fill: 'none',
+      stroke: 'var(--pine)', 'stroke-width': 3, 'stroke-linecap': 'round',
+      'stroke-linejoin': 'round' }));
+    tit.append(sv);
+  }
+  tit.append(document.createTextNode(esc(s.t).replace(/&[a-z]+;/g, m =>
+    ({ '&amp;': '&', '&lt;': '<', '&gt;': '>', '&#39;': "'", '&quot;': '"' }[m] || m))));
+  c.append(tit);
   c.append(el('p', 'sfida-d', esc(s.d)));
 
   if (!fatta && !saltata) {
     const r = el('div', 'row');
     r.style.gap = '8px';
     const ok = el('button', 'btn pri grow', 'Fatta');
-    ok.onclick = () => { segnaSfida(k, 'fatta'); route(); toast(`+${s.punti} punti`); };
+    ok.onclick = () => {
+      // i coriandoli prima del route(): dopo, la carta e' un altro elemento
+      if (typeof coriandoli === 'function') coriandoli(c);
+      if (typeof pulsa === 'function') pulsa(c, { scala: 1.02, dur: 380 });
+      segnaSfida(k, 'fatta');
+      setTimeout(() => { route(); toast(`+${s.punti} punti`); }, 260);
+    };
     const no = el('button', 'btn', 'Oggi no');
     no.onclick = () => { segnaSfida(k, 'saltata'); route(); };
     r.append(ok, no);
@@ -170,10 +273,26 @@ function cardSfida(k) {
     c.append(undo);
   }
 
-  c.append(el('div', 'sfida-f',
-    `<span>${p.punti} punti in tutto</span>`
-    + (p.fila > 1 ? `<span>${p.fila} giorni di fila</span>` : '')
-    + `<span>${p.fatte} sfide fatte</span>`));
+  /* Il piede: la fiamma della striscia, e i punti che salgono contando. */
+  const f = el('div', 'sfida-f');
+  f.append(bloccoFiamma(typeof streak === 'function' ? streak(k) : p.fila, true));
+  const nums = el('div', 'sf-nums');
+  const np = el('span', 'v'), nf2 = el('span', 'v');
+  nums.append(el('span', 'l', 'punti'), np, el('span', 'l', 'fatte'), nf2);
+  f.append(nums);
+  c.append(f);
+  if (typeof osserva === 'function') osserva(nums, () => {
+    contaSu(np, p.punti, { dur: 800 });
+    contaSu(nf2, p.fatte, { dur: 800 });
+  });
+  // stato finale scritto subito: se l'osservatore non scatta la carta e' giusta
+  np.textContent = nf(p.punti); nf2.textContent = nf(p.fatte);
+
+  if (typeof osserva === 'function' && fatta)
+    osserva(c, () => {
+      const t = c.querySelector('.sf-tick path');
+      if (t && typeof disegnaPath === 'function') disegnaPath(t, { dur: 420 });
+    });
   return c;
 }
 
@@ -183,6 +302,11 @@ function cardCostanza(k, n) {
   const liv = livelloCostanza(co.generale);
   const c = el('div', 'cw');
   c.append(el('h3', null, 'Costanza'));
+  if (typeof streak === 'function') {
+    const fb = bloccoFiamma(streak(k));
+    fb.style.margin = '2px 0 10px';
+    c.append(fb);
+  }
   c.append(el('div', 'sub',
     `Ultimi ${co.n} giorni fino a ieri. Non e' un voto su di te: dice quanto e' continuo il registro, che e' cio' che rende affidabile tutto il resto.`));
 
