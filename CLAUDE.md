@@ -457,6 +457,22 @@ Le costanti stanno in `data/palestra.json` e sono valori tipici di letteratura,
 
 ### I grafici
 
+Le due righe di riferimento — target e media — hanno due token loro,
+`--rif` e `--media`, e non sono serie: sono annotazioni. Devono restare
+distinguibili l una dall altra E dalla serie in tutti e tre gli ambiti (chiaro,
+scuro, .hx). Passate dal validatore della skill dataviz a coppie complete.
+
+Passandolo e saltato fuori un problema che c era gia: al buio il grigio del
+target (#6E7B87) contro la serie (#4FA88F) dava **ΔE 13,0 a vista normale**,
+sotto la soglia di 15 — due righe che si confondono anche a chi vede tutti i
+colori. #B9C4CC porta la coppia peggiore a 17,0 normale e 12,5 in protanopia.
+Nessuno lo aveva notato a occhio in mesi: e il motivo per cui il colore si
+calcola invece di sceglierlo.
+
+E quando target e media quasi coincidono — proprio il caso in cui fa piacere
+vederlo — le due etichette finivano una sopra l altra: con target 2482 e media
+2488 usciva "tmegaea". Ora la piu bassa va sotto la sua riga.
+
 La tavolozza in `viz.css` **non e' stata scelta a occhio**: e' passata dal
 validatore della skill dataviz su tutti i controlli, in entrambi i temi —
 banda di luminosita', soglia di croma, separazione per daltonismo su tutte le
@@ -471,6 +487,11 @@ Regole che il toolkit applica e che non vanno violate:
   composizione). Tutto il resto e' a serie singola e usa `--pine`
 - **Piu' serie con una sola che conta** -> evidenza (una in accento, le altre
   grigie) piu' etichetta diritta, non tre colori
+- **La media e anche una riga sul grafico**, accanto a quella del target:
+  blu (`--media`) contro il grigio (`--rif`), e due tratteggi diversi — corto e
+  lungo — perche l identita non deve mai stare solo nel colore. I due token
+  sono passati dal validatore della skill dataviz a coppie complete, nei tre
+  ambiti (chiaro, scuro, .hx)
 - **Sotto ogni grafico la stessa riga**: ultimo valore, media del periodo,
   target, scarto. La media si ferma a IERI — la giornata in corso non e finita
   e la tira giu ogni mattina. La funzione e una sola (`riepilogo()`): quando

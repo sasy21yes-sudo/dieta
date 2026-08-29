@@ -70,11 +70,53 @@ function vuoto(titolo, sub, msg) {
  * etichetta.
  */
 /**
+ * La media del periodo, ferma a ieri.
+ * La usano sia la riga di riepilogo sia la linea disegnata sul grafico: se
+ * fossero due conti diversi prima o poi direbbero due numeri diversi, ed e'
+ * il tipo di incoerenza che fa perdere fiducia in tutto il resto.
+ */
+function mediaPeriodo(days, vals) {
+  const oggi = today();
+  const v = vals.map((x, i) => ({ x, k: days[i] }))
+    .filter(y => y.x != null && !isNaN(y.x) && y.k < oggi).map(y => y.x);
+  return v.length ? avg(v) : null;
+}
+
+/**
+ * Le righe di riferimento: target e media.
+ * Non sono serie, sono annotazioni, e si distinguono anche senza colore —
+ * tratteggio lungo il target, corto la media — perche' l'identita' non deve
+ * mai stare solo nel colore.
+ */
+function righeRiferimento(s, g, o, media) {
+  const righe = [
+    { v: o.target, col: 'var(--rif)', dash: '5 4', t: 'target' },
+    { v: media, col: 'var(--media)', dash: '2 4', t: 'media' }
+  ].filter(r => r.v != null && r.v >= g.lo && r.v <= g.hi)
+    .map(r => ({ ...r, y: g.y(r.v) }));
+
+  /* Quando target e media quasi coincidono — ed e' proprio il caso in cui fa
+     piacere vederlo — le due etichette finiscono una sopra l'altra e si
+     leggono come una parola sola. Provato: con target 2482 e media 2488
+     usciva "tmegaea". Si allontanano di quel tanto che basta, sopra e sotto. */
+  const vicine = righe.length === 2 && Math.abs(righe[0].y - righe[1].y) < 11;
+  righe.sort((a, b) => a.y - b.y);
+  for (const [n, r] of righe.entries()) {
+    s.append(mk('line', { x1: g.l, x2: g.l + g.w, y1: r.y, y2: r.y,
+      stroke: r.col, 'stroke-width': 1.5, 'stroke-dasharray': r.dash }));
+    // sopra la riga di norma; con due righe attaccate, la piu' bassa va sotto
+    const dy = vicine && n === 1 ? 10 : -4;
+    const t = mk('text', { x: g.l + g.w, y: r.y + dy, 'text-anchor': 'end',
+      'font-size': 8.5, 'font-family': 'var(--mono)', fill: r.col });
+    t.textContent = r.t;
+    s.append(t);
+  }
+}
+
+
+/**
  * Il riepilogo sotto ogni grafico: ultimo valore, media del periodo, target.
- *
- * La media si ferma a IERI. La giornata in corso non e' finita — i pasti non
- * sono tutti spuntati, i passi non tutti fatti — e infilarla in una media la
- * tira giu' sistematicamente ogni mattina.
+ * Gli stessi tre numeri che sul grafico sono la serie e le due righe.
  */
 function riepilogo(o) {
   const { days, vals, dec = 0, unit = '', target = null } = o;
@@ -83,7 +125,7 @@ function riepilogo(o) {
     .filter(x => x.v != null && !isNaN(x.v));
   if (!buoni.length) return null;
   const chiusi = buoni.filter(x => x.k < oggi);
-  const media = chiusi.length ? avg(chiusi.map(x => x.v)) : null;
+  const media = mediaPeriodo(days, vals);
   const ultimo = buoni[buoni.length - 1];
   const pezzi = [
     `<span><b>${nf(ultimo.v, dec)}</b>${unit ? ' ' + esc(unit) : ''} ${
@@ -209,7 +251,11 @@ function chartLine(o) {
     return vuoto(o.titolo, o.sub, 'Servono almeno due rilevazioni.');
   const c = card(o.titolo, o.sub);
   const H = o.h || 140, g = geo(H); g.n = o.days.length;
+  // la scala deve contenere anche le righe di riferimento, o la media finirebbe
+  // fuori dal riquadro proprio nei periodi in cui interessa
+  const media0 = mediaPeriodo(o.days, o.ma || o.vals);
   const tutti = dati.map(p => p.v).concat(o.target != null ? [o.target] : [])
+    .concat(media0 != null ? [media0] : [])
     .concat(o.band ? o.band.map(b => b.lo).concat(o.band.map(b => b.hi)) : []);
   const min = Math.min(...tutti), max = Math.max(...tutti);
   const pad = (max - min || 1) * .12;
@@ -217,9 +263,10 @@ function chartLine(o) {
   const s = svgEl(H);
   s.append(grid(g));
 
-  if (o.target != null)
-    s.append(mk('line', { x1: g.l, x2: g.l + g.w, y1: g.y(o.target), y2: g.y(o.target),
-      stroke: 'var(--ink-3)', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }));
+  // le righe di riferimento vanno sotto la serie: sono lo sfondo su cui si
+  // legge, non qualcosa che le passa davanti
+  const mediaL = mediaPeriodo(o.days, o.ma || o.vals);
+  righeRiferimento(s, g, o, mediaL);
 
   if (o.band) {
     const su = o.band.map(b => `${g.x(b.i)},${g.y(b.hi)}`).join(' ');
@@ -255,7 +302,8 @@ function chartLine(o) {
       ? [{ n: o.puntiNome || 'valore del giorno', col: 'var(--ink-3)' },
          { n: o.maNome || 'media mobile a 7 giorni', col: 'var(--pine)' }]
       : [{ n: o.serieNome || 'valore registrato', col: 'var(--pine)' }];
-    if (o.target != null) voci.push({ n: 'target', col: 'var(--ink-2)' });
+    if (o.target != null) voci.push({ n: 'target', col: 'var(--rif)' });
+    if (media0 != null) voci.push({ n: 'media dei ' + o.days.length + ' giorni', col: 'var(--media)' });
     if (o.band) voci.push({ n: 'previsione con banda al 95%', col: 'var(--pine-soft)' });
     c.append(legenda(voci));
   }
@@ -280,7 +328,8 @@ function chartBars(o) {
   if (!dati.length) return vuoto(o.titolo, o.sub, o.msg || 'Nessun dato ancora.');
   const c = card(o.titolo, o.sub);
   const H = o.h || 132, g = geo(H); g.n = o.days.length;
-  const max = Math.max(...dati, o.target || 0) * 1.1;
+  const mediaB = mediaPeriodo(o.days, o.vals);
+  const max = Math.max(...dati, o.target || 0, mediaB || 0) * 1.1;
   g.scale(0, max || 1);
   const s = svgEl(H);
   s.append(grid(g));
@@ -292,13 +341,12 @@ function chartBars(o) {
       fill: o.colore || 'var(--pine)',
       opacity: o.target && v < o.target * .8 ? .45 : 1 }));
   });
-  if (o.target != null)
-    s.append(mk('line', { x1: g.l, x2: g.l + g.w, y1: g.y(o.target), y2: g.y(o.target),
-      stroke: 'var(--ink-2)', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }));
+  righeRiferimento(s, g, o, mediaB);
   s.append(xLabels(g, o.days, true));
   c.append(s);
   c.append(legenda([{ n: o.serieNome || o.titolo.toLowerCase(), col: 'var(--pine)' }]
-    .concat(o.target != null ? [{ n: 'target', col: 'var(--ink-2)' }] : [])));
+    .concat(o.target != null ? [{ n: 'target', col: 'var(--rif)' }] : [])
+    .concat(mediaB != null ? [{ n: 'media dei ' + o.days.length + ' giorni', col: 'var(--media)' }] : [])));
   const rp = riepilogo({ days: o.days, vals: o.vals, dec: o.dec, unit: o.unit,
     target: o.target });
   if (rp) c.append(rp);
@@ -379,12 +427,18 @@ function chartEmphasis(o) {
   if (!usabili.length) return vuoto(o.titolo, o.sub, 'Nessuna misura registrata.');
   const c = card(o.titolo, o.sub);
   const H = o.h || 140, g = geo(H); g.n = o.days.length;
-  const tutti = usabili.flatMap(se => se.vals.filter(v => v != null));
+  const forteE = usabili.find(se => se.forte) || usabili[0];
+  const mediaE = mediaPeriodo(o.days, forteE.vals);
+  const tutti = usabili.flatMap(se => se.vals.filter(v => v != null))
+    .concat(o.target != null ? [o.target] : []).concat(mediaE != null ? [mediaE] : []);
   const min = Math.min(...tutti), max = Math.max(...tutti);
   const pad = (max - min || 1) * .12;
   g.scale(min - pad, max + pad);
   const s = svgEl(H);
   s.append(grid(g));
+  // la media della serie in evidenza: sulle altre sarebbe una riga per serie,
+  // e tre righe orizzontali su un grafico a tre linee non le legge nessuno
+  righeRiferimento(s, g, o, mediaE);
   for (const se of usabili) {
     const p = se.vals.map((v, i) => v == null ? null : { i, v }).filter(Boolean);
     if (p.length < 2) continue;
@@ -406,8 +460,10 @@ function chartEmphasis(o) {
      agli altri sembrava disallineato — perche' lo era: gli mancavano due righe
      che tutti gli altri hanno. */
   c.append(legenda(usabili.map(se => ({
-    n: se.nome, col: se.forte ? 'var(--pine)' : 'var(--ink-3)' }))));
-  const forte = usabili.find(se => se.forte) || usabili[0];
+    n: se.nome, col: se.forte ? 'var(--pine)' : 'var(--ink-3)' }))
+    .concat(o.target != null ? [{ n: 'target', col: 'var(--rif)' }] : [])
+    .concat(mediaE != null ? [{ n: 'media di ' + forteE.nome, col: 'var(--media)' }] : [])));
+  const forte = forteE;
   const rp = riepilogo({ days: o.days, vals: forte.vals, dec: o.dec,
     unit: o.unit, target: o.target });
   if (rp) c.append(rp);

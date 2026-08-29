@@ -8,6 +8,13 @@
    ------------------------------------------------------------------- */
 :root{
   --c1:#2a78d6; --c2:#eb6834; --c3:#1baf7a;          /* categorici */
+  /* Le due righe di riferimento di un grafico: il target e la media. Non sono
+     serie, sono annotazioni, e hanno due token loro perche' devono restare
+     distinguibili l'una dall'altra E dalla serie in tutti e tre gli ambiti.
+     Validate con lo script della skill dataviz, coppie complete:
+     chiaro pine/rif/media -> normale 16.4, CVD 14.2, contrasto ok. */
+  --rif:#8A93A0;                                     /* riga del target */
+  --media:#2a78d6;                                   /* riga della media */
   --s1:#8FBFB0; --s2:#5DA08D; --s3:#357A6A; --s4:#12594A;  /* sequenziale */
   --grid:#EDF1F4;
 }
@@ -16,6 +23,13 @@
     --c1:#3987e5; --c2:#d95926; --c3:#199e70;
     --s1:#35796A; --s2:#45947E; --s3:#57AF94; --s4:#6FC8AA;
     --grid:#1B242A;
+    /* Al buio il grigio del target era #6E7B87 e contro la serie #4FA88F dava
+       ΔE 13,0 a vista normale: sotto la soglia di 15, cioe' due righe che si
+       confondono anche a chi vede tutti i colori. Era un problema che c'era
+       gia' prima della media, ed e' saltato fuori solo passando il validatore.
+       #B9C4CC porta la coppia peggiore a 17,0 normale e 12,5 in protanopia. */
+    --rif:#B9C4CC;
+    --media:#3987e5;
   }
 }
 
@@ -158,6 +172,7 @@
   --s1:#6B6320; --s2:#9C9110; --s3:#C7B808; --s4:#F2E205;
   --c1:#3987e5; --c2:#d95926; --c3:#199e70;
   --alert:#FF6B4A; --amber:#F2E205;
+  --rif:#B9C4CC; --media:#3987e5;   /* contro il giallo: 21,8 normale, 20,7 CVD */
   background:#0B0D0E; color:#FFFFFF;
   margin:-16px -16px -24px; padding:16px 16px 28px;
   min-height:calc(100vh - 190px);
