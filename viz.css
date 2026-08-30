@@ -862,6 +862,8 @@
 .cd-live .u{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.09em;
   text-transform:uppercase;color:var(--ink-3);margin-top:3px}
 .seg.wrap{flex-wrap:wrap}
+/* con cinque voci "180 gg" si spezzava fra il numero e l'unita' */
+.seg.gg button{white-space:nowrap;min-width:46px;padding:0 5px;font-size:13px}
 
 /* ---------------- ingresso della scheda Gym ---------------- */
 .gym-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}

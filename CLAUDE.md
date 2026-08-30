@@ -80,6 +80,7 @@ carico.js       scarico automatico + dolori e infortuni
 cardio.js       corsa e simili, tracciato GPS, cartolina PNG da condividere
 salute.js       import di passi e sonno da un Comando iOS
 scambio.js      esporta/importa un pezzo solo: la dieta, le schede, o tutti e due
+pdf.js          generatore di PDF scritto a mano (font di base, WinAnsi)
 sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
 giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
 piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
@@ -204,6 +205,11 @@ non un dettaglio.
 - **Revisione settimanale** — diagnosi pesata della settimana chiusa, grafico a
   manubrio contro la precedente, cosa non ha funzionato, come si sistema e la
   sola cosa da cambiare. Si propone da sola la domenica e il lunedi
+- **Il periodo si sceglie** — la settimana chiusa resta il default, ma revisione
+  e cruscotto accettano due date qualsiasi. Il confronto e' sempre con il
+  periodo di **pari lunghezza** subito prima
+- **Resoconto in PDF** — lo stesso contenuto della revisione su A4, generato sul
+  telefono senza librerie e senza server. Da dare a chi l'app non ce l'ha
 - **Timer di recupero**, **scarico automatico**, **dolori e infortuni** in Gym
 - **Dispensa** — quello che hai in casa si sottrae dalla lista della spesa
 - **Cerca un esercizio su internet** — catalogo pubblico di 873 esercizi con
@@ -933,6 +939,79 @@ l'accoppiamento a tentativi produrrebbe l'esecuzione **sbagliata**, che è peggi
 di nessuna esecuzione. Chi importa dal catalogo online se lo porta dietro da
 solo (`exdbId`).
 
+### Il periodo di riferimento
+
+La settimana resta l'unita' su cui la revisione e' costruita, e resta il
+default: il giorno da solo e' rumore, il mese arriva tardi per correggere. Ma
+il ritmo settimanale non copre tutto — le due settimane di ferie, il mese fra
+due visite, i dieci giorni di uno scarico sono periodi veri, e tagliarli a
+fette di sette li spezza a meta'.
+
+`revPeriodoAttivo()` restituisce sempre un oggetto con la stessa forma —
+`giorni`, `prima`, `da`, `a`, `n` — e tutto il motore lavora su quello:
+`revMetriche(per)`, `revDiagnosi(per)`, `revVerdetto(diag)`. Le funzioni non
+prendono piu' una data e non sanno se stanno guardando una settimana.
+
+Tre conseguenze che non sono dettagli:
+
+1. **Il confronto e' con il periodo di pari lunghezza subito prima.** Mettere
+   venti giorni contro i sette precedenti direbbe che hai camminato tre volte
+   tanto: vero, e senza alcun significato.
+2. **Le soglie che erano su sette si scalano.** L'obiettivo di sedute e' per
+   settimana e si moltiplica per `n/7`; la soglia del registro e' meta' dei
+   giorni, non tre. Lasciarle fisse avrebbe detto "sotto" a ogni periodo corto
+   e "sopra" a ogni periodo lungo.
+3. **L'impegno resta settimanale** e sparisce sui periodi scelti a mano: e' un
+   patto che si chiude di domenica, e su "dal 3 al 19" non c'e' niente a cui
+   agganciarlo. Stessa cosa per `revisioneLetta`, che continua a valere solo
+   per la settimana — chiudere un periodo scelto a mano non deve zittire la
+   revisione di domenica.
+
+Nel cruscotto la stessa scelta e' `datiFine` accanto a `datiRange`: sposta la
+**fine** del periodo, e con lei si spostano anche i riquadri di testa —
+tendenza del peso, composizione, costanza. Muovere i grafici e lasciare i
+riquadri su "adesso" darebbe una pagina che parla di due momenti diversi.
+
+Dettaglio di lingua, non di codice: le preposizioni articolate stanno nel
+periodo (`confronto`, `su`, `primaNome`). "Rispetto a la settimana prima" e'
+il genere di sbavatura che fa sembrare l'app tradotta da un'altra.
+
+### Il resoconto in PDF
+
+Serve a una cosa che sullo schermo non si puo' fare: portarselo via. Il medico
+o l'allenatore non installano la PWA per guardare i tuoi numeri, e uno
+screenshot di sei schermate non e' un documento.
+
+`window.print()` era la strada corta ed e' proprio dove iOS si rompe: dentro
+una web app aggiunta alla Home la finestra di stampa a volte non si apre, e
+quando si apre e' il browser a decidere margini e interruzioni. Quindi il PDF
+si scrive: `pdf.js` e' un generatore vero — testo, righe, rettangoli, cerchi
+(quattro Bezier con kappa 0,5523), ritorno a capo, numerazione delle pagine e
+tabella `xref` con gli offset in byte.
+
+Tre scelte dichiarate:
+
+| Scelta | Perche' |
+|---|---|
+| Solo Helvetica e Helvetica-Bold | Sono fra i quattordici font che ogni lettore ha gia': non vanno incorporati, e il file resta di 10-20 kB invece che di qualche centinaio |
+| Solo WinAnsi | Accenti e virgolette tipografiche ci stanno tutti (`’` sta a 0x92, `—` a 0x97); quello che non entra diventa `?` invece di rompere il file in silenzio |
+| Tavolozza fissa del tema chiaro | Un PDF si stampa su carta bianca. Generarlo scuro perche' il telefono e' in modalita' notturna vorrebbe dire consegnare una pagina nera |
+
+Le larghezze dei caratteri (`PDF_WID`) sono le metriche vere di Helvetica in
+millesimi di em: senza, il ritorno a capo e' a occhio e il testo esce dal
+margine. E' l'unica tabella di dati dentro il codice di questo progetto, e ci
+sta perche' non e' dominio: e' il font.
+
+Il contenuto e' quello della schermata, **nello stesso ordine e con le stesse
+parole**. Riscriverlo per la carta avrebbe voluto dire mantenere due testi che
+dicono la stessa cosa, e prima o poi due testi che dicono cose diverse.
+
+Come si verifica, visto che qui non c'e' un lettore PDF: si riproduce il flusso
+di comandi su un canvas e si guarda, e in piu' si controlla a calcolo che
+nessuna riga superi il margine destro — `x + pdfLarghezza(testo)`, con le
+stesse metriche del ritorno a capo. Controllare solo la `x` di partenza non
+serve: una riga che sfora comincia dentro il margine.
+
 ### Passare un pezzo di piano
 
 Il backup completo c'era gia' e risponde a un'altra domanda: *come non perdo
@@ -1077,6 +1156,22 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   per far quadrare i conti: la mappa muscolare, il volume e la forma-fatica si
   reggono su quei gruppi. Un muscolo senza corrispondenza va dichiarato, non
   indovinato
+- Non lasciare fisse le soglie della revisione quando il periodo non e' di
+  sette giorni: l'obiettivo di sedute e' settimanale e va scalato, la soglia
+  del registro e' meta' dei giorni. Altrimenti ogni periodo corto risulta
+  "sotto" e ogni periodo lungo "sopra", che e' un artefatto e non una misura
+- Non confrontare un periodo con una finestra di lunghezza diversa: venti
+  giorni contro sette dicono che hai camminato tre volte tanto
+- Non agganciare l'impegno o `revisioneLetta` a un periodo scelto a mano: sono
+  due cose settimanali, e chiudere "dal 3 al 19" non deve zittire la revisione
+  di domenica
+- Non usare `window.print()` per fare un PDF su iOS: dentro una PWA aggiunta
+  alla Home la finestra di stampa a volte non si apre, e i margini li decide il
+  browser. Il file si genera, e cosi' si sa cosa contiene
+- Non incorporare font nel PDF ne' inventare le larghezze dei caratteri: con i
+  quattordici font di base il file resta di venti kB, e senza le metriche vere
+  il ritorno a capo va a occhio e il testo esce dal foglio
+- Non generare il PDF con i colori del tema scuro: si stampa su carta bianca
 - Non far sostituire l'archivio a un file di scambio: quello e' il mestiere del
   backup. Un piano che arriva da fuori si **aggiunge**, e sui doppioni si chiede
 - Non esportare lo strato `S.piano` come se fosse il piano: chi sta sul piano di

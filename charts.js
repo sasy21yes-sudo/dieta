@@ -653,23 +653,59 @@ function tile(o) {
 
 /* ========================================================== cruscotto */
 let datiRange = 30;
+/* La fine del periodo. Di suo e' oggi — un cruscotto guarda avanti — ma con
+   le date scelte a mano si sposta, e con lei si sposta TUTTO: tendenza del
+   peso, composizione, costanza. Muovere i grafici e lasciare i riquadri su
+   "adesso" darebbe una pagina che parla di due momenti diversi. */
+let datiFine = null;
 
 function viewDati(v) {
-  const k = today();
+  const k = datiFine || today();
   const giorni = span(datiRange, k);
   const val = (kk, f) => { const d = S.log[kk]; return d ? (f(d) ?? null) : null; };
 
   /* --- selettore di periodo, una riga sopra i grafici --- */
   const sel = el('div', 'card flat');
   sel.append(el('div', 'eyebrow', 'Periodo'));
-  const seg = el('div', 'seg');
+  const seg = el('div', 'seg wrap gg');
   for (const n of [7, 30, 90, 180]) {
     const b = el('button', null, n + ' gg');
-    b.setAttribute('aria-pressed', datiRange === n);
-    b.onclick = () => { datiRange = n; route(); };
+    b.setAttribute('aria-pressed', String(!datiFine && datiRange === n));
+    b.onclick = () => { datiFine = null; datiRange = n; route(); };
     seg.append(b);
   }
-  sel.append(seg); v.append(sel);
+  const bd = el('button', null, 'Date');
+  bd.setAttribute('aria-pressed', String(!!datiFine));
+  bd.onclick = () => { datiFine = datiFine ? null : today(); route(); };
+  seg.append(bd);
+  sel.append(seg);
+
+  /* Le due date. Non sono un quinto preset: sono l'unico modo di guardare un
+     tratto che non finisce oggi — le due settimane di ferie di marzo, il mese
+     fra due visite. I preset restano perche' nove volte su dieci basta uno. */
+  if (datiFine) {
+    const g = el('div');
+    g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px';
+    const da = giorni[0], a = giorni[giorni.length - 1];
+    const campo = (val, lab, onC) => {
+      const f = el('div', 'field', `<label>${lab}</label>`);
+      const i = el('input');
+      i.type = 'date'; i.value = val; i.max = today();
+      i.onchange = () => { if (i.value) { onC(i.value); route(); } };
+      f.append(i); g.append(f);
+    };
+    campo(da, 'Dal giorno', x => {
+      // si tiene ferma la fine e si ricalcola la lunghezza: trascinare
+      // l'inizio deve allargare il periodo, non spostarlo
+      const n = Math.round((new Date(a) - new Date(x)) / 864e5) + 1;
+      datiRange = Math.max(1, Math.min(730, n));
+    });
+    campo(a, 'Al giorno', x => { datiFine = x; });
+    sel.append(g);
+    sel.append(el('p', 'hint', `${datiRange} giorni, dal ${da} al ${a}.`
+      + (a >= today() ? ' Oggi non e\' finito: le medie di giornata lo escludono.' : '')));
+  }
+  v.append(sel);
 
   /* --- riquadri di testa --- */
   const kpis = el('div', 'kpis');
@@ -738,6 +774,23 @@ function viewDati(v) {
 
   /* --- costanza a punteggio --- */
   if (typeof cardCostanza === 'function') v.append(cardCostanza(k, datiRange));
+
+  /* Lo stesso periodo, su carta. Il cruscotto e' fatto per essere sfogliato;
+     il resoconto per essere consegnato a qualcuno che l'app non ce l'ha. */
+  if (typeof scaricaResoconto === 'function') {
+    const cr = el('div', 'card flat');
+    cr.append(el('div', 'eyebrow', 'Portatelo via'));
+    cr.append(el('div', 'muted',
+      'Il resoconto di questo periodo in un PDF: verdetto, numeri a confronto, '
+      + 'cosa non ha funzionato e come si sistema. Da dare al medico o '
+      + 'all\'allenatore, che l\'app non ce l\'hanno.'));
+    const b = el('button', 'btn wide');
+    b.style.marginTop = '9px';
+    b.textContent = 'Scarica il resoconto in PDF';
+    b.onclick = () => scaricaResoconto(revPeriodoDate(giorni[0], giorni[giorni.length - 1]));
+    cr.append(b);
+    v.append(cr);
+  }
 
   /* --- calendario --- */
   v.append(chartCal({
