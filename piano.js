@@ -610,6 +610,20 @@ function viewPiano(v) {
   base.append(alt);
   v.append(base);
 
+  /* --- passarlo, o farselo passare --- */
+  const sc = el('div', 'card flat');
+  sc.append(el('div', 'eyebrow', 'Passalo a qualcuno'));
+  sc.append(el('div', 'muted',
+    'Un file JSON con il piano e basta: target, alimenti tuoi, pasti, settimana, '
+    + 'integratori. Non il diario, non le pesate, non le foto — quelli sono tuoi '
+    + 'e non servono a chi riceve il piano. Caricandone uno si aggiunge al tuo: '
+    + 'sui nomi che esistono gia’ te lo chiede prima.'));
+  const bsc = el('button', 'btn wide', 'Esporta o importa un piano');
+  bsc.style.marginTop = '8px';
+  bsc.onclick = () => sheetScambio();
+  sc.append(bsc);
+  v.append(sc);
+
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Se ti sei perso</div>
      <div class="muted">Il caso piu’ comune sono i primi due passi e basta: metti i tuoi

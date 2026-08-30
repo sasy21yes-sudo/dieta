@@ -1224,6 +1224,16 @@ function sheetSchede() {
   b.style.marginTop = '10px';
   b.onclick = () => sheetScheda(null);
   w.append(b);
+
+  // una scheda che funziona la si vuole passare a qualcuno, o portare
+  // sull'altro profilo: e' qui che viene in mente, non dentro le impostazioni
+  const sc2 = el('button', 'btn wide', 'Esporta o importa schede');
+  sc2.style.marginTop = '8px';
+  sc2.onclick = () => sheetScambio();
+  w.append(sc2);
+  w.append(el('p', 'note',
+    'Un file JSON con le schede e gli esercizi tuoi che ci stanno dentro. '
+    + 'Caricandone uno le schede si aggiungono alle tue.'));
   sheet(w);
 }
 

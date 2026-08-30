@@ -25,6 +25,44 @@ function alimento(nome) {
            fonte: 'verificato', prodotto: o.nome };
 }
 
+/**
+ * Tutto quello che si puo' mangiare, in un elenco solo: gli alimenti del piano
+ * piu' i prodotti reali che NON sostituiscono gia' un alimento.
+ *
+ * Quelli collegati non si ripetono: se lo Skyr sostituisce lo yogurt greco, i
+ * suoi valori arrivano gia' da alimento('yogurt greco') e mostrarlo due volte
+ * darebbe due righe che dicono la stessa cosa con due nomi diversi. Quelli
+ * scollegati invece prima non comparivano da nessuna parte — li registravi col
+ * codice a barre e poi non c'era modo di mangiarli.
+ */
+function mangiabili() {
+  const out = Object.keys(D.alimenti).sort().map(n => {
+    const al = alimento(n);
+    return { id: 'a:' + n, nome: n, fonte: 'piano', unita: al.unita || 'g',
+             kcal: al.kcal, p: al.p, c: al.c, g: al.g, fibre: al.fibre || 0,
+             stima: al.fonte === 'stima', marca: al.prodotto || null };
+  });
+  for (const p of prodotti()) {
+    if (p.sostituisce) continue;          // gia' dentro, sotto il nome del piano
+    out.push({ id: 'p:' + p.id, nome: p.nome, fonte: 'prodotto',
+               unita: p.unita || 'g', kcal: p.kcal, p: p.p, c: p.c, g: p.g,
+               fibre: p.fibre || 0, stima: false, marca: p.marca || null });
+  }
+  return out.sort((a, b) => a.nome.localeCompare(b.nome));
+}
+
+/** Un mangiabile dal suo id, e i macro per una quantita'. */
+function mangiabile(id) { return mangiabili().find(x => x.id === id) || null; }
+function macroMangiabile(id, qta) {
+  const x = mangiabile(id);
+  if (!x) return null;
+  const f = qta / 100;
+  // due decimali: 60 g di una barretta da 12 g di grassi danno 7,1999999999,
+  // e quel numero finisce cosi' com'e' dentro il diario salvato
+  const r = v => Math.round(v * f * 100) / 100;
+  return { kcal: r(x.kcal), p: r(x.p), c: r(x.c), g: r(x.g), fibre: r(x.fibre) };
+}
+
 /* --------------------------------------------------------------- vista */
 function viewProdotti(v) {
   const list = prodotti();

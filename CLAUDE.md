@@ -79,6 +79,7 @@ timer.js        timer di recupero fra le serie
 carico.js       scarico automatico + dolori e infortuni
 cardio.js       corsa e simili, tracciato GPS, cartolina PNG da condividere
 salute.js       import di passi e sonno da un Comando iOS
+scambio.js      esporta/importa un pezzo solo: la dieta, le schede, o tutti e due
 sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
 giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
 piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
@@ -251,7 +252,9 @@ non un dettaglio.
   lettura del codice a barre dove il browser la supporta, con ricerca opzionale
   su Open Food Facts. Collegando un prodotto a un alimento del piano, i suoi
   valori **sostituiscono la stima ovunque**: pasti, sostituzioni, analisi,
-  previsione
+  previsione. Un prodotto che non e' collegato a niente compare comunque
+  nell'elenco del pasto fuori piano (`mangiabili()`), mentre uno gia' collegato
+  no: sarebbe la stessa cosa due volte, una col nome del piano e una col suo
 - **Foto** — uno scatto al giorno per posa (fronte/lato/schiena), confronto
   primo/ultimo e timelapse sfogliabile. Stanno in IndexedDB, compresse a 1280 px
 - **Palestra** (scheda "Gym") — registro delle sedute, mappa muscolare fronte e
@@ -277,6 +280,11 @@ non un dettaglio.
 - **Analisi** — motore a regole "cosa sto sbagliando" (vedi sotto)
 - **Spesa** — fabbisogno settimanale aggregato per categoria, con spunta
 - **Impostazioni** — generatore `.ics`, export/import backup JSON
+- **Passa il piano, non l'archivio** — export/import del solo piano alimentare,
+  delle sole schede di palestra, o di tutti e due. Il file si carica **sopra** a
+  quello che hai, non al posto: sui nomi che esistono gia' si sceglie. Sta in
+  Impostazioni, in Piano e dentro le schede in Gym — nei tre punti in cui viene
+  in mente
 
 ### Calorie bruciate: il punto in cui quasi tutte le app sbagliano
 
@@ -925,6 +933,40 @@ l'accoppiamento a tentativi produrrebbe l'esecuzione **sbagliata**, che è peggi
 di nessuna esecuzione. Chi importa dal catalogo online se lo porta dietro da
 solo (`exdbId`).
 
+### Passare un pezzo di piano
+
+Il backup completo c'era gia' e risponde a un'altra domanda: *come non perdo
+quello che ho*. Prende tutto, e quando lo rimetti **sostituisce** l'archivio —
+che e' esattamente cio' che deve fare un backup.
+
+La domanda che restava scoperta e' un'altra: voglio dare la mia dieta a
+qualcuno, o portarmi le schede sul secondo profilo. Con il backup completo si
+puo' solo consegnare anche sessanta giorni di pesate, che non c'entrano niente
+e non sono neanche sue. Da qui `scambio.js`, con quattro decisioni:
+
+1. **L'import aggiunge, non sostituisce.** Un backup si ripristina; una dieta
+   che ti passa qualcuno si affianca alla tua. Sui nomi che esistono gia' si
+   chiede — "tieni i miei" e' il default — e non si decide di nascosto.
+2. **`raccogli()` legge da `D`, non da `S.piano`.** Lo strato dell'utente e'
+   quasi vuoto per chi sta sul piano di esempio: esportarlo consegnerebbe un
+   file che **non contiene la dieta che mangi**. L'unica eccezione sono gli
+   alimenti: i 44 di base ce li ha gia' chiunque installi l'app, e rispedirli
+   sarebbe solo peso e quarantaquattro finti conflitti.
+3. **Settimana e target non arrivano di default**, sono due interruttori. I
+   target sono tarati su altezza, peso ed eta' di chi ha fatto quel piano; la
+   settimana riscrive l'assegnazione di sette giorni. Prendere i pasti senza
+   prendere quei due e' il caso normale, non l'eccezione.
+4. **Le schede si portano dietro i loro esercizi** (quelli personalizzati, presi
+   da `S.palestra.esercizi` per gli `ex` che citano), altrimenti dall'altra
+   parte arriva una scheda con le righe che puntano al nulla. E ogni scheda
+   importata prende un **id nuovo**: due schede con lo stesso id e la seconda
+   non si apre piu', perche' `scheda(id)` trova sempre la prima.
+
+Il diario non viene toccato in nessun caso, e la UI lo dice due volte.
+
+Un backup completo caricato qui per sbaglio non e' un errore dell'utente: e' un
+file giusto nella porta sbagliata, e il messaggio dice quale e' quella giusta.
+
 ### Passi e sonno senza scriverli
 
 Nessuna API web legge HealthKit. Un **Comando iOS** però ha i permessi che il
@@ -1035,6 +1077,13 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   per far quadrare i conti: la mappa muscolare, il volume e la forma-fatica si
   reggono su quei gruppi. Un muscolo senza corrispondenza va dichiarato, non
   indovinato
+- Non far sostituire l'archivio a un file di scambio: quello e' il mestiere del
+  backup. Un piano che arriva da fuori si **aggiunge**, e sui doppioni si chiede
+- Non esportare lo strato `S.piano` come se fosse il piano: chi sta sul piano di
+  esempio ce l'ha quasi vuoto, e il file consegnato non conterrebbe la dieta che
+  mangia davvero. Si esporta `D`, meno i 44 alimenti di base che ha gia' chiunque
+- Non riusare l'id di una scheda importata: `scheda(id)` restituisce la prima che
+  trova, e la seconda diventa impossibile da aprire
 - Non usare media e deviazione standard per riconoscere una pesata sbagliata:
   il valore anomalo alza sia la media sia lo scarto e finisce per giustificarsi
   da solo. Servono mediana e MAD

@@ -1072,13 +1072,16 @@ function sheetExtra(k) {
      tutti e cinque, non solo due — li fa lui. */
   let scelto = null;
   if (typeof selettoreCercabile === 'function') {
-    const f = el('div', 'field', '<label>Cerca un alimento</label>');
-    const opz = Object.keys(D.alimenti).sort().map(n => {
-      const al = alimento(n);
-      return { v: n, lab: n, sub: `${nf(al.kcal)} kcal · ${nf(al.p, 1)} P per 100 ${al.unita || 'g'}` };
-    });
+    const f = el('div', 'field', '<label>Cerca un alimento o un tuo prodotto</label>');
+    // l'elenco comprende i prodotti registrati col codice a barre: prima
+    // restavano nel registro dei prodotti senza poter finire in una giornata
+    const opz = (typeof mangiabili === 'function' ? mangiabili() : []).map(x => ({
+      v: x.id, lab: x.nome,
+      sub: `${x.fonte === 'prodotto' ? (x.marca ? x.marca + ' · ' : 'tuo prodotto · ') : ''}${
+        nf(x.kcal)} kcal · ${nf(x.p, 1)} P per 100 ${x.unita}`
+    }));
     const selA = selettoreCercabile(opz, null, n => { scelto = n; aggiorna(); },
-      'pane, tofu, banana…');
+      'pane, tofu, la tua barretta…');
     f.append(selA);
     w.append(f);
   }
@@ -1100,7 +1103,10 @@ function sheetExtra(k) {
   const macroScelti = () => {
     if (!scelto) return null;
     const q = parseNum($('#x-q')?.value) ?? 100;
-    return { nome: scelto, q, m: foodM(scelto, q) };
+    const x = typeof mangiabile === 'function' ? mangiabile(scelto) : null;
+    if (!x) return null;
+    return { id: scelto, nome: x.nome, unita: x.unita, stima: x.stima,
+             prodotto: x.fonte === 'prodotto', q, m: macroMangiabile(scelto, q) };
   };
   const aggiorna = () => {
     const s = macroScelti();
@@ -1108,9 +1114,9 @@ function sheetExtra(k) {
     if (!s) return;
     anteprima.innerHTML = `<span><b>${nf(s.m.kcal)} kcal</b></span><span>${nf(s.m.p, 1)} P</span>`
       + `<span>${nf(s.m.c, 1)} C</span><span>${nf(s.m.g, 1)} G</span><span>${nf(s.m.fibre, 1)} fibre</span>`;
-    const al = alimento(scelto);
-    if (al?.fonte === 'stima')
-      anteprima.innerHTML += '<span class="mono muted">valore stimato</span>';
+    if (s.stima) anteprima.innerHTML += '<span class="mono muted">valore stimato</span>';
+    else if (s.prodotto)
+      anteprima.innerHTML += '<span class="mono muted">dalla tua etichetta</span>';
   };
   w.addEventListener('input', e => { if (e.target.id === 'x-q') aggiorna(); });
 
@@ -1118,8 +1124,7 @@ function sheetExtra(k) {
   b.onclick = () => {
     const s = macroScelti();
     if (s) {
-      day(k).extra.push({ nome: `${s.nome} · ${nf(s.q)} ${alimento(s.nome)?.unita || 'g'}`,
-        ...s.m });
+      day(k).extra.push({ nome: `${s.nome} · ${nf(s.q)} ${s.unita}`, ...s.m });
     } else {
       const n = $('#x-n').value.trim();
       const kc = parseNum($('#x-k').value) || 0;
@@ -2233,6 +2238,12 @@ function sheetMenu() {
      + (S.settings.backup ? ' Ultimo backup: ' + S.settings.backup + '.'
                           : ' Non ne hai ancora fatto nessuno.'),
      () => { const n = exportBackup(); toast(n > 1 ? n + ' profili esportati' : 'Backup scaricato'); });
+
+  mk('Passa la dieta o le schede',
+     'Un pezzo solo, non tutto l\'archivio: il piano alimentare, le schede di palestra, '
+     + 'o tutti e due. Serve a darli a qualcun altro o a portarli sul secondo profilo. '
+     + 'Caricandone uno si aggiunge a quello che hai, non lo sostituisce.',
+     () => sheetScambio());
 
   mk('Importa backup', 'Prima ti mostra cosa contiene il file, poi chiede conferma.', () => {
     const i = el('input'); i.type = 'file'; i.accept = '.json,application/json';
