@@ -623,6 +623,8 @@ function metriche(k = today(), n = 7) {
     { id: 'kcal', lab: 'Calorie', val: cm('kcal'), tgt: D.target.kcal, unit: 'kcal',
       vuoto: 'nessun pasto spuntato' },
     { id: 'p', lab: 'Proteine', val: cm('p'), tgt: D.target.p, unit: 'g', tolleranza: .08 },
+    { id: 'c', lab: 'Carboidrati', val: cm('c'), tgt: D.target.c, unit: 'g' },
+    { id: 'g', lab: 'Grassi', val: cm('g'), tgt: D.target.g, unit: 'g' },
     { id: 'fibre', lab: 'Fibre', val: cm('fibre'), tgt: D.target.fibre, unit: 'g' },
     { id: 'acqua', lab: 'Acqua', val: md('acqua'), tgt: D.target.acqua_l, unit: 'L', dec: 1 },
     { id: 'sonno', lab: 'Sonno', val: md('sonno'), tgt: D.target.sonno_h, unit: 'h', dec: 1 },
@@ -829,6 +831,23 @@ function viewDati(v) {
     titolo: 'Proteine', sub: 'La variabile che protegge la massa magra.',
     days: giorni, vals: cons.map(m => m && m.kcal > 400 ? m.p : null),
     target: D.target.p, unit: 'g', dec: 0
+  }));
+  /* Carboidrati e grassi hanno il loro grafico, non solo la fetta nello
+     stack: la ripartizione dice come sono divise le calorie di quel giorno,
+     ma non quanti grammi sono — e due giorni con la stessa torta possono
+     essere uno a 180 g di carboidrati e l'altro a 320. */
+  v.append(chartBars({
+    titolo: 'Carboidrati', sub: 'Il carburante del lavoro pesante: si vede sulle ultime ripetizioni prima che sulla bilancia.',
+    days: giorni, vals: cons.map(m => m && m.kcal > 400 ? m.c : null),
+    target: D.target.c, unit: 'g', dec: 0
+  }));
+  const pav = typeof pavimentoGrassi === 'function' ? pavimentoGrassi(k) : null;
+  v.append(chartBars({
+    titolo: 'Grassi', sub: 'Non solo calorie: sono il substrato degli ormoni e il veicolo delle vitamine liposolubili.',
+    days: giorni, vals: cons.map(m => m && m.kcal > 400 ? m.g : null),
+    target: D.target.g, unit: 'g', dec: 0,
+    note: pav ? `Sotto i ${pav} g al giorno — 0,6 g per kg del tuo peso — la questione smette `
+      + 'di essere il bilancio calorico. E\' una soglia di letteratura, non una misura su di te.' : null
   }));
 
   /* --- ripartizione dei macro --- */

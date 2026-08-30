@@ -490,7 +490,7 @@ function pianoPassi() {
       // a zero i target non sono target: targetNeutro() non puo' calcolarli
       // finche' non c'e' il profilo, e dirlo e' piu' utile di "0 kcal"
       stato: D.target.kcal > 0
-        ? `${nf(D.target.kcal)} kcal · ${D.target.p} g di proteine`
+        ? `${nf(D.target.kcal)} kcal · ${D.target.p} P · ${D.target.c} C · ${D.target.g} G · ${D.target.fibre} fibre`
         : 'si calcolano appena metti peso, altezza ed eta\'' },
     { id: 'integratori', t: 'Cosa integri',
       d: 'Aggiungi, cambia o togli quello che prendi.',
@@ -827,7 +827,7 @@ function sezAlimenti(v) {
     const a = D.alimenti[n];
     const r = el('button', 'prod');
     r.innerHTML = `<div class="grow"><div class="nm">${esc(n)}</div>
-      <div class="mt">${nf(a.kcal)} kcal · ${esc(a.categoria || '')}</div></div>
+      <div class="mt">${nf(a.kcal)} kcal · ${macroRiga(a)} · ${esc(a.categoria || '')}</div></div>
       ${p.alimenti[n] ? '<span class="pill ok">modificato</span>' : ''}`;
     r.onclick = () => sheetAlimento(n);
     c2.append(r);
@@ -1025,10 +1025,9 @@ function sheetPasto(id) {
       const m = a ? foodM(ing.alimento, ing.qta) : M0();
       const r = el('div', 'cmp-r');
       r.style.cursor = 'pointer';
-      r.innerHTML = `<span>${esc(ing.alimento)}</span>
+      r.innerHTML = `<span>${esc(ing.alimento)}<span class="mm">${macroRiga(m)}</span></span>
         <span class="mono qv">${nf(ing.qta)} ${esc(a?.unita || 'g')}</span>
-        <span class="mono muted kv">${nf(m.kcal)} kcal</span>
-        <span class="mono pv">${nf(m.p, 1)}P</span>`;
+        <span class="mono muted kv">${nf(m.kcal)} kcal</span>`;
       // Tocco = apri l'editor sotto la riga. Prima c'era un prompt() del
       // browser: fuori dal design, senza unita' di misura e senza modo di
       // vedere l'effetto sul totale mentre si cambia la quantita'.
@@ -1047,7 +1046,7 @@ function sheetPasto(id) {
           const mm = a ? foodM(ing.alimento, stato.ing[i].qta) : M0();
           r.querySelector('.qv').textContent = nf(stato.ing[i].qta) + ' ' + (a?.unita || 'g');
           r.querySelector('.kv').textContent = nf(mm.kcal) + ' kcal';
-          r.querySelector('.pv').textContent = nf(mm.p, 1) + 'P';
+          r.querySelector('.mm').textContent = macroRiga(mm);
           aggiornaTot();
         };
         ed.querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
@@ -1145,7 +1144,7 @@ function sezSettimana(v) {
     const c = el('div', 'card');
     c.append(el('div', 'row between',
       `<strong style="font-family:var(--serif);font-size:16px">${esc(g.giorno)}</strong>
-       <span class="mono muted" style="font-size:11px">${nf(g.totali.kcal)} kcal · ${nf(g.totali.p, 0)} P</span>`));
+       <span class="mono muted" style="font-size:11px">${nf(g.totali.kcal)} kcal · ${macroRiga(g.totali)}</span>`));
     for (const [si, s] of (g.pasti || []).entries()) {
       const pa = D.pasti[s.codice];
       // s.codice e' null finche' non assegni, ed esc(null) stampava "null":

@@ -227,7 +227,8 @@ non un dettaglio.
 - **Confronto foto a cursore** — prima e dopo sovrapposte, con la riga che si
   trascina
 - **Passi e sonno da un Comando iOS**, senza scriverli a mano
-- **Oggi** — giorno navigabile, barre macro consumato/target, pasti spuntabili,
+- **Oggi** — giorno navigabile, cinque barre consumato/target (kcal, proteine,
+  carboidrati, grassi, fibre), pasti spuntabili con i macro di ognuno,
   totale residuo, registrazione pasti fuori piano senza tono colpevolizzante
 - **Sostituzioni** — motore che, dato un alimento e una quantità, cerca nella stessa
   categoria e riscala per far combaciare il macro dominante (proteine se danno >20%
@@ -686,8 +687,9 @@ Non è un elenco di consigli generici: applica la matrice decisionale del piano.
 
 1. Se ci sono <3 giorni loggati su 7, **dice che non ci sono dati** e si ferma.
    Non produce conclusioni dal rumore
-2. Confronta calorie e proteine medie effettive (dai pasti spuntati, non da quanto
-   dichiarato) contro il target
+2. Confronta contro il target le medie effettive (dai pasti spuntati, non da
+   quanto dichiarato) di **tutti e cinque** i valori: calorie, proteine,
+   carboidrati, grassi, fibre — vedi "Tutti i macro, non solo due" 
 3. Calcola la media mobile del peso a 7 giorni e la confronta con quella di 7 giorni
    prima, incrocia con il trend della vita e con i carichi dichiarati, e cerca la
    riga corrispondente in `regole_calorie`
@@ -976,6 +978,51 @@ Dettaglio di lingua, non di codice: le preposizioni articolate stanno nel
 periodo (`confronto`, `su`, `primaNome`). "Rispetto a la settimana prima" e'
 il genere di sbavatura che fa sembrare l'app tradotta da un'altra.
 
+### Tutti i macro, non solo due
+
+Per molto tempo l'app contava bene le calorie e le proteine, teneva d'occhio le
+fibre, e di carboidrati e grassi diceva solo la fetta nella torta della
+ripartizione. Il pasto su Oggi mostrava "635 kcal / 23 P" e basta; la revisione
+li ignorava; l'analisi non aveva una sola regola su di loro.
+
+Il caso che lo rende evidente si vede a colpo d'occhio nel cruscotto: calorie
+2500 su un target di 2482, proteine 132 su 135, fibre 35 su 38 — tutto in
+linea — e sotto **carboidrati a −77 g e grassi a +34 g**. Il totale tornava
+perche' i due errori si compensavano, e nessuna schermata lo diceva.
+
+Quindi ora carboidrati e grassi sono voci di prima classe: barre su Oggi,
+grafico a barre proprio nel cruscotto (accanto alla ripartizione, che dice come
+sono divise le calorie ma non quanti grammi sono — due giorni con la stessa
+torta possono essere uno a 180 g di carboidrati e l'altro a 320), righe nella
+tabella e nel manubrio del resoconto, regole nell'analisi e nella diagnosi
+settimanale.
+
+Due dettagli che non sono cosmetici:
+
+- **`verso: 'target'`, non `'su'`.** Per le proteine "di piu'" e' quasi sempre
+  meglio; per carboidrati e grassi no, e conta lo scarto in tutte e due le
+  direzioni. Nove calorie al grammo di grasso comprimono i carboidrati senza
+  che il totale si muova.
+- **Il pavimento dei grassi** (`pavimentoGrassi()`): 0,6 g per kg di peso, il
+  bordo basso dell'intervallo prudenziale di letteratura. Sotto quella quota il
+  grasso smette di essere una voce del bilancio — e' il substrato degli ormoni
+  steroidei e il veicolo delle vitamine liposolubili — e infatti nella diagnosi
+  pesa 84, piu' delle calorie. Sopra il pavimento torna una voce come le altre
+  e scende a 54. Come tutte le costanti di letteratura di quest'app **non e'
+  una misura sull'utente, e la UI lo dice**.
+
+`macroRiga()` scrive i quattro numeri in un posto solo. E' nata perche' la
+stessa riga stava per comparire in cinque punti diversi, e cinque copie
+diventano prima o poi cinque ordini diversi degli stessi valori. E' compatta di
+proposito — `23P 81C 22G 9,4fib` sta in novanta pixel, la stessa riga con i
+puntini in mezzo ne prendeva centocinquanta, cioe' meta' della larghezza di un
+telefono per quattro numeri.
+
+Con dieci voci in lista il manubrio della revisione non poteva piu' fermarsi al
+135%: 116 g di grassi su un target di 82 fanno 141%, e chi stava oltre il bordo
+ci si appoggiava, indistinguibile da chi stava esattamente li'. Ora l'asse
+cresce coi dati fino al 220%, oltre quello taglia **e lo scrive**.
+
 ### Il resoconto in PDF
 
 Serve a una cosa che sullo schermo non si puo' fare: portarselo via. Il medico
@@ -1156,6 +1203,15 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   per far quadrare i conti: la mappa muscolare, il volume e la forma-fatica si
   reggono su quei gruppi. Un muscolo senza corrispondenza va dichiarato, non
   indovinato
+- Non trattare carboidrati e grassi come contorno di calorie e proteine: due
+  errori di segno opposto si compensano nel totale, e una giornata "in linea"
+  puo' essere 77 g sotto di carboidrati e 34 sopra di grassi
+- Non dare a carboidrati e grassi `verso: 'su'`: non sono le proteine, conta lo
+  scarto in tutte e due le direzioni
+- Non presentare il pavimento dei grassi come una misura: e' 0,6 g/kg preso
+  dalla letteratura, come le costanti di Banister. La UI deve continuare a dirlo
+- Non fermare l'asse del manubrio a una costante: con dieci voci qualcuno
+  finisce oltre il 135%, e un punto appoggiato al bordo dice una cosa falsa
 - Non lasciare fisse le soglie della revisione quando il periodo non e' di
   sette giorni: l'obiettivo di sedute e' settimanale e va scalato, la soglia
   del registro e' meta' dei giorni. Altrimenti ogni periodo corto risulta

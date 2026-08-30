@@ -74,6 +74,7 @@ function sheetPorzioni(k, code) {
     const dk = m.kcal - base.kcal;
     tot.innerHTML = `<span><b>${nf(m.kcal)} kcal</b></span><span>${nf(m.p, 1)} P</span>`
       + `<span>${nf(m.c, 1)} C</span><span>${nf(m.g, 1)} G</span>`
+      + `<span>${nf(m.fibre, 1)} fibre</span>`
       + (Math.abs(dk) >= 1 ? `<span>${dk > 0 ? '+' : ''}${nf(dk)} sul piano</span>` : '');
   };
   const disegna = () => {

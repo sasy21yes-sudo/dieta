@@ -133,6 +133,20 @@ function day(k = today()) {
 
 /* ------------------------------------------------------------ nutrizione */
 const M0 = () => ({ kcal: 0, p: 0, c: 0, g: 0, fibre: 0 });
+/**
+ * I quattro macro in una riga sola, senza le calorie.
+ *
+ * Sta qui e non in tre posti diversi perche' e' comparso in tre posti diversi
+ * — pasto del giorno, fuori piano, anteprima — e tre versioni della stessa
+ * riga diventano prima o poi tre ordini diversi degli stessi numeri.
+ */
+function macroRiga(m, sep = ' ') {
+  // compatta di proposito: "23P 81C 22G 9fib" sta in novanta pixel, e la
+  // stessa riga con i puntini in mezzo ne prendeva centocinquanta, cioe' meta'
+  // della larghezza di un telefono per quattro numeri
+  return [[m.p, 'P'], [m.c, 'C'], [m.g, 'G'], [m.fibre, 'fib']]
+    .map(([v, l]) => `${nf(v || 0, (v || 0) < 10 ? 1 : 0)}${l}`).join(sep);
+}
 function addM(a, b, k = 1) {
   for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) a[x] += (b[x] || 0) * k;
   return a;
@@ -487,6 +501,25 @@ function pausaDi(k) {
 function senzaPause(giorni) { return giorni.filter(g => !inPausa(g)); }
 
 /* ------------------------------------------------- motore "cosa sbaglio" */
+/**
+ * Il pavimento dei grassi.
+ *
+ * Sotto una certa quota i grassi smettono di essere una voce del bilancio e
+ * diventano un problema di funzionamento: sono il substrato degli ormoni
+ * steroidei e il veicolo delle vitamine liposolubili, e un piano che li
+ * schiaccia per far posto al resto si paga altrove. La letteratura mette il
+ * minimo prudenziale fra 0,6 e 0,8 g per kg di peso: qui si usa 0,6, il bordo
+ * basso, perche' e' una soglia d'allarme e non un obiettivo.
+ *
+ * Come tutte le costanti di letteratura di quest'app non e' una misura
+ * sull'utente, e dove compare la UI lo dice.
+ */
+function pavimentoGrassi(k = today()) {
+  const peso = (typeof weightMA === 'function' && weightMA(k))
+    || D.profilo?.peso_iniziale_kg;
+  return peso > 0 ? Math.round(peso * 0.6) : null;
+}
+
 function analyse(k = today()) {
   const F = [], T = D.target;
   const d7 = windowDays(k, 7), d14 = windowDays(k, 14);
@@ -513,6 +546,25 @@ function analyse(k = today()) {
       `Media ${nf(ap, 1)} g contro ${T.p} g. È la variabile che protegge la massa magra: prima di toccare qualsiasi altra cosa, sistema questa.`]);
     if (af && af < 25) F.push(['warn', 'F', 'Fibre basse',
       `Media ${nf(af, 1)} g. Il piano ne prevede ~${T.fibre}. Se stai saltando i legumi, stai anche perdendo ferro e sazietà.`]);
+
+    /* Carboidrati e grassi non sono contorno degli altri due. Il carboidrato
+       e' il carburante del lavoro pesante; il grasso ha un pavimento sotto il
+       quale non e' piu' una questione di bilancio. Le calorie da sole non
+       bastano a vederlo: si puo' centrare il totale ed essere fuori su tutti
+       e due, uno in su e uno in giu'. */
+    const ac = avg(cons.map(m => m.c)), ag = avg(cons.map(m => m.g));
+    if (T.c && ac != null && ac < T.c * 0.85) F.push(['warn', 'C', 'Carboidrati sotto il target',
+      `Media ${nf(ac)} g contro ${T.c} g. Sono il carburante delle serie pesanti e il modo piu' rapido di rimettere glicogeno: quando calano il primo segno non è sulla bilancia, è sulle ultime ripetizioni e sul recupero fra le serie.`]);
+    else if (T.c && ac != null && ac > T.c * 1.2) F.push(['warn', 'C', 'Carboidrati sopra il target',
+      `Media ${nf(ac)} g contro ${T.c} g. Di per sé non è un problema; guarda però se proteine o grassi sono scesi per fare posto, perché è lì che si perde qualcosa.`]);
+
+    const pav = pavimentoGrassi(k);
+    if (T.g && ag != null && pav && ag < pav) F.push(['bad', 'G', 'Grassi sotto il minimo',
+      `Media ${nf(ag)} g, sotto i ${pav} g che corrispondono a 0,6 g per kg di peso. Sotto quella quota i grassi non sono più una voce del bilancio: sono il substrato degli ormoni steroidei e il veicolo delle vitamine liposolubili. È un valore di letteratura, non una misura su di te.`]);
+    else if (T.g && ag != null && ag < T.g * 0.8) F.push(['warn', 'G', 'Grassi sotto il target',
+      `Media ${nf(ag)} g contro ${T.g} g. Sei sopra il minimo, quindi non è urgente: è però la voce più facile da riportare in linea, perché bastano pochi grammi di frutta secca o di olio.`]);
+    else if (T.g && ag != null && ag > T.g * 1.25) F.push(['warn', 'G', 'Grassi sopra il target',
+      `Media ${nf(ag)} g contro ${T.g} g. Nove calorie al grammo contro quattro: senza accorgersene comprimono i carboidrati, e i carboidrati sono quelli che ti fanno finire l'allenamento.`]);
   }
 
   // --- peso: media mobile 7 giorni contro quella di 7 giorni prima
@@ -846,8 +898,11 @@ function viewOggi(v) {
   const cons = consumed(k), tgt = dayTarget(k);
   const box = el('div', 'card');
   const g = el('div', 'macros');
+  // le fibre erano l'unica voce del target senza la sua barra, e finivano per
+  // essere quella che non guardava nessuno
   for (const [id, lab, dec] of [['kcal', 'kcal', 0], ['p', 'prot', 0],
-                                ['c', 'carb', 0], ['g', 'gras', 0]]) {
+                                ['c', 'carb', 0], ['g', 'gras', 0],
+                                ['fibre', 'fibre', 0]]) {
     const pc = tgt[id] ? cons[id] / tgt[id] : 0;
     const cls = pc > 1.15 ? 'way' : pc > 1.02 ? 'over' : '';
     const mb = el('div', 'macro',
@@ -868,8 +923,16 @@ function viewOggi(v) {
   }
   box.append(g);
   const rest = tgt.kcal - cons.kcal;
+  const manca = ([id, nome]) => {
+    const q = (tgt[id] || 0) - (cons[id] || 0);
+    return q > 0.5 ? `<strong>${nf(q)} g</strong> di ${nome}` : null;
+  };
+  const resti = [['p', 'proteine'], ['c', 'carboidrati'], ['g', 'grassi'], ['fibre', 'fibre']]
+    .map(manca).filter(Boolean);
   box.append(el('div', 'muted', rest > 0
-    ? `Restano <strong>${nf(rest)} kcal</strong> e <strong>${nf(Math.max(tgt.p - cons.p, 0), 1)} g</strong> di proteine.`
+    ? `Restano <strong>${nf(rest)} kcal</strong>${resti.length
+        ? ': ' + resti.slice(0, -1).join(', ') + (resti.length > 1 ? ' e ' : '') + resti[resti.length - 1]
+        : ''}.`
     : `Sei a <strong>${nf(-rest)} kcal</strong> oltre il totale del giorno. Non compensare domani: conta la media della settimana.`));
   box.lastChild.style.marginTop = '10px';
   v.append(box);
@@ -925,8 +988,10 @@ function viewOggi(v) {
       testa.onclick = () => sheetPorzioni(k, s.codice);
     h.append(tick, testa,
       el('div', 'meal-kcal', (() => {
+        // prima c'erano solo calorie e proteine, e per sapere quanti
+        // carboidrati aveva un pasto bisognava aprirlo e sommare a mano
         const mg = typeof mealMGiorno === 'function' ? mealMGiorno(s.codice, k) : p.macro;
-        return `${nf(mg.kcal)}<br>${nf(mg.p, 1)} P`;
+        return `<b>${nf(mg.kcal)}</b> kcal<span class="mm">${macroRiga(mg)}</span>`;
       })()));
     m.append(h);
     const ul = el('ul', 'ings');
@@ -956,12 +1021,13 @@ function listaExtra(k, d, conPiano) {
   ex.lastChild.style.marginTop = conPiano ? '' : '0';
   ex.append(el('p', 'muted', conPiano
     ? 'Registralo e basta. Non serve compensare: il bilancio è settimanale.'
-    : 'Aggiungi quello che mangi durante la giornata. Cercando un alimento i macro li calcola lui; altrimenti scrivi tu calorie e proteine.'));
+    : 'Aggiungi quello che mangi durante la giornata. Cercando un alimento i macro li calcola lui — tutti e cinque; altrimenti scrivi tu calorie e proteine.'));
   for (const [i, e] of d.extra.entries()) {
     const row = el('div', 'row between');
     row.style.cssText = 'padding:8px 0;border-top:1px solid var(--rule)';
-    row.append(el('div', 'grow', esc(e.nome)),
-      el('span', 'pill', `${nf(e.kcal)} kcal · ${nf(e.p, 1)} P`));
+    row.append(el('div', 'grow',
+      `${esc(e.nome)}<span class="mm">${macroRiga(e)}</span>`),
+      el('span', 'pill', `${nf(e.kcal)} kcal`));
     const del = el('button', 'btn sm', '×');
     del.onclick = () => { d.extra.splice(i, 1); save(); route(); };
     row.append(del); ex.append(row);
@@ -1012,7 +1078,7 @@ function sheetSwap(nome, qta) {
     `${nf(qta, qta % 1 ? 1 : 0)} ${a.unita} di ${esc(nome)}`));
   wrap.lastChild.style.marginTop = '0';
   wrap.append(el('p', 'muted',
-    `${nf(src.kcal)} kcal · ${nf(src.p, 1)} P · ${nf(src.c, 1)} C · ${nf(src.g, 1)} G`));
+    `${nf(src.kcal)} kcal · ${macroRiga(src)}`));
 
   const curated = D.sostituzioni_consigliate.filter(s => s.da === nome);
   if (curated.length) {
@@ -1027,11 +1093,19 @@ function sheetSwap(nome, qta) {
   const list = swaps(nome, qta);
   if (!list.length) wrap.append(el('p', 'muted', 'Nessuna alternativa nella stessa categoria.'));
   for (const s of list) {
-    const dk = s.macro.kcal - src.kcal, dp = s.macro.p - src.p;
+    // il motore riscala sul macro dominante, ma la sostituzione la paghi su
+    // tutti e quattro: vedere solo lo scarto in proteine nasconde la meta'
+    // dei casi in cui il cambio costa venti grammi di carboidrati
+    const dk = s.macro.kcal - src.kcal;
+    const dd = ([id, l]) => {
+      const q = s.macro[id] - src[id];
+      return `${q >= 0 ? '+' : '−'}${nf(Math.abs(q), 1)} ${l}`;
+    };
     wrap.append(el('div', 'swapopt',
       `<div class="grow"><strong>${esc(s.nome)}</strong>
-         <div class="d">${dk >= 0 ? '+' : ''}${nf(dk)} kcal ·
-           ${dp >= 0 ? '+' : ''}${nf(dp, 1)} P${s.fonte === 'stima' ? ' · valore stimato' : ''}</div></div>
+         <div class="d">${dk >= 0 ? '+' : '−'}${nf(Math.abs(dk))} kcal ·
+           ${[['p', 'P'], ['c', 'C'], ['g', 'G'], ['fibre', 'fib']].map(dd).join(' · ')}${
+             s.fonte === 'stima' ? ' · valore stimato' : ''}</div></div>
        <div class="mono">${nf(s.qta, s.qta < 20 ? 1 : 0)} ${s.unita}</div>`));
   }
   const b = el('button', 'btn wide pri', 'Chiudi'); b.style.marginTop = '14px';
@@ -1078,7 +1152,7 @@ function sheetExtra(k) {
     const opz = (typeof mangiabili === 'function' ? mangiabili() : []).map(x => ({
       v: x.id, lab: x.nome,
       sub: `${x.fonte === 'prodotto' ? (x.marca ? x.marca + ' · ' : 'tuo prodotto · ') : ''}${
-        nf(x.kcal)} kcal · ${nf(x.p, 1)} P per 100 ${x.unita}`
+        nf(x.kcal)} kcal · ${nf(x.p, 1)} P · ${nf(x.c, 1)} C · ${nf(x.g, 1)} G per 100 ${x.unita}`
     }));
     const selA = selettoreCercabile(opz, null, n => { scelto = n; aggiorna(); },
       'pane, tofu, la tua barretta…');

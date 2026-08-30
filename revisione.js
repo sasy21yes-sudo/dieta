@@ -137,6 +137,15 @@ function revMetriche(per) {
       tgt: T.kcal, unit: 'kcal', dec: 0, verso: 'target' },
     { id: 'p', lab: 'Proteine', ora: cm(questa, 'p'), pre: cm(prima, 'p'),
       tgt: T.p, unit: 'g', dec: 0, verso: 'su' },
+    /* Carboidrati e grassi guardano al TARGET e non verso l'alto: per le
+       proteine "di piu'" e' quasi sempre meglio, per questi due no. Nove
+       calorie al grammo di grasso comprimono i carboidrati senza che il
+       totale si muova, ed e' esattamente il caso che le calorie da sole non
+       fanno vedere. */
+    { id: 'c', lab: 'Carboidrati', ora: cm(questa, 'c'), pre: cm(prima, 'c'),
+      tgt: T.c, unit: 'g', dec: 0, verso: 'target' },
+    { id: 'g', lab: 'Grassi', ora: cm(questa, 'g'), pre: cm(prima, 'g'),
+      tgt: T.g, unit: 'g', dec: 0, verso: 'target' },
     { id: 'fibre', lab: 'Fibre', ora: cm(questa, 'fibre'), pre: cm(prima, 'fibre'),
       tgt: T.fibre, unit: 'g', dec: 0, verso: 'su' },
     { id: 'acqua', lab: 'Acqua', ora: md(questa, 'acqua'), pre: md(prima, 'acqua'),
@@ -199,6 +208,33 @@ function revDiagnosi(per) {
     else if (scarto > 0.12) agg(70, 'kcal', 'Mangi piu\' del piano',
       `Media ${nf(kc.ora)} kcal contro ${nf(T.kcal)}. Su un periodo breve non e' un problema; se continua, la vita sale prima dei carichi.`,
       'Prima di togliere calorie, controlla che il piano sia ancora quello giusto: se il target e\' vecchio di due mesi il problema e\' il target, non la settimana.');
+  }
+
+  /* I grassi sotto il pavimento pesano piu' di qualsiasi altra cosa dopo le
+     proteine, e piu' delle calorie: li' non si sta sbagliando un bilancio, si
+     sta togliendo il substrato agli ormoni. Sopra il pavimento tornano a
+     essere una voce come le altre, e scendono in fondo. */
+  const gr = m('g'), pav = typeof pavimentoGrassi === 'function' ? pavimentoGrassi(per.a) : null;
+  if (gr.ora != null && T.g) {
+    if (pav && gr.ora < pav) agg(84, 'g', 'Grassi sotto il minimo',
+      `Media ${nf(gr.ora)} g, sotto i ${pav} g che sono 0,6 g per kg del tuo peso. Sotto quella quota il grasso non e' piu' una voce del bilancio: e' il substrato degli ormoni steroidei e il veicolo delle vitamine liposolubili. E' una soglia di letteratura, non una misura su di te.`,
+      `Trenta grammi di frutta secca, o un cucchiaio d'olio in piu' al giorno, coprono da soli il divario. Non serve cambiare i pasti: serve non toglierli.`);
+    else if (gr.ora < T.g * 0.8) agg(54, 'g', 'Grassi sotto il target',
+      `Media ${nf(gr.ora)} g contro ${T.g}. Sei sopra il minimo, quindi non e' urgente — ma e' la voce piu' facile da rimettere in riga, perche' bastano pochi grammi.`,
+      'Frutta secca a colazione o un filo d\'olio a crudo sulla verdura: sono grammi che entrano senza doverli pesare tutti i giorni.');
+    else if (gr.ora > T.g * 1.25) agg(50, 'g', 'Grassi sopra il target',
+      `Media ${nf(gr.ora)} g contro ${T.g}. Non c'e' niente di sbagliato nel grasso in se': il punto e' che a nove calorie al grammo occupa spazio in fretta, e lo toglie ai carboidrati.`,
+      'Guarda i condimenti prima dei cibi: l\'olio a occhio sulla padella e\' il posto dove finiscono piu\' grammi di quanti se ne contino.');
+  }
+
+  const ca = m('c');
+  if (ca.ora != null && T.c) {
+    if (ca.ora < T.c * 0.85) agg(74, 'c', 'Carboidrati sotto il target',
+      `Media ${nf(ca.ora)} g contro ${T.c}. Sono il carburante delle serie pesanti e il modo piu' rapido di rimettere glicogeno: quando calano, il primo segno non e' sulla bilancia, e' sulle ultime ripetizioni e sul recupero fra le serie.`,
+      'Il punto piu\' facile e\' il pasto prima dell\'allenamento: e\' li\' che i carboidrati fanno la differenza che si sente, e non serve aggiungerli altrove.');
+    else if (ca.ora > T.c * 1.2) agg(46, 'c', 'Carboidrati sopra il target',
+      `Media ${nf(ca.ora)} g contro ${T.c}. Di per se' non e' un problema: vale la pena guardare se proteine o grassi sono scesi per fargli posto, perche' e' li' che si perde qualcosa.`,
+      'Prima di togliere, controlla gli altri due: se proteine e grassi sono in linea, questo scarto e\' solo il modo in cui hai distribuito le calorie.');
   }
 
   const aq = m('acqua');
@@ -611,7 +647,16 @@ function chartPendenza(metriche, per) {
   }
   const W = 320, L = 96, RH = 22, TOP = 22;
   const H = TOP + righe.length * RH + 20;
-  const x0 = L, x1 = W - 14, MAX = 1.35;
+  /* L'asse arrivava sempre al 135%, e chi stava piu' in la' si appoggiava al
+     bordo indistinguibile da chi stava esattamente li'. Con carboidrati e
+     grassi in lista capita spesso: 116 g su un target di 82 fa 141%. Quindi
+     l'asse cresce coi dati, ma non oltre il 220% — piu' in la' schiaccerebbe
+     tutte le altre righe in un dito di spazio per far vedere un punto solo. */
+  const qMax = Math.max(...righe.flatMap(m =>
+    [m.ora / m.tgt, m.pre == null ? 0 : m.pre / m.tgt]));
+  const MAX = Math.min(2.2, Math.max(1.35, qMax * 1.06));
+  const tagliato = qMax > MAX;
+  const x0 = L, x1 = W - 14;
   const s = mk('svg', { viewBox: `0 0 ${W} ${H}` });
   const X = q => x0 + Math.max(0, Math.min(MAX, q)) / MAX * (x1 - x0);
   const testo = (x, y, t, o = {}) => {
@@ -665,7 +710,8 @@ function chartPendenza(metriche, per) {
             fill: 'backwards' }));
   });
   box.append(el('p', 'note',
-    `Ogni riga e\' in percentuale del suo target: e\' l\'unico modo di mettere i passi e i litri d\'acqua sullo stesso disegno. Le voci senza pallino vuoto non avevano un valore ${per?.primaNome || 'prima'}.`));
+    `Ogni riga e\' in percentuale del suo target: e\' l\'unico modo di mettere i passi e i litri d\'acqua sullo stesso disegno. Le voci senza pallino vuoto non avevano un valore ${per?.primaNome || 'prima'}.`
+    + (tagliato ? ' Qualche valore supera il bordo destro e li\' si ferma: l\'asse non si allunga oltre il doppio del target, o le altre righe diventerebbero illeggibili.' : '')));
   return box;
 }
 
@@ -782,7 +828,10 @@ function pdfResoconto(per) {
     const RH = 17, LAB = 108, hG = righe.length * RH + 30;
     doc.serve(hG + 14);
     doc.y += 12;
-    const gy = doc.y, gx0 = X + LAB, gx1 = X + W - 26, MAXQ = 1.35;
+    const qMax = Math.max(...righe.flatMap(m =>
+      [m.ora / m.tgt, m.pre == null ? 0 : m.pre / m.tgt]));
+    const MAXQ = Math.min(2.2, Math.max(1.35, qMax * 1.06));
+    const gy = doc.y, gx0 = X + LAB, gx1 = X + W - 26;
     const PX = q => gx0 + Math.max(0, Math.min(MAXQ, q)) / MAXQ * (gx1 - gx0);
     for (const [q, lab] of [[0, '0'], [.5, '50%'], [1, 'target']]) {
       const x = PX(q), forte = q === 1;

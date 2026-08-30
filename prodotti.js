@@ -120,7 +120,7 @@ function viewProdotti(v) {
       const r = el('button', 'prod');
       const a = D.alimenti[n];
       r.innerHTML = `<div class="grow"><div class="nm">${esc(n)}</div>
-        <div class="mt">${nf(a.kcal)} kcal · ${nf(a.p, 1)}P /100${esc(a.unita || 'g')}</div></div>
+        <div class="mt">${nf(a.kcal)} kcal · ${macroRiga(a)} /100${esc(a.unita || 'g')}</div></div>
         <span class="pill warn">stima</span>`;
       r.onclick = () => sheetProdotto({ nome: n, sostituisce: n, unita: a.unita,
         kcal: a.kcal, p: a.p, c: a.c, g: a.g, fibre: a.fibre, nuovo: true });
