@@ -1047,6 +1047,28 @@ function sheetSceltaModo(k) {
   b2.style.marginTop = '8px';
   b2.onclick = () => sheetLibero(k);
   w.append(b2);
+
+  /* Una seduta registrata per sbaglio — il giorno sbagliato, due volte la
+     stessa — restava li' per sempre, e non e' un dettaglio: entra nel volume
+     settimanale, nella forma-fatica, nel monitoraggio della scheda e nel
+     conteggio delle sedute della revisione. Un dato falso che non si puo'
+     togliere sporca tutti i motori che lo leggono. */
+  if (gia) {
+    const del = el('button', 'btn wide');
+    del.style.marginTop = '14px';
+    del.textContent = 'Elimina la seduta di questo giorno';
+    del.onclick = () => {
+      if (!confirm(`Eliminare le ${gia} serie registrate il ${k}? Non si puo' annullare.`)) return;
+      delete P().sessioni[k];
+      if (typeof _ffCache !== 'undefined' && _ffCache.clear) _ffCache.clear();
+      save(); closeSheet(); route();
+      toast('Seduta eliminata');
+    };
+    w.append(del);
+    w.append(el('p', 'note',
+      'Toglie solo le serie di palestra di quel giorno. Il cardio si elimina dalla '
+      + 'sua scheda, e il resto del diario non viene toccato.'));
+  }
   sheet(w);
 }
 

@@ -113,7 +113,16 @@ function fondiPiano() {
     misure: esempio ? DBASE.misure : DBASE.misure.map(m => ({ ...m, base: null })),
     integratori: fondiIntegratori(esempio)
   };
-  D.settimana = D.settimana.map(g => ({ ...g, totali: totaliGiorno(g) }));
+  /* L'ordine per orario si applica QUI, in lettura, e non solo quando si
+     aggiunge uno slot: cosi' vale per il piano di esempio, per una settimana
+     arrivata da un file di scambio e per qualunque altra strada — e vale
+     ovunque, perche' tutti leggono D.settimana. E' idempotente e non tocca le
+     voci senza ora, che restano dove le hai messe trascinandole. */
+  D.settimana = D.settimana.map(g => ({
+    ...g,
+    pasti: ordinaSlotOrari((g.pasti || []).map(x => ({ ...x }))),
+    totali: totaliGiorno(g)
+  }));
 }
 
 /**

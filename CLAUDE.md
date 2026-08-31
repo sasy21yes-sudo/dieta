@@ -239,7 +239,7 @@ non un dettaglio.
   calorie) e ordina per distanza sui quattro macro **e per affinità di nome**.
   Si **applicano**, solo per quel giorno, e si può anche scegliere a mano
   qualunque alimento: vedi "La sostituzione si applica"
-- **Diario** — peso, acqua, Coca Zero, passi, sonno, allenamento, fame, energia,
+- **Diario** — peso, acqua a bicchieri, Coca Zero, passi, sonno, allenamento, fame, energia,
   aderenza, sintomi gastrointestinali, checklist integratori
 - **Corpo** — target fisico e composizione stimata a confronto; figura SVG
   **parametrica** (le larghezze vengono dalle circonferenze registrate, la sagoma
@@ -766,6 +766,52 @@ accalcavano in una banda alta trenta pixel e le etichette si sovrapponevano per
 forza. Il manubrio dà a ogni voce una riga di altezza fissa — collisione
 impossibile — e mette il movimento in orizzontale. Un asse solo: la percentuale
 del proprio target, l'unico metro che tiene sulla stessa figura i passi e i litri.
+
+### Una seduta si elimina
+
+Registrata il giorno sbagliato, o due volte la stessa, restava li' per sempre:
+si potevano togliere le serie una a una, ma la seduta vuota rimaneva. E non e'
+una questione di ordine — una seduta finta entra nel volume settimanale, nella
+forma-fatica, nel monitoraggio della scheda e nel conteggio delle sedute della
+revisione. Un dato falso che non si puo' togliere sporca tutti i motori che lo
+leggono, e le decisioni che ne escono: lo scarico consigliato, il verdetto
+sulla scheda, la diagnosi della settimana.
+
+Il bottone sta nel punto d'ingresso della giornata (`sheetSceltaModo`), cioe'
+dove ci si accorge dell'errore, e compare **solo se quel giorno ha delle
+serie**. Chiede conferma dicendo quante ne sta buttando, e svuota `_ffCache`
+perche' la forma-fatica e' memorizzata per muscolo e altrimenti risponderebbe
+con i numeri di prima. Tocca solo la palestra: il cardio ha la sua scheda e il
+resto del diario non si muove — e la nota lo dice, perche' "elimina la seduta"
+letto in fretta sembra piu' largo di quello che e'.
+
+### L'acqua si aggiunge a bicchieri
+
+Era un campo numerico in litri dentro la griglia del diario, e chiedeva la cosa
+sbagliata due volte. Primo: nessuno beve "0,25 L", si beve un bicchiere.
+Secondo, e piu' importante: l'acqua e' l'unica voce del diario che si registra
+**otto volte al giorno** e non una — e ogni volta erano tastiera, cancella 1,2,
+scrivi 1,4. A quel prezzo si finisce per stimare la sera, che e' come non
+registrarla.
+
+Quattro recipienti, perche' quattro sono quelli che uno ha in casa: bicchiere
+200 ml, tazza 250, bottiglietta 500, bottiglia 1,5 L. Sono **capienze
+convenzionali, non misure**, e la carta lo scrive — un bicchiere da tavola sta
+fra i 200 e i 250 ml, e chi ha una borraccia da 750 usa "scrivi tu", che e'
+rimasto e vale come totale.
+
+Il livello sta in `d.acqua` in litri, come prima: tutto quello che gia' legge
+l'acqua — analisi, cruscotto, statistiche, PDF — non si e' accorto di niente.
+Accanto, `d.sorsi` e' l'elenco dei millilitri aggiunti, e **non e' ridondante**:
+serve a togliere l'ultimo esattamente com'era. Senza, "annulla" dovrebbe
+chiedere a chi ha toccato per sbaglio quanto valeva il tocco. Scrivendo il
+totale a mano l'elenco si azzera, perche' da quel momento il numero l'ha deciso
+l'utente e i sorsi di prima non lo compongono piu'.
+
+La bottiglia si riempie fino alla quota del target, ed e' disegnata **prima**
+di qualunque animazione: se l'IntersectionObserver non scatta il livello e'
+comunque giusto. E' la stessa regola della fiamma della striscia — il dato sta
+nel riempimento, il movimento e' solo il modo in cui ci si arriva.
 
 ### Timer, scarico, acciacchi
 
@@ -1329,6 +1375,16 @@ partisse da ovunque non si potrebbe piu' scorrere la pagina con il dito sopra
 l'elenco. Le altre righe si spostano davvero mentre trascini: senza, non si
 capisce dove andra' a finire quella che si ha in mano.
 
+**E l'ordinamento sta in `fondiPiano()`, non nell'inserimento.** All'inizio si
+riordinava quando si aggiungeva un pasto, e bastava: chi componeva la settimana
+vedeva le righe al posto giusto. Ma un piano si scrive anche da un file di
+scambio, da un backup, o a mano nell'editor della settimana, e per tutte quelle
+strade nessuno passava di li' — la stessa giornata usciva ordinata dall'editor
+e disordinata su Oggi. Ordinando in lettura la domanda "chi l'ha scritta" non
+si pone piu': `ordinaSlotOrari()` e' idempotente e non tocca le voci senza ora,
+quindi rifonderlo mille volte da' sempre la stessa giornata, con i trascinamenti
+a mano ancora dove li avevi lasciati.
+
 ### Esercizi: una pagina, non un foglio
 
 "Esercizi" apriva un foglio con dentro solo i propri, e i 59 del catalogo non
@@ -1659,6 +1715,19 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non far cambiare al foglio delle sostituzioni il pasto nel piano: quello e'
   la ricetta e vale per tutti i giorni. Una sostituzione vale per il giorno in
   cui la fai, come le porzioni
+- Non ordinare i pasti solo quando si inseriscono: un piano arriva anche da un
+  backup, da un file di scambio e dall'editor della settimana, e per quelle
+  strade nessuno passa dall'inserimento. Si ordina in lettura, in
+  `fondiPiano()`, dove l'ordinamento e' idempotente
+- Non lasciare senza uscita una seduta registrata per sbaglio: entra nel
+  volume, nella forma-fatica, nel monitoraggio della scheda e nel conteggio
+  della revisione. E chi la elimina va avvisato che tocca solo la palestra
+- Non far dimenticare a `_ffCache` una seduta cancellata: la forma-fatica e'
+  memorizzata per muscolo e continuerebbe a rispondere coi numeri di prima
+- Non presentare le capienze dei bicchieri come misure: 200/250/500/1500 ml
+  sono convenzioni, e per la borraccia da 750 deve restare il campo libero
+- Non tenere solo il totale dell'acqua: senza l'elenco dei sorsi "annulla"
+  dovrebbe chiedere a chi ha sbagliato tocco quanto valeva quel tocco
 - Non ordinare da soli i pasti senza orario: per quelli non esiste un ordine
   giusto da calcolare, e vanno lasciati dove sono con una maniglia per
   spostarli

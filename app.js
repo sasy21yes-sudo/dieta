@@ -1449,6 +1449,199 @@ function sheetExtra(k) {
 }
 
 /* --------------------------------------------------------- vista DIARIO */
+/* ==================================================================== acqua
+ *
+ * Era un campo numerico in litri, e chiedeva la cosa sbagliata: nessuno beve
+ * "0,25 L", si beve un bicchiere. E soprattutto l'acqua non si registra una
+ * volta al giorno — si aggiunge otto volte — quindi ogni registrazione doveva
+ * costare un tocco, non "apri la tastiera, cancella 1.2, scrivi 1.4".
+ *
+ * I recipienti sono quattro perche' quattro sono quelli che uno ha in casa, e
+ * i millilitri sono quelli tipici: un bicchiere da tavola sta fra i 200 e i
+ * 250, una tazza da colazione sui 250, la bottiglietta da banco e' 500, la
+ * bottiglia grande 1,5 L. Sono capienze convenzionali, non misure: chi ha una
+ * borraccia da 750 scrive il numero, e il campo per farlo e' rimasto.
+ */
+const BICCHIERI = [
+  { id: 'bicchiere', n: 'Bicchiere', ml: 200 },
+  { id: 'tazza', n: 'Tazza', ml: 250 },
+  { id: 'bottiglietta', n: 'Bottiglietta', ml: 500 },
+  { id: 'bottiglia', n: 'Bottiglia', ml: 1500 }
+];
+
+/** I quattro recipienti, disegnati. Sette tratti l'uno, come le icone di Gym. */
+function iconaBicchiere(id) {
+  const P = {
+    // un tronco di cono: il bicchiere da tavola
+    bicchiere: 'M7.5 4h9l-1.2 16h-6.6z',
+    // la tazza, col manico
+    tazza: 'M6 5h11v9a4.5 4.5 0 0 1-4.5 4.5h-2A4.5 4.5 0 0 1 6 14zM17 7.5h1.8a2.4 2.4 0 0 1 0 4.8H17',
+    // la bottiglietta: collo corto, spalle piene
+    bottiglietta: 'M10 3h4v2.6l1.8 2.6V21H8.2V8.2L10 5.6z',
+    // la bottiglia grande: collo lungo
+    bottiglia: 'M10.2 2.6h3.6v4l2 2.8V21H8.2V9.4l2-2.8z'
+  };
+  const s = mk('svg', { viewBox: '0 0 24 24', class: 'ic-g', 'aria-hidden': 'true' });
+  s.append(mk('path', { d: P[id] || P.bicchiere, fill: 'none', stroke: 'currentColor',
+    'stroke-width': 1.6, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+  return s;
+}
+
+/**
+ * La bottiglia che si riempie.
+ *
+ * Il livello e' scritto nell'SVG prima di qualunque animazione: se
+ * l'IntersectionObserver non scatta, o il browser non anima, il disegno e'
+ * comunque giusto — e' il riempimento a portare il dato, il movimento e' solo
+ * il modo in cui ci arriva.
+ */
+function bottigliaSVG(quota) {
+  const q = Math.max(0, Math.min(1, quota || 0));
+  const W = 74, H = 122;
+  const s = mk('svg', { viewBox: `0 0 ${W} ${H}`, class: 'bott', 'aria-hidden': 'true' });
+  const sagoma = 'M27 6h20v13.5l9 12.5v78a6 6 0 0 1-6 6H24a6 6 0 0 1-6-6V32l9-12.5z';
+  const cid = 'bott-clip-' + Math.random().toString(36).slice(2, 7);
+  const cp = mk('clipPath', { id: cid });
+  cp.append(mk('path', { d: sagoma }));
+  s.append(cp);
+  s.append(mk('path', { d: sagoma, fill: 'var(--wash)' }));
+  const g = mk('g', { 'clip-path': `url(#${cid})`, class: 'liv' });
+  // l'acqua parte dal fondo: alta quanto la quota, e con la superficie mossa
+  const h = 6 + q * (H - 12);
+  const y = H - h;
+  g.append(mk('path', {
+    d: `M-4 ${y + 4} q 10 -5 20 0 t 20 0 t 20 0 t 20 0 V${H + 4} H-4 Z`,
+    fill: 'var(--media)', opacity: q ? .85 : 0
+  }));
+  s.append(g);
+  s.append(mk('path', { d: sagoma, fill: 'none', stroke: 'var(--ink-3)',
+    'stroke-width': 2.4, 'stroke-linejoin': 'round' }));
+  return { svg: s, gruppo: g };
+}
+
+/**
+ * La carta dell'acqua.
+ *
+ * `d.sorsi` e' l'elenco dei millilitri aggiunti, e non e' ridondante rispetto
+ * a `d.acqua`: serve a togliere l'ultimo esattamente com'era, senza chiedere
+ * a chi ha toccato per sbaglio di ricordarsi quanto valeva.
+ */
+function cardAcqua(k) {
+  const d = day(k);
+  const tgt = D.target?.acqua_l || 2.5;
+  const litri = d.acqua || 0;
+  const quota = tgt ? litri / tgt : 0;
+
+  const c = el('div', 'card acqua');
+  c.append(el('div', 'eyebrow', 'Acqua'));
+
+  const testa = el('div', 'acq-testa');
+  const { svg, gruppo } = bottigliaSVG(quota);
+  testa.append(svg);
+  const nums = el('div', 'acq-num');
+  const manca = Math.max(0, tgt - litri);
+  // il numero sta in uno span suo: contaSu() scrive textContent, e con l'unita'
+  // dentro lo stesso nodo la "L" sparirebbe al primo fotogramma
+  nums.innerHTML = `<div class="v"><span class="n">${nf(litri, 2)}</span><em>L</em></div>
+    <div class="t">su ${nf(tgt, 2)} L</div>
+    <div class="s">${litri >= tgt
+      ? 'target raggiunto'
+      : `ne mancano ${nf(manca, 2)} L`}</div>`;
+  testa.append(nums);
+  c.append(testa);
+  if (typeof osserva === 'function' && typeof motionOk === 'function')
+    osserva(c, () => {
+      if (!motionOk()) return;
+      gruppo.style.transformOrigin = 'bottom';
+      gruppo.animate([{ transform: 'scaleY(0)' }, { transform: 'none' }],
+        { duration: 700, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' });
+      contaSu(nums.querySelector('.v .n'), litri, { dec: 2, dur: 700 });
+    });
+
+  const aggiungi = ml => {
+    const dd = day(k);
+    dd.sorsi = [...(dd.sorsi || []), ml];
+    dd.acqua = Math.round(((dd.acqua || 0) + ml / 1000) * 1000) / 1000;
+    save(); route();
+  };
+
+  const g = el('div', 'acq-grid');
+  for (const b of BICCHIERI) {
+    const bt = el('button', 'acq-b');
+    bt.append(iconaBicchiere(b.id));
+    bt.append(el('span', 'n', esc(b.n)));
+    bt.append(el('span', 'ml', b.ml >= 1000 ? nf(b.ml / 1000, 1) + ' L' : b.ml + ' ml'));
+    bt.onclick = () => {
+      if (typeof pulsa === 'function') pulsa(bt, { scala: 1.08, dur: 260 });
+      setTimeout(() => aggiungi(b.ml), 90);
+    };
+    g.append(bt);
+  }
+  c.append(g);
+
+  const riga = el('div', 'row');
+  riga.style.cssText = 'gap:8px;margin-top:10px';
+  const undo = el('button', 'btn sm');
+  const ultimo = (d.sorsi || [])[(d.sorsi || []).length - 1];
+  undo.textContent = ultimo
+    ? `Annulla ${ultimo >= 1000 ? nf(ultimo / 1000, 1) + ' L' : ultimo + ' ml'}`
+    : 'Annulla l\'ultimo';
+  undo.disabled = !ultimo;
+  undo.onclick = () => {
+    const dd = day(k);
+    const ml = (dd.sorsi || []).pop();
+    if (!ml) return;
+    dd.acqua = Math.max(0, Math.round(((dd.acqua || 0) - ml / 1000) * 1000) / 1000);
+    if (!dd.sorsi.length) delete dd.sorsi;
+    save(); route();
+  };
+  riga.append(undo);
+
+  const man = el('button', 'btn sm', 'Scrivi tu');
+  man.onclick = () => sheetAcquaManuale(k);
+  riga.append(man);
+  c.append(riga);
+
+  if ((d.sorsi || []).length) c.append(el('div', 'hint',
+    `Oggi: ${d.sorsi.map(x => x >= 1000 ? nf(x / 1000, 1) + ' L' : x + ' ml').join(' + ')}.`));
+  c.append(el('p', 'note',
+    'Le capienze sono quelle convenzionali, non misurate: un bicchiere da tavola '
+    + 'sta fra i 200 e i 250 ml. Per una borraccia da 750 o per correggere il '
+    + 'totale c\'e\' "scrivi tu".'));
+  return c;
+}
+
+/** Il totale a mano: per le borracce che non stanno in nessuna delle quattro. */
+function sheetAcquaManuale(k) {
+  const d = day(k);
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Acqua'));
+  w.append(el('h2', 'sec', 'Scrivi il totale'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Il totale di oggi, in litri. Scrivendolo qui l\'elenco dei bicchieri di oggi '
+    + 'si azzera: da quel momento il numero sei tu ad averlo deciso, e i tocchi '
+    + 'successivi ripartono da li\'.'));
+  w.append(el('div', 'field',
+    `<label>Litri</label><input type="text" inputmode="decimal" id="aq-v"
+      value="${d.acqua != null ? esc(String(d.acqua)) : ''}">`));
+  const ok = el('button', 'btn wide pri', 'Salva');
+  ok.onclick = () => {
+    const n = parseNum($('#aq-v').value);
+    if (n == null || n < 0 || n > 20) { toast('Un numero fra 0 e 20'); return; }
+    const dd = day(k);
+    dd.acqua = n;
+    delete dd.sorsi;
+    save(); closeSheet(); route();
+  };
+  w.append(ok);
+  const ann = el('button', 'btn wide', 'Annulla');
+  ann.style.marginTop = '8px';
+  ann.onclick = closeSheet;
+  w.append(ann);
+  sheet(w);
+}
+
 function viewDiario(v) {
   const k = viewDate, d = day(k);
   const set = (id, val) => { d[id] = val; save(); };
@@ -1494,12 +1687,16 @@ function viewDiario(v) {
 
   if (D.profilo?.sesso === 'f' && typeof cardCiclo === 'function') v.append(cardCiclo(k));
 
+  v.append(cardAcqua(k));
+
   const c1 = el('div', 'card');
   c1.append(el('h2', 'sec', 'Ogni giorno'));
   c1.lastChild.style.marginTop = '0';
   c1.append(num('peso', 'Peso', 'kg', '0.01'));
   const grid = el('div'); grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px';
-  grid.append(num('acqua', 'Acqua', 'L', '0.25'), num('coca', 'Coca Zero', 'lattine', '1'),
+  // l'acqua non e' piu' qui: ha una carta sua, perche' e' l'unica voce del
+  // diario che si registra otto volte al giorno e non una
+  grid.append(num('coca', 'Coca Zero', 'lattine', '1'),
               num('passi', 'Passi', '', '100'), num('sonno', 'Sonno', 'ore', '0.5'));
   c1.append(grid);
 
