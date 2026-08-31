@@ -335,35 +335,12 @@ function cardCostanza(k, n) {
  * ingredienti e impostazioni erano tre cose diverse nascoste dietro lo stesso
  * gesto.
  */
-function menuTendina() {
-  const vecchio = $('#dropdown');
-  if (vecchio) { vecchio.remove(); return; }
-  const dd = el('div');
-  dd.id = 'dropdown';
-  const voce = (t, sotto, fn) => {
-    const b = el('button');
-    b.innerHTML = `<span class="t">${esc(t)}</span><span class="s">${esc(sotto)}</span>`;
-    b.onclick = () => { dd.remove(); fn(); };
-    dd.append(b);
-  };
-  voce('Profilo', 'Chi sei, target, profili multipli', () => {
-    if (typeof pianoTab !== 'undefined') pianoTab = 'profilo';
-    location.hash = '#/piano';
-  });
-  voce('Liste ingredienti', 'Alimenti del piano e prodotti reali', () => {
-    if (typeof pianoTab !== 'undefined') pianoTab = 'alimenti';
-    location.hash = '#/piano';
-  });
-  voce('Impostazioni', 'Backup, promemoria, foto, prodotti', () => sheetMenu());
-  $('#top-actions').append(dd);
-  setTimeout(() => {
-    const chiudi = e => {
-      if (dd.contains(e.target) || e.target.id === 'btn-menu') return;
-      dd.remove(); document.removeEventListener('pointerdown', chiudi);
-    };
-    document.addEventListener('pointerdown', chiudi);
-  }, 0);
-}
+/* La tendina del ⋯ non c'e' piu'.
+
+   Aveva tre voci: Profilo, Liste ingredienti, Impostazioni. Le prime due
+   portano esattamente dove porta l'icona del profilo qui accanto, e la terza
+   era un tocco in piu' per arrivare a un foglio che ora si apre da solo. Era
+   una terza superficie di navigazione che non aggiungeva una destinazione. */
 
 /* ------------------------------------------------------------ traguardi */
 /**

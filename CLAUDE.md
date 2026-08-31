@@ -62,7 +62,7 @@ Ricordarlo all'utente ogni ~20 giorni di log.
 ## Struttura
 
 ```
-index.html      guscio: topbar, <main>, tab bar, sheet modale
+index.html      guscio: topbar, <main>, tab bar (5 voci), sheet modale
 style.css       design system (variabili CSS, tema chiaro/scuro automatico)
 viz.css         tavolozza dei grafici + componenti di Dati, Prodotti, Foto
 app.js          stato, router, viste principali, motori. Caricato PER ULTIMO:
@@ -1107,6 +1107,51 @@ UI lo dice — come le costanti di Banister e le soglie di HYROX. E c'e' una
 ragione per cambiare scheda che l'app non conosce e non prova a indovinare: che
 sia diventata noiosa. Anche quello e' scritto.
 
+### Cinque tab, e tre porte diventate una
+
+Le tab erano sette e il menu dieci voci, ma il numero non era il problema: il
+problema era che alla domanda **"come sta andando"** rispondevano tre schermate
+diverse, e bisognava sceglierne una prima di sapere cosa ci fosse dentro.
+
+Si sovrapponevano davvero, non per impressione:
+
+- la **costanza** era calcolata e mostrata due volte — un anello in Analisi e
+  una carta intera in Dati, lo stesso numero a due dita di distanza;
+- le **otto metriche contro il target** erano barre in Analisi e riga di
+  riepilogo sotto ogni grafico in Dati;
+- **due motori a regole** (`analyse()` e `revDiagnosi()`) giravano sugli stessi
+  dati producendo elenchi simili.
+
+Ora c'e' **Andamento**, una tab con tre viste in ordine di quanto sono
+impegnative: **Sintesi** (cosa non torna adesso), **Grafici** (i numeri giorno
+per giorno), **Revisione** (il giudizio su un periodo, e la sola cosa da
+cambiare). I due motori restano due, e la differenza e' il tempo: la sintesi
+guarda gli ultimi sette giorni chiusi e basta, la revisione un periodo scelto,
+con il confronto.
+
+`#/dati`, `#/analisi` e `#/revisione` **restano indirizzi validi** e aprono
+Andamento sulla vista giusta: ci puntano parecchi link dentro l'app, e
+riscriverli tutti per un cambio di navigazione e' il modo piu' sicuro di
+romperne uno.
+
+Intorno, la stessa regola applicata alle altre superfici:
+
+| Prima | Dopo |
+|---|---|
+| 7 tab | **5**: Oggi, Diario, Corpo, Gym, Andamento |
+| Spesa in tab bar | nel menu, prima voce, solo col piano acceso: e' una lista che si guarda una volta a settimana |
+| tendina del ⋯ con 3 voci | via: il ⋯ apre le impostazioni e basta |
+| ⋯ con Foto, Piano, Alimenti | via: stanno nel profilo, che e' dove uno le cerca |
+
+Le due superfici superstiti hanno una divisione netta: **l'icona della persona
+e' "tu"** (foto, chi sei, il piano, quello che mangi, i profili), **il ⋯ e'
+"l'app e i dati"** (spesa, promemoria, backup, versione).
+
+Quello che **non** e' stato unito: Diario e Oggi. Sembrano vicine — sono la
+stessa giornata — ma Oggi e' "cosa mangio adesso" e Diario e' "cosa registro
+sulla giornata": trecento righe di campi che dentro Oggi diventerebbero una
+pagina senza fondo.
+
 ### Confrontare due alimenti
 
 "Quale dei due conviene" sembra una domanda semplice e non lo e', per un motivo
@@ -1573,6 +1618,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non stilare come `div` un elemento che e' diventato `button`: senza il reset
   prende il fondo chiaro di sistema, e al buio e' un rettangolo bianco in mezzo
   alla lista
+- Non aggiungere una terza superficie di navigazione: la persona e' "tu", il
+  ⋯ e' "l'app e i dati", e una tendina in mezzo che porta dove portano gia'
+  quelle due non aggiunge una destinazione
+- Non rompere `#/dati`, `#/analisi` e `#/revisione`: sono diventati viste di
+  Andamento ma restano indirizzi validi, e ci puntano parecchi link interni
 - Non chiedere di scrivere a mano una categoria che esiste gia': il motore
   delle sostituzioni confronta stringhe, e "legumi" contro "Legumi" sono due
   famiglie separate senza che nessuno se ne accorga. Si sceglie fra quelle in

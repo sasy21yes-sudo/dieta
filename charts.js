@@ -675,6 +675,58 @@ function iconaDati(id) {
   return s;
 }
 
+/* ============================================================== andamento
+ *
+ * Alla domanda "come sta andando" rispondevano tre schermate diverse: Dati con
+ * venti grafici, Analisi con un motore a regole, la Revisione con un altro.
+ * Si sovrapponevano davvero e non per impressione — la costanza era calcolata
+ * e mostrata due volte, le otto metriche contro il target comparivano sia
+ * come barre in Analisi sia come riga di riepilogo sotto ogni grafico — e
+ * soprattutto obbligavano a scegliere una porta prima di sapere cosa c'era
+ * dentro.
+ *
+ * Adesso e' una tab con tre viste, in ordine di quanto sono impegnative:
+ * **Sintesi** dice cosa non torna adesso, **Grafici** fa vedere i numeri,
+ * **Revisione** giudica un periodo e chiede di cambiare una cosa.
+ *
+ * I vecchi indirizzi restano validi: #/dati, #/analisi e #/revisione aprono
+ * Andamento sulla vista giusta. Ci puntano parecchi link dentro l'app, e
+ * riscriverli tutti per un cambio di navigazione e' il modo piu' sicuro di
+ * romperne uno.
+ */
+let andTab = 'sintesi';
+
+const AND_VISTE = [
+  ['sintesi', 'Sintesi', 'Cosa non torna negli ultimi sette giorni chiusi.'],
+  ['grafici', 'Grafici', 'I numeri giorno per giorno, sul periodo che scegli.'],
+  ['revisione', 'Revisione', 'Il giudizio su un periodo, e la sola cosa da cambiare.']
+];
+
+/** Traduce i vecchi indirizzi nella vista giusta di Andamento. */
+function rottaAndamento(name) {
+  const mappa = { dati: 'grafici', analisi: 'sintesi', revisione: 'revisione' };
+  if (mappa[name]) { andTab = mappa[name]; return 'andamento'; }
+  return name;
+}
+
+function viewAndamento(v) {
+  const barra = el('div', 'card flat');
+  const seg = el('div', 'seg');
+  for (const [id, lab] of AND_VISTE) {
+    const b = el('button', null, lab);
+    b.setAttribute('aria-pressed', String(andTab === id));
+    b.onclick = () => { andTab = id; route(); };
+    seg.append(b);
+  }
+  barra.append(seg);
+  const d = (AND_VISTE.find(x => x[0] === andTab) || [])[2];
+  if (d) barra.append(el('div', 'hint', d));
+  v.append(barra);
+
+  ({ sintesi: sezSintesi, grafici: viewDati, revisione: viewRevisione }[andTab]
+    || sezSintesi)(v);
+}
+
 /* ========================================================== cruscotto */
 let datiRange = 30;
 /* La fine del periodo. Di suo e' oggi — un cruscotto guarda avanti — ma con
@@ -797,8 +849,9 @@ function viewDati(v) {
   const nav = el('div', 'card');
   nav.append(el('div', 'eyebrow', 'Da questi numeri'));
   nav.append(el('div', 'muted',
-    'Le tre cose che i grafici qui sopra non fanno: giudicare la settimana, '
-    + 'guardare avanti, e uscire dall\'app.'));
+    'Le due cose che i grafici qui sopra non fanno: guardare avanti, e uscire '
+    + 'dall\'app. Il giudizio sul periodo sta nella vista <strong>Revisione</strong>, '
+    + 'qui sopra.'));
 
   /* Erano due righe di testo con una freccetta, indistinguibili da un
      paragrafo: si leggevano e non si toccavano. Ora sono riquadri con l'icona
@@ -818,17 +871,7 @@ function viewDati(v) {
     gAz.append(b);
   };
 
-  let statoRev = 'gli ultimi sette giorni chiusi';
-  try {
-    const dg = revDiagnosi(revPeriodoSettimana(k));
-    statoRev = dg.errori.length
-      ? `${dg.errori.length} ${dg.errori.length === 1 ? 'cosa' : 'cose'} da sistemare`
-        + ` · prima: ${dg.priorita.t.toLowerCase()}`
-      : 'niente fuori posto negli ultimi sette giorni';
-  } catch { /* con pochi dati la diagnosi non si fa: resta la riga neutra */ }
-  azione('revisione', 'La revisione settimanale', statoRev,
-    () => { location.hash = '#/revisione'; });
-
+  // la revisione non e' piu' un altrove: e' la vista qui accanto
   let statoPrev = 'servono tre misure su due settimane';
   try {
     const pm = typeof proiezioneMisura === 'function' ? proiezioneMisura('vita') : null;
@@ -850,7 +893,6 @@ function viewDati(v) {
     osserva(gAz, () => entrata([...gAz.children], { passo: 60, su: 8 }));
 
   /* --- costanza a punteggio --- */
-  if (typeof cardCostanza === 'function') v.append(cardCostanza(k, datiRange));
 
   /* --- calendario --- */
   v.append(chartCal({

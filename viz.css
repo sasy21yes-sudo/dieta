@@ -547,6 +547,10 @@
 /* ---------------- testata dell'analisi ---------------- */
 .an-testa{display:flex;align-items:center;gap:16px;margin:6px 0 4px}
 .an-conta{display:flex;gap:18px}
+/* senza l'anello accanto — che ora sta nella carta della costanza, una volta
+   sola — i due numeri si prendono la riga intera */
+.an-conta.solo{margin:8px 0 10px;padding-bottom:10px;
+  border-bottom:1px solid var(--rule)}
 .an-conta b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;
   color:var(--pine)}
 .an-conta .warn b{color:var(--amber)}

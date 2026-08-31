@@ -889,13 +889,14 @@ function cardConsiglio(k) {
 
 /* --------------------------------------------------------------- router */
 const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
-                 palestra: viewPalestra, dati: viewDati, analisi: viewAnalisi,
+                 palestra: viewPalestra, andamento: viewAndamento,
                  spesa: viewSpesa, prodotti: viewProdotti, foto: viewFoto,
                  piano: viewPiano, hyrox: viewHyrox, benvenuto: viewBenvenuto,
-                 revisione: viewRevisione, importa: viewImporta, salute: viewSalute,
+                 importa: viewImporta, salute: viewSalute,
                  previsioni: viewPrevisioni };
 const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
                  palestra: 'Palestra', dati: 'Dati', analisi: 'Analisi',
+                 andamento: 'Andamento',
                  spesa: 'Spesa', prodotti: 'Alimenti', foto: 'Foto',
                  piano: 'Piano', hyrox: 'Road to HYROX', benvenuto: 'Benvenuto',
                  revisione: 'La settimana', importa: 'Importo da Salute',
@@ -905,13 +906,14 @@ function route() {
   let name = (location.hash.replace('#/', '') || 'oggi').split('?')[0];
   // finche' non si e' scelto da cosa partire non si mostra il piano di nessuno
   if (typeof pianoScelto === 'function' && !pianoScelto()) name = 'benvenuto';
+  /* #/dati, #/analisi e #/revisione erano tre schermate e ora sono tre viste
+     di una: restano indirizzi validi — ci puntano i link dentro l'app e i
+     segnalibri di chi ce li ha — e aprono Andamento sulla vista giusta. */
+  if (typeof rottaAndamento === 'function') name = rottaAndamento(name);
   const fn = ROUTES[name] || viewOggi;
   $('#top-title').textContent = TITLES[name] || 'Oggi';
   document.querySelectorAll('#tabbar a').forEach(a =>
     a.toggleAttribute('aria-current', a.dataset.tab === name));
-  // la spesa nasce dal piano settimanale: senza piano non ha di che parlare
-  const tabSpesa = document.querySelector('#tabbar a[data-tab="spesa"]');
-  if (tabSpesa) tabSpesa.hidden = !usaPiano();
   const v = $('#view'); v.innerHTML = '';
   if (name === 'oggi') backupBanner(v);
   fn(v); window.scrollTo(0, 0);
@@ -2187,7 +2189,19 @@ function sheetMisura(m, k, seq) {
 }
 
 /* -------------------------------------------------------- vista ANALISI */
-function viewAnalisi(v) {
+/**
+ * La sintesi: cosa non torna, adesso.
+ *
+ * Era la scheda "Analisi", una delle tre porte alla stessa domanda — insieme a
+ * Dati e alla Revisione. Ora e' la prima delle tre viste di Andamento, e ha
+ * smesso di ripetere quello che dicono le altre due: la costanza si calcola e
+ * si mostra una volta sola, e i grafici stanno nella vista accanto.
+ *
+ * Resta un motore a regole diverso da quello della revisione, e la differenza
+ * e' il tempo: qui gli ultimi sette giorni chiusi e basta, li' un periodo
+ * scelto, con il confronto e la sola cosa da cambiare.
+ */
+function sezSintesi(v) {
   const k = today();
   const c = el('div', 'card flat');
   c.append(el('div', 'eyebrow', 'Carichi in palestra'));
@@ -2224,26 +2238,25 @@ function viewAnalisi(v) {
     }
     c.append(seg);
   }
-  v.append(c);
 
-  /* --- come sta andando la settimana, in un colpo d'occhio --- */
+  /* --- cosa non torna, e quanto --- */
   const trovati = analyse();
   const problemi = trovati.filter(f => f[0] !== 'ok').length;
   const buone = trovati.length - problemi;
+
+  // la costanza sta qui e in nessun altro posto: prima era un anello in questa
+  // schermata e una carta intera in Dati, cioe' lo stesso numero due volte a
+  // due dita di distanza
+  if (typeof cardCostanza === 'function') v.append(cardCostanza(k, 28));
 
   const testa = el('div', 'cw');
   testa.append(el('h3', null, 'La settimana in un colpo d\'occhio'));
   testa.append(el('div', 'sub',
     'Medie degli ultimi sette giorni chiusi, confrontate con i tuoi target. La barra dice quanto, il segno verticale dove doveva arrivare.'));
-  if (typeof costanze === 'function') {
-    const co = costanze(k, 28), liv = livelloCostanza(co.generale);
-    const r = el('div', 'an-testa');
-    r.append(anello(co.generale, 'Costanza', liv.nome));
-    r.append(el('div', 'an-conta',
-      `<div><b>${buone}</b><span>cose a posto</span></div>
-       <div class="${problemi ? 'warn' : ''}"><b>${problemi}</b><span>da sistemare</span></div>`));
-    testa.append(r);
-  }
+  const r = el('div', 'an-conta solo');
+  r.innerHTML = `<div><b>${buone}</b><span>cose a posto</span></div>
+     <div class="${problemi ? 'warn' : ''}"><b>${problemi}</b><span>da sistemare</span></div>`;
+  testa.append(r);
   if (typeof metriche === 'function')
     for (const m of metriche(k, 7)) testa.append(meter(m));
   v.append(testa);
@@ -2254,6 +2267,10 @@ function viewAnalisi(v) {
       `<div class="ico">${ico}</div>
        <div class="grow"><h4>${esc(title)}</h4><p>${body}</p></div>`));
   }
+
+  /* I carichi stavano in cima, ed era il posto sbagliato: non sono una
+     diagnosi, sono un ingrediente della regola sulle calorie. */
+  v.append(c);
 
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Promemoria</div>
@@ -2559,6 +2576,9 @@ function sheetProfilo() {
   vai('Il piano', 'Target, alimenti, pasti, settimana: i cinque passi.',
     () => { if (typeof pianoTab !== 'undefined') pianoTab = null;
       location.hash = '#/piano'; });
+  vai('Quello che mangi', 'L\'elenco degli alimenti e dei prodotti, con da dove viene '
+    + 'il numero di ognuno. Da qui si aggiunge e si confronta.',
+    () => { location.hash = '#/prodotti'; });
 
   /* --- i profili, se ce n'e' piu' di uno --- */
   if (P0.lista.length > 1) {
@@ -2598,27 +2618,18 @@ function sheetMenu() {
     w.lastChild.style.margin = '0 0 14px';
   };
 
+  if (usaPiano()) mk('Lista della spesa',
+     'Il fabbisogno della settimana sommato per categoria, con la spunta. Nasce dai '
+     + 'pasti assegnati ai giorni: senza piano non avrebbe niente da sommare.',
+     () => { closeSheet(); location.hash = '#/spesa'; });
+
   mk('Scarica i promemoria (.ics)',
      'iOS non permette a una web app di programmare notifiche locali. Questo file crea gli eventi ricorrenti nel Calendario: pasti, integratori, pesata e revisione domenicale. Aprilo una volta e le notifiche arrivano native, senza server.',
      () => { download('dieta-promemoria.ics', icsFile(), 'text/calendar'); toast('Aprilo con Calendario'); });
 
-  mk('Piano e profili',
-     'Cambia i target, componi i tuoi pasti, riorganizza la settimana. Oppure crea un secondo profilo: diario, piano e foto restano separati.',
-     () => { closeSheet(); location.hash = '#/piano'; });
-
-  mk('Gli alimenti che mangi',
-     'Un elenco solo: quelli del piano, quelli tuoi e i prodotti col codice a barre. '
-     + 'Ogni riga dice da dove viene il suo numero — letto in etichetta o stimato — '
-     + 'e correggendone uno cambiano tutti i conti dell\'app.',
-     () => { closeSheet(); location.hash = '#/prodotti'; });
-
   mk('Passi e sonno dal telefono',
      'Nessuna pagina web puo\' leggere Salute — il permesso non esiste. Un Comando pero\' si\': legge il dato e apre l\'app col numero dentro l\'indirizzo. Qui c\'e\' la procedura.',
      () => { closeSheet(); location.hash = '#/salute'; });
-
-  mk('Foto dei progressi',
-     'Uno scatto al giorno nella stessa posa. Restano sul telefono e non entrano nel backup JSON: sono troppo grandi.',
-     () => { closeSheet(); location.hash = '#/foto'; });
 
   mk('Giorni che non contano',
      'Vacanza, influenza, trasferta: i dati restano tutti, ma la revisione settimanale e i punteggi di costanza saltano quei giorni.',
@@ -2697,7 +2708,9 @@ async function init() {
     $('#view').innerHTML = '<div class="card">Dati non caricati. Serve un server HTTP (anche GitHub Pages): aprire il file da disco non funziona.</div>';
     return;
   }
-  $('#btn-menu').onclick = menuTendina;
+  // il ⋯ apre le impostazioni e basta: prima passava da una tendina con tre
+  // voci, due delle quali portavano dove porta gia' l'icona del profilo
+  $('#btn-menu').onclick = sheetMenu;
   $('#btn-profilo').onclick = () => sheetProfilo();
   $('#sheet-backdrop').onclick = closeSheet;
   addEventListener('hashchange', route);
