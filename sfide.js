@@ -88,10 +88,7 @@ function costanze(k = today(), n = 28) {
   }).length;
 
   const allenati = giorni.filter(g =>
-    (typeof serieDelGiorno === 'function' && serieDelGiorno(g).length)
-    || (typeof cardioDi === 'function' && cardioDi(g).length)
-    || S.hyrox?.sessioni?.[g]?.fatto
-    || S.log[g]?.allenamento === true).length;
+    allenatoIl(g)).length;
   // il bersaglio non e' "tutti i giorni": e' quante sedute hai detto di reggere
   const seduteObiettivo = (typeof usaHyrox === 'function' && usaHyrox()
     && S.hyrox?.profilo?.sedute)

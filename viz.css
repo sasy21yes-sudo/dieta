@@ -99,6 +99,51 @@
 .foto-tris figure.vuota figcaption{position:static;background:none;color:var(--ink-3);
   padding:0;line-height:1.5}
 
+/* --------- il peso del giorno ---------
+   Grande e al centro perche' e' il numero che si scrive per primo ogni
+   mattina, e perche' e' quello attorno a cui girano tendenza, dispendio,
+   previsione e composizione. I due bottoni muovono di 100 g, che e' la
+   risoluzione vera di una bilancia da casa. */
+.card.peso-c{text-align:center}
+.card.peso-c .note{text-align:left}
+.peso-r{display:flex;align-items:center;justify-content:center;gap:16px;margin:6px 0 2px}
+.peso-v{display:flex;align-items:baseline;gap:3px;background:none;border:0;
+  padding:2px 4px;color:var(--ink);font:inherit;cursor:pointer;border-radius:10px}
+.peso-v .n{font-family:var(--mono);font-size:46px;font-weight:600;line-height:1;
+  letter-spacing:-.03em}
+.peso-v .n.vuoto{color:var(--ink-3)}
+.peso-v em{font-style:normal;font-size:15px;color:var(--ink-3)}
+.peso-v:active{background:var(--wash)}
+.peso-s{font-family:var(--mono);font-size:11px;color:var(--ink-3);min-height:14px}
+
+/* i due bottoni tondi: qui e sulla Coca Zero */
+.stp{width:38px;height:38px;flex:none;border-radius:50%;border:1px solid var(--rule);
+  background:var(--paper);color:var(--ink);font:600 20px/1 var(--sans);cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
+.stp.big{width:48px;height:48px;font-size:24px}
+.stp:active{background:var(--wash);border-color:var(--pine)}
+.stp:disabled{opacity:.35;cursor:default}
+
+/* --------- la Coca Zero, accanto all'acqua --------- */
+.card.acqua .sep{height:1px;background:var(--rule);margin:14px 0 12px}
+.coca-r{display:flex;align-items:center;gap:12px}
+.coca-r .mid{display:flex;align-items:center;gap:9px;flex:1;justify-content:center}
+.coca-r .ic-g{width:26px;height:26px;color:var(--ink-2)}
+.coca-r .tx{text-align:left}
+.coca-r .tx .n{font-size:13px;font-weight:600;line-height:1.15}
+.coca-r .tx .s{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+
+/* --------- le giornate del programma ---------
+   Un programma e' Giorno 1 e Giorno 2: le sue schede vanno viste insieme,
+   con accanto quante sedute ognuna — e' quasi sempre una a rimanere indietro. */
+.gio-r{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}
+.gio{display:flex;flex-direction:column;gap:1px;padding:6px 10px;border-radius:9px;
+  background:var(--wash);border:1px solid var(--rule)}
+.gio .n{font-size:12px;font-weight:600}
+.gio .s{font-family:var(--mono);font-size:10px;color:var(--ink-3)}
+.rev-fix .t em.dove{font-style:normal;font-size:10.5px;color:var(--ink-3);
+  font-weight:400;margin-left:4px}
+
 /* --------- l'acqua ---------
    La bottiglia a sinistra, il numero a destra: il disegno dice a colpo d'occhio
    a che punto sei, il numero dice quanto. Insieme, e non uno al posto

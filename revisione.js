@@ -99,9 +99,7 @@ function seduteAbituali(k = today(), settimane = 8) {
   const conta = [];
   for (let w = 1; w <= settimane; w++) {
     const gg = windowDays(addDays(k, -7 * (w - 1)), 7);
-    const n = gg.filter(x => (typeof serieDelGiorno === 'function' && serieDelGiorno(x).length)
-      || (typeof cardioDi === 'function' && cardioDi(x).length)
-      || S.hyrox?.sessioni?.[x]?.fatto || S.log[x]?.allenamento === true).length;
+    const n = gg.filter(x => allenatoIl(x)).length;
     if (n) conta.push(n);
   }
   if (!conta.length) return 0;
@@ -120,9 +118,7 @@ function revMetriche(per) {
   const cons = g => g.map(x => S.log[x] ? consumed(x) : null).filter(m => m && m.kcal > 400);
   const cm = (g, id) => { const c = cons(g); return c.length ? c.reduce((a, m) => a + m[id], 0) / c.length : null; };
   const md = (g, id) => mediaSu(g, x => S.log[x]?.[id]);
-  const sed = g => contaSu2(g, x => (typeof serieDelGiorno === 'function' && serieDelGiorno(x).length)
-      || (typeof cardioDi === 'function' && cardioDi(x).length)
-    || S.hyrox?.sessioni?.[x]?.fatto || S.log[x]?.allenamento === true);
+  const sed = g => contaSu2(g, x => allenatoIl(x));
   const T = D.target;
   // con HYROX spento il numero di sedute a settimana non lo dichiara nessuno:
   // si prende il ritmo abituale delle ultime otto settimane, non una costante

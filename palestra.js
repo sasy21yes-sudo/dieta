@@ -560,12 +560,12 @@ function viewPalestra(v) {
           : 'niente questa settimana',
     () => { gymTab = 'cardio'; route(); }));
 
-  const segId = schedaSeguita();
-  if (segId) {
-    const mon = monitoraggioScheda(segId, k);
-    g.append(riquadroGym('monitor', 'Scheda in corso',
+  const seg = schedeSeguite();
+  if (seg.length) {
+    const mon = monitoraggioProgramma(seg, k);
+    g.append(riquadroGym('monitor', mon.uno ? 'Scheda in corso' : 'Programma in corso',
       mon.pochiDati ? `${mon.sedute.length} sedute: servono dati`
-        : mon.cambiare ? 'conviene cambiarla'
+        : mon.cambiare ? (mon.uno ? 'conviene cambiarla' : 'conviene cambiarlo')
         : `${mon.settimane}ª settimana · ${mon.mediana == null ? 'niente da dire'
             : (mon.mediana >= 0 ? '+' : '') + nf(mon.mediana, 1) + '% sui carichi'}`,
       () => { gymTab = 'monitor'; route(); }, mon.cambiare));
@@ -875,13 +875,40 @@ function scheda(id) { return schede().find(s => s.id === id) || null; }
  * le sedute fatte con quella: quanto e' salito ogni esercizio da quando l'hai
  * cominciata, e se ha smesso di salire.
  */
-function schedaSeguita() {
-  const id = P().schedaAttiva;
-  return id && scheda(id) ? id : null;
+/*
+ * Se ne seguono PIU' DI UNA, ed e' il caso normale.
+ *
+ * All'inizio la scheda seguita era una sola, e la frase scritta qui sotto
+ * ("se ne segui un'altra, questa smette") descriveva un programma fatto di
+ * una seduta. Ma quasi nessuno si allena cosi': una scheda per giorno —
+ * Giorno 1 spinta, Giorno 2 tirata — e' il modo in cui le schede si scrivono
+ * davvero, e con una sola seguita l'app monitorava meta' del lavoro e
+ * chiamava "il programma" quella meta'.
+ *
+ * Quindi si segue un INSIEME. Il monitoraggio resta per scheda, perche' e'
+ * li' che la progressione di un esercizio ha senso; il verdetto "quando lo
+ * cambio" si calcola invece sull'unione, perche' un programma si cambia
+ * intero e non a giorni.
+ */
+function schedeSeguite() {
+  const p = P();
+  // chi ne seguiva una sola la ritrova dentro l'elenco: un backup vecchio non
+  // e' ambiguo, era gia' un programma di una scheda
+  if (p.schedaAttiva && !p.schedeAttive) p.schedeAttive = [p.schedaAttiva];
+  if (p.schedaAttiva) delete p.schedaAttiva;
+  p.schedeAttive = (p.schedeAttive || []).filter(id => scheda(id));
+  return p.schedeAttive;
 }
-function seguiScheda(id) {
-  P().schedaAttiva = id || null;
-  if (!id) delete P().schedaAttiva;
+/** La prima, per i punti che ne vogliono ancora una sola. */
+function schedaSeguita() { return schedeSeguite()[0] || null; }
+function segui(id) { return schedeSeguite().includes(id); }
+/** Senza secondo argomento fa l'interruttore. */
+function seguiScheda(id, si) {
+  const el = schedeSeguite();
+  const ora = el.includes(id);
+  const vuoi = si == null ? !ora : !!si;
+  if (vuoi && !ora) el.push(id);
+  if (!vuoi && ora) P().schedeAttive = el.filter(x => x !== id);
   save();
 }
 
@@ -984,6 +1011,61 @@ function monitoraggioScheda(id, k = today()) {
     cambiare: !((sedute.length < 3)) && accesi >= 2,
     accesi
   };
+}
+
+/**
+ * Lo stesso quadro, sul programma intero.
+ *
+ * Le tre domande cambiano scala insieme al soggetto: quanto e' salito un
+ * esercizio si guarda dentro la sua scheda (confrontare la panca del Giorno 1
+ * con quella del Giorno 2 vorrebbe dire mettere insieme due sedute diverse),
+ * ma "e' ora di cambiare" si guarda sull'unione, perche' un programma si
+ * cambia intero.
+ */
+function monitoraggioProgramma(ids, k = today()) {
+  const parti = ids.map(id => monitoraggioScheda(id, k)).filter(Boolean);
+  if (!parti.length) return null;
+  const sedute = parti.reduce((a, m) => a.concat(m.sedute), [])
+    .sort((a, b) => a.k.localeCompare(b.k));
+  const righe = parti.reduce((a, m) => a.concat(m.righe.map(r => ({ ...r, sc: m.sc }))), []);
+  const conDati = righe.filter(r => r.delta != null);
+  const pct = conDati.map(r => r.pct).sort((a, b) => a - b);
+  const mediana = pct.length ? pct[Math.floor(pct.length / 2)] : null;
+  const prima = sedute[0]?.k || null;
+  const ultima = sedute.length ? sedute[sedute.length - 1].k : null;
+  const settimane = prima
+    ? Math.max(1, Math.round((new Date(k) - new Date(prima)) / 864e5 / 7)) : 0;
+  const alTetto = righe.filter(r => r.passo?.tipo === 'carico').length;
+  const fermi = conDati.filter(r => r.fermo || r.delta <= 0).length;
+  const uno = parti.length === 1;
+  const cosa = uno ? 'questa scheda' : 'questo programma';
+
+  const segnali = [
+    { id: 'tempo', on: settimane >= SCHEDA_SETT_LUNGA,
+      t: `${settimane} ${settimane === 1 ? 'settimana' : 'settimane'} con ${cosa}`,
+      d: settimane >= SCHEDA_SETT_LUNGA
+        ? `Oltre le ${SCHEDA_SETT_LUNGA} settimane sullo stesso programma i ritorni di solito si appiattiscono. E' un intervallo di pratica comune, non una legge: se stai ancora salendo, sali.`
+        : `Sotto le ${SCHEDA_SETT_LUNGA}: c'e' ancora margine in questo blocco.` },
+    { id: 'fermo', on: conDati.length >= 2 && fermi >= conDati.length / 2,
+      t: conDati.length
+        ? `${fermi} ${fermi === 1 ? 'esercizio fermo' : 'esercizi fermi'} su ${conDati.length}`
+        : 'ancora nessun esercizio con tre sedute',
+      d: conDati.length < 2
+        ? 'Servono almeno tre sedute per esercizio prima di dire se sale o no.'
+        : 'Il massimale stimato non e\' salito fra le prime e le ultime sedute.' },
+    { id: 'tetto', on: righe.length >= 2 && alTetto >= Math.ceil(righe.length * 0.6),
+      t: `${alTetto} ${alTetto === 1 ? 'esercizio' : 'esercizi'} su ${righe.length}`
+        + ' al tetto del range',
+      d: 'Quando quasi tutto chiede di caricare, il blocco ha dato quello che aveva.' }
+  ];
+  const accesi = segnali.filter(x => x.on).length;
+  // con due schede servono tre sedute per almeno una: un Giorno 2 fatto una
+  // volta sola non deve tenere in ostaggio il verdetto su tutto il resto
+  const pochiDati = !parti.some(m => m.sedute.length >= 3);
+
+  return { parti, uno, cosa, sedute, righe, conDati, mediana, prima, ultima,
+           settimane, alTetto, segnali, accesi, pochiDati,
+           cambiare: !pochiDati && accesi >= 2 };
 }
 
 /**
@@ -1368,24 +1450,25 @@ function sheetSchede() {
     'Una scheda e\' la lista degli esercizi di una seduta: <strong>quali, quante serie e in che range di ripetizioni</strong>. Il carico no: quello cambia ogni volta, e lo aggiorni quando la usi.'));
   const list = schede();
   if (!list.length) w.append(el('p', 'hint', 'Nessuna scheda ancora.'));
-  const seg = schedaSeguita();
+  schedeSeguite();
   for (const sc of list) {
     const r = el('button', 'prod');
     const nSer = sc.esercizi.reduce((a, e) => a + (e.serie || 0), 0);
     const n = seduteScheda(sc.id).length;
     r.innerHTML = `<div class="grow"><div class="nm">${esc(sc.nome)}${
-        sc.id === seg ? ' <span class="pill ok">la segui</span>' : ''}</div>
+        segui(sc.id) ? ' <span class="pill ok">la segui</span>' : ''}</div>
       <div class="mt">${sc.esercizi.length} esercizi · ${nSer} serie${
         n ? ' · ' + n + (n === 1 ? ' seduta' : ' sedute') : ''}</div></div>
       <div class="kc">apri &rsaquo;</div>`;
     r.onclick = () => sheetScheda(sc.id);
     w.append(r);
   }
-  if (list.length > 1 || (list.length && !seg))
+  if (list.length)
     w.append(el('p', 'hint',
-      'Quella che <strong>segui</strong> e\' l\'unica che l\'app monitora: '
-      + 'guarda solo le sedute fatte con lei e ti dice quando ha finito di dare. '
-      + 'Si sceglie aprendo la scheda.'));
+      'Le schede che <strong>segui</strong> sono quelle che l\'app monitora: '
+      + 'guarda solo le sedute fatte con loro e ti dice quando il programma ha '
+      + 'finito di dare. Puoi seguirne <strong>piu\' di una</strong> — Giorno 1 e '
+      + 'Giorno 2 sono un programma solo. Si sceglie aprendo la scheda.'));
   const b = el('button', 'btn wide pri', 'Nuova scheda');
   b.style.marginTop = '10px';
   b.onclick = () => sheetScheda(null);
@@ -1477,30 +1560,32 @@ function sheetScheda(id, statoPre) {
   w.append(salva);
 
   if (id) {
-    const seguita = schedaSeguita() === id;
+    const seguita = segui(id);
+    const altre = schedeSeguite().filter(x => x !== id).length;
     const bs = el('button', 'btn wide' + (seguita ? ' pri' : ''));
     bs.style.marginTop = '8px';
     bs.textContent = seguita ? '\u2713 La stai seguendo' : 'Segui questa scheda';
     bs.onclick = () => {
-      seguiScheda(seguita ? null : id);
+      seguiScheda(id);
       closeSheet(); route();
-      toast(seguita ? 'Non la segui piu\'' : 'Da ora l\'app monitora questa');
+      toast(seguita ? 'Non la segui piu\'' : 'Da ora l\'app la monitora');
     };
     w.append(bs);
     w.append(el('p', 'hint',
       seguita
         ? 'L\'app guarda le sedute fatte con questa scheda e ti dice quando la '
-          + 'progressione si ferma. Se ne segui un\'altra, questa smette.'
+          + 'progressione si ferma. Toccando di nuovo smetti, e le altre restano.'
         : 'Seguirla vuol dire che l\'app misura i progressi su di lei — quanto sale '
-          + 'ogni esercizio, e quando conviene passare a un altro blocco. Se ne stai '
-          + 'gia\' seguendo un\'altra, quella smette.'));
+          + 'ogni esercizio, e quando conviene passare a un altro blocco.'
+          + (altre ? ` Le altre ${altre === 1 ? 'che segui gia\' resta' : 'che segui gia\' restano'}: `
+              + 'un programma e\' fatto di piu\' giornate.' : '')));
 
     const del = el('button', 'btn wide', 'Elimina la scheda');
     del.style.marginTop = '8px';
     del.onclick = () => {
       if (!confirm(`Eliminare "${sc.nome}"? Le sedute gia' registrate restano.`)) return;
       P().schede = schede().filter(x => x.id !== id);
-      if (P().schedaAttiva === id) delete P().schedaAttiva;
+      P().schedeAttive = schedeSeguite().filter(x => x !== id);
       save(); closeSheet(); route(); toast('Eliminata');
     };
     w.append(del);
@@ -1991,37 +2076,51 @@ function bottoneEsecuzione(exId) {
  * l'app non sa se questo blocco era di scarico o se hai avuto l'influenza.
  */
 function sezGymMonitor(v, k) {
-  const id = schedaSeguita();
-  if (!id) {
+  const ids = schedeSeguite();
+  if (!ids.length) {
     const c = el('div', 'card');
     c.append(el('div', 'eyebrow', 'Nessuna scheda seguita'));
     c.append(el('div', 'muted',
-      'Segna una scheda come "quella che stai seguendo" e da li\' l\'app guarda '
-      + 'solo le sedute fatte con quella: quanto sale ogni esercizio, e quando '
-      + 'il programma ha finito di dare.'));
-    const b = el('button', 'btn wide pri', 'Scegli la scheda');
+      'Segna le schede che stai facendo e da li\' l\'app guarda solo le sedute '
+      + 'fatte con quelle: quanto sale ogni esercizio, e quando il programma ha '
+      + 'finito di dare. Puoi segnarne piu\' di una — Giorno 1 e Giorno 2 sono '
+      + 'un programma solo.'));
+    const b = el('button', 'btn wide pri', 'Scegli le schede');
     b.style.marginTop = '10px';
     b.onclick = () => sheetSchede();
     c.append(b);
     v.append(c);
     return;
   }
-  const mon = monitoraggioScheda(id, k);
+  const mon = monitoraggioProgramma(ids, k);
 
   /* --- testata --- */
   const t = el('div', 'card');
   t.append(el('div', 'eyebrow', 'Stai seguendo'));
-  t.append(el('h2', 'sec', esc(mon.sc.nome)));
+  t.append(el('h2', 'sec', mon.uno ? esc(mon.parti[0].sc.nome)
+    : `${mon.parti.length} schede`));
   t.lastChild.style.marginTop = '2px';
+  if (!mon.uno) {
+    // le giornate del programma, con quante sedute ognuna: e' la prima cosa
+    // che si vuole sapere, perche' e' quasi sempre una a rimanere indietro
+    const gio = el('div', 'gio-r');
+    for (const m of mon.parti) {
+      const x = el('div', 'gio');
+      x.innerHTML = `<span class="n">${esc(m.sc.nome)}</span>
+        <span class="s">${m.sedute.length} ${m.sedute.length === 1 ? 'seduta' : 'sedute'}</span>`;
+      gio.append(x);
+    }
+    t.append(gio);
+  }
   t.append(el('div', 'read',
-    `<span><b>${mon.sedute.length}</b> sedute</span>`
+    `<span><b>${mon.sedute.length}</b> sedute in tutto</span>`
     + `<span>${mon.settimane} ${mon.settimane === 1 ? 'settimana' : 'settimane'}</span>`
     + (mon.mediana == null ? '<span>carichi: servono dati</span>'
       : `<span>carichi <b>${mon.mediana >= 0 ? '+' : ''}${nf(mon.mediana, 1)}%</b></span>`)
     + (mon.ultima ? `<span>ultima ${esc(mon.ultima)}</span>` : '')));
   const cambia = el('button', 'btn wide');
   cambia.style.marginTop = '10px';
-  cambia.textContent = 'Cambia la scheda che segui';
+  cambia.textContent = mon.uno ? 'Cambia le schede che segui' : 'Aggiungi o togli una scheda';
   cambia.onclick = () => sheetSchede();
   t.append(cambia);
   v.append(t);
@@ -2029,46 +2128,61 @@ function sezGymMonitor(v, k) {
   if (mon.pochiDati) {
     v.append(el('div', 'card flat',
       `<div class="eyebrow">Ancora presto</div>
-       <div class="muted">${mon.sedute.length} sedute registrate con questa scheda.
-       Da tre in su i confronti cominciano a significare qualcosa: con due punti
-       la retta passa esatta e non dice niente.</div>`));
+       <div class="muted">${mon.sedute.length} sedute registrate con
+       ${mon.uno ? 'questa scheda' : 'queste schede'}. Da tre in su per scheda i
+       confronti cominciano a significare qualcosa: con due punti la retta passa
+       esatta e non dice niente.</div>`));
   }
 
-  /* --- quanto e' salito ogni esercizio --- */
-  const c = el('div', 'cw');
-  c.append(el('h3', null, 'Come sta andando, esercizio per esercizio'));
-  c.append(el('div', 'sub',
-    'Massimale stimato con Epley corretto col RIR: media delle prime due sedute '
-    + 'contro le ultime due. Una giornata storta da sola non sposta il verdetto.'));
+  /* --- quanto e' salito ogni esercizio, scheda per scheda ---
+     Il raggruppamento non e' ordine: la panca del Giorno 1 e quella del
+     Giorno 2 sono due serie di dati diverse, e mescolarle in un elenco solo
+     farebbe sembrare doppioni due righe che non lo sono. */
   const max = Math.max(6, ...mon.conDati.map(r => Math.abs(r.pct)));
-  for (const r of mon.righe) {
-    const riga = el('div', 'prog-r');
-    if (r.delta == null) {
-      riga.innerHTML = `<span class="nm">${esc(r.nome)}</span>
-        <span class="bar"></span>
-        <span class="v muted">${r.n} ${r.n === 1 ? 'seduta' : 'sedute'}</span>`;
-    } else {
-      const q = Math.min(1, Math.abs(r.pct) / max) * 50;
-      const su = r.pct > 0;
-      riga.innerHTML = `<span class="nm">${esc(r.nome)}
-          <em>${nf(r.inizio, 1)} → ${nf(r.fine, 1)} kg</em></span>
-        <span class="bar"><i class="${r.fermo ? 'fermo' : su ? 'su' : 'giu'}"
-          style="${su ? 'left:50%' : 'right:50%'};width:${q.toFixed(1)}%"></i>
-          <b></b></span>
-        <span class="v ${r.fermo ? '' : su ? 'su' : 'giu'}">${
-          r.pct >= 0 ? '+' : ''}${nf(r.pct, 1)}%</span>`;
+  for (const m of mon.parti) {
+    const c = el('div', 'cw');
+    c.append(el('h3', null, mon.uno ? 'Come sta andando, esercizio per esercizio'
+      : esc(m.sc.nome)));
+    if (mon.uno || m === mon.parti[0])
+      c.append(el('div', 'sub',
+        'Massimale stimato con Epley corretto col RIR: media delle prime due sedute '
+        + 'contro le ultime due. Una giornata storta da sola non sposta il verdetto.'));
+    else
+      c.append(el('div', 'sub',
+        `${m.sedute.length} ${m.sedute.length === 1 ? 'seduta registrata' : 'sedute registrate'} con questa.`));
+    for (const r of m.righe) {
+      const riga = el('div', 'prog-r');
+      if (r.delta == null) {
+        riga.innerHTML = `<span class="nm">${esc(r.nome)}</span>
+          <span class="bar"></span>
+          <span class="v muted">${r.n} ${r.n === 1 ? 'seduta' : 'sedute'}</span>`;
+      } else {
+        const q = Math.min(1, Math.abs(r.pct) / max) * 50;
+        const su = r.pct > 0;
+        riga.innerHTML = `<span class="nm">${esc(r.nome)}
+            <em>${nf(r.inizio, 1)} → ${nf(r.fine, 1)} kg</em></span>
+          <span class="bar"><i class="${r.fermo ? 'fermo' : su ? 'su' : 'giu'}"
+            style="${su ? 'left:50%' : 'right:50%'};width:${q.toFixed(1)}%"></i>
+            <b></b></span>
+          <span class="v ${r.fermo ? '' : su ? 'su' : 'giu'}">${
+            r.pct >= 0 ? '+' : ''}${nf(r.pct, 1)}%</span>`;
+      }
+      c.append(riga);
     }
-    c.append(riga);
+    if (mon.uno || m === mon.parti[mon.parti.length - 1]) {
+      const leg = el('div', 'legend');
+      leg.innerHTML = `<span><i class="dt" style="background:var(--pine)"></i>in salita</span>
+        <span><i class="dt" style="background:var(--ink-3)"></i>fermo (meno dell'1,5%)</span>
+        <span><i class="dt" style="background:var(--amber)"></i>in calo</span>`;
+      c.append(leg);
+      c.append(el('p', 'note',
+        'La riga verticale al centro e\' lo zero. Le barre sono in scala fra loro, '
+        + 'non in percentuale assoluta: servono a vedere chi tira e chi no.'
+        + (mon.uno ? '' : ' La scala e\' la stessa per tutte le schede, cosi\' le '
+          + 'giornate si confrontano fra loro.')));
+    }
+    v.append(c);
   }
-  const leg = el('div', 'legend');
-  leg.innerHTML = `<span><i class="dt" style="background:var(--pine)"></i>in salita</span>
-    <span><i class="dt" style="background:var(--ink-3)"></i>fermo (meno dell'1,5%)</span>
-    <span><i class="dt" style="background:var(--amber)"></i>in calo</span>`;
-  c.append(leg);
-  c.append(el('p', 'note',
-    'La riga verticale al centro e\' lo zero. Le barre sono in scala fra loro, '
-    + 'non in percentuale assoluta: servono a vedere chi tira e chi no.'));
-  v.append(c);
 
   /* --- il prossimo passo --- */
   const pp = mon.righe.filter(r => r.passo);
@@ -2080,21 +2194,23 @@ function sezGymMonitor(v, k) {
       + 'il tetto del range con RIR basso.'));
     for (const r of pp) {
       const x = el('div', 'rev-fix');
-      x.innerHTML = `<span class="t">${esc(r.nome)}</span>
+      x.innerHTML = `<span class="t">${esc(r.nome)}${mon.uno ? ''
+        : ` <em class="dove">${esc(r.sc.nome)}</em>`}</span>
         <span class="c">${esc(r.passo.testo)}</span>`;
       cp.append(x);
     }
     v.append(cp);
   }
 
-  /* --- quando cambiarla --- */
+  /* --- quando cambiarlo --- */
   const cq = el('div', 'card' + (mon.cambiare ? ' imp-esito' : ' flat'));
-  cq.append(el('div', 'eyebrow', 'Quando cambiarla'));
+  cq.append(el('div', 'eyebrow', mon.uno ? 'Quando cambiarla' : 'Quando cambiarlo'));
   cq.append(el('h2', 'sec', mon.pochiDati ? 'Troppo presto per dirlo'
-    : mon.cambiare ? 'Conviene cambiarla' : 'Tienila ancora'));
+    : mon.cambiare ? (mon.uno ? 'Conviene cambiarla' : 'Conviene cambiarlo')
+    : (mon.uno ? 'Tienila ancora' : 'Tienilo ancora')));
   cq.lastChild.style.marginTop = '2px';
   cq.append(el('p', 'muted', mon.pochiDati
-    ? 'Servono almeno tre sedute registrate con questa scheda.'
+    ? `Servono almeno tre sedute registrate con ${mon.uno ? 'questa scheda' : 'una delle schede'}.`
     : mon.cambiare
       ? `Sono accesi ${mon.accesi} segnali su tre. Non e' un obbligo: e' il momento in cui, di solito, un blocco nuovo rende piu' di uno vecchio.`
       : `Segnali accesi: ${mon.accesi} su tre. Ne servono due, e uno solo si accende anche per caso.`));
@@ -2108,6 +2224,9 @@ function sezGymMonitor(v, k) {
   cq.append(el('p', 'note',
     'Le otto settimane sono un intervallo di pratica comune, non una misura su '
     + 'di te: se stai ancora salendo su tutto, continuare e\' la scelta giusta. '
+    + (mon.uno ? '' : 'I segnali si contano sul programma intero, perche\' un '
+      + 'programma si cambia intero: una giornata sola che si e\' fermata si '
+      + 'sistema dentro, senza buttare le altre. ')
     + 'E una scheda si cambia anche perche\' e\' noiosa — quello l\'app non lo '
     + 'sa e non prova a indovinarlo.'));
   v.append(cq);

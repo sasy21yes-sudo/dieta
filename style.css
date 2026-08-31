@@ -196,6 +196,11 @@ button.cmp-r:active{background:var(--wash)}
 .led-r.ok>span:last-child{color:var(--pine)}
 
 .hint{font-size:11.5px;color:var(--ink-3);line-height:1.4;margin:8px 0 0}
+/* .note era stilata solo dentro .cw, cioe' i grafici: dentro una carta la
+   stessa classe non prendeva niente e le avvertenze — quelle che dicono
+   "e' una costante di letteratura, non una misura su di te" — uscivano
+   grandi come il testo principale, che e' l'esatto contrario del loro peso. */
+.note{font-size:11px;color:var(--ink-3);line-height:1.4;margin:8px 0 0}
 
 /* ---------------- analisi ---------------- */
 .flag{display:flex;gap:11px;padding:12px 13px;border-radius:11px;

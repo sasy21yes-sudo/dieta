@@ -239,9 +239,11 @@ non un dettaglio.
   calorie) e ordina per distanza sui quattro macro **e per affinità di nome**.
   Si **applicano**, solo per quel giorno, e si può anche scegliere a mano
   qualunque alimento: vedi "La sostituzione si applica"
-- **Diario** — peso, acqua a bicchieri, Coca Zero, passi, sonno, allenamento, fame, energia,
-  aderenza, sintomi gastrointestinali, checklist integratori
-- **Corpo** — target fisico e composizione stimata a confronto; figura SVG
+- **Diario** — acqua a bicchieri e Coca Zero a lattine, passi, sonno, fame,
+  energia, aderenza, sintomi gastrointestinali, checklist integratori.
+  L'allenamento non si dichiara: si legge da quello che hai registrato
+- **Corpo** — il peso del giorno grande al centro, con i due bottoni da 100 g;
+  composizione stimata contro il fisico di riferimento; figura SVG
   **parametrica** (le larghezze vengono dalle circonferenze registrate, la sagoma
   target si sovrappone tratteggiata); tabelle ora/target/manca; grafico peso con
   media mobile a 7 giorni e previsione tratteggiata
@@ -813,6 +815,70 @@ di qualunque animazione: se l'IntersectionObserver non scatta il livello e'
 comunque giusto. E' la stessa regola della fiamma della striscia — il dato sta
 nel riempimento, il movimento e' solo il modo in cui ci si arriva.
 
+**La Coca Zero e' finita nella stessa carta**, che percio' si chiama "cosa
+bevi". Non e' un accorpamento per far posto: e' la stessa cosa dell'acqua —
+si conta a lattine, si aggiunge nel momento in cui la si apre, e un campo di
+testo chiedeva di ricordarsi a sera quante ne erano passate. Sopra le tre
+lattine la carta nomina la caffeina, perche' quello e' il primo posto dove
+guardare quando il sonno e' corto, ed e' un collegamento che l'analisi fa gia'.
+
+### Il diario chiede solo quello che sa solo lui
+
+"Ogni giorno" era una carta con cinque voci — peso, acqua, Coca Zero, passi,
+sonno — piu' l'interruttore dell'allenamento. Tre non ci appartenevano piu':
+
+| Voce | Dove e' andata, e perche' |
+|---|---|
+| **Peso** | In Corpo, grande e al centro. E' il numero che si scrive per primo ogni mattina e quello attorno a cui girano tendenza, dispendio, previsione e composizione: viveva in una casella grande come quella delle lattine |
+| **Acqua e Coca Zero** | Nella carta "cosa bevi", un tocco alla volta. Sono le due voci che si registrano molte volte al giorno, e un campo numerico le fa stimare a sera |
+| **Allenamento** | Non si dichiara: si deduce |
+
+Restano **passi e sonno**, cioe' i due numeri che si scrivono davvero una
+volta al giorno e che nessun'altra parte dell'app conosce.
+
+`allenatoIl(k)` e' la regola sola: la giornata conta come allenamento se ci
+sono serie in palestra, del cardio o una seduta HYROX registrata. Non e' una
+funzione nuova — quel conto lo facevano gia' **quattro motori** (costanza,
+revisione, statistiche, resoconto), ognuno con la sua copia, e quattro copie di
+una regola prima o poi diventano quattro regole. L'interruttore chiedeva una
+cosa a cui l'app sapeva gia' rispondere, e le due risposte potevano
+contraddirsi: quale valeva, allora?
+
+Il flag `allenamento` dei registri vecchi **continua a valere**. Chi ha spuntato
+"sì" senza registrare le serie ha dichiarato un allenamento, e cancellarlo dai
+conti a posteriori vorrebbe dire riscrivere la storia di chi ha usato l'app
+com'era.
+
+La riga resta in Diario ma **in lettura**: dice cosa c'e' registrato quel
+giorno e porta in Gym. Toglierla del tutto avrebbe fatto pensare che
+l'allenamento non contasse piu'.
+
+### Il peso e' in Corpo, grande
+
+Stava terzo in una griglia di campi di testo. Ora e' la prima carta di Corpo,
+al posto della testata del target: numero grande al centro, `−` e `+` ai lati.
+
+Il passo e' **100 g**, che e' la risoluzione vera di una bilancia da casa:
+sotto quella cifra non c'e' informazione, c'e' il bicchiere d'acqua bevuto
+prima. Su una giornata ancora senza pesata il primo tocco **non incrementa
+niente**: appoggia il numero sulla tendenza a 7 giorni, che e' il valore piu'
+vicino al vero che l'app conosce, e da li' si aggiusta — inventare un
+incremento su un numero che non c'e' vorrebbe dire registrare una pesata che
+nessuno ha fatto.
+
+Toccando il numero si scrive per esteso, e li' **si sceglie anche il giorno**:
+il diario ha la sua navigazione, Corpo no, e una pesata segnata sulla data
+sbagliata resta dentro la tendenza per due settimane. Un dato che non si puo'
+correggere e' un dato falso permanente. Nel campo non ci va `nf()` (formatta
+69,4 col separatore e rileggerlo da' un altro numero) ma nemmeno il valore
+grezzo: una pesata importata puo' arrivare con dodici decimali, e un campo che
+dice `69,58359734839807` chiede di correggere una precisione che non esiste.
+
+La carta del target che stava in cima non e' stata sostituita da niente: i suoi
+numeri erano gia' tutti nella sagoma tratteggiata e nella colonna "Target"
+della tabella. La nota sulla loro provenienza — **stimati, non rilevati** — e'
+scesa sotto la figura, che e' dove la sagoma di riferimento si vede.
+
 ### Timer, scarico, acciacchi
 
 - **Timer di recupero** (`timer.js`) — sopravvive ai cambi di schermata perché
@@ -1137,6 +1203,32 @@ sposterebbe il verdetto da sola. Sotto le tre sedute non si dice niente, che e'
 la stessa regola delle proiezioni: con due punti la retta passa esatta e non
 significa nulla. "Fermo" e' entro l'1,5%, sotto quella soglia e' rumore di
 arrotondamento del RIR.
+
+**Se ne seguono piu' di una, ed e' il caso normale.** All'inizio la scheda
+seguita era una sola, e la frase "se ne segui un'altra, questa smette"
+descriveva un programma fatto di una seduta. Ma quasi nessuno si allena cosi':
+una scheda per giorno — Giorno 1 spinta, Giorno 2 tirata — e' il modo in cui le
+schede si scrivono davvero, e con una sola seguita l'app monitorava meta' del
+lavoro e chiamava "il programma" quella meta'.
+
+`S.palestra.schedeAttive` e' quindi un elenco (`schedaAttiva` dei backup vecchi
+ci entra da sola: un programma di una scheda non e' ambiguo). E il livello a cui
+si guarda una cosa non e' lo stesso per tutte:
+
+- **la progressione di un esercizio si legge dentro la sua scheda.** La panca
+  del Giorno 1 e quella del Giorno 2 sono due serie di dati diverse — carichi
+  diversi, giorni diversi, stato di freschezza diverso — e mescolarle in un
+  elenco solo fa sembrare doppioni due righe che non lo sono;
+- **il verdetto "quando lo cambio" si calcola sull'unione**, perche' un
+  programma si cambia intero. Una giornata sola che si e' fermata si sistema
+  dentro, senza buttare le altre.
+
+Le barre restano in scala **fra tutte le schede**, cosi' le giornate si
+confrontano fra loro: e' l'unico modo di vedere che il Giorno 2 non sale
+mentre il Giorno 1 tira.
+
+E `pochiDati` diventa "nessuna delle schede seguite ha tre sedute": un Giorno 2
+fatto una volta sola non deve tenere in ostaggio il verdetto su tutto il resto.
 
 **Quando cambiarla** sono tre segnali indipendenti e ne servono due — stessa
 regola dello scarico automatico, e per lo stesso motivo: uno solo si accende
@@ -1724,6 +1816,26 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   della revisione. E chi la elimina va avvisato che tocca solo la palestra
 - Non far dimenticare a `_ffCache` una seduta cancellata: la forma-fatica e'
   memorizzata per muscolo e continuerebbe a rispondere coi numeri di prima
+- Non tenere quattro copie della stessa regola: "mi sono allenato quel giorno"
+  la calcolavano costanza, revisione, statistiche e resoconto, ognuna per conto
+  suo. Ora e' `allenatoIl(k)`, e le quattro chiamano quella
+- Non chiedere all'utente un dato che l'app ha gia': l'interruttore
+  dell'allenamento poteva contraddire le serie registrate, e non c'era modo di
+  sapere quale delle due risposte valeva. Ma il flag dei registri vecchi va
+  continuato a leggere, o si riscrive la storia di chi l'ha usato
+- Non togliere il peso dal diario senza dare un altro posto dove **correggere
+  una giornata passata**: Corpo non ha la navigazione dei giorni, quindi il
+  foglio del peso porta la sua data dentro. Una pesata sbagliata resta nella
+  tendenza per due settimane
+- Non far incrementare al bottone del peso un numero che non esiste: su una
+  giornata senza pesata il primo tocco appoggia sulla tendenza, e non registra
+  una pesata che nessuno ha fatto
+- Non monitorare una scheda sola quando il programma ne ha due: Giorno 1 e
+  Giorno 2 sono un programma solo, e giudicarne meta' chiamandola "il
+  programma" e' un errore di soggetto, non di calcolo
+- Non mettere in un elenco solo la progressione di schede diverse: la panca del
+  Giorno 1 e quella del Giorno 2 sono due serie di dati, e affiancarle fa
+  sembrare doppioni due righe che non lo sono
 - Non presentare le capienze dei bicchieri come misure: 200/250/500/1500 ml
   sono convenzioni, e per la borraccia da 750 deve restare il campo libero
 - Non tenere solo il totale dell'acqua: senza l'elenco dei sorsi "annulla"

@@ -98,9 +98,7 @@ function statSettimana(per) {
     r.passi = statMedia(r.date.map(k => S.log[k]?.passi));
     r.sonno = statMedia(r.date.map(k => S.log[k]?.sonno));
     r.sedute = r.date.filter(k =>
-      (typeof serieDelGiorno === 'function' && serieDelGiorno(k).length)
-      || (typeof cardioDi === 'function' && cardioDi(k).length)
-      || S.hyrox?.sessioni?.[k]?.fatto || S.log[k]?.allenamento === true).length;
+      allenatoIl(k)).length;
     /* "Aderenza" qui e' una cosa sola e dichiarata: quanto le calorie del
        giorno si avvicinano al target. Non e' un voto sul cibo — questa app non
        ne da' — e' la distanza da un numero che l'utente ha scelto. */
@@ -223,8 +221,9 @@ function statMisure(per) {
 function statAllenamento(per) {
   const gg = statGiorni(per);
   let sedute = 0, serie = 0, tonnellaggio = 0, cardioN = 0, cardioMin = 0, cardioKm = 0;
-  // chi spunta solo "oggi mi sono allenato" nel diario non registra nessuna
-  // serie: senza questo conteggio la sua sezione allenamento sarebbe vuota
+  // l'interruttore "oggi mi sono allenato" non c'e' piu' — l'app lo deduce —
+  // ma nei registri scritti prima c'e', e vale: quel giorno e' un allenamento
+  // dichiarato, e toglierlo a posteriori riscriverebbe la storia
   let dichiarati = 0;
   const perEs = new Map();
   for (const k of gg) {

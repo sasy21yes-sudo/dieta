@@ -353,6 +353,31 @@ function composition(k = today()) {
   };
 }
 
+/**
+ * Ti sei allenato quel giorno?
+ *
+ * Era un interruttore nel diario, e chiedeva una cosa che l'app sapeva gia':
+ * se ci sono delle serie registrate in palestra, una corsa nel cardio o una
+ * seduta HYROX segnata, l'allenamento c'e' stato — e nessuna delle due
+ * risposte possibili al "Sì / No" aggiungeva niente a quello che era gia'
+ * scritto. Peggio: le due potevano contraddirsi, e allora quale valeva?
+ *
+ * Il flag `allenamento` resta letto per i backup vecchi, dove qualcuno ha
+ * spuntato "sì" senza registrare le serie: quel giorno e' un allenamento
+ * dichiarato, e cancellarlo dai conti a posteriori vorrebbe dire riscrivere
+ * la storia di chi ha usato l'app com'era.
+ *
+ * Quattro motori facevano questo stesso conto ognuno per conto suo — costanza,
+ * revisione, statistiche, resoconto — e quattro copie di una regola prima o
+ * poi diventano quattro regole.
+ */
+function allenatoIl(k) {
+  return !!((typeof serieDelGiorno === 'function' && serieDelGiorno(k).length)
+    || (typeof cardioDi === 'function' && cardioDi(k).length)
+    || S.hyrox?.sessioni?.[k]?.fatto
+    || S.log[k]?.allenamento === true);
+}
+
 /* --------------------------------------------- motore di previsione */
 /**
  * Peso di tendenza: media su finestra elastica, tollera i giorni saltati.
@@ -1469,6 +1494,17 @@ const BICCHIERI = [
   { id: 'bottiglia', n: 'Bottiglia', ml: 1500 }
 ];
 
+/** La lattina della Coca Zero, disegnata come i quattro recipienti. */
+function iconaLattina() {
+  const s = mk('svg', { viewBox: '0 0 24 24', class: 'ic-g', 'aria-hidden': 'true' });
+  s.append(mk('path', {
+    d: 'M8 3.4h8v2.2l-.7 13a2.2 2.2 0 0 1-2.2 2.1h-2.2a2.2 2.2 0 0 1-2.2-2.1l-.7-13z'
+       + 'M8 6.4h8',
+    fill: 'none', stroke: 'currentColor', 'stroke-width': 1.6,
+    'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+  return s;
+}
+
 /** I quattro recipienti, disegnati. Sette tratti l'uno, come le icone di Gym. */
 function iconaBicchiere(id) {
   const P = {
@@ -1533,7 +1569,7 @@ function cardAcqua(k) {
   const quota = tgt ? litri / tgt : 0;
 
   const c = el('div', 'card acqua');
-  c.append(el('div', 'eyebrow', 'Acqua'));
+  c.append(el('div', 'eyebrow', 'Cosa bevi'));
 
   const testa = el('div', 'acq-testa');
   const { svg, gruppo } = bottigliaSVG(quota);
@@ -1608,6 +1644,34 @@ function cardAcqua(k) {
     'Le capienze sono quelle convenzionali, non misurate: un bicchiere da tavola '
     + 'sta fra i 200 e i 250 ml. Per una borraccia da 750 o per correggere il '
     + 'totale c\'e\' "scrivi tu".'));
+
+  /* La Coca Zero sta qui e non piu' nella griglia dei numeri, per la stessa
+     ragione dell'acqua: e' una cosa che si beve, si conta a lattine, e si
+     aggiunge nel momento in cui la si apre. Un campo di testo chiedeva di
+     ricordarsi a sera quante ne erano passate. */
+  c.append(el('div', 'sep'));
+  const lat = d.coca || 0;
+  const cz = el('div', 'coca-r');
+  const men = el('button', 'stp', '−');
+  men.setAttribute('aria-label', 'Una lattina in meno');
+  men.disabled = !lat;
+  men.onclick = () => { const dd = day(k); dd.coca = Math.max(0, (dd.coca || 0) - 1);
+    if (!dd.coca) delete dd.coca; save(); route(); };
+  const piu = el('button', 'stp', '+');
+  piu.setAttribute('aria-label', 'Una lattina in piu\'');
+  piu.onclick = () => { const dd = day(k); dd.coca = (dd.coca || 0) + 1; save(); route(); };
+  const mid = el('div', 'mid');
+  mid.append(iconaLattina());
+  const txt = el('div', 'tx');
+  txt.innerHTML = `<div class="n">Coca Zero</div>
+    <div class="s">${lat ? lat + (lat === 1 ? ' lattina oggi' : ' lattine oggi')
+      : 'nessuna oggi'}</div>`;
+  mid.append(txt);
+  cz.append(men, mid, piu);
+  c.append(cz);
+  if (lat >= 3) c.append(el('p', 'hint',
+    'Tre lattine sono circa ' + (lat * 34) + ' mg di caffeina: se il sonno e\' '
+    + 'corto, e\' il primo posto dove guardare.'));
   return c;
 }
 
@@ -1671,11 +1735,6 @@ function viewDiario(v) {
     v.append(t);
   }
 
-  v.append(el('div', 'card flat',
-    `<div class="eyebrow">Regola</div>
-     <div class="muted">Pesati al mattino, dopo il bagno, prima di bere o mangiare.
-     Una singola pesata non contiene informazione: conta solo la media a 7 giorni.</div>`));
-
   const num = (id, lab, unit, step, hint) => {
     const f = el('div', 'field',
       `<label>${lab}${unit ? ` <span class="muted">(${unit})</span>` : ''}</label>
@@ -1689,26 +1748,48 @@ function viewDiario(v) {
 
   v.append(cardAcqua(k));
 
+  /* Qui dentro erano rimaste cinque voci, e tre non ci appartenevano piu':
+     il peso ha una carta sua in Corpo, l'acqua e la Coca Zero si aggiungono
+     un bicchiere alla volta, e l'allenamento l'app lo deduce da quello che
+     hai registrato. Restano i due numeri che si scrivono davvero una volta
+     al giorno e che nessun'altra parte dell'app conosce. */
   const c1 = el('div', 'card');
   c1.append(el('h2', 'sec', 'Ogni giorno'));
   c1.lastChild.style.marginTop = '0';
-  c1.append(num('peso', 'Peso', 'kg', '0.01'));
   const grid = el('div'); grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px';
-  // l'acqua non e' piu' qui: ha una carta sua, perche' e' l'unica voce del
-  // diario che si registra otto volte al giorno e non una
-  grid.append(num('coca', 'Coca Zero', 'lattine', '1'),
-              num('passi', 'Passi', '', '100'), num('sonno', 'Sonno', 'ore', '0.5'));
+  grid.append(num('passi', 'Passi', '', '100'), num('sonno', 'Sonno', 'ore', '0.5'));
   c1.append(grid);
+  c1.append(el('p', 'hint',
+    'Il peso si registra in Corpo, l\'acqua e la Coca Zero qui sopra.'));
+  v.append(c1);
 
-  const tr = el('div', 'field', `<label>Allenamento</label>`);
-  const seg = el('div', 'seg');
-  for (const [val, lab] of [[true, 'Sì'], [false, 'No']]) {
-    const b = el('button', null, lab);
-    b.setAttribute('aria-pressed', d.allenamento === val);
-    b.onclick = () => { set('allenamento', val); route(); };
-    seg.append(b);
-  }
-  tr.append(seg); c1.append(tr); v.append(c1);
+  /* L'allenamento non si dichiara piu': si legge. La riga resta perche' e'
+     un dato della giornata e sparire del tutto sembrerebbe che non conti
+     piu', ma e' una lettura e non un campo — e porta dove si registra. */
+  const ca = el('div', 'card flat');
+  const ser = typeof serieDelGiorno === 'function' ? serieDelGiorno(k) : [];
+  const car = typeof cardioDi === 'function' ? cardioDi(k) : [];
+  const hx = !!S.hyrox?.sessioni?.[k]?.fatto;
+  const pezzi = [];
+  if (ser.length) pezzi.push(`${ser.length} ${ser.length === 1 ? 'serie' : 'serie'} in palestra`);
+  if (car.length) pezzi.push(`${car.length} ${car.length === 1 ? 'uscita' : 'uscite'} di cardio`);
+  if (hx) pezzi.push('una seduta HYROX');
+  if (!pezzi.length && S.log[k]?.allenamento === true) pezzi.push('segnato a mano (registro vecchio)');
+  ca.append(el('div', 'row between',
+    `<div><div class="eyebrow">Allenamento</div>
+       <div class="muted">${pezzi.length ? esc(pezzi.join(' · '))
+         : 'Niente registrato in questa giornata.'}</div></div>
+     <span class="pill${pezzi.length ? ' ok' : ''}">${pezzi.length ? 'fatto' : 'riposo'}</span>`));
+  const bg = el('button', 'btn wide');
+  bg.style.marginTop = '10px';
+  bg.textContent = pezzi.length ? 'Apri Gym' : 'Registra una seduta';
+  bg.onclick = () => { location.hash = '#/palestra'; };
+  ca.append(bg);
+  ca.append(el('p', 'note',
+    'Non c\'e\' piu\' niente da spuntare: la giornata conta come allenamento se '
+    + 'ci sono serie, cardio o una seduta HYROX registrata. Era una domanda a cui '
+    + 'l\'app sapeva gia\' rispondere.'));
+  v.append(ca);
 
   const c2 = el('div', 'card');
   c2.append(el('h2', 'sec', 'Come stai'));
@@ -1977,30 +2058,147 @@ function bodySVG(cur, tgt) {
 }
 
 /* ------------------------------------------------------------ vista */
+/* ===================================================== il peso del giorno
+ *
+ * Stava nella griglia del diario, terzo campo di testo fra la Coca Zero e i
+ * passi, e non era il posto giusto per due ragioni. La prima: e' il numero
+ * che si registra per primo, appena scesi dalla bilancia, e cercarlo dentro
+ * un modulo lungo e' un attrito su un gesto quotidiano. La seconda: e' il
+ * numero attorno a cui gira tutto il resto — tendenza, dispendio, previsione,
+ * composizione — e viveva in una casella grande come quella delle lattine.
+ *
+ * Qui e' grande, al centro, e si muove con due bottoni. Il passo e' 100 g:
+ * e' la risoluzione delle bilance da casa, e sotto quella cifra non c'e'
+ * informazione, c'e' il bicchiere d'acqua che hai bevuto prima.
+ */
+const PESO_PASSO = 0.1;
+
+function cardPeso(k) {
+  const d = day(k);
+  const p = d.peso;
+  const tr = trendW(k);
+  const ieri = S.log[addDays(k, -1)]?.peso;
+
+  const c = el('div', 'card peso-c');
+  c.append(el('div', 'eyebrow', k === today() ? 'Peso del giorno' : 'Peso del ' + esc(k)));
+
+  const rig = el('div', 'peso-r');
+  const meno = el('button', 'stp big', '−');
+  meno.setAttribute('aria-label', 'Cento grammi in meno');
+  const piu = el('button', 'stp big', '+');
+  piu.setAttribute('aria-label', 'Cento grammi in piu\'');
+  const muovi = seg => {
+    const dd = day(k);
+    // senza una pesata di oggi il primo tocco non muove niente: appoggia il
+    // numero sulla tendenza, che e' il valore piu' vicino al vero che l'app
+    // conosce, e da li' si aggiusta. Inventare un incremento su un numero che
+    // non c'e' vorrebbe dire registrare una pesata che nessuno ha fatto
+    if (dd.peso == null) {
+      dd.peso = Math.round((tr ?? D.profilo?.peso ?? 70) * 10) / 10;
+    } else {
+      dd.peso = Math.round((dd.peso + seg * PESO_PASSO) * 10) / 10;
+    }
+    save(); route();
+  };
+  meno.onclick = () => muovi(-1);
+  piu.onclick = () => muovi(1);
+
+  const val = el('button', 'peso-v');
+  val.innerHTML = p == null
+    ? '<span class="n vuoto">—</span><em>kg</em>'
+    : `<span class="n">${nf(p, 1)}</span><em>kg</em>`;
+  val.setAttribute('aria-label', 'Scrivi il peso');
+  val.onclick = () => sheetPeso(k);
+  rig.append(meno, val, piu);
+  c.append(rig);
+
+  const sotto = [];
+  if (p == null) sotto.push('non ancora registrato');
+  if (tr != null) sotto.push(`media 7 giorni ${nf(tr, 1)} kg`);
+  if (p != null && ieri != null) {
+    const dd = p - ieri;
+    sotto.push(`${dd >= 0 ? '+' : ''}${nf(dd, 1)} kg da ieri`);
+  }
+  c.append(el('div', 'peso-s', esc(sotto.join(' · ') || ' ')));
+
+  const alt = el('button', 'btn wide');
+  alt.style.marginTop = '10px';
+  alt.textContent = 'Scrivilo, o correggi un altro giorno';
+  alt.onclick = () => sheetPeso(k);
+  c.append(alt);
+
+  c.append(el('p', 'note',
+    'Pesati al mattino, dopo il bagno, prima di bere o mangiare. Una singola '
+    + 'pesata non contiene informazione: conta solo la media a 7 giorni, ed e\' '
+    + 'quella che i conti dell\'app usano. I bottoni vanno di 100 g, che e\' '
+    + 'quanto una bilancia da casa sa distinguere.'));
+  return c;
+}
+
+/** Il numero esatto, e la giornata a cui appartiene. */
+function sheetPeso(k) {
+  let giorno = k;
+  /* Nel campo non ci va nf(): formatterebbe 69,4 col separatore italiano e
+     rileggerlo darebbe un altro numero. E non ci va nemmeno il valore grezzo:
+     una pesata importata puo' arrivare con dodici decimali, e un campo che
+     dice 69,58359734839807 chiede di correggere una precisione che non
+     esiste. Due decimali sono gia' dieci volte la risoluzione della bilancia. */
+  const scritto = x => x == null ? '' : String(Math.round(x * 100) / 100);
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Peso'));
+  w.append(el('h2', 'sec', 'Scrivi la pesata'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Il giorno si puo\' cambiare: una pesata segnata sulla data sbagliata resta '
+    + 'nella tendenza per due settimane, e correggerla deve essere possibile.'));
+  w.append(el('div', 'field',
+    `<label>Giorno</label>
+     <input type="date" id="pk-g" value="${esc(giorno)}" max="${esc(today())}">`));
+  const campo = el('div', 'field',
+    `<label>Peso <span class="muted">(kg)</span></label>
+     <input type="text" inputmode="decimal" id="pk-v"
+       value="${esc(scritto(S.log[giorno]?.peso))}">`);
+  w.append(campo);
+  w.querySelector('#pk-g').onchange = e => {
+    giorno = e.target.value || today();
+    w.querySelector('#pk-v').value = scritto(S.log[giorno]?.peso);
+  };
+
+  const ok = el('button', 'btn wide pri', 'Salva');
+  ok.onclick = () => {
+    const n = parseNum(w.querySelector('#pk-v').value);
+    if (n == null || n < 25 || n > 300) { toast('Un peso fra 25 e 300 kg'); return; }
+    day(giorno).peso = n;
+    save(); closeSheet(); route();
+  };
+  w.append(ok);
+
+  if (S.log[giorno]?.peso != null) {
+    const via = el('button', 'btn wide', 'Togli la pesata di quel giorno');
+    via.style.marginTop = '8px';
+    via.onclick = () => {
+      const g = w.querySelector('#pk-g').value || giorno;
+      if (S.log[g]) delete S.log[g].peso;
+      save(); closeSheet(); route(); toast('Tolta');
+    };
+    w.append(via);
+  }
+  const ann = el('button', 'btn wide', 'Annulla');
+  ann.style.marginTop = '8px';
+  ann.onclick = closeSheet;
+  w.append(ann);
+  sheet(w);
+}
+
 function viewCorpo(v) {
   const k = today(), C = composition(k), TF = D.target_fisico;
   ledgerRecord(k);
 
-  /* --- target --- */
-  /* Il file di dominio tiene ancora il nome della persona da cui queste misure
-     sono state prese e il racconto di come ci si e' arrivati. Qui non servono:
-     quello che conta sono i numeri e il fatto che siano stime. Il nome di un
-     attore in cima alla scheda del proprio corpo e' un paragone, e un paragone
-     non e' un dato. */
-  const ct = el('div', 'card');
-  ct.append(el('div', 'row between',
-    `<div><div class="eyebrow">Target</div>
-       <div class="tname">Il fisico di riferimento</div></div>
-     <span class="pill">${esc(TF.fonte)}</span>`));
-  ct.append(el('p', 'muted',
-    'Le misure verso cui stai andando. Non e\' un obiettivo di peso: fra dove sei '
-    + 'e dove vuoi arrivare la bilancia cambia poco e cambiano le proporzioni, ed '
-    + 'e\' per questo che qui sotto c\'e\' il metro e non solo il peso.'));
-  if (TF.fonte === 'stima')
-    ct.append(el('p', 'hint',
-      'Valori stimati, non rilevati: servono a dare una direzione alle proporzioni, '
-      + 'non sono una soglia da centrare al decimo.'));
-  v.append(ct);
+  /* In cima c'e' il peso, che e' il numero che si scrive tutti i giorni.
+     La carta del target che stava qui diceva cose vere ma non chiedeva
+     niente: le misure di riferimento restano dove servono davvero — la
+     sagoma tratteggiata qui sotto e la colonna "Target" della tabella. */
+  v.append(cardPeso(k));
 
   /* --- figura --- */
   const curM = figMeas(Object.fromEntries(D.misure.map(m => [m.id, lastMeas(m.id)])));
@@ -2011,6 +2209,15 @@ function viewCorpo(v) {
      <span><i class="sw sw-tgt"></i>Target</span>`));
   cf.append(el('p', 'hint',
     'La sagoma è disegnata sulle circonferenze registrate: cambia quando cambiano i numeri. È schematica, serve a leggere le proporzioni.'));
+  // la nota sulla provenienza del target segue il target, che ora e' solo qui
+  // e nella tabella: presentare come rilevato cio' che e' stimato sarebbe la
+  // stessa bugia anche detta in un punto diverso
+  cf.append(el('p', 'note',
+    'La tratteggiata e\' il fisico di riferimento. Non e\' un obiettivo di peso: '
+    + 'fra qui e li\' la bilancia cambia poco e cambiano le proporzioni.'
+    + (TF.fonte === 'stima'
+      ? ' I suoi numeri sono stimati e non rilevati: danno una direzione, non '
+        + 'una soglia da centrare al decimo.' : '')));
   v.append(cf);
 
   /* --- composizione --- */
