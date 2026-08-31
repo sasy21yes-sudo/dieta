@@ -167,6 +167,8 @@ function statoMuscoli(k = today()) {
   for (const m of muscoli()) ff[m.id] = formaFaticaCache(m.id, k);
   const maxFat = Math.max(0.001, ...Object.values(ff).map(x => x.fatica));
   const maxForma = Math.max(0.001, ...Object.values(ff).map(x => x.forma));
+  const rifVolume = Math.max(V.min_serie || 10,
+    ...muscoli().map(m => vol[m.id].serie));
   const out = {};
   for (const m of muscoli()) {
     const v = vol[m.id], f = ff[m.id];
@@ -175,7 +177,13 @@ function statoMuscoli(k = today()) {
       forma: f.forma, fatica: f.fatica, prontezza: f.prontezza,
       nFatica: f.fatica / maxFat,
       nForma: f.forma / maxForma,
-      nVolume: Math.min(1, v.serie / (V.max_serie || 22)),
+      // Il volume si misurava su una costante (22 serie): in una settimana
+      // normale il gruppo piu' allenato ne fa otto, quindi la mappa usava un
+      // terzo della tavolozza e sembrava spenta. Si normalizza sul gruppo piu'
+      // caricato della settimana — come gia' fanno fatica e forma — con un
+      // pavimento al minimo consigliato, o una settimana da due serie in tutto
+      // si dipingerebbe come una settimana piena.
+      nVolume: Math.min(1, v.serie / rifVolume),
       stato: v.serie === 0 ? 'fermo'
            : v.serie < V.min_serie ? 'sotto'
            : v.serie > V.max_serie ? 'sopra' : 'ok',
@@ -390,7 +398,53 @@ function prossimoPasso(id) {
  */
 
 /** Un livello 0–4 della rampa sequenziale gia' validata. */
-function livello(v) { return v <= 0.02 ? 0 : Math.max(1, Math.min(4, Math.ceil(v * 4))); }
+/**
+ * Dal valore normalizzato alla tinta, e il punto e' la SFUMATURA.
+ *
+ * Prima erano quattro gradini secchi su una scala lineare: `ceil(v * 4)`.
+ * Due difetti che si sommavano e schiacciavano tutto in fondo alla scala.
+ *
+ * 1. **Il primo gradino teneva un quarto del mondo.** Tutto quello che stava
+ *    fra il 2% e il 25% usciva dello stesso identico colore: un muscolo con
+ *    due serie e uno con cinque erano indistinguibili, ed e' proprio li' che
+ *    sta quasi tutto quello che uno vede in una settimana normale.
+ * 2. **La scala era lineare**, ma i dati non lo sono: il volume settimanale
+ *    per gruppo e' una distribuzione con la coda a destra — un paio di gruppi
+ *    alti e otto bassi — quindi meta' della tavolozza restava inutilizzata.
+ *
+ * La radice quadrata allunga la parte bassa, che e' dove stanno i dati:
+ * 5% e 15% passano da "stesso gradino" a due gradini diversi. E dentro ogni
+ * gradino l'opacita' continua a salire, cosi' due muscoli vicini non sono mai
+ * esattamente lo stesso colore.
+ */
+/* I quattro toni della tavolozza sequenziale sono stati scelti con passi di
+   luminosita' regolari. Mescolarli fra loro da' una scala continua che
+   mantiene quella regolarita', cosa che l'opacita' su una tinta sola non fa:
+   al fondo della scala un verde trasparente su fondo scuro sparisce prima di
+   diventare "poco". Dove color-mix non c'e' — Safari sotto la 16.2 — si
+   ripiega sull'opacita', che e' peggio ma non e' rotto. */
+const _mixOK = typeof CSS !== 'undefined' && CSS.supports
+  && CSS.supports('color', 'color-mix(in oklab, red, blue)');
+
+function intensita(v) {
+  const q = Math.max(0, Math.min(1, v || 0));
+  if (q <= 0.015) return { on: false, fill: 'var(--paper)', op: 1 };
+  /* Gamma 0,65: la radice quadrata piena allungava troppo e portava anche i
+     gruppi da due serie a meta' tavolozza, lasciando inutilizzato il tono
+     piu' chiaro. Con 0,65 il fondo resta pallido E il 5% si distingue dal
+     15%, che era il punto. */
+  const t = Math.pow(q, 0.65);
+  if (!_mixOK) return { on: true, fill: 'var(--s4)', op: 0.16 + 0.84 * t };
+  /* La scala parte dal colore della superficie e non dal primo tono: cosi'
+     gli intervalli diventano quattro invece di tre, e soprattutto "quasi
+     niente" torna a somigliare a quasi niente. Con la scala che partiva da
+     --s1 anche un gruppo al 2% del piu' caricato usciva verde pieno. */
+  const scala = ['var(--wash)', 'var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)'];
+  const x = t * (scala.length - 1);
+  const i = Math.min(scala.length - 2, Math.floor(x)), f = x - i;
+  return { on: true, op: 1,
+    fill: `color-mix(in oklab, ${scala[i]} ${((1 - f) * 100).toFixed(1)}%, ${scala[i + 1]})` };
+}
 
 /** La vista giusta per profilo e lato. */
 function vistaCorpo(vista) {
@@ -420,13 +474,17 @@ function mappaSVG(vista, stato, modo, onTap) {
     const st = stato[id];
     const v = !st ? 0
       : modo === 'fatica' ? st.nFatica : modo === 'forma' ? st.nForma : st.nVolume;
-    const l = livello(v || 0);
+    const { on, fill, op } = intensita(v || 0);
+    /* I quattro gradini discreti erano il problema, non la soluzione: fra il
+       2% e il 25% usciva un colore solo. Ora la scala non ha gradini, quindi
+       due muscoli con volumi diversi non hanno mai lo stesso colore. */
     const g = mk('g', {
-      fill: l ? `var(--s${l})` : 'var(--paper)',
+      fill,
+      'fill-opacity': op.toFixed(3),
       stroke: 'var(--pine)', 'stroke-width': 1.1,
       'stroke-linejoin': 'round',
-      opacity: l ? .95 : .55,
-      style: 'cursor:pointer', class: 'mus' + (l ? ' on' : '')
+      opacity: on ? 1 : 0.5,
+      style: 'cursor:pointer', class: 'mus' + (on ? ' on' : '')
     });
     g.setAttribute('data-mus', id);
     for (const d of paths) g.append(mk('path', { d }));
@@ -444,8 +502,10 @@ function mappaSVG(vista, stato, modo, onTap) {
   if (typeof osserva === 'function') osserva(s, () => {
     if (!motionOk()) return;
     const acc = [...s.querySelectorAll('.mus.on')];
+    // l'intensita' ora sta in fill-opacity: animando opacity si parte da zero
+    // e si torna a uno, senza toccare il dato che il colore porta
     acc.forEach((g, i) => g.animate(
-      [{ opacity: 0 }, { opacity: g.getAttribute('opacity') || 1 }],
+      [{ opacity: 0 }, { opacity: 1 }],
       { duration: 320, delay: 60 + i * 70, fill: 'backwards' }));
   });
   return s;
@@ -691,11 +751,25 @@ function sezGymMappa(v, k, st) {
   }));
   cm.append(box);
   cm.append(read);
+  // la legenda disegna la scala vera: la stessa tinta a intensita' crescente,
+  // non quattro colori che sulla mappa non esistono piu'
   cm.append(el('div', 'calscale',
-    '<span>poco</span>' + [1, 2, 3, 4].map(n => `<i style="background:var(--s${n})"></i>`).join('')
-    + '<span>molto</span>'));
+    `<span>${gymModo === 'volume' ? 'poco' : 'basso'}</span>`
+    + [.06, .2, .4, .65, 1].map(q => {
+        const t2 = intensita(q);
+        return `<i style="background:${t2.fill};opacity:${t2.op.toFixed(2)}"></i>`;
+      }).join('')
+    + `<span>${gymModo === 'volume'
+      ? `${nf(Math.max(V.min_serie || 10, ...muscoli().map(m => st[m.id].serie)), 0)} serie`
+      : 'alto'}</span>`));
   cm.append(el('p', 'note',
-    'I tracciati sono anatomici: ogni ventre muscolare ha la sua forma, e il colore '
+    (gymModo === 'volume'
+      ? 'Il colore e\' relativo alla settimana che stai guardando: il pieno e\' il '
+        + 'gruppo piu\' caricato, con un minimo di ' + (V.min_serie || 10) + ' serie '
+        + 'perche\' una settimana quasi vuota non si dipinga come una piena. '
+        + 'Per il confronto con i riferimenti c\'e\' il volume settimanale qui sotto. '
+      : 'Il colore e\' relativo: il pieno e\' il gruppo messo peggio, non una soglia. ')
+    + 'I tracciati sono anatomici: ogni ventre muscolare ha la sua forma, e il colore '
     + 'riempie il muscolo vero. La figura segue il sesso del profilo. Adduttori, '
     + 'tibiale e collo restano grigi: esistono nel disegno ma non fra i tredici '
     + 'gruppi che questa app conta, e colorarli vorrebbe dire inventarsi un dato. '

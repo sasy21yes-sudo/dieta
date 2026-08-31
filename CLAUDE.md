@@ -673,6 +673,42 @@ restano **sagoma neutra** — esistono nel disegno ma non fra i gruppi che l'app
 conta, e colorarli vorrebbe dire inventarsi un dato. Stessa scelta già fatta
 con free-exercise-db.
 
+**La scala del colore era schiacciata**, e per due motivi che si sommavano.
+
+Il primo: quattro gradini secchi, `ceil(v * 4)`. Il primo gradino teneva un
+quarto del mondo — tutto fra il 2% e il 25% usciva **dello stesso identico
+colore**, quindi un gruppo con due serie e uno con cinque erano pixel per
+pixel uguali. Ed e' proprio li' che sta quasi tutto quello che si vede in una
+settimana normale.
+
+Il secondo: il volume si normalizzava su una **costante** (22 serie), mentre
+fatica e forma erano gia' relative al massimo della settimana. Se il gruppo
+piu' allenato ne fa otto, la mappa usava un terzo della tavolozza e sembrava
+spenta.
+
+Ora: `nVolume` si normalizza sul gruppo piu' caricato della settimana, con un
+pavimento al minimo consigliato (o una settimana da due serie in tutto si
+dipingerebbe come una piena); e `intensita()` produce una scala **continua**,
+interpolando in oklab fra il colore della superficie e i quattro toni della
+tavolozza sequenziale. Cinque stazioni invece di quattro gradini, e il fondo
+che parte da `--wash` — cosi' "quasi niente" torna a somigliare a quasi
+niente, invece di uscire verde pieno.
+
+La gamma e' 0,65: la radice quadrata piena allungava troppo e portava anche i
+gruppi da due serie a meta' tavolozza. Misurato in luminosita' oklab, sullo
+stesso dato: 10% e 13% del massimo passano da ΔL 0,009 a ΔL 0,034, e l'intero
+arco da 0,19 a 0,27.
+
+Due dettagli: `color-mix` non c'e' su Safari sotto la 16.2, e li' si ripiega
+sull'opacita' su una tinta sola — peggio, ma non rotto; e l'intensita' sta in
+`fill-opacity`, non in `opacity`, perche' l'animazione d'ingresso anima
+`opacity` e altrimenti si porterebbe via il dato mentre entra.
+
+La legenda disegna **la scala vera** — la stessa rampa a cinque campioni — e
+non quattro colori che sulla mappa non esistono piu'. E la nota dice che il
+colore e' relativo alla settimana, non una quota assoluta: per i riferimenti
+c'e' il volume settimanale sotto.
+
 ### Cardio, e perché il GPS ha un asterisco
 
 **Su iPhone una pagina web non può registrare un percorso con lo schermo
@@ -2102,6 +2138,18 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non far cancellare dati a un interruttore di modulo: spegnere nasconde, non
   distrugge. E non dare per scontato che `S.settings.moduli` esista — un backup
   scritto prima non ce l'ha, e `modulliDaStato()` lo deduce
+- Non colorare una mappa a gradini larghi: con quattro livelli il primo tiene
+  un quarto della scala, e due valori diversi escono identici. La scala e'
+  continua, e parte dal colore della superficie
+- Non normalizzare il volume della mappa su una costante mentre fatica e forma
+  sono relative alla settimana: la stessa mappa userebbe un terzo della
+  tavolozza e sembrerebbe spenta. Ma serve un pavimento, o una settimana quasi
+  vuota si dipinge come una piena
+- Non mettere l'intensita' del colore in `opacity`: l'animazione d'ingresso
+  anima quella, e si porterebbe via il dato. Va in `fill-opacity`
+- Non usare `color-mix` senza ripiego: sotto Safari 16.2 non esiste, e un
+  valore non valido in un attributo di presentazione non lascia il colore di
+  prima — lo azzera
 - Non mappare `adductors` e `neck` di free-exercise-db dentro glutei o trapezi
   per far quadrare i conti: la mappa muscolare, il volume e la forma-fatica si
   reggono su quei gruppi. Un muscolo senza corrispondenza va dichiarato, non
