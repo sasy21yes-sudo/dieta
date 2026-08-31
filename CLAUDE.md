@@ -81,6 +81,7 @@ cardio.js       corsa e simili, tracciato GPS, cartolina PNG da condividere
 salute.js       import di passi e sonno da un Comando iOS
 scambio.js      esporta/importa un pezzo solo: la dieta, le schede, o tutti e due
 pdf.js          generatore di PDF scritto a mano (font di base, WinAnsi)
+statistiche.js  i conti del resoconto: registro, settimana, pasti, fuori piano
 sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
 giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
 piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
@@ -208,8 +209,10 @@ non un dettaglio.
 - **Il periodo si sceglie** — la settimana chiusa resta il default, ma revisione
   e cruscotto accettano due date qualsiasi. Il confronto e' sempre con il
   periodo di **pari lunghezza** subito prima
-- **Resoconto in PDF** — lo stesso contenuto della revisione su A4, generato sul
-  telefono senza librerie e senza server. Da dare a chi l'app non ce l'ha
+- **Resoconto in PDF** — la revisione piu' otto sezioni di dati su A4, generato
+  sul telefono senza librerie e senza server. Da dare a chi l'app non ce l'ha
+- **Controllo della versione** — quale versione stai usando, se ce n'e' una
+  nuova, e un bottone per ricaricare. Su iPhone non c'era nessun altro modo
 - **Timer di recupero**, **scarico automatico**, **dolori e infortuni** in Gym
 - **Dispensa** — quello che hai in casa si sottrae dalla lista della spesa
 - **Cerca un esercizio su internet** — catalogo pubblico di 873 esercizi con
@@ -941,6 +944,27 @@ l'accoppiamento a tentativi produrrebbe l'esecuzione **sbagliata**, che è peggi
 di nessuna esecuzione. Chi importa dal catalogo online se lo porta dietro da
 solo (`exdbId`).
 
+### Le medie arrivano a oggi
+
+Per un periodo le medie si sono fermate a ieri, per una ragione vera: la
+giornata in corso e' a meta' e infilarla nella media la tira giu' ogni mattina.
+
+Il prezzo era pero' piu' alto del problema. La media non corrispondeva ai dati
+disegnati sul grafico sopra di lei, e su sette giorni escluderne uno cambia il
+numero di un settimo senza che si veda perche'. Una media bassa al mattino e'
+un fastidio; una media che non si puo' verificare contando le barre e' un
+numero di cui non ci si fida.
+
+Vale per `mediaPeriodo()` (che alimenta sia la riga di riepilogo sia la linea
+disegnata), per il riquadro delle calorie medie e per `costanze()`. Se si
+cambia idea vanno cambiati **tutti e tre**: una pagina che conta fino a ieri e
+una che conta fino a oggi danno due numeri diversi per lo stesso periodo, e non
+si capisce perche'.
+
+Restano fermi i concetti che si chiamano per nome "chiusi" — la settimana
+chiusa della revisione, le medie degli ultimi sette giorni chiusi in Analisi —
+perche' li' il fatto che il periodo sia finito e' il punto.
+
 ### Il periodo di riferimento
 
 La settimana resta l'unita' su cui la revisione e' costruita, e resta il
@@ -1022,6 +1046,37 @@ Con dieci voci in lista il manubrio della revisione non poteva piu' fermarsi al
 135%: 116 g di grassi su un target di 82 fanno 141%, e chi stava oltre il bordo
 ci si appoggiava, indistinguibile da chi stava esattamente li'. Ora l'asse
 cresce coi dati fino al 220%, oltre quello taglia **e lo scrive**.
+
+### Il resoconto e' un documento clinico, non uno screenshot
+
+La prima versione conteneva quello che c'era sullo schermo: verdetto, numeri a
+confronto, cosa non ha funzionato. Utile per chi lo scrive, magro per chi lo
+riceve. Un nutrizionista o un medico che quei numeri non li ha mai visti non
+chiede "come e' andata": chiede **dove** si concentra il problema, **quale**
+pasto salta, **cosa** entra oltre al piano, e soprattutto **quanto e' completo
+il registro** da cui esce tutto il resto.
+
+Da qui `statistiche.js` e otto sezioni in piu':
+
+| Sezione | Perche' un professionista la chiede |
+|---|---|
+| Il registro | Va per prima, e non e' burocrazia: una media di calorie su nove giorni registrati su trenta non e' un'alimentazione, e' quello che si e' avuto voglia di scrivere. Tutto il resto del foglio vale quanto vale questa riga |
+| La ripartizione | Non solo i grammi: la quota di calorie per macro e i **g per kg di peso**, che e' il modo in cui proteine e grassi si leggono in clinica — "135 g" non dice niente senza il peso della persona |
+| Come si distribuisce nella settimana | Non quanto si mangia, ma QUANDO le cose si spostano. Il sabato e il mercoledi sono quasi sempre due diete diverse, e la media dei sette giorni li nasconde tutti e due |
+| I pasti, uno per uno | Quante volte quel pasto era previsto e quante risulta consumato, per slot e per pasto. Il denominatore e' il numero di volte in cui compare nel piano, non i giorni: uno spuntino puo' esserci tre volte a settimana |
+| Fuori dal piano | Le voci ricorrenti con quante volte e quante kcal. E' il dato che di solito manca del tutto |
+| Peso e misure | Prima e ultima rilevazione dentro il periodo, con il ritmo settimanale calcolato sulla **tendenza** e non sulle due pesate agli estremi |
+| Allenamento | Sedute, serie, tonnellaggio, cardio, ritmo settimanale |
+| Integrazione e abitudini | Aderenza per voce, e acqua/sonno/passi/fame/energia contro i target |
+
+Due regole che valgono per tutte: **producono numeri, non giudizi** — "il pasto
+che salti piu' spesso" e' un fatto utile, farne una colpa non aggiungerebbe
+niente e romperebbe la regola sul tono — e **dichiarano il denominatore**, che
+e' l'unico modo di rendere verificabile una percentuale.
+
+Una sola voce assomiglia a un giudizio, l'"aderenza" per giorno della settimana,
+ed e' definita per esteso nel file: **la distanza delle calorie dal target**.
+Non e' un voto sul cibo, che questa app non da'.
 
 ### Il resoconto in PDF
 
@@ -1212,6 +1267,16 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   dalla letteratura, come le costanti di Banister. La UI deve continuare a dirlo
 - Non fermare l'asse del manubrio a una costante: con dieci voci qualcuno
   finisce oltre il 135%, e un punto appoggiato al bordo dice una cosa falsa
+- Non scrivere una sola delle due date del cruscotto: `datiIntervallo()` le
+  prende tutte e due e ricalcola la lunghezza. Toccando solo la fine il periodo
+  scivolava intero e anche la data di inizio si muoveva da sola — dall'esterno
+  sembrava che il filtro non funzionasse, ed era esattamente quello che
+  succedeva
+- Non far contare a una pagina fino a ieri e a un'altra fino a oggi: sono due
+  numeri diversi per lo stesso periodo, e chi legge non puo' saperlo
+- Non mettere il nome di una persona reale in cima alla scheda del corpo di
+  qualcun altro: un paragone non e' un dato. Le misure di riferimento restano
+  nel file di dominio, il racconto no
 - Non lasciare fisse le soglie della revisione quando il periodo non e' di
   sette giorni: l'obiettivo di sedute e' settimanale e va scalato, la soglia
   del registro e' meta' dei giorni. Altrimenti ogni periodo corto risulta

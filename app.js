@@ -898,11 +898,12 @@ function viewOggi(v) {
   const cons = consumed(k), tgt = dayTarget(k);
   const box = el('div', 'card');
   const g = el('div', 'macros');
-  // le fibre erano l'unica voce del target senza la sua barra, e finivano per
-  // essere quella che non guardava nessuno
+  /* Quattro voci e non cinque: le fibre hanno il loro grafico nel cruscotto e
+     la loro riga in ogni pasto, ma qui erano la quinta colonna su un telefono
+     e stringevano le altre quattro — che sono quelle che si guardano dieci
+     volte al giorno. */
   for (const [id, lab, dec] of [['kcal', 'kcal', 0], ['p', 'prot', 0],
-                                ['c', 'carb', 0], ['g', 'gras', 0],
-                                ['fibre', 'fibre', 0]]) {
+                                ['c', 'carb', 0], ['g', 'gras', 0]]) {
     const pc = tgt[id] ? cons[id] / tgt[id] : 0;
     const cls = pc > 1.15 ? 'way' : pc > 1.02 ? 'over' : '';
     const mb = el('div', 'macro',
@@ -927,7 +928,7 @@ function viewOggi(v) {
     const q = (tgt[id] || 0) - (cons[id] || 0);
     return q > 0.5 ? `<strong>${nf(q)} g</strong> di ${nome}` : null;
   };
-  const resti = [['p', 'proteine'], ['c', 'carboidrati'], ['g', 'grassi'], ['fibre', 'fibre']]
+  const resti = [['p', 'proteine'], ['c', 'carboidrati'], ['g', 'grassi']]
     .map(manca).filter(Boolean);
   box.append(el('div', 'muted', rest > 0
     ? `Restano <strong>${nf(rest)} kcal</strong>${resti.length
@@ -1548,14 +1549,24 @@ function viewCorpo(v) {
   ledgerRecord(k);
 
   /* --- target --- */
+  /* Il file di dominio tiene ancora il nome della persona da cui queste misure
+     sono state prese e il racconto di come ci si e' arrivati. Qui non servono:
+     quello che conta sono i numeri e il fatto che siano stime. Il nome di un
+     attore in cima alla scheda del proprio corpo e' un paragone, e un paragone
+     non e' un dato. */
   const ct = el('div', 'card');
   ct.append(el('div', 'row between',
     `<div><div class="eyebrow">Target</div>
-       <div class="tname">${esc(TF.nome)}</div></div>
+       <div class="tname">Il fisico di riferimento</div></div>
      <span class="pill">${esc(TF.fonte)}</span>`));
-  ct.append(el('p', 'muted', esc(TF.chiave)));
+  ct.append(el('p', 'muted',
+    'Le misure verso cui stai andando. Non e\' un obiettivo di peso: fra dove sei '
+    + 'e dove vuoi arrivare la bilancia cambia poco e cambiano le proporzioni, ed '
+    + 'e\' per questo che qui sotto c\'e\' il metro e non solo il peso.'));
   if (TF.fonte === 'stima')
-    ct.append(el('p', 'hint', `Valore stimato. ${esc(TF.nota)}`));
+    ct.append(el('p', 'hint',
+      'Valori stimati, non rilevati: servono a dare una direzione alle proporzioni, '
+      + 'non sono una soglia da centrare al decimo.'));
   v.append(ct);
 
   /* --- figura --- */
@@ -2337,11 +2348,23 @@ function sheetMenu() {
     i.click();
   });
 
+  mk('Versione e aggiornamenti',
+     'Quale versione stai usando e se ce n\'e\' una piu\' nuova. Su iPhone una web app '
+     + 'aggiunta alla Home a volte viene ripristinata dalla memoria invece di ricaricare, '
+     + 'e resta indietro senza dirlo.',
+     () => sheetVersione());
+
   const days = Object.keys(S.log).length;
-  w.append(el('div', 'card flat',
+  const stato = el('div', 'card flat',
     `<div class="eyebrow">Stato</div>
      <div class="muted">${days} giorni registrati · target ${nf(D.target.kcal)} kcal,
-     ${D.target.p} g proteine · versione dati ${D.meta.versione}</div>`));
+     ${D.target.p} g proteine · versione dati ${D.meta.versione}
+     <span class="vers"></span></div>`);
+  w.append(stato);
+  versioneInUso().then(v => {
+    const t = stato.querySelector('.vers');
+    if (t && v) t.textContent = ' · app ' + v;
+  });
 
   const b = el('button', 'btn wide pri', 'Chiudi');
   b.onclick = closeSheet; w.append(b);
@@ -2375,7 +2398,140 @@ async function init() {
   if (!location.hash) location.hash = '#/oggi';
   route();
   persist();
-  if ('serviceWorker' in navigator)
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+  registraSW();
 }
 init();
+
+/* ==================================================== prendere la versione nuova
+ *
+ * Il service worker e' rete-prima, quindi una versione nuova arriva alla prima
+ * navigazione. Il guaio e' che su iOS una web app aggiunta alla Home spesso non
+ * naviga per niente: riaprendola dall'icona il sistema ripristina il documento
+ * che era gia' in memoria, con dentro il JavaScript vecchio. Il worker si
+ * aggiorna sotto, la pagina no.
+ *
+ * E dentro una PWA a schermo intero non c'e' la barra del browser, quindi non
+ * c'e' un bottone di ricarica; il pull-to-refresh non c'e' perche' il body ha
+ * `overscroll-behavior: none`. Messe insieme le due cose: non esisteva NESSUN
+ * modo, dall'interno dell'app, di prendere una versione nuova. Si restava a
+ * guardare la copia vecchia convinti che le modifiche non fossero arrivate.
+ *
+ * Tre pezzi, e il terzo e' quello che conta:
+ * 1. a ogni ritorno in primo piano si richiede al browser di ricontrollare sw.js
+ * 2. quando un worker nuovo e' pronto compare una striscia con "Ricarica"
+ * 3. in Impostazioni c'e' un controllo esplicito, che dice anche quale versione
+ *    stai usando: senza quel numero non si puo' nemmeno capire se il problema
+ *    e' il telefono o il codice
+ *
+ * Non si ricarica MAI da soli: la pagina puo' avere sotto un pasto a meta' di
+ * inserimento, e una ricarica a sorpresa lo butterebbe via.
+ */
+let SW_REG = null;
+
+const numeroV = k => +(String(k).match(/v(\d+)/)?.[1] || 0);
+
+/** La versione che stai usando davvero: il nome della cache del worker. */
+async function versioneInUso() {
+  try {
+    const ks = (await caches.keys()).filter(k => k.startsWith('dieta-v'));
+    return ks.sort((a, b) => numeroV(a) - numeroV(b)).pop() || null;
+  } catch { return null; }
+}
+
+/** Quella pubblicata: si legge da sw.js, saltando ogni cache. */
+async function versionePubblicata() {
+  const r = await fetch('sw.js?v=' + Date.now(), { cache: 'no-store' });
+  const t = await r.text();
+  return t.match(/const V = '([^']+)'/)?.[1] || null;
+}
+
+function bannerAggiornamento() {
+  if ($('#upd')) return;
+  const b = el('div', 'upd');
+  b.id = 'upd';
+  b.append(el('span', 'grow', 'C\'e\' una versione nuova dell\'app.'));
+  const go = el('button', 'btn sm pri', 'Ricarica');
+  go.onclick = () => location.reload();
+  const no = el('button', 'btn sm', 'Dopo');
+  no.onclick = () => b.remove();
+  b.append(go, no);
+  document.body.append(b);
+}
+
+function registraSW() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    SW_REG = reg;
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      if (!nw) return;
+      nw.addEventListener('statechange', () => {
+        // "installed" con un controller gia' presente vuol dire versione nuova
+        // pronta; senza controller e' la primissima installazione, e li' non
+        // c'e' niente da annunciare
+        if (nw.state === 'installed' && navigator.serviceWorker.controller)
+          bannerAggiornamento();
+      });
+    });
+  }).catch(() => {});
+
+  // riaprendo l'app dall'icona iOS spesso non ricarica niente: e' qui che si
+  // chiede al browser di andare a vedere se sw.js e' cambiato
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && SW_REG) SW_REG.update().catch(() => {});
+  });
+}
+
+/** Il controllo a mano, con il numero di versione in chiaro. */
+async function sheetVersione() {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Versione'));
+  w.append(el('h2', 'sec', 'Aggiornamenti'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'L\'app si aggiorna da sola quando la riapri, ma su iPhone una web app '
+    + 'aggiunta alla Home a volte viene solo ripristinata dalla memoria, e resta '
+    + 'quella di prima. Qui si controlla e si ricarica a mano.'));
+
+  const riga = el('div', 'read');
+  riga.innerHTML = '<span>controllo in corso…</span>';
+  w.append(riga);
+
+  const b = el('button', 'btn wide pri', 'Controlla adesso');
+  b.style.marginTop = '12px';
+  w.append(b);
+  const ric = el('button', 'btn wide', 'Ricarica comunque');
+  ric.style.marginTop = '8px';
+  ric.onclick = () => location.reload();
+  w.append(ric);
+  w.append(el('p', 'note',
+    'Ricaricare non tocca i dati: diario, piano, foto e schede stanno in una '
+    + 'memoria separata dal codice dell\'app.'));
+
+  const guarda = async () => {
+    riga.innerHTML = '<span>controllo in corso…</span>';
+    const [in_uso, pub] = await Promise.all([
+      versioneInUso(),
+      versionePubblicata().catch(() => null)
+    ]);
+    if (SW_REG) SW_REG.update().catch(() => {});
+    riga.innerHTML = `<span>in uso <b>${esc(in_uso || 'non registrata')}</b></span>`
+      + `<span>pubblicata <b>${esc(pub || 'non raggiungibile')}</b></span>`;
+    if (pub && in_uso && numeroV(pub) > numeroV(in_uso)) {
+      riga.innerHTML += '<span class="mono">c\'e\' una versione nuova</span>';
+      bannerAggiornamento();
+      b.textContent = 'Ricarica e prendi la nuova';
+      b.onclick = () => location.reload();
+    } else if (pub && in_uso) {
+      riga.innerHTML += '<span class="mono muted">sei aggiornato</span>';
+      b.textContent = 'Controlla di nuovo';
+      b.onclick = guarda;
+    } else {
+      b.textContent = 'Riprova';
+      b.onclick = guarda;
+    }
+  };
+  b.onclick = guarda;
+  sheet(w);
+  guarda();
+}

@@ -322,9 +322,9 @@ function viewRevisione(v) {
   const diag = revDiagnosi(per);
   const ver = revVerdetto(diag);
   const questa = per.giorni;
-  // la costanza deve coprire lo stesso tratto: costanze() conta all'indietro
-  // dal giorno PRIMA di quello che gli passi, quindi si parte dal giorno dopo
-  const co = typeof costanze === 'function' ? costanze(addDays(per.a, 1), per.n) : null;
+  // la costanza deve coprire lo stesso tratto del periodo, ultimo giorno
+  // compreso
+  const co = typeof costanze === 'function' ? costanze(per.a, per.n) : null;
 
   /* --- testata --- */
   const testa = el('div', 'rev-hero');
@@ -918,6 +918,243 @@ function pdfResoconto(per) {
     for (const t of testi)
       doc.paragrafo(t, { x: X + 12, w: W - 24, size: 9, col: RES_C.ink2, interlinea: 12.5 });
     doc.y = yb + h;
+  }
+
+  /* ================================================== i dati per chi legge
+   *
+   * Da qui in giu' il resoconto smette di rispondere a "cosa cambio domani" e
+   * risponde a un'altra domanda: cosa serve a un nutrizionista o a un medico
+   * che questi numeri non li ha mai visti. Sono fatti, in tabella, senza
+   * commento — il commento sta nelle due sezioni qui sopra.
+   */
+
+  /** Una tabella: intestazione, righe, e le colonne allineate a destra. */
+  const tabella = (intest, righe, larghezze, nota) => {
+    if (!righe.length) return;
+    const tot = larghezze.reduce((a, b) => a + b, 0);
+    const bordi = [X];
+    for (const l of larghezze) bordi.push(bordi[bordi.length - 1] + l / tot * W);
+    doc.serve(30 + righe.length * 13);
+    doc.y += 13;
+    intest.forEach((t, i) => doc.testo(t, i ? bordi[i + 1] : bordi[0], doc.y,
+      { size: 8, bold: true, col: RES_C.ink3, align: i ? 'right' : 'left' }));
+    doc.y += 5;
+    doc.linea(X, doc.y, X + W, doc.y, { col: RES_C.rule });
+    for (const r of righe) {
+      doc.serve(15);
+      doc.y += 12.5;
+      r.forEach((t, i) => {
+        const forte = r.forte === i;
+        doc.testo(t, i ? bordi[i + 1] : bordi[0], doc.y,
+          { size: 9, bold: !!forte || i === 0 && r.grassetto,
+            col: r.col && r.col[i] ? r.col[i] : (i ? RES_C.ink : RES_C.ink2),
+            align: i ? 'right' : 'left' });
+      });
+      doc.y += 3.5;
+      doc.linea(X, doc.y, X + W, doc.y, { col: RES_C.rule, w: .35 });
+    }
+    if (nota) {
+      doc.y += 7;
+      doc.paragrafo(nota, { size: 8, col: RES_C.ink3, interlinea: 11 });
+    }
+  };
+
+  const nn = (v, d = 0, u = '') => v == null ? '—' : nf(v, d) + (u ? ' ' + u : '');
+  const pct = v => v == null ? '—' : nf(v, 0) + '%';
+
+  /* --- quanto vale quello che segue --- */
+  const reg = statRegistro(per);
+  titolo('Il registro');
+  doc.y += 10;
+  doc.paragrafo('Tutte le medie di questo foglio valgono quanto vale questa riga: '
+    + 'una media di calorie su nove giorni registrati su trenta non e’ '
+    + 'un’alimentazione, e’ quello che si e’ avuto voglia di scrivere.',
+    { size: 8.5, col: RES_C.ink3, interlinea: 11.5 });
+  tabella(['', 'Giorni', 'Sul periodo'], [
+    ['Giornate con qualcosa registrato', String(reg.registrati), pct(reg.registrati * 100 / reg.giorni)],
+    ['Pesate', String(reg.pesate), pct(reg.pesate * 100 / reg.giorni)],
+    ['Giornate con pasti o fuori piano', String(reg.conPasti), pct(reg.conPasti * 100 / reg.giorni)],
+    ['Completezza media della giornata', '—', pct(reg.completezza == null ? null : reg.completezza * 100)]
+  ].concat(reg.inPausa ? [['Giorni marcati come pausa', String(reg.inPausa), pct(reg.inPausa * 100 / reg.giorni)]] : []),
+    [3, 1, 1],
+    'La completezza media conta cinque voci per giornata: peso, pasti, acqua, passi, sonno.'
+    + (reg.inPausa ? ' I giorni in pausa restano nei conti di questa tabella, ma escono dalla '
+      + 'diagnosi e dai punteggi di costanza: sono giorni in cui il piano non era in gioco.' : ''));
+
+  /* --- la ripartizione, come la legge un professionista --- */
+  const mac = statMacro(per);
+  if (mac) {
+    titolo('La ripartizione');
+    doc.y += 10;
+    tabella(['Macro', 'Media', 'Quota kcal', 'Per kg'], [
+      ['Proteine', nn(mac.p, 0, 'g'), pct(mac.quotaP), mac.pPerKg ? nf(mac.pPerKg, 2) + ' g/kg' : '—'],
+      ['Carboidrati', nn(mac.c, 0, 'g'), pct(mac.quotaC), '—'],
+      ['Grassi', nn(mac.g, 0, 'g'), pct(mac.quotaG), mac.gPerKg ? nf(mac.gPerKg, 2) + ' g/kg' : '—'],
+      ['Fibre', nn(mac.fibre, 0, 'g'), '—',
+        mac.fibrePer1000 ? nf(mac.fibrePer1000, 1) + ' g/1000 kcal' : '—']
+    ], [2, 1, 1, 1.3],
+      `Medie su ${mac.giorni} giornate con pasti registrati, di ${reg.giorni} del periodo`
+      + (mac.peso ? `, su un peso di riferimento di ${nf(mac.peso, 1)} kg` : '')
+      + '. I grammi per chilo sono il modo in cui proteine e grassi si leggono in clinica: '
+      + '"135 g" non dice niente senza il peso della persona.');
+  }
+
+  /* --- dove si concentra il problema --- */
+  const set = statSettimana(per);
+  const conDati = set.giorni.filter(r => r.giorni > 0);
+  if (conDati.length) {
+    titolo('Come si distribuisce nella settimana');
+    doc.y += 10;
+    doc.paragrafo('Non quanto si mangia, ma quando le cose si spostano. La media dei '
+      + 'sette giorni nasconde sia il sabato sia il mercoledi’.',
+      { size: 8.5, col: RES_C.ink3, interlinea: 11.5 });
+    tabella(['Giorno', 'Volte', 'kcal', 'P/C/G', 'Passi', 'Allen.'],
+      conDati.map(r => {
+        const riga = [r.nome, String(r.giorni), nn(r.kcal),
+          r.p == null ? '—' : `${nf(r.p, 0)}/${nf(r.c, 0)}/${nf(r.g, 0)}`,
+          nn(r.passi), `${r.sedute}/${r.giorni}`];
+        // il giorno piu' lontano dal target si segna, non si commenta
+        if (set.peggiore && r.nome === set.peggiore.nome && conDati.length > 2)
+          riga.col = [RES_C.amber, RES_C.amber, RES_C.amber, RES_C.amber, RES_C.amber, RES_C.amber];
+        return riga;
+      }), [1.7, .8, 1, 1.4, 1, .9]);
+    const frasi = [];
+    if (set.migliore && set.peggiore && set.migliore.nome !== set.peggiore.nome)
+      frasi.push('Le calorie si avvicinano di piu’ al target di '
+        + `${set.migliore.nome.toLowerCase()} (${nn(set.migliore.kcal)} kcal, `
+        + `${set.migliore.scarto > 0 ? '+' : ''}${nf(set.migliore.scarto * 100, 0)}%) e se ne allontanano `
+        + `di piu’ ${set.peggiore.nome.toLowerCase()} (${nn(set.peggiore.kcal)} kcal, `
+        + `${set.peggiore.scarto > 0 ? '+' : ''}${nf(set.peggiore.scarto * 100, 0)}%).`);
+    if (set.piuAllenato && set.piuAllenato.sedute)
+      frasi.push(`Ci si allena piu’ spesso di ${set.piuAllenato.nome.toLowerCase()} `
+        + `(${set.piuAllenato.sedute} volte su ${set.piuAllenato.giorni})`
+        + (set.menoAllenato && set.menoAllenato.sedute === 0
+          ? `, e mai di ${set.menoAllenato.nome.toLowerCase()}.` : '.'));
+    if (frasi.length) {
+      doc.y += 6;
+      doc.paragrafo(frasi.join(' '), { size: 9, col: RES_C.ink2, interlinea: 12.5 });
+    }
+  }
+
+  /* --- quale pasto salta --- */
+  const pst = statPasti(per);
+  if (pst && pst.slot.length) {
+    titolo('I pasti, uno per uno');
+    doc.y += 10;
+    doc.paragrafo('Quante volte quel pasto era previsto dal piano nel periodo, e quante '
+      + 'volte risulta consumato. Il denominatore non e’ il numero di giorni: uno '
+      + 'spuntino puo’ comparire tre volte a settimana e la colazione sette.',
+      { size: 8.5, col: RES_C.ink3, interlinea: 11.5 });
+    tabella(['Momento', 'Previsti', 'Consumati', 'Quota'],
+      pst.slot.map(r => [r.nome, String(r.previsti), String(r.spuntati), pct(r.quota)]),
+      [2.4, 1, 1, 1]);
+    if (pst.piuSaltato && pst.piuCostante && pst.piuSaltato.chiave !== pst.piuCostante.chiave) {
+      doc.y += 6;
+      doc.paragrafo(`Il piu’ costante e’ ${pst.piuCostante.nome.toLowerCase()} `
+        + `(${nf(pst.piuCostante.quota, 0)}%), quello che salta piu’ spesso e’ `
+        + `${pst.piuSaltato.nome.toLowerCase()} (${nf(pst.piuSaltato.quota, 0)}%). `
+        + 'Un pasto che si salta sistematicamente e’ quasi sempre un pasto che non '
+        + 'sta nella giornata di chi lo deve fare, non una questione di volonta’.',
+        { size: 9, col: RES_C.ink2, interlinea: 12.5 });
+    }
+    const top = pst.pasti.filter(r => r.previsti >= 3).slice(0, 8);
+    if (top.length > 1) {
+      doc.y += 4;
+      tabella(['Pasto del piano', 'Previsto', 'Consumato', 'Quota'],
+        top.map(r => [r.nome, String(r.previsti), String(r.spuntati), pct(r.quota)]),
+        [3, 1, 1, 1]);
+    }
+  }
+
+  /* --- cosa entra fuori dal piano --- */
+  const ext = statExtra(per);
+  if (ext.voci.length) {
+    titolo('Fuori dal piano');
+    doc.y += 10;
+    tabella(['Voce', 'Volte', 'kcal tot.', 'kcal medie'],
+      ext.voci.map(r => [r.nome, String(r.n), nn(r.kcal), nn(r.kcal / r.n)]),
+      [3, .9, 1.1, 1.2],
+      `${ext.quante} voci diverse in tutto, ${nf(ext.kcalTot)} kcal, `
+      + `in media ${nf(ext.kcalGiorno)} kcal al giorno sul periodo. `
+      + 'Registrato non vuol dire sbagliato: e’ quello che e’ stato mangiato '
+      + 'oltre ai pasti previsti, ed e’ esattamente il dato che di solito manca.');
+  }
+
+  /* --- peso, misure, composizione --- */
+  const pes = statPeso(per), mis = statMisure(per);
+  if (pes.primo || mis.length) {
+    titolo('Peso e misure');
+    doc.y += 10;
+    const righe = [];
+    if (pes.primo) {
+      righe.push(['Peso rilevato', nf(pes.primo.v, 1) + ' kg', nf(pes.ultimo.v, 1) + ' kg',
+        `${pes.ultimo.v - pes.primo.v >= 0 ? '+' : ''}${nf(pes.ultimo.v - pes.primo.v, 1)} kg`]);
+      if (pes.tendenzaIn != null && pes.tendenzaFin != null)
+        righe.push(['Peso di tendenza', nf(pes.tendenzaIn, 2) + ' kg', nf(pes.tendenzaFin, 2) + ' kg',
+          `${pes.delta >= 0 ? '+' : ''}${nf(pes.delta, 2)} kg`]);
+    }
+    for (const m of mis)
+      righe.push([m.nome, nf(m.prima, 1) + ' cm', nf(m.ultima, 1) + ' cm',
+        m.delta == null ? '—' : `${m.delta >= 0 ? '+' : ''}${nf(m.delta, 1)} cm`]);
+    tabella(['', 'Inizio', 'Fine', 'Differenza'], righe, [2.2, 1, 1, 1.2],
+      (pes.primo ? `${pes.pesate} pesate su ${reg.giorni} giorni, ritmo `
+        + `${pes.kgSettimana >= 0 ? '+' : ''}${nf(pes.kgSettimana, 2)} kg a settimana sulla tendenza. ` : '')
+      + 'La differenza sulle circonferenze e’ fra la prima e l’ultima rilevazione '
+      + 'dentro il periodo, non fra due date fisse: con misure prese di rado puo’ '
+      + 'coprire un tratto piu’ corto del periodo.');
+  }
+
+  /* --- allenamento --- */
+  const all = statAllenamento(per);
+  if (all.totali) {
+    titolo('Allenamento');
+    doc.y += 10;
+    const righe = [
+      ['Giornate di allenamento', String(all.totali), ''],
+      ['Sedute in palestra', String(all.sedute), ''],
+      ['Serie registrate', String(all.serie), all.sedute ? nf(all.serie / all.sedute, 1) + ' a seduta' : ''],
+      ['Tonnellaggio', nf(all.tonnellaggio) + ' kg', ''],
+      ['Sessioni di cardio', String(all.cardioN),
+        all.cardioKm ? nf(all.cardioKm, 1) + ' km' : ''],
+      ['Minuti di cardio', nf(all.cardioMin), ''],
+      ['Ritmo', nf(all.seduteSettimana, 1) + ' a settimana', '']
+    ].filter(r => r[1] !== '0' && r[1] !== '0 kg');
+    tabella(['', 'Nel periodo', ''], righe, [2.4, 1.3, 1.3],
+      all.esercizi.length
+        ? 'Esercizi piu’ frequenti: '
+          + all.esercizi.map(e => `${e.nome} (${e.n})`).join(', ') + '.'
+        : null);
+  }
+
+  /* --- integratori --- */
+  const intg = statIntegratori(per).filter(r => r.attese > 0);
+  if (intg.length) {
+    titolo('Integrazione');
+    doc.y += 10;
+    tabella(['Voce', 'Dose', 'Prese', 'Aderenza'],
+      intg.map(r => [r.nome, r.dose || '—', `${r.prese}/${r.attese}`, pct(r.quota)]),
+      [2.4, 1.2, .9, 1],
+      'Le voci settimanali sono contate a settimane e non a giorni: contare i giorni '
+      + 'darebbe 4 su 30 anche a chi non ne ha saltata nemmeno una. L’app tiene '
+      + 'l’elenco che le viene dato e ricorda quando tocca: cosa prendere si decide '
+      + 'altrove.');
+  }
+
+  /* --- abitudini --- */
+  const ab = statAbitudini(per);
+  if (ab.acqua != null || ab.sonno != null || ab.passi != null) {
+    titolo('Abitudini');
+    doc.y += 10;
+    const righe = [
+      ['Acqua', nn(ab.acqua, 1, 'L'), nn(D.target.acqua_l, 1, 'L')],
+      ['Sonno', nn(ab.sonno, 1, 'h'), nn(D.target.sonno_h, 1, 'h')],
+      ['Passi', nn(ab.passi), nn(D.target.passi)],
+      ['Coca Zero', nn(ab.coca, 1, 'lattine al di’'), '—'],
+      ['Fame percepita', nn(ab.fame, 1, 'su 5'), '—'],
+      ['Energia percepita', nn(ab.energia, 1, 'su 5'), '—']
+    ].filter(r => r[1] !== '—');
+    tabella(['', 'Media', 'Target'], righe, [2.4, 1.3, 1.3],
+      ab.gi ? `Sintomi gastrointestinali segnalati in ${ab.gi} giornate su ${ab.giorniGi}.` : null);
   }
 
   /* --- chiusura --- */

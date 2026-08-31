@@ -75,8 +75,11 @@ function costanze(k = today(), n = 28) {
   // i giorni marcati in pausa escono dal conto: se sei stato una settimana con
   // l'influenza, dividere per 28 invece che per 21 non misura la tua costanza,
   // misura che ti sei ammalato
-  const giorni = typeof senzaPause === 'function'
-    ? senzaPause(windowDays(k, n)) : windowDays(k, n);
+  // la finestra comprende il giorno stesso, come tutte le altre medie
+  // dell'app: una pagina che conta fino a ieri e una che conta fino a oggi
+  // danno due numeri diversi per lo stesso periodo, e non si capisce perche'
+  const finestra = lastDays(k, n);
+  const giorni = typeof senzaPause === 'function' ? senzaPause(finestra) : finestra;
   const st = SFS();
 
   const nutr = giorni.filter(g => {
@@ -311,7 +314,7 @@ function cardCostanza(k, n) {
     c.append(fb);
   }
   c.append(el('div', 'sub',
-    `Ultimi ${co.n} giorni fino a ieri. Non e' un voto su di te: dice quanto e' continuo il registro, che e' cio' che rende affidabile tutto il resto.`));
+    `Ultimi ${co.n} giorni, oggi compreso. Non e' un voto su di te: dice quanto e' continuo il registro, che e' cio' che rende affidabile tutto il resto.`));
 
   const riga = el('div', 'rings');
   riga.append(anello(co.generale, 'Generale', liv.nome));

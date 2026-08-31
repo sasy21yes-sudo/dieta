@@ -71,8 +71,19 @@ button.btn.sm{min-height:36px;padding:7px 11px;font-size:13px}
 .pill.warn{background:var(--amber-soft);color:var(--amber)}
 .pill.bad{background:var(--alert-soft);color:var(--alert)}
 
+/* la striscia di aggiornamento: sopra la tab bar, mai sopra il contenuto,
+   e non copre mai un bottone perche' sta nel margine sicuro in basso */
+.upd{position:fixed;left:10px;right:10px;z-index:30;
+  bottom:calc(70px + var(--safe-b));display:flex;align-items:center;gap:8px;
+  padding:10px 12px;border-radius:12px;background:var(--pine);color:#fff;
+  box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:13.5px}
+.upd .grow{flex:1;line-height:1.3}
+.upd .btn{min-height:34px;padding:6px 10px;background:rgba(255,255,255,.14);
+  border-color:rgba(255,255,255,.35);color:#fff}
+.upd .btn.pri{background:#fff;border-color:#fff;color:var(--pine);font-weight:600}
+
 /* ---------------- barre macro ---------------- */
-.macros{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:9px}
+.macros{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
 .macro .lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
   text-transform:uppercase;color:var(--ink-3)}
 .macro .val{font-family:var(--mono);font-size:17px;font-weight:600;

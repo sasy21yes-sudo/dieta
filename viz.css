@@ -869,17 +869,20 @@
 .seg.gg button{white-space:nowrap;min-width:46px;padding:0 5px;font-size:13px}
 
 /* ---------------- ingresso della scheda Gym ---------------- */
-.gym-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-.gym-t{display:flex;flex-direction:column;align-items:flex-start;gap:7px;
+.gym-grid,.act-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+/* il terzo riquadro, rimasto solo sulla seconda riga, prende tutta la
+   larghezza invece di lasciare un buco a destra */
+.act-grid>:last-child:nth-child(odd){grid-column:1/-1}
+.gym-t,.act-t{display:flex;flex-direction:column;align-items:flex-start;gap:7px;
   background:var(--paper);border:1px solid var(--rule);border-radius:13px;
   padding:14px 13px 13px;font:inherit;color:inherit;text-align:left;cursor:pointer;
   min-height:104px}
-.gym-t.on{border-color:var(--amber);background:var(--wash)}
-.gym-t .ic-g{width:23px;height:23px;color:var(--pine);flex:none}
-.gym-t.on .ic-g{color:var(--amber)}
-.gym-t .body{display:flex;flex-direction:column;gap:2px}
-.gym-t .t{font-weight:600;font-size:14px;line-height:1.2}
-.gym-t .s{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);line-height:1.35}
+.gym-t.on,.act-t.on{border-color:var(--amber);background:var(--wash)}
+.gym-t .ic-g,.act-t .ic-g{width:23px;height:23px;color:var(--pine);flex:none}
+.gym-t.on .ic-g,.act-t.on .ic-g{color:var(--amber)}
+.gym-t .body,.act-t .body{display:flex;flex-direction:column;gap:2px}
+.gym-t .t,.act-t .t{font-weight:600;font-size:14px;line-height:1.2}
+.gym-t .s,.act-t .s{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);line-height:1.35}
 .gym-avv{display:block;width:100%;text-align:left;font:inherit;color:inherit;
   background:var(--wash);border:0;border-left:3px solid var(--amber);
   border-radius:11px;padding:12px 13px;margin-top:10px;cursor:pointer}

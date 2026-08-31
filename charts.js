@@ -70,15 +70,23 @@ function vuoto(titolo, sub, msg) {
  * etichetta.
  */
 /**
- * La media del periodo, ferma a ieri.
+ * La media del periodo, giornata in corso compresa.
+ *
+ * Per un po' si e' fermata a ieri, per una ragione vera: la giornata di oggi
+ * e' a meta' — i pasti non sono ancora tutti spuntati, i passi non ancora
+ * tutti fatti — e infilarla nella media la tira giu' ogni mattina.
+ *
+ * Il prezzo pero' era piu' alto del problema: la media non corrispondeva ai
+ * dati disegnati sul grafico, e su un periodo di sette giorni escluderne uno
+ * cambia il numero di un settimo senza che si veda perche'. Meglio una media
+ * che al mattino e' bassa ma che si puo' verificare a mano contando le barre.
+ *
  * La usano sia la riga di riepilogo sia la linea disegnata sul grafico: se
  * fossero due conti diversi prima o poi direbbero due numeri diversi, ed e'
  * il tipo di incoerenza che fa perdere fiducia in tutto il resto.
  */
 function mediaPeriodo(days, vals) {
-  const oggi = today();
-  const v = vals.map((x, i) => ({ x, k: days[i] }))
-    .filter(y => y.x != null && !isNaN(y.x) && y.k < oggi).map(y => y.x);
+  const v = vals.filter(x => x != null && !isNaN(x));
   return v.length ? avg(v) : null;
 }
 
@@ -160,15 +168,13 @@ function riepilogo(o) {
   const buoni = vals.map((v, i) => ({ v, k: days[i] }))
     .filter(x => x.v != null && !isNaN(x.v));
   if (!buoni.length) return null;
-  const chiusi = buoni.filter(x => x.k < oggi);
   const media = mediaPeriodo(days, vals);
   const ultimo = buoni[buoni.length - 1];
   const pezzi = [
     `<span><b>${nf(ultimo.v, dec)}</b>${unit ? ' ' + esc(unit) : ''} ${
       ultimo.k === oggi ? 'oggi' : 'l\'ultimo'}</span>`
   ];
-  if (media != null) pezzi.push(`<span>media ${nf(media, dec)}${
-    chiusi.length < buoni.length ? ' <em class="fino">fino a ieri</em>' : ''}</span>`);
+  if (media != null) pezzi.push(`<span>media ${nf(media, dec)}</span>`);
   if (target != null) {
     pezzi.push(`<span>target ${nf(target, dec)}</span>`);
     if (media != null) {
@@ -431,16 +437,14 @@ function chartStack(o) {
   /* In un'area impilata l'occhio legge le proporzioni, non i valori: la media
      di ogni fascia e' il numero che poi si va comunque a cercare. */
   {
-    const oggi2 = today();
     const pezzi = o.serie.map(se => {
-      const vv = se.vals.map((x, n) => ({ x, k: o.days[n] }))
-        .filter(y => y.x != null && !isNaN(y.x) && y.k < oggi2).map(y => y.x);
+      const vv = se.vals.filter(x => x != null && !isNaN(x));
       return vv.length
         ? '<span>' + esc(se.nome) + ' <b>' + nf(avg(vv), o.dec ?? 0) + '</b></span>' : '';
     }).filter(Boolean);
     if (pezzi.length) {
       const r = el('div', 'riep');
-      r.innerHTML = '<span class="fino">media fino a ieri</span>' + pezzi.join('');
+      r.innerHTML = '<span class="fino">media del periodo</span>' + pezzi.join('');
       c.append(r);
     }
   }
@@ -653,6 +657,24 @@ function tile(o) {
   return t;
 }
 
+/**
+ * Le tre icone dei riquadri d'azione del cruscotto.
+ * Stesso riquadro 24x24, stesso spessore e stesso arrotondamento delle otto
+ * di Gym: e' quello che le fa sembrare una famiglia invece di tre disegni
+ * capitati li'.
+ */
+function iconaDati(id) {
+  const P = {
+    revisione: 'M12 21a9 9 0 1 1 9-9M12 7v5l3 2M21 12l-2.5 3.2L16 12',
+    previsioni: 'M4 17.5 9.5 11l3.5 3.2L20 6.5M20 6.5h-4.8M20 6.5v4.6M4 21h16',
+    pdf: 'M7 3h7l5 5v13H7zM14 3v5h5M10 12.5h4M10 16.5h4'
+  };
+  const s = mk('svg', { viewBox: '0 0 24 24', class: 'ic-g', 'aria-hidden': 'true' });
+  s.append(mk('path', { d: P[id] || P.pdf, fill: 'none', stroke: 'currentColor',
+    'stroke-width': 1.7, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+  return s;
+}
+
 /* ========================================================== cruscotto */
 let datiRange = 30;
 /* La fine del periodo. Di suo e' oggi — un cruscotto guarda avanti — ma con
@@ -660,6 +682,21 @@ let datiRange = 30;
    peso, composizione, costanza. Muovere i grafici e lasciare i riquadri su
    "adesso" darebbe una pagina che parla di due momenti diversi. */
 let datiFine = null;
+
+/**
+ * Fissa il periodo del cruscotto dai suoi due estremi.
+ *
+ * Lo stato resta (lunghezza, fine) perche' e' quello che serve a mezza
+ * pagina — "27 su 30", la costanza, il calendario — ma l'unico modo di
+ * scriverlo e' passare da qui con tutte e due le date, cosi' non si puo' piu'
+ * cambiarne una e dimenticarsi l'altra.
+ */
+function datiIntervallo(d1, d2) {
+  const [da, a] = d1 <= d2 ? [d1, d2] : [d2, d1];
+  datiFine = a;
+  datiRange = Math.max(1, Math.min(730,
+    Math.round((new Date(a) - new Date(da)) / 864e5) + 1));
+}
 
 function viewDati(v) {
   const k = datiFine || today();
@@ -696,13 +733,13 @@ function viewDati(v) {
       i.onchange = () => { if (i.value) { onC(i.value); route(); } };
       f.append(i); g.append(f);
     };
-    campo(da, 'Dal giorno', x => {
-      // si tiene ferma la fine e si ricalcola la lunghezza: trascinare
-      // l'inizio deve allargare il periodo, non spostarlo
-      const n = Math.round((new Date(a) - new Date(x)) / 864e5) + 1;
-      datiRange = Math.max(1, Math.min(730, n));
-    });
-    campo(a, 'Al giorno', x => { datiFine = x; });
+    /* Le due date sono i due estremi, e si scrivono SEMPRE tutti e due.
+       Prima "Al giorno" toccava solo la fine e lasciava stare la lunghezza:
+       spostando la fine indietro di un mese il periodo scivolava intero e
+       anche la data di inizio si muoveva da sola. Dall'esterno sembrava che
+       il filtro non funzionasse, ed era esattamente quello che succedeva. */
+    campo(da, 'Dal giorno', x => datiIntervallo(x, a));
+    campo(a, 'Al giorno', x => datiIntervallo(da, x));
     sel.append(g);
     sel.append(el('p', 'hint', `${datiRange} giorni, dal ${da} al ${a}.`
       + (a >= today() ? ' Oggi non e\' finito: le medie di giornata lo escludono.' : '')));
@@ -731,13 +768,13 @@ function viewDati(v) {
     spark: pesi }));
 
   const cons = giorni.map(d => S.log[d] ? consumed(d) : null);
-  // i grafici mostrano anche oggi, ma la MEDIA no: la giornata in corso non e'
-  // finita e tirerebbe giu' il numero ogni mattina
-  const kcalOk = giorni.filter(d => d < today())
+  // giornata in corso compresa, come tutte le altre medie: cosi' il numero
+  // qui e le barre del grafico piu' sotto raccontano lo stesso periodo
+  const kcalOk = giorni
     .map(d => S.log[d] ? consumed(d) : null)
     .map(m => m && m.kcal > 400 ? m.kcal : null).filter(Boolean);
   kpis.append(tile({ k: 'Calorie medie', v: kcalOk.length ? nf(avg(kcalOk)) : '—', unit: 'kcal',
-    d: kcalOk.length ? `target ${nf(D.target.kcal)} · fino a ieri` : 'nessun pasto spuntato',
+    d: kcalOk.length ? `target ${nf(D.target.kcal)} · ${kcalOk.length} giorni` : 'nessun pasto spuntato',
     dir: 'flat', spark: cons.map(m => m && m.kcal > 400 ? m.kcal : null) }));
 
   const brucia = giorni.map(d => typeof kcalAllenamento === 'function'
@@ -759,40 +796,61 @@ function viewDati(v) {
      navigazione: titolo, una riga che dice cosa ci trovi, e la freccia. */
   const nav = el('div', 'card');
   nav.append(el('div', 'eyebrow', 'Da questi numeri'));
-  const vai = (t, d, hash) => {
-    const b = el('button', 'nav-r');
-    b.innerHTML = `<span class="body"><span class="t">${esc(t)}</span>
-      <span class="d">${esc(d)}</span></span><span class="go">›</span>`;
-    b.onclick = () => { location.hash = hash; };
-    nav.append(b);
+  nav.append(el('div', 'muted',
+    'Le tre cose che i grafici qui sopra non fanno: giudicare la settimana, '
+    + 'guardare avanti, e uscire dall\'app.'));
+
+  /* Erano due righe di testo con una freccetta, indistinguibili da un
+     paragrafo: si leggevano e non si toccavano. Ora sono riquadri con l'icona
+     e, soprattutto, con lo STATO — quante cose non hanno funzionato, dove
+     porta il ritmo, quanti giorni copre il file. Un bottone che dice gia' cosa
+     troverai dentro e' l'unica differenza fra una voce di menu e
+     un'informazione. */
+  const gAz = el('div', 'act-grid');
+  const azione = (ic, t, stato, fn) => {
+    const b = el('button', 'act-t');
+    b.append(iconaDati(ic));
+    const body = el('span', 'body');
+    body.append(el('span', 't', esc(t)));
+    body.append(el('span', 's', stato));
+    b.append(body);
+    b.onclick = fn;
+    gAz.append(b);
   };
-  vai('La revisione settimanale',
-      'Cosa non ha funzionato negli ultimi sette giorni, come si sistema, e la sola cosa da cambiare.',
-      '#/revisione');
-  vai('Dove stai andando',
-      'Misure, grasso e massa magra, forza: dove ti porta il ritmo attuale fra quattro settimane.',
-      '#/previsioni');
+
+  let statoRev = 'gli ultimi sette giorni chiusi';
+  try {
+    const dg = revDiagnosi(revPeriodoSettimana(k));
+    statoRev = dg.errori.length
+      ? `${dg.errori.length} ${dg.errori.length === 1 ? 'cosa' : 'cose'} da sistemare`
+        + ` · prima: ${dg.priorita.t.toLowerCase()}`
+      : 'niente fuori posto negli ultimi sette giorni';
+  } catch { /* con pochi dati la diagnosi non si fa: resta la riga neutra */ }
+  azione('revisione', 'La revisione settimanale', statoRev,
+    () => { location.hash = '#/revisione'; });
+
+  let statoPrev = 'servono tre misure su due settimane';
+  try {
+    const pm = typeof proiezioneMisura === 'function' ? proiezioneMisura('vita') : null;
+    if (pm && pm.ok)
+      statoPrev = `vita ${nf(pm.ora, 1)} → ${nf(pm.fra, 1)} cm (±${nf(pm.banda, 1)})`
+        + ` fra ${pm.orizzonte} giorni`;
+  } catch { /* idem */ }
+  azione('previsioni', 'Dove stai andando', statoPrev,
+    () => { location.hash = '#/previsioni'; });
+
+  if (typeof scaricaResoconto === 'function')
+    azione('pdf', 'Il resoconto in PDF',
+      `${datiRange} giorni · da dare a chi l’app non ce l’ha`,
+      () => scaricaResoconto(revPeriodoDate(giorni[0], giorni[giorni.length - 1])));
+
+  nav.append(gAz);
   v.append(nav);
+  if (typeof osserva === 'function')
+    osserva(gAz, () => entrata([...gAz.children], { passo: 60, su: 8 }));
 
   /* --- costanza a punteggio --- */
   if (typeof cardCostanza === 'function') v.append(cardCostanza(k, datiRange));
-
-  /* Lo stesso periodo, su carta. Il cruscotto e' fatto per essere sfogliato;
-     il resoconto per essere consegnato a qualcuno che l'app non ce l'ha. */
-  if (typeof scaricaResoconto === 'function') {
-    const cr = el('div', 'card flat');
-    cr.append(el('div', 'eyebrow', 'Portatelo via'));
-    cr.append(el('div', 'muted',
-      'Il resoconto di questo periodo in un PDF: verdetto, numeri a confronto, '
-      + 'cosa non ha funzionato e come si sistema. Da dare al medico o '
-      + 'all\'allenatore, che l\'app non ce l\'hanno.'));
-    const b = el('button', 'btn wide');
-    b.style.marginTop = '9px';
-    b.textContent = 'Scarica il resoconto in PDF';
-    b.onclick = () => scaricaResoconto(revPeriodoDate(giorni[0], giorni[giorni.length - 1]));
-    cr.append(b);
-    v.append(cr);
-  }
 
   /* --- calendario --- */
   v.append(chartCal({
