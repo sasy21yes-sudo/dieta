@@ -76,7 +76,7 @@ previsioni.js   proiezioni di misure, composizione e forza a 28 giorni
 cerca.js        selettore cercabile riusabile + dispensa
 peso.js         pesate anomale e ciclo mestruale: cio' che sporca la bilancia
 timer.js        timer di recupero fra le serie
-seduta.js       la seduta guidata: un passo alla volta, e il recupero da solo
+seduta.js       la seduta guidata, il recupero ad anello, il resoconto di una seduta
 carico.js       scarico automatico + dolori e infortuni
 cardio.js       corsa e simili, tracciato GPS, cartolina PNG da condividere
 salute.js       import di passi e sonno da un Comando iOS
@@ -215,10 +215,14 @@ non un dettaglio.
   sul telefono senza librerie e senza server. Da dare a chi l'app non ce l'ha
 - **Controllo della versione** — quale versione stai usando, se ce n'e' una
   nuova, e un bottone per ricaricare. Su iPhone non c'era nessun altro modo
-- **Seduta guidata** — un esercizio alla volta, il bersaglio della serie, le
-  ripetizioni fatte a portata di pollice, e il recupero — tuo, della scheda o
-  calcolato — che parte da solo e diventa rosso se lo superi; le superserie si
-  fanno alternate come in sala
+- **Seduta guidata** — un esercizio alla volta, il carico gia' scritto da
+  quello che hai appena fatto, le ripetizioni fatte a portata di pollice, e il
+  recupero ad anello che prende il posto della carta e diventa rosso se lo
+  superi; le superserie si fanno alternate come in sala. Chiudendo per sbaglio
+  si riprende da dove si era
+- **Resoconto di una seduta** — cosa e' stata quella giornata, con i motori di
+  Gym che ci sono gia': volume, dove e' finito il lavoro, massimali mai visti
+  prima, recupero vero, e il confronto con le sedute confrontabili
 - **Timer di recupero**, **scarico automatico**, **dolori e infortuni** in Gym
 - **Dispensa** — quello che hai in casa si sottrae dalla lista della spesa
 - **Cerca un esercizio su internet** — catalogo pubblico di 873 esercizi con
@@ -424,6 +428,14 @@ Tre cose che il modulo non sapeva fare:
 3. **ogni scarico ha la sua casella**, con le ripetizioni che la scheda si
    aspetta gia' nel segnaposto
 
+**Il carico se lo ricorda.** Il campo kg arriva pieno, e in ordine di quanto
+e' vicino alla verita': la **serie di prima di oggi**, poi la stessa serie
+dell'ultima volta, poi l'ultima di quella volta, poi il peso di partenza della
+scheda. Il primo caso e' quello normale — se hai appena fatto 60 kg, la serie
+dopo si fa con 60 finche' non decidi altrimenti — ed era esattamente il lavoro
+che l'app faceva fare a mano ogni volta. La riga sotto il titolo dice **da
+dove viene** il numero, invece di lasciarlo indovinare.
+
 **Le ripetizioni sono quelle fatte, e sono obbligatorie.** Il campo nasce
 vuoto col bersaglio nel segnaposto, e "Serie completata" si rifiuta senza un
 numero. Prima il bersaglio faceva da ripiego, il che voleva dire scrivere nel
@@ -475,6 +487,95 @@ stare fermi per un lavoro che non arrivera'.
 collaterale: e' l'unico modo di correggere un numero sbagliato senza uscire
 dalla guida, e la riga di riepilogo in fondo — quello che hai gia' messo
 dentro — esiste perche' non ci si debba fidare a memoria.
+
+### Il recupero e' la schermata, non una barra sopra
+
+Prima il recupero era una barra che compariva sopra il foglio **mentre la
+carta della serie dopo era gia' li'**. Sbagliato per come funziona una seduta:
+fra due serie non c'e' niente da fare tranne aspettare, e mettere davanti i
+campi della serie successiva significa chiedere di compilarli adesso, cioe'
+prima di averla fatta.
+
+Ora il recupero **prende il posto** della carta: un anello che si svuota,
+quanto manca al centro, `−30″` e `+30″` sotto, e in fondo l'unica cosa che
+serve sapere mentre aspetti — cosa arriva dopo. Scaduto non sparisce: diventa
+rosso e conta all'insu'.
+
+Lo stato resta dov'era (`dieta.rec` in localStorage, via `avviaRecupero`),
+quindi sopravvive a un ricaricamento e **la barra torna a fare il suo mestiere
+appena esci dal foglio**: `recDisegna()` la nasconde finche' l'anello e' sullo
+schermo. Due timer dello stesso recupero sono un timer di troppo.
+
+**E il recupero vero si registra.** Uscendo dall'anello, i secondi passati
+davvero finiscono su `rec_s` della serie **appena fatta** — non di quella che
+arriva: il recupero appartiene alla serie che lo ha reso necessario. Sopra
+l'ora non si scrive niente, che non e' un recupero ma il telefono lasciato
+aperto sul tavolo. Da li' escono la durata della seduta e il recupero medio
+del resoconto.
+
+### Una guida lasciata a meta' riprende da dove era
+
+Chiudere il foglio per sbaglio — o perche' e' suonato il telefono — non e' una
+decisione: e' un incidente. Passare di nuovo da "come registri?" costringeva a
+ritrovare la scheda giusta in un elenco stando sotto un bilanciere.
+
+`sheetSeduta()` guarda `s.guida`: se c'e' una seduta guidata in corso su una
+scheda che esiste ancora, ci torna dentro e basta. Il modo di uscirne resta
+scritto — "abbandona la guida e registra a mano" — e non cancella niente: le
+serie fatte restano, si continua dal modulo.
+
+### Uno stripping vale uguale ovunque
+
+Uno stripping non e' una serie e non e' due: e' una serie piu' N code fatte a
+cedimento senza recupero. La convenzione — mezza serie per scarico, e tutti i
+chili perche' quelli sono stati sollevati davvero — era **copiata a mano in
+cinque posti e mancava in altri tre**: il tonnellaggio per seduta, quello del
+resoconto in PDF e il conteggio delle serie delle statistiche ignoravano gli
+scarichi. La stessa seduta valeva di piu' o di meno a seconda della schermata
+che la guardava.
+
+Ora sono tre funzioni sole — `serieEquivalenti()`, `tonnellaggioSerie()`,
+`ripetizioniSerie()` — e le chiamano tutti: mappa muscolare, forma-fatica,
+scarico automatico, grafici, statistiche, resoconto. Conseguenza da non
+correggere per errore: **il numero di serie puo' avere la mezza** (12,5 serie
+e' un numero giusto), e va formattato di conseguenza.
+
+### Il resoconto di una seduta
+
+Lo storico era un elenco di date: guardarlo era aprire un archivio, non capire
+com'e' andata. `resocontoSeduta(k)` risponde alla domanda vera, e **non
+inventa un numero suo** — chiede a quelli che ci sono gia':
+
+| Motore | Cosa gli chiede |
+|---|---|
+| `serieEquivalenti` / `tonnellaggioSerie` | quanto vale la seduta, scarichi compresi |
+| `volumeMuscoli` | dove e' finito il lavoro |
+| `e1rm` / `e1rmPerSeduta` | se qualcosa non era mai stato fatto prima |
+| `formaFatica` | su che gambe ci sei arrivato — letta **il giorno prima**, perche' dopo la seduta la fatica e' quella della seduta |
+| `rec_s` | quanto hai recuperato davvero, e quindi quanto e' durata |
+
+Tre regole che lo tengono onesto:
+
+1. **Non e' un voto.** Il titolo e' un fatto — "due massimali stimati mai
+   visti prima", "piu' leggera del solito", "in linea con le ultime" — e la
+   riga sotto dice su cosa si basa. Una seduta piu' leggera non e' un errore:
+   una scarica serve, e la carta lo scrive.
+2. **Il confronto e' con le sedute confrontabili**: quelle fatte con la stessa
+   scheda se ce ne sono almeno due, tutte le altre altrimenti. Mettere una
+   giornata di gambe contro la media di tutto direbbe soltanto che le gambe
+   pesano piu' delle braccia. E il denominatore e' dichiarato: quante sedute,
+   e con che media.
+3. **Corto di proposito.** Un titolo, quattro numeri, poche righe. Il
+   dettaglio sta gia' in mappa muscolare, volume e progressi, e ripeterlo qui
+   vorrebbe dire mantenere due versioni degli stessi conti.
+
+La soglia della prontezza e' la stessa di `statoMuscoli()` — fatica sotto il
+55% della forma — e non e' un caso: due schermate che usano soglie diverse
+direbbero due cose diverse dello stesso muscolo lo stesso giorno.
+
+Dallo storico una seduta si apre sul resoconto, e da li' si tocca una serie
+per correggerla: chi guarda una seduta di tre settimane fa vuole prima
+ricordarsela.
 
 ### Il piano HYROX è tarato sull'atleta
 
@@ -2040,6 +2141,28 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   non sanno che esiste un piramidale
 - Non scrivere "8–8": un range con gli estremi uguali non e' un range, e letto
   su una scheda sembra un errore di compilazione
+- Non far riscrivere il carico a ogni serie: se hai appena fatto 60 kg, la
+  serie dopo parte da 60. E dire da dove viene il numero, invece di lasciarlo
+  indovinare
+- Non mettere il timer del recupero SOPRA la carta della serie successiva:
+  chiede di compilare una serie prima di averla fatta. Il recupero e' la
+  schermata, e quando l'anello e' li' la barra in basso sparisce
+- Non attribuire il recupero alla serie che arriva: appartiene a quella che lo
+  ha reso necessario, cioe' a quella appena fatta
+- Non far ripassare da "come registri?" chi ha chiuso il foglio per sbaglio a
+  meta' seduta: se c'e' una guida in corso si riprende da li'
+- Non ricopiare a mano "mezza serie per scarico": sono `serieEquivalenti()`,
+  `tonnellaggioSerie()` e `ripetizioniSerie()`, e le chiamano tutti. Copiarle
+  significa che la stessa seduta vale di piu' o di meno a seconda di chi la
+  guarda
+- Non arrotondare a intero il numero di serie: con gli scarichi 12,5 e' un
+  numero giusto
+- Non dare un voto a una seduta: il resoconto e' un fatto con accanto il
+  metro con cui e' stato misurato, e una seduta leggera non e' un errore
+- Non confrontare una seduta con la media di tutte quando c'e' una scheda: una
+  giornata di gambe contro la media di tutto dice solo che le gambe pesano
+- Non leggere la forma-fatica del giorno stesso per dire come ci sei arrivato:
+  dopo la seduta la fatica e' quella della seduta
 - Non registrare il bersaglio al posto delle ripetizioni fatte quando il campo
   e' vuoto: il registro direbbe quello che la scheda chiedeva, e da quel numero
   escono massimale stimato, progressione e verdetto sulla scheda

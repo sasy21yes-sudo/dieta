@@ -739,6 +739,31 @@
    E' l'unica cosa che ha il diritto di stare li' — e' l'unica che cambia
    da sola mentre guardi altro. */
 #recbar.sopra{z-index:60;top:calc(var(--safe-t) + 8px);bottom:auto}
+/* mentre la seduta guidata mostra l'anello, la barra non serve */
+#recbar.via{display:none}
+
+/* --------- il recupero della seduta guidata ---------
+   L'anello e' il timer: sta al posto della carta della serie, non sopra.
+   Grande al centro perche' fra due serie non c'e' altro da guardare. */
+.gd-rec{text-align:center}
+.gd-ring{position:relative;width:190px;max-width:64vw;margin:10px auto 4px}
+.gd-ring .gd-anello{display:block;width:100%;height:auto}
+.gd-ring .mid{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px}
+.gd-ring .mid .t{font-family:var(--mono);font-size:36px;font-weight:600;
+  letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.gd-ring .mid .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3)}
+.gd-ring.oltre .mid .t{color:var(--alert)}
+.gd-piu{display:flex;gap:10px;justify-content:center;margin:6px 0 2px}
+.gd-piu .btn{flex:1;max-width:130px;font-family:var(--mono)}
+.gd-poi{display:flex;flex-direction:column;gap:2px;margin:14px 0 2px;
+  padding:10px;border-radius:12px;background:var(--wash);text-align:left}
+.gd-poi .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3)}
+.gd-poi .n{font-weight:600;font-size:15px}
+.gd-poi .d{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.gd-rec .note{text-align:left}
 .rec-in{position:relative;display:flex;align-items:center;gap:8px;padding:8px 10px}
 .rec-mid{flex:1;text-align:center;line-height:1.15}
 .rec-t{display:block;font-family:var(--mono);font-size:20px;font-weight:700;
@@ -769,6 +794,23 @@
 .gd-in{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px}
 .gd-in.due{grid-template-columns:1fr 1fr}
 .gd-in input{font-family:var(--mono);font-size:19px;text-align:center;padding:11px 6px}
+/* --------- il resoconto di una seduta ---------
+   Quattro numeri in fila e poche righe sotto: il dettaglio sta gia' in mappa
+   muscolare, volume e progressi, e ripeterlo qui vorrebbe dire mantenere due
+   versioni degli stessi conti. */
+.card.res .res-n{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+  margin:12px 0 4px;text-align:center}
+.card.res .res-n .v{font-family:var(--mono);font-size:19px;font-weight:600;
+  line-height:1.1;letter-spacing:-.02em}
+.card.res .res-n .l{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);
+  letter-spacing:.05em;margin-top:2px}
+.card.res .res-r{font-size:12.5px;line-height:1.45;color:var(--ink-2);
+  padding:7px 0;border-top:1px solid var(--rule)}
+.card.res .res-r .l{display:block;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:1px}
+.card.res .res-r.su{color:var(--pine)}
+.card.res .res-r b{font-family:var(--mono)}
+
 /* --------- una serie registrata ---------
    E' un bottone, quindi le serve il reset: senza, al buio prende il fondo
    chiaro di sistema e diventa un rettangolo bianco in mezzo all'elenco. */

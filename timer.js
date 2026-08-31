@@ -222,10 +222,14 @@ function recDisegna() {
   b.classList.toggle('oltre', !!oltre);
   const meno = b.querySelector('.rec-b[data-d="-30"]');
   if (meno) meno.disabled = r === 0;
-  /* Sotto un foglio aperto la barra non la vede nessuno, ed e' esattamente la
-     situazione della seduta guidata: il foglio resta li' tutto il tempo. Con
-     un foglio aperto la barra "tenuta" sale in cima e passa sopra. */
-  b.classList.toggle('sopra', !!st.tieni && !document.getElementById('sheet')?.hidden);
+  /* Due timer dello stesso recupero sono un timer di troppo: finche' la
+     seduta guidata mostra il suo anello, la barra non c'e'. Appena esci dal
+     foglio l'anello sparisce e la barra torna, che e' il punto di averla. */
+  const anello = document.querySelector('.gd-anello');
+  b.classList.toggle('via', !!anello);
+  // sotto un foglio aperto la barra non la vede nessuno: quella "tenuta" sale
+  b.classList.toggle('sopra',
+    !anello && !!st.tieni && !document.getElementById('sheet')?.hidden);
   if (r === 0 && !st.suonato) {
     st.suonato = true; recScrivi(st);
     recBip();

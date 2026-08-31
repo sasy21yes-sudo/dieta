@@ -231,11 +231,14 @@ function statAllenamento(per) {
     const ss = typeof serieDelGiorno === 'function' ? serieDelGiorno(k) : [];
     if (ss.length) {
       sedute++;
-      serie += ss.length;
+      // gli scarichi di uno stripping contano mezza serie e tutti i loro
+      // chili, come in ogni altro conto dell'app: qui erano ignorati, e la
+      // stessa seduta valeva di meno nel resoconto che nella mappa muscolare
       for (const x of ss) {
-        tonnellaggio += (x.kg || 0) * (x.reps || 0);
+        serie += serieEquivalenti(x);
+        tonnellaggio += tonnellaggioSerie(x);
         const nome = (typeof esercizio === 'function' && esercizio(x.ex)?.nome) || x.ex;
-        perEs.set(nome, (perEs.get(nome) || 0) + 1);
+        perEs.set(nome, (perEs.get(nome) || 0) + serieEquivalenti(x));
       }
     }
     for (const c of (typeof cardioDi === 'function' ? cardioDi(k) : [])) {
@@ -249,7 +252,7 @@ function statAllenamento(per) {
   return {
     sedute, serie, tonnellaggio, cardioN, cardioMin, cardioKm, dichiarati, totali,
     seduteSettimana: gg.length ? totali / gg.length * 7 : 0,
-    esercizi: [...perEs.entries()].map(([nome, n]) => ({ nome, n }))
+    esercizi: [...perEs.entries()].map(([nome, n]) => ({ nome, n: Math.round(n * 2) / 2 }))
       .sort((a, b) => b.n - a.n).slice(0, 6)
   };
 }

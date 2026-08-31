@@ -71,11 +71,153 @@ function passoCorrente(k, sc) {
   return Math.max(0, Math.min(n, i));
 }
 
-/** Il carico da proporre: l'ultima volta, poi la scheda, poi niente. */
+/**
+ * Il carico da proporre, in ordine di quanto e' vicino alla verita':
+ *
+ *   1. **la serie di prima, oggi.** Se hai appena fatto 60 kg su questo
+ *      esercizio, la serie dopo si fa con 60 finche' non decidi altrimenti —
+ *      e il caso normale e' proprio quello. Riscriverlo a ogni serie era il
+ *      lavoro che l'app faceva fare a te
+ *   2. la stessa serie dell'ultima volta che hai fatto quell'esercizio
+ *   3. l'ultima serie dell'ultima volta
+ *   4. il peso di partenza scritto nella scheda
+ */
 function caricoProposto(riga, k, si) {
+  const oggi = (P().sessioni[k]?.serie || []).filter(x => x.ex === riga.ex);
+  if (oggi.length) return oggi[oggi.length - 1].kg ?? riga.kg ?? null;
   const prec = ultimoUso(riga.ex, k);
   const d = prec?.serie?.[si] ?? prec?.serie?.[prec.serie.length - 1];
   return d?.kg ?? riga.kg ?? null;
+}
+/** Da dove viene, per poterlo scrivere invece di farlo indovinare. */
+function fonteCarico(riga, k) {
+  if ((P().sessioni[k]?.serie || []).some(x => x.ex === riga.ex)) return 'oggi';
+  return ultimoUso(riga.ex, k) ? 'ultima' : riga.kg ? 'scheda' : null;
+}
+
+/* =========================================================== il recupero
+ *
+ * Prima era una barra che compariva sopra il foglio mentre la carta della
+ * serie dopo era gia' li'. Sbagliato per come funziona una seduta: fra due
+ * serie non c'e' niente da fare tranne aspettare, e mettere davanti i campi
+ * della serie successiva significa chiedere di compilarli adesso — cioe'
+ * prima di averla fatta.
+ *
+ * Quindi il recupero **e'** la schermata. Un anello che si svuota, quanto
+ * manca al centro, e in fondo cosa arriva dopo. Quando scade non sparisce:
+ * diventa rosso e conta all'insu', perche' quel tempo e' un dato.
+ *
+ * Lo stato vive dove viveva prima (`dieta.rec` in localStorage, via
+ * `avviaRecupero`), quindi sopravvive a un ricaricamento e la barra torna a
+ * fare il suo mestiere appena esci dal foglio: `recDisegna()` la nasconde
+ * finche' l'anello e' sullo schermo, invece di disegnare due timer.
+ */
+function anelloRecupero(st) {
+  const R = 62, C = 2 * Math.PI * R;
+  const svg = mk('svg', { viewBox: '0 0 160 160', class: 'gd-anello',
+                          'aria-hidden': 'true' });
+  svg.append(mk('circle', { cx: 80, cy: 80, r: R, fill: 'none',
+    stroke: 'var(--rule)', 'stroke-width': 11 }));
+  const arco = mk('circle', { cx: 80, cy: 80, r: R, fill: 'none',
+    stroke: 'var(--pine)', 'stroke-width': 11, 'stroke-linecap': 'round',
+    'stroke-dasharray': C, 'stroke-dashoffset': 0,
+    transform: 'rotate(-90 80 80)' });
+  svg.append(arco);
+  return { svg, arco, C };
+}
+
+function schermataRecupero(k, sc, passi, idx, s) {
+  const st = recStato();
+  const prossimo = passi[idx];
+  const ex = esercizio(prossimo?.riga?.ex);
+  const w = el('div', 'guida gd-rec');
+
+  w.append(el('div', 'eyebrow', `${esc(sc.nome)} · recupero`));
+  const { svg, arco, C } = anelloRecupero(st);
+  const box = el('div', 'gd-ring');
+  box.append(svg);
+  const mid = el('div', 'mid');
+  mid.innerHTML = `<div class="t">0:00</div><div class="l">recupero</div>`;
+  box.append(mid);
+  w.append(box);
+
+  const mmss = n => Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0');
+  let sonato = false;
+  const dipingi = () => {
+    const x = recStato();
+    if (!x) return;
+    const r = recRestanti(x);
+    const oltre = r === 0 ? recOltre(x) : 0;
+    mid.querySelector('.t').textContent = oltre ? '+' + mmss(oltre) : mmss(r);
+    mid.querySelector('.l').textContent = oltre ? 'oltre il recupero'
+      : 'su ' + recTesto(x.sec);
+    arco.setAttribute('stroke-dashoffset', String(C * (1 - r / Math.max(1, x.sec))));
+    arco.setAttribute('stroke', oltre ? 'var(--alert)' : 'var(--pine)');
+    box.classList.toggle('oltre', !!oltre);
+    if (!r && !sonato) { sonato = true; if (typeof recBip === 'function') recBip(); }
+  };
+  dipingi();
+  const tick = setInterval(() => {
+    if (!document.body.contains(box)) { clearInterval(tick); return; }
+    dipingi();
+  }, 250);
+
+  /* i due bottoni, che qui sono grandi: si toccano col dorso della mano */
+  const riga = el('div', 'gd-piu');
+  for (const d of [-30, 30]) {
+    const b = el('button', 'btn');
+    b.textContent = (d > 0 ? '+' : '−') + Math.abs(d) + '″';
+    b.onclick = () => { spostaRecupero(d); sonato = recRestanti(recStato()) === 0; dipingi(); };
+    riga.append(b);
+  }
+  w.append(riga);
+
+  /* cosa arriva dopo: e' l'unica cosa da sapere mentre aspetti */
+  if (ex) {
+    const bers = bersaglioTesto(prossimo.riga, prossimo.si);
+    w.append(el('div', 'gd-poi',
+      `<span class="l">poi</span><span class="n">${esc(ex.nome)}</span>
+       <span class="d">serie ${prossimo.si + 1} di ${serieDiRiga(prossimo.riga)}
+       · bersaglio ${esc(bers)}</span>`));
+  }
+
+  const vai = el('button', 'btn wide pri gd-ok', 'Recupero finito, vai');
+  vai.onclick = () => {
+    chiudiRecupero(k, s);
+    sheetGuidata(k, sc.id);
+  };
+  w.append(vai);
+
+  const esci = el('button', 'btn wide', 'Metti in pausa e chiudi');
+  esci.style.marginTop = '8px';
+  esci.onclick = () => { closeSheet(); route();
+    toast('Il recupero continua nella barra in basso'); };
+  w.append(esci);
+
+  w.append(el('p', 'note',
+    'Il tempo che passa qui viene registrato sulla serie appena fatta: e\' il '
+    + 'recupero vero, non quello previsto, ed e\' quello che dice se una seduta '
+    + 'e\' stata densa o lunga.'));
+  return w;
+}
+
+/**
+ * Chiude il recupero e ne scrive la durata VERA sulla serie appena fatta.
+ *
+ * Non su quella che sta per arrivare: il recupero appartiene alla serie che
+ * lo ha reso necessario. Sopra l'ora non si registra niente — quello non e'
+ * un recupero, e' il telefono lasciato aperto sul tavolo.
+ */
+function chiudiRecupero(k, s) {
+  const st = recStato();
+  if (st) {
+    const vero = Math.round((Date.now() - st.t0) / 1000);
+    const ultima = s.serie[s.serie.length - 1];
+    if (ultima && vero > 0 && vero < 3600) ultima.rec_s = vero;
+  }
+  if (s.guida) delete s.guida.attesa;
+  fermaRecupero();
+  save();
 }
 
 /* ------------------------------------------------------------- la schermata */
@@ -103,6 +245,15 @@ function sheetGuidata(k, schedaId) {
     save();
   }
   const idx = passoCorrente(k, sc);
+
+  /* Se c'e' un recupero in corso, la schermata e' quella: la serie dopo si
+     compila quando si va a farla, non mentre si aspetta. */
+  if (s.guida?.attesa && recStato() && idx < passi.length)
+    return sheet(schermataRecupero(k, sc, passi, idx, s));
+  // un recupero segnato ma senza piu' stato (ricaricato, o chiuso a mano):
+  // la giornata riprende dalla serie, non resta appesa
+  if (s.guida?.attesa) { delete s.guida.attesa; save(); }
+
   const w = el('div', 'guida');
 
   /* --- finita --- */
@@ -153,7 +304,11 @@ function sheetGuidata(k, schedaId) {
   const sotto = [`<span class="sk-g">${esc(passo.et.testo)}</span>`,
     `serie <b>${passo.si + 1}</b> di ${serieDiRiga(riga)}`,
     `bersaglio <b>${esc(bers)}</b> ${+bers === 1 ? 'ripetizione' : 'ripetizioni'}`];
-  if (kgProp != null) sotto.push(`${nf(kgProp, 1)} kg l'ultima volta`);
+  if (kgProp != null) {
+    const fc = fonteCarico(riga, k);
+    sotto.push(`${nf(kgProp, 1)} kg ${fc === 'oggi' ? 'la serie prima'
+      : fc === 'ultima' ? "l'ultima volta" : 'da scheda'}`);
+  }
   // quanto durera' il recupero si sa prima di cominciare la serie, non dopo:
   // e' meta' della decisione su come farla
   if (passo.recupero && idx + 1 < passi.length)
@@ -292,6 +447,8 @@ function sheetGuidata(k, schedaId) {
     if (passo.recupero && idx + 1 < passi.length) {
       const sec = recupeoConsigliato(ex, riga, sc);
       avviaRecupero(sec, ex.nome, true);
+      s.guida.attesa = 1;
+      save();
     }
     sheetGuidata(k, sc.id);
   };
@@ -313,6 +470,7 @@ function sheetGuidata(k, schedaId) {
       // correggere un numero sbagliato senza uscire dalla guida
       if (s.serie.length) s.serie.pop();
       s.guida = { scheda: sc.id, i: idx - 1 };
+      delete s.guida.attesa;
       scordaFatica();
       save(); fermaRecupero(); sheetGuidata(k, sc.id);
     };
@@ -349,4 +507,234 @@ function riepilogoGuida(k) {
     c.append(r);
   }
   return c;
+}
+
+
+/* ===================================================== il resoconto di una seduta
+ *
+ * Non un voto: i numeri di quella giornata messi accanto a quelli che l'app
+ * ha gia'. E' un motore che non ne inventa nessuno di suo — chiede a quelli
+ * che ci sono, che e' il motivo per cui i conti tornano con la mappa
+ * muscolare, con i progressi e col resoconto in PDF:
+ *
+ *   serieEquivalenti / tonnellaggioSerie  quanto vale una serie, scarichi compresi
+ *   volumeMuscoli                         dove e' finito il lavoro
+ *   e1rm / e1rmPerSeduta                  se qualcosa non era mai stato fatto
+ *   formaFatica                           su che gambe ci sei arrivato
+ *   prossimoPasso                         cosa chiede la prossima volta
+ *
+ * Il confronto e' con le **sedute confrontabili**: quelle fatte con la stessa
+ * scheda se ce n'e' una, tutte le altre altrimenti. Confrontare una giornata
+ * di gambe con la media di tutto direbbe soltanto che le gambe pesano piu'
+ * delle braccia.
+ */
+function resocontoSeduta(k) {
+  const s = P().sessioni[k];
+  if (!s || !(s.serie || []).length) return null;
+  const serie = s.serie;
+
+  const nSerie = serie.reduce((a, x) => a + serieEquivalenti(x), 0);
+  const tonn = serie.reduce((a, x) => a + tonnellaggioSerie(x), 0);
+  const reps = serie.reduce((a, x) => a + ripetizioniSerie(x), 0);
+  const conRir = serie.filter(x => x.rir != null);
+  const rir = conRir.length ? conRir.reduce((a, x) => a + (+x.rir || 0), 0) / conRir.length : null;
+  const scarichi = serie.reduce((a, x) => a + (x.drop?.length || 0), 0);
+
+  /* per esercizio, nell'ordine in cui li hai fatti */
+  const ordine = [];
+  const perEx = new Map();
+  for (const x of serie) {
+    if (!perEx.has(x.ex)) { perEx.set(x.ex, { ex: x.ex, n: 0, tonn: 0, top: 0 }); ordine.push(x.ex); }
+    const v = perEx.get(x.ex);
+    v.n += serieEquivalenti(x);
+    v.tonn += tonnellaggioSerie(x);
+    v.top = Math.max(v.top, e1rm(x.kg, x.reps, x.rir));
+  }
+  const esercizi = ordine.map(id => ({ ...perEx.get(id),
+    nome: esercizio(id)?.nome || id }));
+
+  /* dove e' finito il lavoro: gli stessi numeri della mappa muscolare */
+  const vol = typeof volumeMuscoli === 'function' ? volumeMuscoli([k]) : {};
+  const muscoli_ = Object.entries(vol)
+    .filter(([, v]) => v.serie > 0.4)
+    .map(([id, v]) => ({ id, nome: muscolo(id)?.nome || id, serie: v.serie }))
+    .sort((a, b) => b.serie - a.serie);
+
+  /* quanto e' durata: i recuperi veri dove ci sono, piu' il tempo sotto il
+     carico. Se i recuperi registrati sono meno di meta' non si scrive niente:
+     una durata stimata su tre serie di dieci non e' una durata */
+  const conRec = serie.filter(x => x.rec_s > 0);
+  const durata = conRec.length >= Math.ceil(serie.length / 2)
+    ? Math.round((conRec.reduce((a, x) => a + x.rec_s, 0) + reps * 3) / 60)
+    : null;
+  const recMedio = conRec.length
+    ? Math.round(conRec.reduce((a, x) => a + x.rec_s, 0) / conRec.length) : null;
+
+  /* le sedute confrontabili, prima di questa */
+  const tutte = Object.keys(P().sessioni)
+    .filter(x => x < k && (P().sessioni[x]?.serie || []).length);
+  const stessaScheda = s.scheda
+    ? tutte.filter(x => P().sessioni[x].scheda === s.scheda) : [];
+  const base = (stessaScheda.length >= 2 ? stessaScheda : tutte).sort().reverse().slice(0, 6);
+  const conf = base.length ? {
+    n: base.length,
+    // la frase deve reggere sia dopo "sopra" sia dopo "il confronto e' con"
+    quali: stessaScheda.length >= 2
+      ? 'la media di questa scheda' : 'la media delle ultime sedute',
+    tonn: base.reduce((a, x) => a + P().sessioni[x].serie
+      .reduce((b, y) => b + tonnellaggioSerie(y), 0), 0) / base.length,
+    serie: base.reduce((a, x) => a + P().sessioni[x].serie
+      .reduce((b, y) => b + serieEquivalenti(y), 0), 0) / base.length
+  } : null;
+  const scarto = conf && conf.tonn > 0 ? (tonn - conf.tonn) / conf.tonn * 100 : null;
+
+  /* record stimati: un massimale che prima non c'era mai stato */
+  const record = [];
+  for (const e of esercizi) {
+    if (!(e.top > 0)) continue;
+    const storia = (typeof e1rmPerSeduta === 'function' ? e1rmPerSeduta(e.ex) : [])
+      .filter(x => x.k < k);
+    if (storia.length < 2) continue;          // con un punto solo non e' un record
+    const prima = Math.max(...storia.map(x => x.v));
+    if (e.top > prima * 1.005)
+      record.push({ nome: e.nome, ora: e.top, prima, su: (e.top - prima) / prima * 100 });
+  }
+
+  /* su che gambe ci sei arrivato: la prontezza del muscolo piu' colpito,
+     letta il giorno PRIMA — dopo la seduta la fatica e' quella della seduta */
+  /* La soglia e' la stessa di statoMuscoli() — fatica sotto il 55% della
+     forma — e non e' un caso: confrontare la prontezza di Banister con una
+     soglia assoluta non direbbe niente, perche' con tau 42 contro 7 chi si
+     allena ce l'ha sempre positiva. Vale il rapporto, e vale quello che gia'
+     usa la mappa muscolare, o due schermate direbbero due cose diverse dello
+     stesso muscolo lo stesso giorno. */
+  let prontezza = null;
+  if (muscoli_.length && typeof formaFatica === 'function') {
+    const ff = formaFatica(muscoli_[0].id, addDays(k, -1));
+    if (ff && ff.forma > 0.5)
+      prontezza = { mus: muscoli_[0].nome,
+                    pronto: ff.fatica < ff.forma * 0.55,
+                    quota: ff.fatica / ff.forma };
+  }
+
+  /* il titolo: un fatto, non un voto */
+  let titolo, perche;
+  if (record.length) {
+    titolo = record.length === 1 ? 'Un massimale stimato mai visto prima'
+      : `${record.length} massimali stimati mai visti prima`;
+    perche = 'Epley sulle ripetizioni piu' + '’ il RIR: e’ una stima, non una prova di forza.';
+  } else if (scarto != null && scarto >= 12) {
+    titolo = 'Piu’ lavoro del solito';
+    perche = `${nf(Math.abs(scarto))}% di tonnellaggio sopra ${conf.quali}.`;
+  } else if (scarto != null && scarto <= -20) {
+    titolo = 'Piu’ leggera del solito';
+    perche = `${nf(Math.abs(scarto))}% di tonnellaggio sotto ${conf.quali}. `
+      + 'Non e’ un problema: una scarica serve, e la scheda non e’ un obbligo.';
+  } else if (conf) {
+    titolo = 'In linea con le ultime';
+    perche = `Tonnellaggio a ${scarto >= 0 ? '+' : ''}${nf(scarto)}% su ${conf.quali}.`;
+  } else {
+    titolo = 'La prima con cui confrontare le prossime';
+    perche = 'Da qui in poi questa seduta diventa il metro delle altre.';
+  }
+
+  return { k, s, serie, nSerie, tonn, reps, rir, scarichi, esercizi, muscoli: muscoli_,
+           durata, recMedio, conf, scarto, record, prontezza, titolo, perche };
+}
+
+/**
+ * La carta del resoconto. Corta di proposito: un titolo, quattro numeri e
+ * due righe. Il dettaglio sta gia' in mappa muscolare, progressi e volume, e
+ * ripeterlo qui vorrebbe dire mantenere due versioni degli stessi conti.
+ */
+function cardResoconto(r) {
+  const c = el('div', 'card res');
+  c.append(el('div', 'eyebrow', `${esc(r.k)}${r.s.nome ? ' · ' + esc(r.s.nome) : ''}`));
+  c.append(el('h2', 'sec', esc(r.titolo)));
+  c.lastChild.style.marginTop = '2px';
+  c.append(el('p', 'muted', esc(r.perche)));
+
+  const g = el('div', 'res-n');
+  const cella = (v, l) => `<div><div class="v">${v}</div><div class="l">${l}</div></div>`;
+  g.innerHTML = cella(nf(r.nSerie, r.nSerie % 1 ? 1 : 0), 'serie')
+    + cella(nf(r.tonn), 'kg sollevati')
+    + cella(r.rir == null ? '—' : nf(r.rir, 1), 'RIR medio')
+    + cella(r.durata == null ? '—' : r.durata + '′', 'durata');
+  c.append(g);
+
+  if (r.muscoli.length) {
+    const top = r.muscoli.slice(0, 3)
+      .map(m => `${esc(m.nome)} <b>${nf(m.serie, 1)}</b>`).join(' · ');
+    c.append(el('div', 'res-r', `<span class="l">Dove e’ finito</span>${top}`));
+  }
+  if (r.record.length)
+    c.append(el('div', 'res-r su', `<span class="l">Record stimati</span>`
+      + r.record.map(x => `${esc(x.nome)} <b>${nf(x.ora, 1)} kg</b> (+${nf(x.su, 1)}%)`).join(' · ')));
+  if (r.recMedio != null)
+    c.append(el('div', 'res-r',
+      `<span class="l">Recupero vero</span>${recTesto(r.recMedio)} in media fra le serie`));
+  if (r.scarichi)
+    c.append(el('div', 'res-r',
+      `<span class="l">Scarichi</span>${r.scarichi} `
+      + `${r.scarichi === 1 ? 'scarico' : 'scarichi'}, mezza serie ciascuno nel volume`));
+  if (r.prontezza)
+    c.append(el('div', 'res-r',
+      `<span class="l">Ci sei arrivato</span>${esc(r.prontezza.mus)}: `
+      + `${r.prontezza.pronto ? 'riposato' : 'con della fatica addosso'}, `
+      + `<b>${nf(r.prontezza.quota * 100)}%</b> di fatica sulla forma il giorno prima`));
+
+  c.append(el('p', 'note',
+    (r.conf ? `Il confronto e’ con ${r.conf.quali}: ${r.conf.n} sedute, `
+      + `${nf(r.conf.tonn)} kg e ${nf(r.conf.serie, 1)} serie in media. ` : '')
+    + 'I numeri sono gli stessi che alimentano mappa muscolare, volume e '
+    + 'progressi: qui sono solo messi insieme. Non e’ un voto sulla seduta.'));
+  return c;
+}
+
+/**
+ * Una seduta aperta dallo storico: prima cos’e’ stata, poi cosa c’e’
+ * scritto dentro. L’ordine conta — chi apre una seduta di tre settimane fa
+ * quasi sempre vuole ricordarsela, non correggerla.
+ */
+function sheetResoconto(k) {
+  const r = resocontoSeduta(k);
+  if (!r) return sheetSceltaModo(k);
+  const w = el('div');
+  w.append(cardResoconto(r));
+
+  const c = el('div', 'card');
+  c.append(el('h2', 'sec', 'Le serie'));
+  c.lastChild.style.marginTop = '0';
+  c.append(el('p', 'muted',
+    'Toccane una per correggerla: carico, ripetizioni, RIR, e anche l’esercizio.'));
+  let ultimo = null;
+  r.serie.forEach((x, i) => {
+    const ex = esercizio(x.ex);
+    if (ex && ex.id !== ultimo) {
+      const h = el('div', 'eyebrow', esc(ex.nome));
+      h.style.marginTop = '10px';
+      c.append(h);
+      ultimo = ex.id;
+    }
+    const riga = el('button', 'serie-r');
+    riga.innerHTML = `<span class="mono n">serie ${i + 1}</span>
+      <span class="mono">${nf(x.kg, 1)} kg</span>
+      <span class="mono">${x.reps} rip</span>
+      <span class="mono muted">RIR ${x.rir}</span>
+      ${x.drop?.length ? `<span class="mono muted">+${x.drop.length}</span>` : ''}
+      <span class="go">&rsaquo;</span>`;
+    riga.onclick = () => sheetSerie(k, i, () => sheetResoconto(k));
+    c.append(riga);
+  });
+  w.append(c);
+
+  const mod = el('button', 'btn wide', 'Aggiungi o togli serie');
+  mod.onclick = () => sheetLibero(k);
+  w.append(mod);
+
+  const ch = el('button', 'btn wide', 'Chiudi');
+  ch.style.marginTop = '8px';
+  ch.onclick = () => { closeSheet(); route(); };
+  w.append(ch);
+  sheet(w);
 }

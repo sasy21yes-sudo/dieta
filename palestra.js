@@ -33,6 +33,28 @@ function e1rm(kg, reps, rir) {
   return kg * (1 + r / 30);
 }
 
+/* ------------------------------------------------- quanto vale una serie
+ *
+ * Uno stripping non e' una serie e non e' due: e' una serie piu' N code fatte
+ * a cedimento senza recupero. La convenzione piu' diffusa — e quella che
+ * quest'app usa dappertutto — e' mezza serie per scarico, mentre i chili si
+ * sommano per intero perche' quelli sono stati sollevati davvero.
+ *
+ * Erano due righe copiate in cinque posti e mancavano in altri tre: il
+ * tonnellaggio per seduta, il tonnellaggio del resoconto e il conteggio delle
+ * serie delle statistiche ignoravano gli scarichi, quindi la stessa seduta
+ * valeva di piu' o di meno a seconda di quale schermata la guardava.
+ */
+function serieEquivalenti(x) { return 1 + (x?.drop || []).length * 0.5; }
+function tonnellaggioSerie(x) {
+  return (+x?.kg || 0) * (+x?.reps || 0)
+    + (x?.drop || []).reduce((a, d) => a + (+d.kg || 0) * (+d.reps || 0), 0);
+}
+/** Ripetizioni totali della serie, scarichi compresi. */
+function ripetizioniSerie(x) {
+  return (+x?.reps || 0) + (x?.drop || []).reduce((a, d) => a + (+d.reps || 0), 0);
+}
+
 /** Quanto una serie stimola un muscolo: 1 se primario, 0.5 se secondario. */
 function pesoMuscolare(ex, mus) {
   if (!ex) return 0;
@@ -59,11 +81,8 @@ function volumeMuscoli(days) {
       const ex = esercizio(s.ex); if (!ex) continue;
       for (const m of muscoli()) {
         const w = pesoMuscolare(ex, m.id); if (!w) continue;
-        // uno scarico di stripping e' lavoro vero ma piu' corto di una serie
-        // piena: conta mezza serie, che e' la convenzione piu' diffusa
-        out[m.id].serie += w * (1 + (s.drop || []).length * 0.5);
-        out[m.id].tonn += w * ((+s.kg || 0) * (+s.reps || 0)
-          + (s.drop || []).reduce((a, x) => a + x.kg * x.reps, 0));
+        out[m.id].serie += w * serieEquivalenti(s);
+        out[m.id].tonn += w * tonnellaggioSerie(s);
         out[m.id].sedute.add(k);
       }
     }
@@ -92,7 +111,7 @@ function formaFatica(mus, fino = today(), giorni = 120) {
       const ex = esercizio(s.ex); if (!ex) continue;
       const w = pesoMuscolare(ex, mus); if (!w) continue;
       // gli scarichi si fanno a cedimento: stimolo pieno, mezza serie
-      imp += w * sforzo(s.rir) * (1 + (s.drop || []).length * 0.5);
+      imp += w * sforzo(s.rir) * serieEquivalenti(s);
     }
     if (imp) {
       forma += imp; fatica += imp;
@@ -763,7 +782,7 @@ function sezGymProgressi(v, k, st) {
   const gg = span(datiRange || 30, k);
   const ton = gg.map(kk => {
     const s = serieDelGiorno(kk);
-    return s.length ? s.reduce((a, x) => a + (+x.kg || 0) * (+x.reps || 0), 0) : null;
+    return s.length ? s.reduce((a, x) => a + tonnellaggioSerie(x), 0) : null;
   });
   v.append(chartBars({
     titolo: 'Tonnellaggio per seduta', sub: 'Chili sollevati in totale. Utile per vedere i buchi, non per confrontare esercizi diversi.',
@@ -811,16 +830,28 @@ function sezGymStorico(v, k) {
     .filter(x => (P().sessioni[x]?.serie || []).length)
     .sort().reverse().slice(0, 60);
   if (sedute.length) {
+    /* In cima il resoconto dell'ultima: aprire lo storico e vedere un elenco
+       di date e' guardare un archivio, non capire com'e' andata. Il resoconto
+       non aggiunge conti nuovi — chiede a quelli che ci sono gia'. */
+    if (typeof resocontoSeduta === 'function') {
+      const r = resocontoSeduta(sedute[0]);
+      if (r) v.append(cardResoconto(r));
+    }
     const c = el('div', 'card');
     c.append(el('h2', 'sec', 'Ultime sedute'));
     c.lastChild.style.marginTop = '0';
     for (const kk of sedute) {
       const s = P().sessioni[kk];
       const r = el('button', 'prod');
-      const ton2 = s.serie.reduce((a, x) => a + (+x.kg || 0) * (+x.reps || 0), 0);
+      const ton2 = s.serie.reduce((a, x) => a + tonnellaggioSerie(x), 0);
+      const ns = s.serie.reduce((a, x) => a + serieEquivalenti(x), 0);
       r.innerHTML = `<div class="grow"><div class="nm">${esc(s.nome || 'Seduta')}</div>
-        <div class="mt">${kk} · ${s.serie.length} serie · ${nf(ton2)} kg</div></div>`;
-      r.onclick = () => sheetSeduta(kk);
+        <div class="mt">${kk} · ${nf(ns, ns % 1 ? 1 : 0)} serie · ${nf(ton2)} kg</div></div>
+        <div class="kc">apri &rsaquo;</div>`;
+      // dallo storico si apre il resoconto, non il modulo di registrazione:
+      // chi guarda una seduta di tre settimane fa vuole ricordarsela
+      r.onclick = () => typeof sheetResoconto === 'function'
+        ? sheetResoconto(kk) : sheetSeduta(kk);
       c.append(r);
     }
     v.append(c);
@@ -1090,6 +1121,15 @@ function monitoraggioProgramma(ids, k = today()) {
 function sheetSeduta(k) {
   const p = P();
   p.sessioni[k] ||= { nome: '', serie: [] };
+  /* Una seduta guidata lasciata a meta' riprende da dove era.
+     Chiudere il foglio per sbaglio — o perche' e' suonato il telefono — non
+     e' una decisione: e' un incidente, e passare di nuovo da "come registri?"
+     costringe a ritrovare la scheda giusta in un elenco mentre si e' sotto un
+     bilanciere. Se c'e' una guida in corso su una scheda che esiste ancora,
+     si torna li' e basta. */
+  const g = p.sessioni[k].guida;
+  if (g?.scheda && scheda(g.scheda) && typeof sheetGuidata === 'function')
+    return sheetGuidata(k, g.scheda);
   // sempre la schermata di scelta: prima, se c'erano gia' delle serie, si
   // finiva dritti nella seduta libera e alle schede non si arrivava piu'
   return sheetSceltaModo(k);
@@ -1101,6 +1141,25 @@ function sheetSceltaModo(k) {
   w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
   w.append(el('h2', 'sec', 'Come registri?'));
   w.lastChild.style.marginTop = '0';
+
+  // chi arriva qui con una guida in corso l'ha voluto: sheetSeduta() lo
+  // avrebbe gia' riportato dentro. Il modo di uscirne resta scritto
+  const guida = P().sessioni[k]?.guida;
+  if (guida?.scheda && scheda(guida.scheda)) {
+    const rip = el('button', 'btn wide pri',
+      `Riprendi "${scheda(guida.scheda).nome}" da dove eri`);
+    rip.onclick = () => sheetGuidata(k, guida.scheda);
+    w.append(rip);
+    const ab = el('button', 'btn wide', 'Abbandona la guida e registra a mano');
+    ab.style.marginTop = '8px';
+    ab.onclick = () => {
+      delete P().sessioni[k].guida; save(); sheetSceltaModo(k);
+    };
+    w.append(ab);
+    w.append(el('p', 'hint',
+      'Abbandonare la guida non cancella niente: le serie gia\' fatte restano, '
+      + 'e si continua dal modulo.'));
+  }
 
   if (gia) {
     // dallo storico si arriva qui su una seduta di tre mesi fa, e "continua

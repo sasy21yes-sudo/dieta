@@ -40,7 +40,7 @@ function traiettoriaFaticaCalc(mus, fino, giorni) {
     for (const s of serieDelGiorno(k)) {
       const ex = esercizio(s.ex); if (!ex) continue;
       const w = pesoMuscolare(ex, mus); if (!w) continue;
-      imp += w * sforzo(s.rir) * (1 + (s.drop || []).length * 0.5);
+      imp += w * sforzo(s.rir) * serieEquivalenti(s);
     }
     forma += imp; fatica += imp;
     forma *= df; fatica *= dt;

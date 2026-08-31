@@ -1108,7 +1108,9 @@ function pdfResoconto(per) {
     const righe = [
       ['Giornate di allenamento', String(all.totali), ''],
       ['Sedute in palestra', String(all.sedute), ''],
-      ['Serie registrate', String(all.serie), all.sedute ? nf(all.serie / all.sedute, 1) + ' a seduta' : ''],
+      // con gli scarichi il conto e' a mezze serie: 12,5 e' un numero giusto
+      ['Serie registrate', nf(all.serie, all.serie % 1 ? 1 : 0),
+        all.sedute ? nf(all.serie / all.sedute, 1) + ' a seduta' : ''],
       ['Tonnellaggio', nf(all.tonnellaggio) + ' kg', ''],
       ['Sessioni di cardio', String(all.cardioN),
         all.cardioKm ? nf(all.cardioKm, 1) + ' km' : ''],
