@@ -499,7 +499,7 @@ function pianoPassi() {
       stato: D.integratori.length ? D.integratori.length + ' voci' : 'nessuna' },
     ...(usaPiano() ? [
     { id: 'alimenti', t: 'Cosa mangi',
-      d: 'Aggiungi i tuoi alimenti o correggi quelli del piano.',
+      d: 'Tutto quello che mangi, in un elenco solo: a mano, col codice a barre o da internet.',
       perche: 'Sono i mattoni dei pasti. Puoi saltare questo passo: i ' + baseAli + ' del piano di partenza bastano per cominciare.',
       mio: nAli > 0,
       stato: nAli ? `${nAli} tuoi, oltre ai ${baseAli} di base` : `${baseAli} di base, nessuno tuo` },
@@ -797,42 +797,31 @@ function sezTarget(v) {
 }
 
 /* -------------------------------------------------------------- alimenti */
+/**
+ * "Cosa mangi" e la vecchia pagina "I tuoi prodotti" sono la stessa schermata.
+ *
+ * Erano due, con due bottoni "aggiungi", due ricerche su internet e due
+ * lettori di codici a barre, e la differenza fra un "alimento" e un "prodotto"
+ * era chiara solo a chi aveva scritto il codice. Sotto restano due cose — un
+ * alimento e' un nome dentro una ricetta, un prodotto e' una scatola con
+ * un'etichetta — ma la domanda di chi usa l'app e' una sola.
+ */
 function sezAlimenti(v) {
-  const p = piano();
-  const mieiIds = Object.keys(p.alimenti);
+  if (typeof elencoAlimenti === 'function') {
+    elencoAlimenti(v, { titolo: 'Quello che mangi' });
+    v.append(el('div', 'card flat',
+      `<div class="eyebrow">Come si legge</div>
+       <div class="muted">I ${Object.keys(DBASE.alimenti).length} del piano di
+       partenza ci sono gia': puoi correggerli e la versione modificata vale solo
+       per questo profilo, il file resta com'e'. La <strong>categoria</strong>
+       serve al motore delle sostituzioni, che cerca alternative dentro la stessa
+       famiglia.</div>`));
+    return;
+  }
+  // ripiego se prodotti.js non e' caricato: meglio un elenco spoglio che niente
   const b = el('button', 'btn wide pri', 'Aggiungi un alimento');
   b.onclick = () => sheetAlimento(null);
   v.append(b);
-
-  if (mieiIds.length) {
-    const c = el('div', 'card');
-    c.append(el('h2', 'sec', `Aggiunti da te (${mieiIds.length})`));
-    c.lastChild.style.marginTop = '0';
-    for (const n of mieiIds.sort()) {
-      const a = D.alimenti[n];
-      const r = el('button', 'prod');
-      r.innerHTML = `<div class="grow"><div class="nm">${esc(n)}</div>
-        <div class="mt">${nf(a.p, 1)}P ${nf(a.c, 1)}C ${nf(a.g, 1)}G · ${esc(a.categoria || '')}</div></div>
-        <div class="kc">${nf(a.kcal)}<br><span class="mt">/100${esc(a.unita || 'g')}</span></div>`;
-      r.onclick = () => sheetAlimento(n);
-      c.append(r);
-    }
-    v.append(c);
-  }
-  const c2 = el('div', 'card');
-  c2.append(el('h2', 'sec', `Nel piano di base (${Object.keys(DBASE.alimenti).length})`));
-  c2.lastChild.style.marginTop = '0';
-  c2.append(el('p', 'muted', 'Puoi modificarli: la versione modificata vale solo per questo profilo, il file di partenza resta com\'e\'.'));
-  for (const n of Object.keys(DBASE.alimenti).sort()) {
-    const a = D.alimenti[n];
-    const r = el('button', 'prod');
-    r.innerHTML = `<div class="grow"><div class="nm">${esc(n)}</div>
-      <div class="mt">${nf(a.kcal)} kcal · ${macroRiga(a)} · ${esc(a.categoria || '')}</div></div>
-      ${p.alimenti[n] ? '<span class="pill ok">modificato</span>' : ''}`;
-    r.onclick = () => sheetAlimento(n);
-    c2.append(r);
-  }
-  v.append(c2);
 }
 
 /**
@@ -918,6 +907,26 @@ function sheetAlimento(nome, pre) {
     av.innerHTML = '<strong>Controlla questi numeri.</strong> ' + esc(pre.avviso.d);
     w.append(av);
   }
+  /* Se i valori di questo alimento vengono dall'etichetta di un prodotto, va
+     detto QUI: e' il posto dove uno li guarda, e senza quella riga sembrano
+     numeri usciti dal nulla — o peggio, si prova a correggerli a mano senza
+     capire perche' tornano quelli di prima. */
+  const pr = nome && typeof overrideDi === 'function' ? overrideDi(nome) : null;
+  if (pr) {
+    const box = el('div', 'card flat');
+    box.append(el('div', 'eyebrow', 'I numeri vengono da un\'etichetta'));
+    box.append(el('div', 'muted',
+      `<strong>${esc(pr.nome)}</strong>${pr.marca ? ' · ' + esc(pr.marca) : ''}`
+      + `${pr.barcode ? ' · ' + esc(pr.barcode) : ''}. Finche' e' collegato, quello `
+      + 'che scrivi qui sotto non cambia i conti: li decide il prodotto.'));
+    const b2 = el('button', 'btn wide');
+    b2.style.marginTop = '9px';
+    b2.textContent = 'Apri il prodotto';
+    b2.onclick = () => sheetProdotto(pr);
+    box.append(b2);
+    w.append(box);
+  }
+
   const campo = (id, lab, val, mode) => el('div', 'field',
     `<label>${lab}</label><input type="text" inputmode="${mode || 'decimal'}"
       id="al-${id}" value="${val != null ? esc(String(val)) : ''}">`);

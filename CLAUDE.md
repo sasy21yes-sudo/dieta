@@ -1082,6 +1082,44 @@ UI lo dice — come le costanti di Banister e le soglie di HYROX. E c'e' una
 ragione per cambiare scheda che l'app non conosce e non prova a indovinare: che
 sia diventata noiosa. Anche quello e' scritto.
 
+### Un elenco solo: gli alimenti
+
+C'erano due schermate per la stessa domanda, e non si capiva quale fosse quale.
+
+- **"Cosa mangi"**, nel piano: gli alimenti, cioe' i nomi che le ricette usano.
+- **"I tuoi prodotti"**, dal menu: i prodotti reali col codice a barre, da
+  collegare a un alimento per sostituirne i valori stimati.
+
+Due bottoni "aggiungi", due ricerche su Open Food Facts, due lettori di codici
+a barre. La differenza fra un "alimento" e un "prodotto" era chiara solo a chi
+aveva scritto il codice.
+
+Sotto restano due cose diverse, e devono restarlo: **un alimento e' un nome
+dentro una ricetta, un prodotto e' una scatola con un'etichetta**, ed e' proprio
+questa distinzione che permette a un prodotto di correggere i valori di un
+alimento in tutti i conti. Ma per chi usa l'app la domanda e' una sola — *le
+cose che mangio, e quanto fanno* — e adesso la risposta e' una schermata sola,
+`elencoAlimenti()`, renderizzata sia dal passo del piano sia dalla voce di menu.
+Non due che si somigliano: la stessa.
+
+Quello che ogni riga dice non e' a quale registro interno appartiene, ma **da
+dove viene il suo numero**: `etichetta` se e' stato letto sulla confezione,
+`stima` se e' una media di categoria, `tuo` se l'hai aggiunto, `fuori piano` se
+e' un prodotto che nessuna ricetta sa ancora usare. Con i filtri sopra, perche'
+"quali sono ancora stimati" e' la domanda che porta a migliorare i dati.
+
+Tre dettagli che non sono cosmetici:
+
+- l'elenco mostra i valori **effettivi** (`alimento(nome)`, non
+  `D.alimenti[nome]`): se un prodotto sostituisce quell'alimento la riga deve
+  mostrare i numeri che l'app usa davvero, o direbbe "etichetta" scrivendo
+  accanto la stima;
+- un prodotto **collegato non compare due volte**: i suoi valori arrivano gia'
+  dalla riga dell'alimento;
+- aprendo un alimento sostituito da un prodotto, la scheda lo **dice** — senza,
+  quei numeri sembrano usciti dal nulla, e chi prova a correggerli a mano non
+  capisce perche' tornano quelli di prima.
+
 ### Il nome conta quanto i macro
 
 Il motore ordinava solo per distanza sui macro, dentro la stessa categoria. Su
@@ -1467,6 +1505,12 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non stilare come `div` un elemento che e' diventato `button`: senza il reset
   prende il fondo chiaro di sistema, e al buio e' un rettangolo bianco in mezzo
   alla lista
+- Non aprire una seconda schermata per gli alimenti: "Cosa mangi" e la voce di
+  menu sono la stessa `elencoAlimenti()`. Due elenchi che si somigliano sono
+  peggio di uno lungo
+- Non mostrare in elenco `D.alimenti[nome]` dove un prodotto lo sostituisce:
+  vanno mostrati i valori che l'app usa davvero, o la riga dice "etichetta" e
+  scrive accanto la stima
 - Non ordinare le sostituzioni solo sui macro: "latte di soia proteico" ha
   macro diversi da "latte di soia" *per costruzione*, ed è proprio la
   sostituzione che si cerca più spesso. Il nome è un criterio, non un dettaglio

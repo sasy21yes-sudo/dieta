@@ -120,6 +120,11 @@
    mangiato meta' del nome dell'alimento */
 .cmp-r .mm{text-align:left;margin-top:1px}
 .prod .kc{font-family:var(--mono);font-size:13px;text-align:right;flex:none}
+/* le targhette di provenienza sotto il nome: dicono da dove viene il numero,
+   che e' l'unica cosa che serve sapere per fidarsene o no */
+.prod .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.prod .tags:empty{display:none}
+.prod .tags .pill{font-size:10px;padding:2px 6px}
 #scanbox{width:100%;border-radius:11px;background:#000;aspect-ratio:4/3;
   object-fit:cover;display:block}
 .scanwrap{position:relative;margin-bottom:10px}

@@ -64,68 +64,225 @@ function macroMangiabile(id, qta) {
 }
 
 /* --------------------------------------------------------------- vista */
-function viewProdotti(v) {
-  const list = prodotti();
-
-  const intro = el('div', 'card flat');
-  intro.append(el('div', 'eyebrow', 'Perche\' serve'));
-  intro.append(el('div', 'muted',
-    `Nel piano ${Object.values(D.alimenti).filter(a => a.fonte === 'stima').length} alimenti
-     hanno valori <strong>stimati</strong>: medie di categoria, non l'etichetta del
-     prodotto che compri davvero. Registrando qui il prodotto e collegandolo,
-     tutti i conti dell'app iniziano a usare i numeri veri.`));
-  v.append(intro);
-
-  const b = el('button', 'btn wide pri', 'Aggiungi un prodotto');
-  b.onclick = () => sheetProdotto(null);
-  v.append(b);
-
-  // il bottone c'e' sempre: se il browser non sa leggere i codici lo dice,
-  // invece di sparire lasciando credere che la funzione non esista
-  const bs = el('button', 'btn wide', 'Scansiona un codice a barre');
-  bs.style.marginTop = '8px';
-  bs.onclick = () => leggiCodice();
-  v.append(bs);
-
-  v.append(el('h2', 'sec', `I tuoi prodotti (${list.length})`));
-  if (!list.length) {
-    v.append(el('div', 'card', el('p', 'muted',
-      'Nessuno ancora. Il primo da registrare e\' quello che compri piu\' spesso: e\' quello che sposta di piu\' i conti.').outerHTML));
-  } else {
-    const c = el('div', 'card');
-    for (const p of list.slice().sort((a, b2) => a.nome.localeCompare(b2.nome))) {
-      const r = el('button', 'prod');
-      r.innerHTML = `<div class="grow">
-          <div class="nm">${esc(p.nome)}</div>
-          <div class="mt">${p.marca ? esc(p.marca) + ' · ' : ''}${nf(p.p, 1)}P ${nf(p.c, 1)}C ${nf(p.g, 1)}G
-          ${p.sostituisce ? ' · sostituisce ' + esc(p.sostituisce) : ''}</div>
-        </div>
-        <div class="kc">${nf(p.kcal)}<br><span class="mt">/100${esc(p.unita || 'g')}</span></div>`;
-      r.onclick = () => sheetProdotto(p);
-      c.append(r);
-    }
-    v.append(c);
+/* ==================================================== un elenco solo
+ *
+ * Per molto tempo ce n'erano due, e non si capiva quale fosse quale.
+ *
+ * - "Cosa mangi", nel piano: gli alimenti, cioe' i nomi che le ricette usano.
+ * - "I tuoi prodotti", dal menu: i prodotti reali col codice a barre, che si
+ *   collegano a un alimento per sostituirne i valori stimati.
+ *
+ * Sotto sono due cose diverse e restano tali — un alimento e' un nome dentro
+ * una ricetta, un prodotto e' una scatola con un'etichetta — ma per chi usa
+ * l'app sono la stessa domanda: *le cose che mangio, e quanto fanno*. Due
+ * schermate con due bottoni "aggiungi" ciascuna, due ricerche su internet e
+ * due lettori di codici a barre erano una risposta sbagliata a una domanda
+ * sola.
+ *
+ * Adesso l'elenco e' uno, lo stesso in tutti e due i punti d'ingresso, e ogni
+ * riga dice **da dove viene il suo numero**: letto in etichetta, stimato, o
+ * corretto da te. E' quella l'informazione che serve, non a quale dei due
+ * registri interni appartiene la voce.
+ */
+function vociAlimentari() {
+  const p = piano();
+  const out = [];
+  for (const nome of Object.keys(D.alimenti)) {
+    // alimento() e non D.alimenti: se un prodotto lo sostituisce, la riga deve
+    // mostrare i numeri che l'app usa davvero, non quelli che ha rimpiazzato —
+    // altrimenti dice "etichetta" e accanto scrive la stima
+    const a = alimento(nome);
+    const pr = overrideDi(nome);
+    out.push({
+      tipo: 'alimento', nome, a,
+      marca: pr?.marca || '', barcode: pr?.barcode || a.barcode || '',
+      mio: !!p.alimenti[nome], base: !!DBASE.alimenti[nome],
+      etichetta: !!pr || a.fonte === 'verificato',
+      stima: !pr && a.fonte === 'stima',
+      prodotto: pr || null
+    });
   }
+  /* I prodotti non collegati a niente: fino a ieri stavano in un elenco a
+     parte e non li vedeva nessuno. Stanno qui, marcati per quello che sono —
+     roba che hai registrato ma che le ricette non sanno ancora usare. */
+  for (const pr of prodotti()) {
+    if (pr.sostituisce && D.alimenti[pr.sostituisce]) continue;
+    out.push({
+      tipo: 'prodotto', nome: pr.nome, a: pr, marca: pr.marca || '',
+      barcode: pr.barcode || '', mio: true, base: false,
+      etichetta: true, stima: false, fuoriPiano: true, prodotto: pr
+    });
+  }
+  return out.sort((x, y) => x.nome.localeCompare(y.nome));
+}
 
-  /* quali stime restano da sostituire */
-  const stime = Object.entries(D.alimenti)
-    .filter(([n, a]) => a.fonte === 'stima' && !overrideDi(n))
-    .map(([n]) => n).sort();
-  if (stime.length) {
-    const c = el('div', 'card');
-    c.append(el('h2', 'sec', 'Ancora stimati'));
-    c.lastChild.style.marginTop = '0';
-    c.append(el('p', 'muted', 'Tocca una voce per registrare il prodotto vero che usi al suo posto.'));
-    for (const n of stime) {
-      const r = el('button', 'prod');
-      const a = D.alimenti[n];
-      r.innerHTML = `<div class="grow"><div class="nm">${esc(n)}</div>
-        <div class="mt">${nf(a.kcal)} kcal · ${macroRiga(a)} /100${esc(a.unita || 'g')}</div></div>
-        <span class="pill warn">stima</span>`;
-      r.onclick = () => sheetProdotto({ nome: n, sostituisce: n, unita: a.unita,
-        kcal: a.kcal, p: a.p, c: a.c, g: a.g, fibre: a.fibre, nuovo: true });
-      c.append(r);
+const FILTRI_ALIMENTI = [
+  ['tutti', 'Tutti', () => true],
+  ['miei', 'Tuoi', v => v.mio],
+  ['etichetta', 'Da etichetta', v => v.etichetta],
+  ['stima', 'Stimati', v => v.stima],
+  ['fuori', 'Fuori piano', v => v.fuoriPiano]
+];
+
+/**
+ * L'elenco, con la ricerca e i filtri. Lo usano sia il passo "Cosa mangi" del
+ * piano sia la voce del menu: e' letteralmente la stessa schermata, cosi' non
+ * si puo' piu' arrivare in due posti diversi e trovare due cose diverse.
+ *
+ * Il filtro non passa da route(): ridisegnare a ogni lettera fa perdere il
+ * fuoco al campo e su un telefono chiude la tastiera.
+ */
+function elencoAlimenti(v, opt = {}) {
+  const c = el('div', 'cw');
+  const testa = el('div', 'row between');
+  testa.append(el('h3', null, opt.titolo || 'Quello che mangi'));
+  const piu = el('button', 'btn-piu');
+  piu.textContent = '+';
+  piu.title = 'Aggiungi';
+  piu.setAttribute('aria-label', 'Aggiungi un alimento');
+  piu.onclick = () => sheetAggiungiAlimento();
+  testa.append(piu);
+  c.append(testa);
+
+  const tutte = vociAlimentari();
+  const nStima = tutte.filter(x => x.stima).length;
+  c.append(el('div', 'sub',
+    `${tutte.length} voci. Ogni riga dice da dove viene il suo numero: `
+    + `<strong>etichetta</strong> se l'hai letto sulla confezione, `
+    + `<strong>stima</strong> se e' una media di categoria.`
+    + (nStima ? ` Ne restano ${nStima} stimate.` : '')));
+
+  const f = el('div', 'field');
+  const inp = el('input');
+  inp.type = 'search';
+  inp.placeholder = 'pane, tofu, la tua barretta…';
+  inp.autocomplete = 'off';
+  f.append(inp);
+  c.append(f);
+
+  let filtro = 'tutti';
+  const chips = el('div', 'seg wrap chips');
+  for (const [id, lab, fn] of FILTRI_ALIMENTI) {
+    const n = tutte.filter(fn).length;
+    if (!n && id !== 'tutti') continue;
+    const b = el('button', null, `${lab} ${n}`);
+    b.setAttribute('aria-pressed', String(filtro === id));
+    b.onclick = () => {
+      filtro = id;
+      [...chips.children].forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      disegna();
+    };
+    chips.append(b);
+  }
+  c.append(chips);
+
+  const lista = el('div');
+  c.append(lista);
+
+  const disegna = () => {
+    const q = inp.value.trim().toLowerCase();
+    const test = (FILTRI_ALIMENTI.find(x => x[0] === filtro) || [])[2] || (() => true);
+    lista.innerHTML = '';
+    const righe = tutte.filter(x => {
+      if (!test(x)) return false;
+      if (!q) return true;
+      const t = [x.nome, x.marca, x.a.categoria || '', x.barcode].join(' ').toLowerCase();
+      return q.split(/\s+/).every(w => t.includes(w));
+    });
+    if (!righe.length) {
+      lista.append(el('p', 'hint',
+        'Nessuna corrispondenza. Col + qui sopra lo aggiungi: a mano, col codice '
+        + 'a barre, o cercandolo su internet.'));
+      return;
     }
+    for (const x of righe) {
+      const r = el('button', 'prod');
+      const a = x.a;
+      r.innerHTML = `<div class="grow"><div class="nm">${esc(x.nome)}</div>
+          <div class="mt">${x.marca ? esc(x.marca) + ' · ' : ''}${macroRiga(a)}${
+            a.categoria ? ' · ' + esc(a.categoria) : ''}</div>
+          <div class="tags">${
+            x.fuoriPiano ? '<span class="pill warn">fuori piano</span>' : ''}${
+            x.etichetta ? '<span class="pill ok">etichetta</span>' : ''}${
+            x.stima ? '<span class="pill warn">stima</span>' : ''}${
+            x.mio && !x.fuoriPiano ? '<span class="pill">tuo</span>' : ''}</div></div>
+        <div class="kc">${nf(a.kcal)}<br><span class="mt">/100${esc(a.unita || 'g')}</span></div>`;
+      r.onclick = () => x.tipo === 'prodotto' ? sheetProdotto(x.prodotto)
+                                              : sheetAlimento(x.nome);
+      lista.append(r);
+    }
+    lista.append(el('p', 'hint', `${righe.length} su ${tutte.length}.`));
+  };
+  inp.oninput = disegna;
+  disegna();
+  v.append(c);
+}
+
+/** Le tre strade per aggiungerne uno, tutte da un posto solo. */
+function sheetAggiungiAlimento() {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Aggiungi'));
+  w.append(el('h2', 'sec', 'Una cosa che mangi'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Tre strade, e cambia solo da dove arrivano i numeri: quello che scrivi tu '
+    + 'dalla confezione vale piu\' di quello che arriva da un archivio pubblico, '
+    + 'e l\'app continua a dirlo ovunque compaia.'));
+
+  const b1 = el('button', 'btn wide pri', 'Leggi il codice a barre');
+  b1.onclick = () => leggiCodice(a => {
+    if (!a) { sheetAggiungiAlimento(); return; }
+    sheetAlimento(null, {
+      nome: [a.nome, a.marca].filter(Boolean).join(' — ').slice(0, 60),
+      kcal: a.kcal, p: a.p, c: a.c, g: a.g, fibre: a.fibre, unita: a.unita,
+      barcode: a.codice, origine: a.origine || null,
+      avviso: a.origine && typeof coerenza === 'function' ? coerenza(a) : null
+    });
+  });
+  w.append(b1);
+
+  const b2 = el('button', 'btn wide', 'Cerca su internet');
+  b2.style.marginTop = '8px';
+  b2.onclick = () => sheetCercaAlimento(a => {
+    if (!a) { sheetAggiungiAlimento(); return; }
+    sheetAlimento(null, {
+      nome: [a.nome, a.marca].filter(Boolean).join(' — ').slice(0, 60),
+      kcal: a.kcal, p: a.p, c: a.c, g: a.g, fibre: a.fibre, unita: a.unita,
+      fonte: 'stima', origine: 'openfoodfacts', barcode: a.codice, avviso: a.coerenza
+    });
+  });
+  w.append(b2);
+
+  const b3 = el('button', 'btn wide', 'Scrivilo a mano');
+  b3.style.marginTop = '8px';
+  b3.onclick = () => sheetAlimento(null);
+  w.append(b3);
+
+  const ch = el('button', 'btn wide', 'Chiudi');
+  ch.style.marginTop = '14px';
+  ch.onclick = closeSheet;
+  w.append(ch);
+  sheet(w);
+}
+
+/**
+ * La vecchia schermata "I tuoi prodotti" e' diventata questa, ed e' la stessa
+ * del passo "Cosa mangi". Resta raggiungibile dal menu e da un vecchio
+ * segnalibro: e' lo stesso posto, non uno parallelo.
+ */
+function viewProdotti(v) {
+  elencoAlimenti(v);
+
+  const stime = vociAlimentari().filter(x => x.stima);
+  if (stime.length) {
+    const c = el('div', 'card flat');
+    c.append(el('div', 'eyebrow', 'Perche\' conviene'));
+    c.append(el('div', 'muted',
+      `${stime.length} voci hanno valori <strong>stimati</strong>: medie di `
+      + 'categoria, non l\'etichetta di quello che compri davvero. Aprendone una e '
+      + 'leggendo il codice a barre, o copiando i numeri dalla confezione, tutti i '
+      + 'conti dell\'app cominciano a usare quelli veri — pasti, sostituzioni, '
+      + 'analisi e previsione.'));
     v.append(c);
   }
 }
@@ -156,18 +313,35 @@ function sheetProdotto(p) {
            campo('barcode', 'Codice a barre', p?.barcode));
   w.append(g);
 
-  /* collegamento a un alimento del piano */
-  const f = el('div', 'field', `<label>Sostituisce nel piano</label>`);
-  const selt = el('select');
-  selt.id = 'p-sost';
-  selt.style.cssText = 'width:100%;padding:9px 10px;border:1px solid var(--rule);'
-    + 'border-radius:9px;background:var(--paper);color:var(--ink);font:inherit';
-  selt.append(new Option('— nessuno —', ''));
-  for (const n of Object.keys(D.alimenti).sort())
-    selt.append(new Option(n + (D.alimenti[n].fonte === 'stima' ? '  (stima)' : ''), n,
-      false, p?.sostituisce === n));
-  f.append(selt);
-  f.append(el('div', 'hint', 'Se lo colleghi, l\'app usera\' questi valori al posto di quelli del piano in tutti i conti: pasti, analisi, previsione.'));
+  /* Il collegamento a un alimento del piano.
+     E' la parte che decide se questo prodotto conta davvero: senza, resta una
+     scheda che nessuna ricetta sa usare. Con cinquanta alimenti la tendina non
+     era piu' un selettore — stesso problema degli esercizi — quindi campo
+     cercabile. */
+  const f = el('div', 'field', '<label>Prende il posto di</label>');
+  let sost = p?.sostituisce || '';
+  if (typeof selettoreCercabile === 'function') {
+    const opz = [{ v: '', lab: '— nessuno: resta fuori dal piano —', sub: '' }].concat(
+      Object.keys(D.alimenti).sort().map(n => ({
+        v: n, lab: n,
+        sub: `${nf(D.alimenti[n].kcal)} kcal · ${D.alimenti[n].fonte === 'stima'
+          ? 'valore stimato: conviene proprio questo' : 'gia\' verificato'}`
+      })));
+    f.append(selettoreCercabile(opz, sost, x => { sost = x || ''; }, 'a quale alimento…'));
+  } else {
+    const selt = el('select');
+    selt.id = 'p-sost';
+    selt.append(new Option('— nessuno —', ''));
+    for (const n of Object.keys(D.alimenti).sort())
+      selt.append(new Option(n, n, false, sost === n));
+    selt.onchange = () => { sost = selt.value; };
+    f.append(selt);
+  }
+  f.append(el('div', 'hint',
+    'Collegandolo, l\'app usa <strong>questi</strong> valori al posto di quelli del '
+    + 'piano in tutti i conti: pasti, sostituzioni, analisi, previsione. Senza '
+    + 'collegamento il prodotto resta registrato ma le ricette non lo vedono — '
+    + 'compare solo quando scrivi un pasto fuori piano.'));
   w.append(f);
 
   const salva = el('button', 'btn wide pri', 'Salva');
@@ -180,7 +354,7 @@ function sheetProdotto(p) {
       id: (p && p.id) || uid(), nome, marca: get('marca'),
       unita: p?.unita || 'g', barcode: get('barcode'),
       kcal: num('kcal'), p: num('p'), c: num('c'), g: num('g'), fibre: num('fibre'),
-      sostituisce: $('#p-sost').value || null,
+      sostituisce: sost || null,
       creato: (p && p.creato) || today()
     };
     if (rec.kcal <= 0) { toast('Le calorie non possono essere zero'); return; }

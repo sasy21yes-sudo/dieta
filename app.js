@@ -896,7 +896,7 @@ const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
                  previsioni: viewPrevisioni };
 const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
                  palestra: 'Palestra', dati: 'Dati', analisi: 'Analisi',
-                 spesa: 'Spesa', prodotti: 'Prodotti', foto: 'Foto',
+                 spesa: 'Spesa', prodotti: 'Alimenti', foto: 'Foto',
                  piano: 'Piano', hyrox: 'Road to HYROX', benvenuto: 'Benvenuto',
                  revisione: 'La settimana', importa: 'Importo da Salute',
                  salute: 'Dati dal telefono', previsioni: 'Dove stai andando' };
@@ -1314,7 +1314,7 @@ function sheetSwap(nome, qta, ctx) {
       + 'alimento — le proteine se ne danno piu\' di un quinto delle calorie, '
       + 'altrimenti le calorie. Cambiala e i quattro scarti si aggiornano. '
       + 'Qui ci sono gli alimenti del piano: un prodotto col codice a barre '
-      + 'compare dopo che lo hai collegato a uno di loro, in Prodotti.'));
+      + 'compare dopo che lo hai collegato a uno di loro, dall\'elenco degli alimenti.'));
   }
 
   const b = el('button', 'btn wide pri', 'Chiudi');
@@ -2512,8 +2512,10 @@ function sheetMenu() {
      'Cambia i target, componi i tuoi pasti, riorganizza la settimana. Oppure crea un secondo profilo: diario, piano e foto restano separati.',
      () => { closeSheet(); location.hash = '#/piano'; });
 
-  mk('Prodotti e codici a barre',
-     'Registra i prodotti che compri davvero, con i valori letti in etichetta. Collegandoli al piano, l\'app smette di usare le stime.',
+  mk('Gli alimenti che mangi',
+     'Un elenco solo: quelli del piano, quelli tuoi e i prodotti col codice a barre. '
+     + 'Ogni riga dice da dove viene il suo numero — letto in etichetta o stimato — '
+     + 'e correggendone uno cambiano tutti i conti dell\'app.',
      () => { closeSheet(); location.hash = '#/prodotti'; });
 
   mk('Passi e sonno dal telefono',
