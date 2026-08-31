@@ -631,8 +631,13 @@ function analyse(k = today()) {
   // --- distribuzione proteica di oggi
   const dd = day(k), plan = D.settimana[dayIdx(k)];
   const main = plan.pasti.filter(s => ['Colazione', 'Pranzo', 'Cena'].includes(s.slot));
-  const low = main.filter(s => dd.pasti[s.codice] && D.pasti[s.codice]
-    && D.pasti[s.codice].macro.p < T.min_p_per_pasto);
+  // il pasto di oggi, non quello previsto: se lo hai cambiato conta il nuovo
+  const low = main.filter(s => {
+    if (!dd.pasti[s.codice]) return false;
+    const m = typeof mealMGiorno === 'function' ? mealMGiorno(s.codice, k)
+      : D.pasti[s.codice]?.macro;
+    return m && m.p < T.min_p_per_pasto;
+  });
   if (low.length) F.push(['warn', 'L', 'Dose proteica bassa in un pasto',
     `Oggi ${low.length} pasto/i principali sotto i ${T.min_p_per_pasto} g. Da fonti vegetali sotto quella soglia la leucina non basta ad attivare la sintesi proteica: meglio ridistribuire che aggiungere alla fine della giornata.`]);
 
@@ -956,7 +961,10 @@ function viewOggi(v) {
     v.append(av);
   }
   for (const s of plan.pasti) {
-    const p = D.pasti[s.codice], done = !!d.pasti[s.codice];
+    // il pasto che c'e' oggi: se lo hai cambiato, si vede quello
+    const eff = typeof pastoDelGiorno === 'function'
+      ? pastoDelGiorno(s.codice, k) : s.codice;
+    const p = D.pasti[eff], done = !!d.pasti[s.codice];
     // slot senza pasto: con il piano vuoto e' la norma, non un errore
     if (!p) {
       const vuoto = el('button', 'meal vuoto');
@@ -982,8 +990,9 @@ function viewOggi(v) {
     // 50 g di salsa, ma se oggi ne hai usati 100 il conto deve seguire te
     const testa = el('div', 'grow tap',
       `<div class="meal-slot">${esc(s.slot)} · ${s.ora}</div>
-       <div class="meal-name">${esc(p.nome)}${typeof porzioniCambiate === 'function'
-         && porzioniCambiate(s.codice, k)
+       <div class="meal-name">${esc(p.nome)}${eff !== s.codice
+         ? ' <em class="mod-tag">al posto di ' + esc(D.pasti[s.codice]?.nome || s.codice) + '</em>'
+         : typeof porzioniCambiate === 'function' && porzioniCambiate(s.codice, k)
          ? ' <em class="mod-tag">porzioni cambiate</em>' : ''}</div>`);
     if (typeof sheetPorzioni === 'function' && p.ingredienti)
       testa.onclick = () => sheetPorzioni(k, s.codice);

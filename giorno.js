@@ -20,8 +20,53 @@
  * quando quell'ingrediente e' stato sostituito: quello e' il posto nella
  * ricetta, e non cambia perche' ci hai messo dentro un'altra cosa.
  */
+/**
+ * Il pasto che quel giorno ha preso il posto di quello previsto.
+ *
+ * E' il terzo strato sopra il piano, dopo le quantita' e le sostituzioni di
+ * ingrediente, e sta allo stesso livello: il piano dice cosa era previsto, il
+ * diario dice cos'e' successo. La chiave resta il codice dello SLOT — il posto
+ * nella giornata — cosi' la spunta, le porzioni e tutto il resto continuano a
+ * parlare della stessa riga anche dopo il cambio.
+ */
+function pastoDelGiorno(code, k) {
+  const alt = S.log[k]?.pastoSwap?.[code];
+  return alt && D.pasti[alt] ? alt : code;
+}
+
+/**
+ * Mette (o toglie) il pasto sostitutivo, e con `scala` lo ridimensiona.
+ *
+ * Cambiando il pasto si buttano via le porzioni e le sostituzioni di
+ * ingrediente di quello slot, e non e' una perdita: erano grammi e alimenti
+ * di un'altra ricetta. Tenerli vorrebbe dire applicare a un pasto le
+ * correzioni fatte su un altro.
+ */
+function mettePastoSwap(code, k, nuovo, scala = 1) {
+  const d = day(k);
+  d.pastoSwap ||= {};
+  if (d.swap?.[code]) delete d.swap[code];
+  if (d.porzioni?.[code]) delete d.porzioni[code];
+  if (!nuovo || nuovo === code) delete d.pastoSwap[code];
+  else {
+    d.pastoSwap[code] = nuovo;
+    // la scala si scrive come porzioni del pasto nuovo: e' lo stesso strato
+    // che usa gia' il moltiplicatore, non serve inventarne un altro
+    if (scala && Math.abs(scala - 1) > 0.02) {
+      const ing = D.pasti[nuovo]?.ingredienti || [];
+      if (ing.length) {
+        d.porzioni ||= {};
+        d.porzioni[code] = Object.fromEntries(ing.map(i =>
+          [i.alimento, Math.max(0, Math.round(i.qta * scala * 10) / 10)]));
+      }
+    }
+  }
+  if (!Object.keys(d.pastoSwap).length) delete d.pastoSwap;
+  save();
+}
+
 function ingredientiGiorno(code, k) {
-  const p = D.pasti[code];
+  const p = D.pasti[pastoDelGiorno(code, k)];
   if (!p?.ingredienti) return [];
   const sw = S.log[k]?.swap?.[code] || {};
   const por = S.log[k]?.porzioni?.[code] || {};
@@ -38,11 +83,13 @@ function ingredientiGiorno(code, k) {
 }
 
 function mealMGiorno(code, k) {
+  const eff = pastoDelGiorno(code, k);
   const sw = S.log[k]?.swap?.[code];
   const por = S.log[k]?.porzioni?.[code];
-  const p = D.pasti[code];
-  const cambiato = (por && Object.keys(por).length) || (sw && Object.keys(sw).length);
-  if (!cambiato || !p?.ingredienti) return mealM(code);
+  const p = D.pasti[eff];
+  const cambiato = eff !== code
+    || (por && Object.keys(por).length) || (sw && Object.keys(sw).length);
+  if (!cambiato || !p?.ingredienti) return mealM(eff);
   const m = M0();
   for (const i of ingredientiGiorno(code, k)) addM(m, foodM(i.alimento, i.qta));
   for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) m[x] = Math.round(m[x] * 10) / 10;
@@ -53,6 +100,47 @@ function mealMGiorno(code, k) {
 function porzioniCambiate(code, k) {
   return ingredientiGiorno(code, k)
     .filter(i => i.alPostoDi || i.qta !== i.qtaPiano).length;
+}
+
+/** In che momento della giornata quel pasto compare di solito nella settimana. */
+function slotAbituale(code) {
+  const conta = new Map();
+  for (const g of (D.settimana || []))
+    for (const sl of (g.pasti || []))
+      if (sl.codice === code) conta.set(sl.slot, (conta.get(sl.slot) || 0) + 1);
+  if (!conta.size) return '';
+  return [...conta.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
+/**
+ * I pasti che possono prendere il posto di questo, a parita' di macro.
+ *
+ * Stessa idea del motore delle sostituzioni sugli alimenti, un piano sopra:
+ * si riscala il candidato per far combaciare le calorie — entro limiti
+ * ragionevoli, perche' meta' porzione di un pasto non e' piu' quel pasto — e
+ * poi si ordina per distanza sui quattro macro. Il momento della giornata non
+ * esclude niente: mangiare a cena quello che il piano metteva a colazione e'
+ * una scelta, non un errore, e la riga lo dice invece di nasconderlo.
+ */
+function pastiEquivalenti(code, k, n = 8) {
+  const eff = pastoDelGiorno(code, k);
+  const src = D.pasti[eff];
+  if (!src?.macro?.kcal) return [];
+  const m0 = src.macro;
+  const out = [];
+  for (const [id, p] of Object.entries(D.pasti)) {
+    if (id === eff || !p?.macro?.kcal || !p.ingredienti?.length) continue;
+    const scala = Math.max(0.6, Math.min(1.6, m0.kcal / p.macro.kcal));
+    const m = {};
+    for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) m[x] = (p.macro[x] || 0) * scala;
+    let dist = 0;
+    for (const x of ['kcal', 'p', 'c', 'g']) {
+      const base = Math.max(m0[x] || 0, 5);
+      dist += Math.abs(m[x] - (m0[x] || 0)) / base;
+    }
+    out.push({ id, nome: p.nome, slot: slotAbituale(id), scala, macro: m, dist });
+  }
+  return out.sort((a, b) => a.dist - b.dist).slice(0, n);
 }
 
 /** La sostituzione attiva su quell'ingrediente, quel giorno. */
@@ -82,7 +170,8 @@ function metteSwap(code, k, slot, nuovo, qta) {
 
 /* ------------------------------------------------- porzioni di un pasto */
 function sheetPorzioni(k, code) {
-  const p = D.pasti[code];
+  // il pasto di oggi, che puo' non essere quello del piano
+  const p = D.pasti[pastoDelGiorno(code, k)];
   if (!p) return;
   const d = day(k);
   d.porzioni ||= {};
@@ -94,6 +183,13 @@ function sheetPorzioni(k, code) {
   w.lastChild.style.marginTop = '0';
   w.append(el('p', 'muted',
     'Cambia le quantita\' solo per questo giorno. Il pasto nel piano resta com\'e\': domani torna alle sue.'));
+
+  // la via d'uscita per chi quel pasto non lo mangia proprio
+  const cambia = el('button', 'btn wide');
+  cambia.style.marginBottom = '12px';
+  cambia.textContent = 'Sostituisci tutto il pasto \u203a';
+  cambia.onclick = () => sheetCambiaPasto(k, code);
+  w.append(cambia);
 
   /* Scalare tutto insieme e' il caso piu' frequente — "oggi ho mangiato
      mezza porzione" — e farlo ingrediente per ingrediente e' cinque tocchi
@@ -189,6 +285,85 @@ function sheetPorzioni(k, code) {
     r.onclick = () => { delete d.porzioni[code]; save(); closeSheet(); route(); toast('Ripristinate'); };
     w.append(r);
   }
+  sheet(w);
+}
+
+/**
+ * Cambiare tutto il pasto, non un ingrediente alla volta.
+ *
+ * La sostituzione per alimento risolve "il tofu oggi non ce l'ho". Questa
+ * risolve un'altra cosa: "oggi quel pasto non lo mangio", che e' il caso in
+ * cui uno esce dal piano del tutto. Finora l'unica strada era spuntare niente
+ * e riscrivere la giornata come fuori piano, cioe' buttare via il piano per
+ * un pasto.
+ */
+function sheetCambiaPasto(k, code) {
+  const eff = pastoDelGiorno(code, k);
+  const src = D.pasti[eff];
+  if (!src) return;
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Tutto il pasto'));
+  w.append(el('h2', 'sec', esc(src.nome)));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted', `${nf(src.macro.kcal)} kcal · ${macroRiga(src.macro)}`));
+  w.append(el('p', 'hint',
+    'Vale <strong>solo per oggi</strong>, come le porzioni: il piano resta com\'e\' '
+    + 'e domani torna il pasto previsto. Le quantita\' e le sostituzioni di '
+    + 'ingrediente gia\' fatte su questo slot vengono azzerate — erano di un\'altra '
+    + 'ricetta.'));
+
+  if (eff !== code) {
+    const box = el('div', 'card flat');
+    box.append(el('div', 'eyebrow', 'Il piano qui prevedeva'));
+    box.append(el('div', 'muted', `<strong>${esc(D.pasti[code]?.nome || code)}</strong>`));
+    const via = el('button', 'btn wide');
+    via.style.marginTop = '9px';
+    via.textContent = 'Rimetti quello del piano';
+    via.onclick = () => {
+      mettePastoSwap(code, k, null);
+      closeSheet(); route(); toast('Rimesso il pasto del piano');
+    };
+    box.append(via);
+    w.append(box);
+  }
+
+  const list = pastiEquivalenti(code, k);
+  w.append(el('h2', 'sec', 'A parita’ di macro'));
+  if (!list.length) {
+    w.append(el('p', 'muted',
+      'Non ci sono altri pasti composti fra cui scegliere. Si compongono in '
+      + 'Piano, passo "Come li combini".'));
+  }
+  for (const x of list) {
+    const dk = x.macro.kcal - src.macro.kcal;
+    const dd = ([id, l]) => {
+      const q = (x.macro[id] || 0) - (src.macro[id] || 0);
+      return `${q >= 0 ? '+' : '−'}${nf(Math.abs(q), 1)} ${l}`;
+    };
+    const r = el('button', 'swapopt');
+    r.innerHTML = `<div class="grow"><strong>${esc(x.nome)}</strong>
+        <div class="d">${dk >= 0 ? '+' : '−'}${nf(Math.abs(dk))} kcal · ${
+          [['p', 'P'], ['c', 'C'], ['g', 'G'], ['fibre', 'fib']].map(dd).join(' · ')}${
+          x.slot ? ' · di solito a ' + esc(x.slot.toLowerCase()) : ''}</div></div>
+      <div class="mono">${Math.abs(x.scala - 1) > 0.02
+        ? '×' + nf(x.scala, 2) : 'intero'} ›</div>`;
+    r.onclick = () => {
+      mettePastoSwap(code, k, x.id, x.scala);
+      closeSheet(); route();
+      toast(x.nome + ' al posto di ' + src.nome + ', solo per oggi');
+    };
+    w.append(r);
+  }
+  w.append(el('p', 'note',
+    'Il moltiplicatore riscala tutti gli ingredienti per far combaciare le '
+    + 'calorie, e si ferma fra ×0,6 e ×1,6: oltre quei limiti mezza porzione '
+    + 'di un pasto non e’ piu’ quel pasto. Le quantita’ restano modificabili '
+    + 'una per una qui accanto.'));
+
+  const ch = el('button', 'btn wide pri', 'Chiudi');
+  ch.style.marginTop = '12px';
+  ch.onclick = closeSheet;
+  w.append(ch);
   sheet(w);
 }
 

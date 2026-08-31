@@ -1048,6 +1048,39 @@ Con dieci voci in lista il manubrio della revisione non poteva piu' fermarsi al
 ci si appoggiava, indistinguibile da chi stava esattamente li'. Ora l'asse
 cresce coi dati fino al 220%, oltre quello taglia **e lo scrive**.
 
+### La scheda si segue, e a un certo punto si cambia
+
+Una scheda non e' un elenco di esercizi: e' un esperimento con una durata. La
+domanda a cui l'app non sapeva rispondere non era "cosa faccio oggi" — a quella
+rispondeva gia' — ma **"questa roba sta ancora funzionando, e quando la
+cambio"**.
+
+Una scheda si marca come **seguita** (`S.palestra.schedaAttiva`, una sola per
+volta) e da li' in poi `monitoraggioScheda()` guarda **solo le sedute fatte con
+quella** — l'aggancio c'era gia', ogni seduta salva `s.scheda`.
+
+Per ogni esercizio si confrontano **le prime due sedute con le ultime due**, non
+la prima con l'ultima: una giornata storta — dormito male, allenato di corsa —
+sposterebbe il verdetto da sola. Sotto le tre sedute non si dice niente, che e'
+la stessa regola delle proiezioni: con due punti la retta passa esatta e non
+significa nulla. "Fermo" e' entro l'1,5%, sotto quella soglia e' rumore di
+arrotondamento del RIR.
+
+**Quando cambiarla** sono tre segnali indipendenti e ne servono due — stessa
+regola dello scarico automatico, e per lo stesso motivo: uno solo si accende
+anche per caso.
+
+| Segnale | Quando si accende |
+|---|---|
+| Il tempo | oltre 8 settimane sullo stesso programma |
+| La progressione | meta' o piu' degli esercizi con dati sufficienti non e' salito |
+| Il tetto | la maggioranza degli esercizi chiede solo di caricare: la doppia progressione e' arrivata in fondo |
+
+Le otto settimane sono **un intervallo di pratica comune, non una misura**, e la
+UI lo dice — come le costanti di Banister e le soglie di HYROX. E c'e' una
+ragione per cambiare scheda che l'app non conosce e non prova a indovinare: che
+sia diventata noiosa. Anche quello e' scritto.
+
 ### La sostituzione si applica
 
 Per molto tempo il foglio delle sostituzioni era una tabella: diceva "al posto
@@ -1067,12 +1100,32 @@ dopo la sostituzione. Quello e' il posto nella ricetta, e non cambia perche' ci
 hai messo dentro un'altra cosa — se l'indice diventasse il nome nuovo, togliere
 la sostituzione non saprebbe piu' a cosa tornare.
 
-`ingredientiGiorno(code, k)` fonde i due strati (`swap` e `porzioni`) e
-restituisce cosa c'era davvero in quel pasto quel giorno; `mealMGiorno()`,
-la lista su Oggi e il foglio delle porzioni passano tutti da li'. Togliendo una
-sostituzione sparisce anche la quantita' cambiata di quel posto: erano grammi
-dell'alimento sostituito, e riportarli sull'originale vorrebbe dire inventarsi
-una porzione che nessuno ha scelto.
+`ingredientiGiorno(code, k)` fonde gli strati e restituisce cosa c'era davvero
+in quel pasto quel giorno; `mealMGiorno()`, la lista su Oggi e il foglio delle
+porzioni passano tutti da li'. Togliendo una sostituzione sparisce anche la
+quantita' cambiata di quel posto: erano grammi dell'alimento sostituito, e
+riportarli sull'originale vorrebbe dire inventarsi una porzione che nessuno ha
+scelto.
+
+**E si puo' cambiare il pasto intero.** La sostituzione per alimento risolve
+"il tofu oggi non ce l'ho"; questa risolve "oggi quel pasto non lo mangio", che
+prima costringeva a spuntare niente e riscrivere la giornata come fuori piano —
+cioe' a buttare via il piano per un pasto.
+
+`pastiEquivalenti()` e' il motore delle sostituzioni un piano sopra: riscala il
+candidato per far combaciare le calorie e poi ordina per distanza sui quattro
+macro. La scala si ferma **fra ×0,6 e ×1,6**, perche' oltre quei limiti mezza
+porzione di un pasto non e' piu' quel pasto. Il momento della giornata non
+esclude niente — mangiare a cena quello che il piano metteva a colazione e' una
+scelta — ma la riga lo dice, invece di nasconderlo.
+
+Due dettagli del modello: il terzo strato e' `S.log[k].pastoSwap[codiceSlot]`, e
+**la chiave resta il codice dello slot**, cosi' la spunta e tutto il resto
+continuano a parlare della stessa riga. Cambiare il pasto **azzera** porzioni e
+sostituzioni di ingrediente di quello slot: erano grammi e alimenti di un'altra
+ricetta, e tenerli vorrebbe dire applicare a un pasto le correzioni fatte su un
+altro. La scala si scrive come porzioni del pasto nuovo, che e' lo stesso strato
+gia' usato dal moltiplicatore: non serviva inventarne un altro.
 
 ### I pasti del giorno vanno in ordine di orario
 
@@ -1375,6 +1428,21 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   dalla letteratura, come le costanti di Banister. La UI deve continuare a dirlo
 - Non fermare l'asse del manubrio a una costante: con dieci voci qualcuno
   finisce oltre il 135%, e un punto appoggiato al bordo dice una cosa falsa
+- Non lasciare che una carta con i testi in bianco fisso prenda
+  `background:var(--ink)`: al buio quel token diventa chiaro, la carta si
+  ribalta e i testi spariscono. Se una superficie deve restare scura in tutti e
+  due i temi le serve un token suo (`--evid`)
+- Non stilare come `div` un elemento che e' diventato `button`: senza il reset
+  prende il fondo chiaro di sistema, e al buio e' un rettangolo bianco in mezzo
+  alla lista
+- Non riscalare un pasto oltre ×0,6–×1,6 per far combaciare i macro: mezza
+  porzione di un pasto non e' piu' quel pasto
+- Non tenere porzioni e sostituzioni di ingrediente quando si cambia il pasto
+  intero: erano di un'altra ricetta
+- Non giudicare una scheda sulla prima seduta contro l'ultima, e non sotto le
+  tre sedute: una giornata storta sposterebbe il verdetto da sola
+- Non presentare le otto settimane come una soglia misurata: e' pratica comune,
+  come le costanti di Banister
 - Non indicizzare una sostituzione sul nome dell'alimento NUOVO: la chiave e'
   il posto nella ricetta, cioe' l'ingrediente del piano. Altrimenti togliere la
   sostituzione non sa piu' a cosa tornare

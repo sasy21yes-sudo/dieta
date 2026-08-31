@@ -455,6 +455,7 @@ function iconaGym(id) {
     esercizi: 'M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10',
     carico: 'M12 20a8 8 0 1 1 0-16 8 8 0 0 1 0 16M12 12l4-3',
     storico: 'M12 7v5l3.2 2M21 12a9 9 0 1 1-9-9',
+    monitor: 'M4 20h16M6 20v-6M11 20V8M16 20v-9M21 20V5',
     hyrox: 'M6 4v16M18 4v16M6 12h12M3 8h3M18 8h3M3 16h3M18 16h3'
   };
   const s = mk('svg', { viewBox: '0 0 24 24', class: 'ic-g', 'aria-hidden': 'true' });
@@ -559,6 +560,17 @@ function viewPalestra(v) {
           : 'niente questa settimana',
     () => { gymTab = 'cardio'; route(); }));
 
+  const segId = schedaSeguita();
+  if (segId) {
+    const mon = monitoraggioScheda(segId, k);
+    g.append(riquadroGym('monitor', 'Scheda in corso',
+      mon.pochiDati ? `${mon.sedute.length} sedute: servono dati`
+        : mon.cambiare ? 'conviene cambiarla'
+        : `${mon.settimane}ª settimana · ${mon.mediana == null ? 'niente da dire'
+            : (mon.mediana >= 0 ? '+' : '') + nf(mon.mediana, 1) + '% sui carichi'}`,
+      () => { gymTab = 'monitor'; route(); }, mon.cambiare));
+  }
+
   g.append(riquadroGym('schede', 'Schede',
     schede().length ? schede().length + (schede().length === 1 ? ' scheda' : ' schede')
                     : 'nessuna, per ora',
@@ -605,7 +617,7 @@ function sezioneGym(v, k) {
   const st = statoMuscoli(k);
   ({ mappa: sezGymMappa, progressi: sezGymProgressi, cardio: sezGymCardio,
      carico: sezGymCarico, storico: sezGymStorico,
-     esercizi: sezGymEsercizi }[gymTab] || sezGymMappa)(v, k, st);
+     esercizi: sezGymEsercizi, monitor: sezGymMonitor }[gymTab] || sezGymMappa)(v, k, st);
 }
 
 /* -------------------------------------------------------- le sezioni
@@ -851,6 +863,128 @@ function ultimoUso(exId, escludi) {
 
 function schede() { P().schede ||= []; return P().schede; }
 function scheda(id) { return schede().find(s => s.id === id) || null; }
+
+/* ==================================================== la scheda che stai seguendo
+ *
+ * Una scheda non e' un elenco di esercizi: e' un esperimento con una durata.
+ * La domanda che l'app non sapeva rispondere non e' "cosa faccio oggi" — a
+ * quella rispondeva gia' — ma "questa roba sta ancora funzionando, e quando la
+ * cambio".
+ *
+ * Quindi una scheda si puo' marcare come SEGUITA, e da li' l'app guarda solo
+ * le sedute fatte con quella: quanto e' salito ogni esercizio da quando l'hai
+ * cominciata, e se ha smesso di salire.
+ */
+function schedaSeguita() {
+  const id = P().schedaAttiva;
+  return id && scheda(id) ? id : null;
+}
+function seguiScheda(id) {
+  P().schedaAttiva = id || null;
+  if (!id) delete P().schedaAttiva;
+  save();
+}
+
+/** Le sedute fatte con quella scheda, in ordine. */
+function seduteScheda(id) {
+  return Object.entries(P().sessioni)
+    .filter(([, s]) => s?.scheda === id && (s.serie || []).length)
+    .map(([k, s]) => ({ k, serie: s.serie }))
+    .sort((a, b) => a.k.localeCompare(b.k));
+}
+
+/**
+ * Quanto e' salito un esercizio DENTRO quella scheda.
+ *
+ * Si confrontano le prime due sedute con le ultime due e non la prima con
+ * l'ultima: una singola giornata storta — dormito male, allenato di corsa —
+ * sposterebbe il verdetto da sola. Sotto le tre sedute non si dice niente:
+ * due punti fanno una retta perfetta e non significano nulla.
+ */
+function progressoEsercizio(exId, sedute) {
+  const punti = [];
+  for (const s of sedute) {
+    const mie = s.serie.filter(x => x.ex === exId);
+    if (!mie.length) continue;
+    punti.push({ k: s.k, v: Math.max(...mie.map(x => e1rm(x.kg, x.reps, x.rir))) });
+  }
+  if (punti.length < 3) return { exId, punti, n: punti.length };
+  const q = Math.min(2, Math.floor(punti.length / 2));
+  const media = a => a.reduce((x, y) => x + y.v, 0) / a.length;
+  const inizio = media(punti.slice(0, q));
+  const fine = media(punti.slice(-q));
+  return { exId, punti, n: punti.length, inizio, fine,
+           delta: fine - inizio, pct: inizio > 0 ? (fine - inizio) / inizio * 100 : 0,
+           // "fermo" e' entro l'1,5%: sotto quella soglia e' rumore di
+           // arrotondamento del RIR, non progresso
+           fermo: inizio > 0 && Math.abs((fine - inizio) / inizio) < 0.015 };
+}
+
+const SCHEDA_SETT_LUNGA = 8;      // settimane oltre le quali quasi tutti i programmi si esauriscono
+
+/**
+ * Il quadro completo, e la risposta a "quando la cambio".
+ *
+ * Tre segnali indipendenti, e ne servono due — stessa regola dello scarico, e
+ * per lo stesso motivo: uno solo si accende anche per caso.
+ *
+ * 1. **il tempo**: oltre le otto settimane sullo stesso programma i ritorni si
+ *    appiattiscono. E' un intervallo di pratica comune, non una legge, e la UI
+ *    lo dice.
+ * 2. **la progressione si e' fermata**: meta' o piu' degli esercizi con dati
+ *    sufficienti non e' salito.
+ * 3. **la doppia progressione e' arrivata in fondo**: la maggioranza degli
+ *    esercizi e' al tetto del range e chiede solo di caricare — la scheda ha
+ *    dato quello che aveva.
+ */
+function monitoraggioScheda(id, k = today()) {
+  const sc = scheda(id);
+  if (!sc) return null;
+  const sedute = seduteScheda(id);
+  const righe = (sc.esercizi || []).map(r => {
+    const p = progressoEsercizio(r.ex, sedute);
+    return { ...p, riga: r, nome: esercizio(r.ex)?.nome || r.ex,
+             passo: typeof prossimoPasso === 'function' ? prossimoPasso(r.ex) : null };
+  });
+  const conDati = righe.filter(r => r.delta != null);
+  const pct = conDati.map(r => r.pct).sort((a, b) => a - b);
+  const mediana = pct.length ? pct[Math.floor(pct.length / 2)] : null;
+
+  const prima = sedute[0]?.k || null;
+  const ultima = sedute[sedute.length - 1]?.k || null;
+  const settimane = prima
+    ? Math.max(1, Math.round((new Date(k) - new Date(prima)) / 864e5 / 7)) : 0;
+  const alTetto = righe.filter(r => r.passo?.tipo === 'carico').length;
+
+  const segnali = [
+    { id: 'tempo', on: settimane >= SCHEDA_SETT_LUNGA,
+      t: `${settimane} settimane con questa scheda`,
+      d: settimane >= SCHEDA_SETT_LUNGA
+        ? `Oltre le ${SCHEDA_SETT_LUNGA} settimane sullo stesso programma i ritorni di solito si appiattiscono. E' un intervallo di pratica comune, non una legge: se stai ancora salendo, sali.`
+        : `Sotto le ${SCHEDA_SETT_LUNGA}: c'e' ancora margine in questo blocco.` },
+    { id: 'fermo', on: conDati.length >= 2
+        && conDati.filter(r => r.fermo || r.delta <= 0).length >= conDati.length / 2,
+      t: conDati.length
+        ? (n => `${n} ${n === 1 ? 'esercizio fermo' : 'esercizi fermi'} su ${conDati.length}`)
+          (conDati.filter(r => r.fermo || r.delta <= 0).length)
+        : 'ancora nessun esercizio con tre sedute',
+      d: conDati.length < 2
+        ? 'Servono almeno tre sedute per esercizio prima di dire se sale o no.'
+        : 'Il massimale stimato non e\' salito fra le prime e le ultime sedute.' },
+    { id: 'tetto', on: righe.length >= 2 && alTetto >= Math.ceil(righe.length * 0.6),
+      t: `${alTetto} ${alTetto === 1 ? 'esercizio' : 'esercizi'} su ${righe.length}`
+        + ' al tetto del range',
+      d: 'Quando quasi tutto chiede di caricare, la scheda ha dato quello che aveva.' }
+  ];
+  const accesi = segnali.filter(x => x.on).length;
+
+  return {
+    sc, sedute, righe, conDati, mediana, prima, ultima, settimane, alTetto, segnali,
+    pochiDati: sedute.length < 3,
+    cambiare: !((sedute.length < 3)) && accesi >= 2,
+    accesi
+  };
+}
 
 /**
  * Punto d'ingresso della registrazione. Se la seduta e' vuota chiede COME
@@ -1212,15 +1346,24 @@ function sheetSchede() {
     'Una scheda e\' la lista degli esercizi di una seduta: <strong>quali, quante serie e in che range di ripetizioni</strong>. Il carico no: quello cambia ogni volta, e lo aggiorni quando la usi.'));
   const list = schede();
   if (!list.length) w.append(el('p', 'hint', 'Nessuna scheda ancora.'));
+  const seg = schedaSeguita();
   for (const sc of list) {
     const r = el('button', 'prod');
     const nSer = sc.esercizi.reduce((a, e) => a + (e.serie || 0), 0);
-    r.innerHTML = `<div class="grow"><div class="nm">${esc(sc.nome)}</div>
-      <div class="mt">${sc.esercizi.length} esercizi · ${nSer} serie</div></div>
+    const n = seduteScheda(sc.id).length;
+    r.innerHTML = `<div class="grow"><div class="nm">${esc(sc.nome)}${
+        sc.id === seg ? ' <span class="pill ok">la segui</span>' : ''}</div>
+      <div class="mt">${sc.esercizi.length} esercizi · ${nSer} serie${
+        n ? ' · ' + n + (n === 1 ? ' seduta' : ' sedute') : ''}</div></div>
       <div class="kc">apri &rsaquo;</div>`;
     r.onclick = () => sheetScheda(sc.id);
     w.append(r);
   }
+  if (list.length > 1 || (list.length && !seg))
+    w.append(el('p', 'hint',
+      'Quella che <strong>segui</strong> e\' l\'unica che l\'app monitora: '
+      + 'guarda solo le sedute fatte con lei e ti dice quando ha finito di dare. '
+      + 'Si sceglie aprendo la scheda.'));
   const b = el('button', 'btn wide pri', 'Nuova scheda');
   b.style.marginTop = '10px';
   b.onclick = () => sheetScheda(null);
@@ -1312,11 +1455,30 @@ function sheetScheda(id, statoPre) {
   w.append(salva);
 
   if (id) {
+    const seguita = schedaSeguita() === id;
+    const bs = el('button', 'btn wide' + (seguita ? ' pri' : ''));
+    bs.style.marginTop = '8px';
+    bs.textContent = seguita ? '\u2713 La stai seguendo' : 'Segui questa scheda';
+    bs.onclick = () => {
+      seguiScheda(seguita ? null : id);
+      closeSheet(); route();
+      toast(seguita ? 'Non la segui piu\'' : 'Da ora l\'app monitora questa');
+    };
+    w.append(bs);
+    w.append(el('p', 'hint',
+      seguita
+        ? 'L\'app guarda le sedute fatte con questa scheda e ti dice quando la '
+          + 'progressione si ferma. Se ne segui un\'altra, questa smette.'
+        : 'Seguirla vuol dire che l\'app misura i progressi su di lei — quanto sale '
+          + 'ogni esercizio, e quando conviene passare a un altro blocco. Se ne stai '
+          + 'gia\' seguendo un\'altra, quella smette.'));
+
     const del = el('button', 'btn wide', 'Elimina la scheda');
     del.style.marginTop = '8px';
     del.onclick = () => {
       if (!confirm(`Eliminare "${sc.nome}"? Le sedute gia' registrate restano.`)) return;
       P().schede = schede().filter(x => x.id !== id);
+      if (P().schedaAttiva === id) delete P().schedaAttiva;
       save(); closeSheet(); route(); toast('Eliminata');
     };
     w.append(del);
@@ -1799,6 +1961,136 @@ function bottoneEsecuzione(exId) {
 }
 
 /* ------------------------------------------------- esercizi personalizzati */
+/**
+ * La sezione della scheda seguita: come sta andando, e quando cambiarla.
+ *
+ * Non da' un voto e non dice "bravo": mostra di quanto e' salito ogni
+ * esercizio e quali segnali sono accesi. La decisione resta di chi si allena —
+ * l'app non sa se questo blocco era di scarico o se hai avuto l'influenza.
+ */
+function sezGymMonitor(v, k) {
+  const id = schedaSeguita();
+  if (!id) {
+    const c = el('div', 'card');
+    c.append(el('div', 'eyebrow', 'Nessuna scheda seguita'));
+    c.append(el('div', 'muted',
+      'Segna una scheda come "quella che stai seguendo" e da li\' l\'app guarda '
+      + 'solo le sedute fatte con quella: quanto sale ogni esercizio, e quando '
+      + 'il programma ha finito di dare.'));
+    const b = el('button', 'btn wide pri', 'Scegli la scheda');
+    b.style.marginTop = '10px';
+    b.onclick = () => sheetSchede();
+    c.append(b);
+    v.append(c);
+    return;
+  }
+  const mon = monitoraggioScheda(id, k);
+
+  /* --- testata --- */
+  const t = el('div', 'card');
+  t.append(el('div', 'eyebrow', 'Stai seguendo'));
+  t.append(el('h2', 'sec', esc(mon.sc.nome)));
+  t.lastChild.style.marginTop = '2px';
+  t.append(el('div', 'read',
+    `<span><b>${mon.sedute.length}</b> sedute</span>`
+    + `<span>${mon.settimane} ${mon.settimane === 1 ? 'settimana' : 'settimane'}</span>`
+    + (mon.mediana == null ? '<span>carichi: servono dati</span>'
+      : `<span>carichi <b>${mon.mediana >= 0 ? '+' : ''}${nf(mon.mediana, 1)}%</b></span>`)
+    + (mon.ultima ? `<span>ultima ${esc(mon.ultima)}</span>` : '')));
+  const cambia = el('button', 'btn wide');
+  cambia.style.marginTop = '10px';
+  cambia.textContent = 'Cambia la scheda che segui';
+  cambia.onclick = () => sheetSchede();
+  t.append(cambia);
+  v.append(t);
+
+  if (mon.pochiDati) {
+    v.append(el('div', 'card flat',
+      `<div class="eyebrow">Ancora presto</div>
+       <div class="muted">${mon.sedute.length} sedute registrate con questa scheda.
+       Da tre in su i confronti cominciano a significare qualcosa: con due punti
+       la retta passa esatta e non dice niente.</div>`));
+  }
+
+  /* --- quanto e' salito ogni esercizio --- */
+  const c = el('div', 'cw');
+  c.append(el('h3', null, 'Come sta andando, esercizio per esercizio'));
+  c.append(el('div', 'sub',
+    'Massimale stimato con Epley corretto col RIR: media delle prime due sedute '
+    + 'contro le ultime due. Una giornata storta da sola non sposta il verdetto.'));
+  const max = Math.max(6, ...mon.conDati.map(r => Math.abs(r.pct)));
+  for (const r of mon.righe) {
+    const riga = el('div', 'prog-r');
+    if (r.delta == null) {
+      riga.innerHTML = `<span class="nm">${esc(r.nome)}</span>
+        <span class="bar"></span>
+        <span class="v muted">${r.n} ${r.n === 1 ? 'seduta' : 'sedute'}</span>`;
+    } else {
+      const q = Math.min(1, Math.abs(r.pct) / max) * 50;
+      const su = r.pct > 0;
+      riga.innerHTML = `<span class="nm">${esc(r.nome)}
+          <em>${nf(r.inizio, 1)} → ${nf(r.fine, 1)} kg</em></span>
+        <span class="bar"><i class="${r.fermo ? 'fermo' : su ? 'su' : 'giu'}"
+          style="${su ? 'left:50%' : 'right:50%'};width:${q.toFixed(1)}%"></i>
+          <b></b></span>
+        <span class="v ${r.fermo ? '' : su ? 'su' : 'giu'}">${
+          r.pct >= 0 ? '+' : ''}${nf(r.pct, 1)}%</span>`;
+    }
+    c.append(riga);
+  }
+  const leg = el('div', 'legend');
+  leg.innerHTML = `<span><i class="dt" style="background:var(--pine)"></i>in salita</span>
+    <span><i class="dt" style="background:var(--ink-3)"></i>fermo (meno dell'1,5%)</span>
+    <span><i class="dt" style="background:var(--amber)"></i>in calo</span>`;
+  c.append(leg);
+  c.append(el('p', 'note',
+    'La riga verticale al centro e\' lo zero. Le barre sono in scala fra loro, '
+    + 'non in percentuale assoluta: servono a vedere chi tira e chi no.'));
+  v.append(c);
+
+  /* --- il prossimo passo --- */
+  const pp = mon.righe.filter(r => r.passo);
+  if (pp.length) {
+    const cp = el('div', 'cw');
+    cp.append(el('h3', null, 'Il prossimo passo'));
+    cp.append(el('div', 'sub',
+      'Doppia progressione: si sale di carico solo quando tutte le serie toccano '
+      + 'il tetto del range con RIR basso.'));
+    for (const r of pp) {
+      const x = el('div', 'rev-fix');
+      x.innerHTML = `<span class="t">${esc(r.nome)}</span>
+        <span class="c">${esc(r.passo.testo)}</span>`;
+      cp.append(x);
+    }
+    v.append(cp);
+  }
+
+  /* --- quando cambiarla --- */
+  const cq = el('div', 'card' + (mon.cambiare ? ' imp-esito' : ' flat'));
+  cq.append(el('div', 'eyebrow', 'Quando cambiarla'));
+  cq.append(el('h2', 'sec', mon.pochiDati ? 'Troppo presto per dirlo'
+    : mon.cambiare ? 'Conviene cambiarla' : 'Tienila ancora'));
+  cq.lastChild.style.marginTop = '2px';
+  cq.append(el('p', 'muted', mon.pochiDati
+    ? 'Servono almeno tre sedute registrate con questa scheda.'
+    : mon.cambiare
+      ? `Sono accesi ${mon.accesi} segnali su tre. Non e' un obbligo: e' il momento in cui, di solito, un blocco nuovo rende piu' di uno vecchio.`
+      : `Segnali accesi: ${mon.accesi} su tre. Ne servono due, e uno solo si accende anche per caso.`));
+  for (const sg of mon.segnali) {
+    const r = el('div', 'sig-r' + (sg.on ? ' on' : ''));
+    r.innerHTML = `<span class="p"></span>
+      <span class="b"><span class="t">${esc(sg.t)}</span>
+      <span class="d">${esc(sg.d)}</span></span>`;
+    cq.append(r);
+  }
+  cq.append(el('p', 'note',
+    'Le otto settimane sono un intervallo di pratica comune, non una misura su '
+    + 'di te: se stai ancora salendo su tutto, continuare e\' la scelta giusta. '
+    + 'E una scheda si cambia anche perche\' e\' noiosa — quello l\'app non lo '
+    + 'sa e non prova a indovinarlo.'));
+  v.append(cq);
+}
+
 /* ------------------------------------------------------- tutti gli esercizi
  *
  * Prima "Esercizi" apriva un foglio con dentro solo i propri, e i cinquantanove

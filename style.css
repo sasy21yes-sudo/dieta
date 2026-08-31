@@ -4,6 +4,10 @@
   --amber:#8A5D0F; --amber-soft:#FCF3E2;
   --ink:#151A1F; --ink-2:#4A5560; --ink-3:#8A93A0;
   --paper:#FFFFFF; --wash:#F4F7F9; --rule:#DDE3E8;
+  /* La carta della priorita' e' scura in TUTTI E DUE i temi, e ha un token
+     suo per questo: con background:var(--ink) al buio si ribaltava in una
+     carta chiara, e i testi dentro — scritti in bianco fisso — sparivano. */
+  --evid:#151A1F;
   --sans:"IBM Plex Sans",-apple-system,system-ui,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,monospace;
   --serif:"IBM Plex Serif",Georgia,serif;
@@ -17,6 +21,7 @@
     --amber:#D9A441; --amber-soft:#2E2410;
     --ink:#E9EEF1; --ink-2:#A6B2BC; --ink-3:#6E7B87;
     --paper:#0E1417; --wash:#161E23; --rule:#26313A;
+    --evid:#15302A;
   }
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -230,6 +235,13 @@ button.cmp-r:active{background:var(--wash)}
   margin:4px auto 12px}
 .swapopt{display:flex;justify-content:space-between;align-items:center;gap:12px;
   padding:12px 0;border-bottom:1px solid var(--rule)}
+/* Da quando la sostituzione si applica, queste righe sono <button>: senza il
+   reset prendevano lo stile di sistema — fondo chiaro e testo nero — che al
+   buio diventa un rettangolo bianco in mezzo alla lista. */
+button.swapopt{width:100%;background:none;border:0;
+  border-bottom:1px solid var(--rule);text-align:left;font:inherit;
+  color:inherit;cursor:pointer}
+button.swapopt:active{background:var(--wash)}
 .swapopt .d{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
 
 #toast{position:fixed;left:50%;bottom:calc(78px + var(--safe-b));
