@@ -1115,19 +1115,47 @@ function sheetPasto(id) {
   const add = el('div', 'card flat');
   add.style.marginTop = '12px';
   add.append(el('div', 'eyebrow', 'Aggiungi un ingrediente'));
-  const sa = el('select');
-  sa.id = 'pt-al';
-  sa.style.cssText = 'width:100%;padding:9px 10px;border:1px solid var(--rule);border-radius:9px;'
-    + 'background:var(--paper);color:var(--ink);font:inherit;margin-bottom:8px';
-  for (const n of Object.keys(D.alimenti).sort()) sa.append(new Option(n, n));
-  add.append(sa);
+  /* Era una tendina su cinquanta voci, cioe' un elenco da scorrere col
+     pollice. Ed erano solo gli alimenti: un prodotto registrato col codice a
+     barre non compariva, che e' esattamente la cosa che uno ha in mano quando
+     compone un pasto. Adesso ci sono anche quelli e, scegliendone uno, entra
+     nel piano da solo — una ricetta ha bisogno di un nome, e glielo diamo. */
+  let scelto = null;
+  if (typeof selettoreCercabile === 'function' && typeof mangiabili === 'function') {
+    const opz = mangiabili().map(x => ({
+      v: x.id, lab: x.nome,
+      sub: `${x.fonte === 'prodotto' ? (x.marca ? x.marca + ' · ' : '') + 'da aggiungere · ' : ''}`
+        + `${nf(x.kcal)} kcal · ${nf(x.p, 1)} P per 100 ${x.unita}`
+    }));
+    add.append(selettoreCercabile(opz, null, v => { scelto = v; },
+      'pane, tofu, la tua barretta…'));
+  } else {
+    const sa = el('select');
+    sa.id = 'pt-al';
+    for (const n of Object.keys(D.alimenti).sort()) sa.append(new Option(n, n));
+    add.append(sa);
+  }
   add.append(el('div', 'field',
     '<label>Quantita</label><input type="text" inputmode="decimal" id="pt-q" value="100">'));
   const ba = el('button', 'btn wide', 'Aggiungi');
   ba.onclick = () => {
     const q = parseNum($('#pt-q').value);
     if (!(q > 0)) { toast('Quantita non valida'); return; }
-    stato.ing.push({ alimento: $('#pt-al').value, qta: q });
+    let nome = null;
+    if (scelto) {
+      const x = mangiabile(scelto);
+      if (!x) { toast('Scegli un ingrediente'); return; }
+      // un prodotto diventa un alimento sul momento: la ricetta ha bisogno di
+      // un nome, e lasciarlo fuori sarebbe un vicolo cieco
+      nome = x.fonte === 'prodotto' && typeof prodottoInAlimento === 'function'
+        ? prodottoInAlimento(prodotti().find(pp => pp.id === scelto.slice(2)))
+        : x.nome;
+      if (x.fonte === 'prodotto') toast(nome + ': aggiunto agli alimenti');
+    } else if ($('#pt-al')) {
+      nome = $('#pt-al').value;
+    }
+    if (!nome) { toast('Scegli un ingrediente'); return; }
+    stato.ing.push({ alimento: nome, qta: q });
     disegna();
   };
   add.append(ba);

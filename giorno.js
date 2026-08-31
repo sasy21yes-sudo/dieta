@@ -77,9 +77,38 @@ function ingredientiGiorno(code, k) {
       alimento: s ? s.a : i.alimento,         // quello che c'e' finito davvero
       qta: por[i.alimento] ?? (s ? s.qta : i.qta),
       qtaPiano: i.qta,
-      alPostoDi: s ? i.alimento : null
+      alPostoDi: s ? i.alimento : null,
+      // un prodotto col codice a barre non ha un nome dentro il piano: il
+      // diario si tiene il suo id, cosi' puo' registrarlo lo stesso
+      prod: s?.prod || null
     };
   });
+}
+
+/**
+ * I macro di una riga di ingrediente, prodotto sciolto compreso.
+ *
+ * Serve perche' una riga puo' puntare a due cose diverse: un alimento del
+ * piano, che si risolve per nome, o un prodotto registrato col codice a barre,
+ * che un nome dentro il piano non ce l'ha. Chi legge una riga non deve sapere
+ * quale delle due: chiede i macro e li ottiene.
+ */
+function macroIngrediente(i, qta) {
+  const q = qta ?? i.qta;
+  if (i.prod && typeof macroMangiabile === 'function') {
+    const m = macroMangiabile('p:' + i.prod, q);
+    if (m) return m;
+  }
+  return foodM(i.alimento, q);
+}
+
+/** L'unita' di misura di una riga di ingrediente. */
+function unitaIngrediente(i) {
+  if (i.prod && typeof prodotti === 'function') {
+    const pr = prodotti().find(x => x.id === i.prod);
+    if (pr) return pr.unita || 'g';
+  }
+  return D.alimenti[i.alimento]?.unita || 'g';
 }
 
 function mealMGiorno(code, k) {
@@ -91,7 +120,7 @@ function mealMGiorno(code, k) {
     || (por && Object.keys(por).length) || (sw && Object.keys(sw).length);
   if (!cambiato || !p?.ingredienti) return mealM(eff);
   const m = M0();
-  for (const i of ingredientiGiorno(code, k)) addM(m, foodM(i.alimento, i.qta));
+  for (const i of ingredientiGiorno(code, k)) addM(m, macroIngrediente(i));
   for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) m[x] = Math.round(m[x] * 10) / 10;
   return m;
 }
@@ -153,14 +182,14 @@ function swapDelGiorno(code, k, slot) { return S.log[k]?.swap?.[code]?.[slot] ||
  * grammi dell'alimento sostituito, e riportarli sull'originale vorrebbe dire
  * inventarsi una porzione che nessuno ha scelto.
  */
-function metteSwap(code, k, slot, nuovo, qta) {
+function metteSwap(code, k, slot, nuovo, qta, prod) {
   const d = day(k);
   d.swap ||= {}; d.swap[code] ||= {};
   if (!nuovo) {
     delete d.swap[code][slot];
     if (d.porzioni?.[code]) delete d.porzioni[code][slot];
   } else {
-    d.swap[code][slot] = { a: nuovo, qta };
+    d.swap[code][slot] = prod ? { a: nuovo, qta, prod } : { a: nuovo, qta };
     if (d.porzioni?.[code]) delete d.porzioni[code][slot];
   }
   if (!Object.keys(d.swap[code]).length) delete d.swap[code];
@@ -219,7 +248,7 @@ function sheetPorzioni(k, code) {
   const ingOggi = () => ingredientiGiorno(code, k);
   const macroOra = () => {
     const m = M0();
-    for (const i of ingOggi()) addM(m, foodM(i.alimento, stato[i.slot] ?? i.qta));
+    for (const i of ingOggi()) addM(m, macroIngrediente(i, stato[i.slot] ?? i.qta));
     return m;
   };
   const aggiorna = () => {
@@ -233,18 +262,18 @@ function sheetPorzioni(k, code) {
   const disegna = () => {
     lista.innerHTML = '';
     for (const i of ingOggi()) {
-      const a = D.alimenti[i.alimento];
+      const unita = unitaIngrediente(i);
       const rif = i.alPostoDi ? i.qta : i.qtaPiano;
       const q = stato[i.slot] ?? i.qta;
       const cambiato = q !== rif;
       const riga = el('div', 'porz' + (cambiato ? ' mod' : ''));
       riga.innerHTML = `<span class="nm">${esc(i.alimento)}
           ${i.alPostoDi ? `<em>al posto di ${esc(i.alPostoDi)}</em>` : ''}
-          ${cambiato ? `<em>piano: ${nf(rif)} ${esc(a?.unita || 'g')}</em>` : ''}</span>
+          ${cambiato ? `<em>piano: ${nf(rif)} ${esc(unita)}</em>` : ''}</span>
         <button class="btn sm" data-d="-10">−</button>
         <input type="text" inputmode="decimal" value="${q}">
         <button class="btn sm" data-d="10">+</button>
-        <span class="u">${esc(a?.unita || 'g')}</span>`;
+        <span class="u">${esc(unita)}</span>`;
       const inp = riga.querySelector('input');
       const setta = n => {
         n = Math.max(0, Math.round(n * 10) / 10);
@@ -253,7 +282,7 @@ function sheetPorzioni(k, code) {
         riga.classList.toggle('mod', n !== rif);
         const em = riga.querySelector('em.qta');
         if (n !== rif && !em) riga.querySelector('.nm').insertAdjacentHTML('beforeend',
-          `<em class="qta">piano: ${nf(rif)} ${esc(a?.unita || 'g')}</em>`);
+          `<em class="qta">piano: ${nf(rif)} ${esc(unita)}</em>`);
         if (n === rif && em) em.remove();
         aggiorna();
       };

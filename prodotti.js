@@ -64,6 +64,37 @@ function macroMangiabile(id, qta) {
 }
 
 /* --------------------------------------------------------------- vista */
+/**
+ * Porta un prodotto dentro il piano.
+ *
+ * Un prodotto registrato col codice a barre e' una scatola con un'etichetta:
+ * il diario sa registrarlo, ma una ricetta no — una ricetta e' fatta di nomi
+ * di alimenti. Questa funzione crea quel nome, con i valori dell'etichetta, e
+ * ci collega il prodotto: da quel momento e' un alimento come gli altri, e i
+ * suoi numeri restano quelli letti sulla confezione.
+ *
+ * La categoria nasce vuota apposta ed e' segnalata: serve al motore delle
+ * sostituzioni, e sceglierla per conto dell'utente vorrebbe dire inventarsi
+ * in quale famiglia sta una cosa che non abbiamo mai visto.
+ */
+function prodottoInAlimento(pr) {
+  const p = piano();
+  let nome = pr.nome;
+  // se quel nome esiste gia' ed e' di qualcun altro, si distingue con la marca
+  if (D.alimenti[nome] && overrideDi(nome)?.id !== pr.id)
+    nome = (pr.marca ? `${nome} — ${pr.marca}` : `${nome} (prodotto)`).slice(0, 60);
+  p.alimenti[nome] = {
+    ...(p.alimenti[nome] || {}),
+    kcal: pr.kcal, p: pr.p, c: pr.c, g: pr.g, fibre: pr.fibre,
+    categoria: p.alimenti[nome]?.categoria || '',
+    unita: pr.unita || 'g', fonte: 'verificato'
+  };
+  if (pr.barcode) p.alimenti[nome].barcode = pr.barcode;
+  pr.sostituisce = nome;
+  save(); fondiPiano();
+  return nome;
+}
+
 /* ==================================================== un elenco solo
  *
  * Per molto tempo ce n'erano due, e non si capiva quale fosse quale.
@@ -343,6 +374,27 @@ function sheetProdotto(p) {
     + 'collegamento il prodotto resta registrato ma le ricette non lo vedono — '
     + 'compare solo quando scrivi un pasto fuori piano.'));
   w.append(f);
+
+  /* La scorciatoia per il caso piu' frequente: un prodotto appena letto col
+     codice a barre, che non sostituisce niente e quindi le ricette non
+     vedono. Un tocco e diventa un alimento come gli altri. */
+  if (p && p.id && !p.sostituisce) {
+    const dentro = el('button', 'btn wide');
+    dentro.style.marginBottom = '10px';
+    dentro.textContent = 'Aggiungilo agli alimenti';
+    dentro.onclick = () => {
+      const n = prodottoInAlimento(p);
+      closeSheet(); route();
+      sheetAlimento(n);
+      toast('Aggiunto: manca solo la categoria');
+    };
+    w.append(dentro);
+    w.append(el('div', 'hint',
+      'Finche\' resta solo un prodotto, i pasti del piano non possono usarlo: '
+      + 'compare quando scrivi un pasto fuori piano o quando sostituisci un '
+      + 'ingrediente, ma non nelle ricette. Aggiungendolo agli alimenti diventa '
+      + 'un nome che il piano sa usare, con i valori della sua etichetta.'));
+  }
 
   const salva = el('button', 'btn wide pri', 'Salva');
   salva.onclick = () => {

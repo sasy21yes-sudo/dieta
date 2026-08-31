@@ -1145,11 +1145,25 @@ parole in comune sul totale, tolte quelle che non distinguono niente ("di",
 E soprattutto: **"Oppure scegli tu"**. Il motore ordina per somiglianza, ma
 "somigliante" non è "voluto" — chi usa il latte proteico oggi e quello normale
 domani sta scegliendo, non cercando un'equivalenza. Il campo cercabile prende
-qualunque alimento del piano, propone la quantità che pareggia il macro
+qualunque cosa si possa mangiare, propone la quantità che pareggia il macro
 dominante e la lascia modificabile, con i quattro scarti che si aggiornano
-mentre scrivi. Restano fuori i prodotti non collegati a un alimento: la ricetta
-di un pasto ragiona per nomi, e un prodotto sciolto dentro il piano un nome non
-ce l'ha.
+mentre scrivi.
+
+**Prodotti compresi**, ed è stata una correzione: erano esclusi perché una
+ricetta ragiona per nomi di alimenti e un prodotto col codice a barre dentro il
+piano un nome non ce l'ha. Ma quello era un problema del modello, non
+dell'utente: se lo hai registrato e stasera lo mangi, il diario deve saperlo
+scrivere. Ora la sostituzione si porta dietro l'id del prodotto
+(`swap[slot] = { a, qta, prod }`), e `macroIngrediente()` / `unitaIngrediente()`
+risolvono una riga senza che chi la legge debba sapere di quale dei due si
+tratta.
+
+Nella composizione di un pasto invece un nome serve davvero, e allora scegliendo
+un prodotto lo si **promuove**: `prodottoInAlimento()` crea l'alimento con i
+valori dell'etichetta e ci collega il prodotto. La categoria nasce vuota
+apposta e la UI lo dice — serve al motore delle sostituzioni, e sceglierla per
+conto dell'utente vorrebbe dire inventarsi in che famiglia sta una cosa che non
+abbiamo mai visto.
 
 ### La sostituzione si applica
 
@@ -1511,6 +1525,9 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non mostrare in elenco `D.alimenti[nome]` dove un prodotto lo sostituisce:
   vanno mostrati i valori che l'app usa davvero, o la riga dice "etichetta" e
   scrive accanto la stima
+- Non escludere i prodotti col codice a barre dalle ricerche: se uno lo ha
+  registrato è perché lo mangia. Dove serve un nome — le ricette — si promuove
+  a alimento; dove basta un valore — il diario — si tiene l'id
 - Non ordinare le sostituzioni solo sui macro: "latte di soia proteico" ha
   macro diversi da "latte di soia" *per costruzione*, ed è proprio la
   sostituzione che si cerca più spesso. Il nome è un criterio, non un dettaglio

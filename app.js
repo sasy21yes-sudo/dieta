@@ -1074,9 +1074,10 @@ function viewOggi(v) {
            ${ing.alPostoDi ? `<em class="dapiano">al posto di ${esc(ing.alPostoDi)}</em>` : ''}
            <span class="swap">${ing.alPostoDi ? 'cambia' : 'sostituisci'}</span></span>
          <span class="q">${nf(ing.qta, ing.qta % 1 ? 1 : 0)} ${
-           D.alimenti[ing.alimento]?.unita || 'g'}</span>`);
+           typeof unitaIngrediente === 'function' ? esc(unitaIngrediente(ing))
+             : (D.alimenti[ing.alimento]?.unita || 'g')}</span>`);
       li.onclick = () => sheetSwap(ing.alimento, ing.qta,
-        { k, code: s.codice, slot: ing.slot });
+        { k, code: s.codice, slot: ing.slot, prod: ing.prod });
       ul.append(li);
     }
     m.append(ul); v.append(m);
@@ -1167,7 +1168,20 @@ function closeSheet() { $('#sheet').hidden = true; }
  */
 function sheetSwap(nome, qta, ctx) {
   const wrap = el('div');
-  const a = D.alimenti[nome], src = foodM(nome, qta);
+  /* Quello che c'e' adesso in quel posto puo' essere un alimento del piano
+     oppure un prodotto col codice a barre, che nel piano un nome non ce l'ha:
+     i suoi valori si prendono dal registro dei prodotti. */
+  const pr = ctx?.prod && typeof mangiabile === 'function'
+    ? mangiabile('p:' + ctx.prod) : null;
+  const a = D.alimenti[nome] || pr;
+  const src = pr && typeof macroMangiabile === 'function'
+    ? (macroMangiabile('p:' + ctx.prod, qta) || M0())
+    : foodM(nome, qta);
+  /* Il motore delle alternative ragiona per categoria, e un prodotto non ne
+     ha una: si parte dall'ingrediente che il PIANO prevedeva in quel posto,
+     che e' comunque la domanda giusta — "cos'altro ci puo' andare". */
+  const rif = ctx?.slot && D.alimenti[ctx.slot] ? ctx.slot
+    : (D.alimenti[nome] ? nome : null);
   const attiva = ctx && typeof swapDelGiorno === 'function'
     ? swapDelGiorno(ctx.code, ctx.k, ctx.slot ?? nome) : null;
 
@@ -1175,7 +1189,8 @@ function sheetSwap(nome, qta, ctx) {
   wrap.append(el('h2', 'sec',
     `${nf(qta, qta % 1 ? 1 : 0)} ${a?.unita || 'g'} di ${esc(nome)}`));
   wrap.lastChild.style.marginTop = '0';
-  wrap.append(el('p', 'muted', `${nf(src.kcal)} kcal · ${macroRiga(src)}`));
+  wrap.append(el('p', 'muted', `${nf(src.kcal)} kcal · ${macroRiga(src)}`
+    + (pr ? ' · <span class="mono">dalla tua etichetta</span>' : '')));
 
   if (ctx) wrap.append(el('p', 'hint',
     'Quello che scegli vale <strong>solo per oggi</strong>: il pasto nel piano '
@@ -1215,7 +1230,7 @@ function sheetSwap(nome, qta, ctx) {
     wrap.append(r);
   };
 
-  const curated = (D.sostituzioni_consigliate || []).filter(x => x.da === nome
+  const curated = (D.sostituzioni_consigliate || []).filter(x => x.da === rif
     && D.alimenti[x.a]);
   if (curated.length) {
     wrap.append(el('h2', 'sec', 'Consigliate'));
@@ -1223,8 +1238,12 @@ function sheetSwap(nome, qta, ctx) {
   }
 
   wrap.append(el('h2', 'sec', 'Calcolate a parita’ di macro'));
-  const list = swaps(nome, qta);
+  const list = rif ? swaps(rif, qta) : [];
   if (!list.length) wrap.append(el('p', 'muted', 'Nessuna alternativa nella stessa categoria.'));
+  else if (rif !== nome) wrap.append(el('p', 'hint',
+    `Calcolate su <strong>${esc(rif)}</strong>, l\'ingrediente che il piano prevede `
+    + 'in questo posto: quello che ci hai messo oggi e\' un prodotto, e i prodotti '
+    + 'non hanno una categoria da cui partire.'));
   for (const x of list) {
     // il motore riscala sul macro dominante, ma la sostituzione la paghi su
     // tutti e quattro: vedere solo lo scarto in proteine nasconde la meta'
@@ -1275,11 +1294,13 @@ function sheetSwap(nome, qta, ctx) {
         + (x.stima ? '<span class="mono muted">valore stimato</span>' : '');
     };
 
-    /* Solo alimenti del piano: la ricetta di un pasto ragiona per nomi di
-       alimenti, e un prodotto sciolto dentro il piano un nome non ce l'ha.
-       Chi lo vuole usare lo collega a un alimento da Prodotti, e da quel
-       momento compare qui con i valori della sua etichetta. */
-    const opz = mangiabili().filter(x => x.fonte === 'piano' && x.nome !== nome).map(x => ({
+    /* Tutto quello che si puo' mangiare, prodotti col codice a barre compresi.
+       Prima erano esclusi perche' la ricetta di un pasto ragiona per nomi di
+       alimenti e un prodotto sciolto un nome dentro il piano non ce l'ha — ma
+       il problema era del modello, non dell'utente: se lo hai registrato e
+       stasera lo mangi, il diario deve saperlo scrivere. Adesso la
+       sostituzione si porta dietro l'id del prodotto. */
+    const opz = mangiabili().filter(x => x.nome !== nome).map(x => ({
       v: x.id, lab: x.nome,
       sub: `${x.fonte === 'prodotto' ? (x.marca ? x.marca + ' · ' : 'tuo prodotto · ') : ''}${
         nf(x.kcal)} kcal · ${nf(x.p, 1)} P per 100 ${x.unita}`
@@ -1287,6 +1308,7 @@ function sheetSwap(nome, qta, ctx) {
     f.append(selettoreCercabile(opz, null, id => {
       scelto = id;
       const x = mangiabile(id);
+      ok.textContent = 'Usa ' + (x ? x.nome : 'questo');
       // la quantita' proposta pareggia il macro dominante, come fa il motore:
       // e' un punto di partenza, non un vincolo
       const dom2 = src.p * 4 > src.kcal * 0.2 ? 'p' : 'kcal';
@@ -1294,7 +1316,6 @@ function sheetSwap(nome, qta, ctx) {
       const prop = per100 > 0 ? Math.round((src[dom2] / per100) * 100) : 100;
       $('#sw-q').value = Math.max(1, Math.min(2000, prop));
       q.hidden = false; ant.hidden = false; ok.hidden = false;
-      ok.textContent = 'Usa ' + x.nome;
       aggiorna();
     }, 'latte proteico, avena, la tua barretta…'));
     wrap.append(f, q, ant);
@@ -1304,7 +1325,10 @@ function sheetSwap(nome, qta, ctx) {
       const x = mangiabile(scelto);
       const qta2 = parseNum($('#sw-q').value);
       if (!x || !(qta2 > 0)) { toast('Serve una quantita\''); return; }
-      metteSwap(ctx.code, ctx.k, ctx.slot ?? nome, x.nome, qta2);
+      // un prodotto si porta dietro il suo id: e' l'unico modo di ritrovarne
+      // i valori, visto che nel piano un nome non ce l'ha
+      metteSwap(ctx.code, ctx.k, ctx.slot ?? nome, x.nome, qta2,
+        x.fonte === 'prodotto' ? scelto.slice(2) : null);
       closeSheet(); route();
       toast(x.nome + ' al posto di ' + nome + ', solo per oggi');
     };
@@ -1313,8 +1337,8 @@ function sheetSwap(nome, qta, ctx) {
       'La quantita\' proposta pareggia il macro che conta di piu\' in questo '
       + 'alimento — le proteine se ne danno piu\' di un quinto delle calorie, '
       + 'altrimenti le calorie. Cambiala e i quattro scarti si aggiornano. '
-      + 'Qui ci sono gli alimenti del piano: un prodotto col codice a barre '
-      + 'compare dopo che lo hai collegato a uno di loro, dall\'elenco degli alimenti.'));
+      + 'Ci sono anche i prodotti registrati col codice a barre: quelli usano i '
+      + 'valori della loro etichetta.'));
   }
 
   const b = el('button', 'btn wide pri', 'Chiudi');
