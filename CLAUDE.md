@@ -233,10 +233,11 @@ non un dettaglio.
 - **Oggi** — giorno navigabile, cinque barre consumato/target (kcal, proteine,
   carboidrati, grassi, fibre), pasti spuntabili con i macro di ognuno,
   totale residuo, registrazione pasti fuori piano senza tono colpevolizzante
-- **Sostituzioni** — motore che, dato un alimento e una quantità, cerca nella stessa
-  categoria e riscala per far combaciare il macro dominante (proteine se danno >20%
-  delle calorie, altrimenti calorie), poi ordina per distanza sui quattro macro.
-  Si **applicano**, solo per quel giorno: vedi "La sostituzione si applica"
+- **Sostituzioni** — motore che, dato un alimento e una quantità, riscala per far
+  combaciare il macro dominante (proteine se danno >20% delle calorie, altrimenti
+  calorie) e ordina per distanza sui quattro macro **e per affinità di nome**.
+  Si **applicano**, solo per quel giorno, e si può anche scegliere a mano
+  qualunque alimento: vedi "La sostituzione si applica"
 - **Diario** — peso, acqua, Coca Zero, passi, sonno, allenamento, fame, energia,
   aderenza, sintomi gastrointestinali, checklist integratori
 - **Corpo** — target fisico e composizione stimata a confronto; figura SVG
@@ -1081,6 +1082,37 @@ UI lo dice — come le costanti di Banister e le soglie di HYROX. E c'e' una
 ragione per cambiare scheda che l'app non conosce e non prova a indovinare: che
 sia diventata noiosa. Anche quello e' scritto.
 
+### Il nome conta quanto i macro
+
+Il motore ordinava solo per distanza sui macro, dentro la stessa categoria. Su
+un caso frequentissimo sbagliava sempre: chi ha in dispensa **"latte di soia" e
+"latte di soia proteico"** vuole spessissimo il secondo — ed era esattamente
+quello che veniva scartato, perché i macro sono diversi *apposta* e la distanza
+lo mandava in fondo, o fuori del tutto se stava in un'altra categoria.
+
+`affinitaNome()` aggiunge il secondo criterio: **un nome contenuto nell'altro
+vale 1** (è la stessa cosa in un'altra versione), altrimenti si contano le
+parole in comune sul totale, tolte quelle che non distinguono niente ("di",
+"al", "con"). Poi due effetti:
+
+- l'affinità **accorcia la distanza fino a metà** — non l'annulla, perché una
+  variante con macro molto diversi resta una scelta e non un'equivalenza, e
+  infatti la riga continua a mostrare lo scarto sui quattro macro;
+- **fuori categoria si entra solo da parenti stretti** (metà delle parole in
+  comune), o l'elenco diventa un catalogo e smette di essere un consiglio.
+  Misurato: "latte soia cioccolato" e "latte di soia proteico" condividono due
+  parole su quattro ed entrano; "latte di mandorla" si ferma a un terzo e resta
+  fuori.
+
+E soprattutto: **"Oppure scegli tu"**. Il motore ordina per somiglianza, ma
+"somigliante" non è "voluto" — chi usa il latte proteico oggi e quello normale
+domani sta scegliendo, non cercando un'equivalenza. Il campo cercabile prende
+qualunque alimento del piano, propone la quantità che pareggia il macro
+dominante e la lascia modificabile, con i quattro scarti che si aggiornano
+mentre scrivi. Restano fuori i prodotti non collegati a un alimento: la ricetta
+di un pasto ragiona per nomi, e un prodotto sciolto dentro il piano un nome non
+ce l'ha.
+
 ### La sostituzione si applica
 
 Per molto tempo il foglio delle sostituzioni era una tabella: diceva "al posto
@@ -1435,6 +1467,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non stilare come `div` un elemento che e' diventato `button`: senza il reset
   prende il fondo chiaro di sistema, e al buio e' un rettangolo bianco in mezzo
   alla lista
+- Non ordinare le sostituzioni solo sui macro: "latte di soia proteico" ha
+  macro diversi da "latte di soia" *per costruzione*, ed è proprio la
+  sostituzione che si cerca più spesso. Il nome è un criterio, non un dettaglio
+- Non far entrare tutto fuori categoria per far salire le varianti: senza il
+  recinto l'elenco diventa un catalogo. Metà delle parole in comune è la soglia
 - Non riscalare un pasto oltre ×0,6–×1,6 per far combaciare i macro: mezza
   porzione di un pasto non e' piu' quel pasto
 - Non tenere porzioni e sostituzioni di ingrediente quando si cambia il pasto

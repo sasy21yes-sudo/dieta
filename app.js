@@ -183,8 +183,54 @@ function dayTarget(k) {
 }
 
 /* --------------------------------------------------- motore sostituzioni */
-/** Trova alimenti della stessa categoria che replicano il macro dominante. */
-function swaps(nome, qta, n = 5) {
+/* Le parole che non distinguono un alimento da un altro: "latte di soia" e
+   "latte al cioccolato" hanno in comune solo rumore, e contarlo farebbe
+   sembrare parenti due cose che non lo sono. */
+const PAROLE_VUOTE = new Set(['di', 'al', 'alla', 'ai', 'con', 'e', 'a', 'in', 'da',
+  'del', 'della', 'dei', 'delle', 'lo', 'la', 'il', 'i', 'gli', 'le', 'un', 'una']);
+
+function paroleAlimento(s) {
+  return String(s).toLowerCase()
+    .replace(/[^a-zà-ù0-9]+/g, ' ').trim().split(/\s+/)
+    .filter(x => x && !PAROLE_VUOTE.has(x));
+}
+
+/**
+ * Quanto due alimenti si somigliano NEL NOME, da 0 a 1.
+ *
+ * Serve a un caso che il solo confronto dei macro sbagliava sempre: se uno ha
+ * in dispensa "latte di soia" e "latte di soia proteico", il secondo e' la
+ * sostituzione piu' ovvia che esista — ed e' proprio quella che il motore
+ * scartava, perche' i macro sono diversi apposta e la distanza lo mandava in
+ * fondo, o fuori del tutto se stava in un'altra categoria.
+ *
+ * Un nome contenuto nell'altro vale 1: e' la stessa cosa in un'altra versione.
+ * Altrimenti si contano le parole in comune sul totale.
+ */
+function affinitaNome(a, b) {
+  const x = String(a).toLowerCase().trim(), y = String(b).toLowerCase().trim();
+  if (!x || !y) return 0;
+  if (x.includes(y) || y.includes(x)) return 1;
+  const A = new Set(paroleAlimento(x)), B = new Set(paroleAlimento(y));
+  if (!A.size || !B.size) return 0;
+  let comuni = 0;
+  for (const w of A) if (B.has(w)) comuni++;
+  return comuni / (A.size + B.size - comuni);
+}
+
+/**
+ * Le alternative a un alimento, in ordine di quanto gli assomigliano.
+ *
+ * Due criteri, non uno: i macro riscalati sul dominante (proteine se danno piu'
+ * del 20% delle calorie, altrimenti calorie) e l'affinita' del nome. La
+ * categoria resta il recinto — sostituire il pane con il tonno non aiuta
+ * nessuno — ma **una variante dello stesso alimento entra anche da un'altra
+ * categoria**: "latte di soia proteico" puo' stare fra i proteici mentre il
+ * latte sta fra le bevande, e restano la stessa cosa in due versioni.
+ */
+const AFFINE_PARENTI = 0.5;      // meta' delle parole in comune: stessa famiglia
+
+function swaps(nome, qta, n = 8) {
   const a = alimento(nome); if (!a) return [];
   const src = foodM(nome, qta);
   // se >20% delle calorie viene da proteine, la proteina è il vincolo
@@ -192,7 +238,14 @@ function swaps(nome, qta, n = 5) {
   const out = [];
   for (const k of Object.keys(D.alimenti)) {
     const v = alimento(k);
-    if (k === nome || v.categoria !== a.categoria) continue;
+    if (k === nome) continue;
+    const aff = affinitaNome(nome, k);
+    /* Fuori categoria si entra solo da parenti stretti, o l'elenco diventa un
+       catalogo e smette di essere un consiglio. Meta' delle parole in comune
+       e' la soglia giusta: "latte soia cioccolato" e "latte di soia proteico"
+       ne condividono due su quattro e sono la stessa cosa in due versioni,
+       mentre "latte di mandorla" si ferma a un terzo e resta fuori. */
+    if (v.categoria !== a.categoria && aff < AFFINE_PARENTI) continue;
     if (!v[dom]) continue;
     const q = (src[dom] / v[dom]) * 100;
     if (q < 3 || q > 900) continue;
@@ -203,7 +256,11 @@ function swaps(nome, qta, n = 5) {
       const base = Math.max(src[x], 5);
       dist += Math.abs(m[x] - src[x]) / base;
     }
-    out.push({ nome: k, qta: q, macro: m, dist, unita: v.unita, fonte: v.fonte });
+    // l'affinita' del nome accorcia la distanza fino a meta': non la annulla,
+    // perche' una variante con i macro molto diversi resta una scelta e non
+    // un'equivalenza, e infatti la riga continua a mostrare lo scarto
+    out.push({ nome: k, qta: q, macro: m, dist: dist * (1 - 0.5 * aff), scarto: dist,
+               variante: aff >= AFFINE_PARENTI, unita: v.unita, fonte: v.fonte });
   }
   out.sort((x, y) => x.dist - y.dist);
   return out.slice(0, n);
@@ -1143,9 +1200,10 @@ function sheetSwap(nome, qta, ctx) {
   }
 
   /** Una riga scegliibile: se c'e' un giorno a cui applicarla, la applica. */
-  const opzione = (titolo, dettaglio, alimento, quanto) => {
+  const opzione = (titolo, dettaglio, alimento, quanto, tag) => {
     const r = el(ctx ? 'button' : 'div', 'swapopt');
-    r.innerHTML = `<div class="grow"><strong>${esc(titolo)}</strong>
+    r.innerHTML = `<div class="grow"><strong>${esc(titolo)}</strong>${
+         tag ? `<span class="pill ok">${esc(tag)}</span>` : ''}
          <div class="d">${dettaglio}</div></div>
        <div class="mono">${nf(quanto, quanto % 1 ? 1 : 0)} ${
          esc(D.alimenti[alimento]?.unita || 'g')}${ctx ? ' ›' : ''}</div>`;
@@ -1180,7 +1238,83 @@ function sheetSwap(nome, qta, ctx) {
       `${dk >= 0 ? '+' : '−'}${nf(Math.abs(dk))} kcal · `
       + [['p', 'P'], ['c', 'C'], ['g', 'G'], ['fibre', 'fib']].map(dd).join(' · ')
       + (x.fonte === 'stima' ? ' · valore stimato' : ''),
-      x.nome, x.qta);
+      x.nome, x.qta, x.variante ? 'stesso alimento, altra versione' : null);
+  }
+
+  /* --- e se nessuna delle proposte e' quella giusta ---
+     Il motore ordina per somiglianza, ma "somigliante" non e' "voluto": chi
+     ha in casa il latte proteico oggi e quello normale domani sta scegliendo,
+     non cercando un'equivalenza. Qui si prende qualunque alimento, la
+     quantita' si propone a parita' di macro dominante e resta modificabile. */
+  if (ctx && typeof selettoreCercabile === 'function' && typeof mangiabili === 'function') {
+    wrap.append(el('h2', 'sec', 'Oppure scegli tu'));
+    let scelto = null;
+    const f = el('div', 'field');
+    const q = el('div', 'field',
+      `<label>Quanto ne metti</label>
+       <input type="text" inputmode="decimal" id="sw-q" value="">`);
+    q.hidden = true;
+    const ant = el('div', 'read');
+    ant.hidden = true;
+    const ok = el('button', 'btn wide pri', 'Usa questo');
+    ok.style.marginTop = '10px';
+    ok.hidden = true;
+
+    const aggiorna = () => {
+      const x = mangiabile(scelto);
+      if (!x) return;
+      const qta2 = parseNum($('#sw-q')?.value) ?? 0;
+      const m = macroMangiabile(scelto, qta2) || M0();
+      const dd2 = ([id, l]) => {
+        const v = (m[id] || 0) - (src[id] || 0);
+        return `<span>${v >= 0 ? '+' : '−'}${nf(Math.abs(v), 1)} ${l}</span>`;
+      };
+      ant.innerHTML = `<span><b>${nf(m.kcal)} kcal</b></span>`
+        + `<span>${(m.kcal - src.kcal) >= 0 ? '+' : '−'}${nf(Math.abs(m.kcal - src.kcal))} kcal</span>`
+        + [['p', 'P'], ['c', 'C'], ['g', 'G'], ['fibre', 'fib']].map(dd2).join('')
+        + (x.stima ? '<span class="mono muted">valore stimato</span>' : '');
+    };
+
+    /* Solo alimenti del piano: la ricetta di un pasto ragiona per nomi di
+       alimenti, e un prodotto sciolto dentro il piano un nome non ce l'ha.
+       Chi lo vuole usare lo collega a un alimento da Prodotti, e da quel
+       momento compare qui con i valori della sua etichetta. */
+    const opz = mangiabili().filter(x => x.fonte === 'piano' && x.nome !== nome).map(x => ({
+      v: x.id, lab: x.nome,
+      sub: `${x.fonte === 'prodotto' ? (x.marca ? x.marca + ' · ' : 'tuo prodotto · ') : ''}${
+        nf(x.kcal)} kcal · ${nf(x.p, 1)} P per 100 ${x.unita}`
+    }));
+    f.append(selettoreCercabile(opz, null, id => {
+      scelto = id;
+      const x = mangiabile(id);
+      // la quantita' proposta pareggia il macro dominante, come fa il motore:
+      // e' un punto di partenza, non un vincolo
+      const dom2 = src.p * 4 > src.kcal * 0.2 ? 'p' : 'kcal';
+      const per100 = x ? x[dom2 === 'p' ? 'p' : 'kcal'] : 0;
+      const prop = per100 > 0 ? Math.round((src[dom2] / per100) * 100) : 100;
+      $('#sw-q').value = Math.max(1, Math.min(2000, prop));
+      q.hidden = false; ant.hidden = false; ok.hidden = false;
+      ok.textContent = 'Usa ' + x.nome;
+      aggiorna();
+    }, 'latte proteico, avena, la tua barretta…'));
+    wrap.append(f, q, ant);
+    wrap.addEventListener('input', e => { if (e.target.id === 'sw-q') aggiorna(); });
+
+    ok.onclick = () => {
+      const x = mangiabile(scelto);
+      const qta2 = parseNum($('#sw-q').value);
+      if (!x || !(qta2 > 0)) { toast('Serve una quantita\''); return; }
+      metteSwap(ctx.code, ctx.k, ctx.slot ?? nome, x.nome, qta2);
+      closeSheet(); route();
+      toast(x.nome + ' al posto di ' + nome + ', solo per oggi');
+    };
+    wrap.append(ok);
+    wrap.append(el('p', 'note',
+      'La quantita\' proposta pareggia il macro che conta di piu\' in questo '
+      + 'alimento — le proteine se ne danno piu\' di un quinto delle calorie, '
+      + 'altrimenti le calorie. Cambiala e i quattro scarti si aggiornano. '
+      + 'Qui ci sono gli alimenti del piano: un prodotto col codice a barre '
+      + 'compare dopo che lo hai collegato a uno di loro, in Prodotti.'));
   }
 
   const b = el('button', 'btn wide pri', 'Chiudi');
