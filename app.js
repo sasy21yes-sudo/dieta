@@ -996,11 +996,21 @@ function viewOggi(v) {
       })()));
     m.append(h);
     const ul = el('ul', 'ings');
-    for (const ing of p.ingredienti) {
-      const li = el('li', null,
-        `<span class="grow">${esc(ing.alimento)} <span class="swap">sostituisci</span></span>
-         <span class="q">${nf(ing.qta, ing.qta % 1 ? 1 : 0)} ${D.alimenti[ing.alimento]?.unita || 'g'}</span>`);
-      li.onclick = () => sheetSwap(ing.alimento, ing.qta);
+    // gli ingredienti di OGGI: se uno e' stato sostituito qui si vede quello
+    // che c'e' davvero, non quello che il piano prevedeva
+    const ingg = typeof ingredientiGiorno === 'function'
+      ? ingredientiGiorno(s.codice, k)
+      : p.ingredienti.map(i => ({ slot: i.alimento, alimento: i.alimento, qta: i.qta,
+                                  qtaPiano: i.qta, alPostoDi: null }));
+    for (const ing of ingg) {
+      const li = el('li', ing.alPostoDi ? 'sost' : null,
+        `<span class="grow">${esc(ing.alimento)}
+           ${ing.alPostoDi ? `<em class="dapiano">al posto di ${esc(ing.alPostoDi)}</em>` : ''}
+           <span class="swap">${ing.alPostoDi ? 'cambia' : 'sostituisci'}</span></span>
+         <span class="q">${nf(ing.qta, ing.qta % 1 ? 1 : 0)} ${
+           D.alimenti[ing.alimento]?.unita || 'g'}</span>`);
+      li.onclick = () => sheetSwap(ing.alimento, ing.qta,
+        { k, code: s.codice, slot: ing.slot });
       ul.append(li);
     }
     m.append(ul); v.append(m);
@@ -1071,46 +1081,103 @@ function sheet(html) {
 }
 function closeSheet() { $('#sheet').hidden = true; }
 
-function sheetSwap(nome, qta) {
+/**
+ * Le sostituzioni, e il bottone che le applica davvero.
+ *
+ * Per molto tempo questo foglio era una tabella: diceva "al posto di 100 g di
+ * riso vanno 120 g di patate" e poi lasciava li'. Chi la sostituzione la
+ * faceva davvero doveva andare in "porzioni", azzerare l'ingrediente
+ * originale e aggiungere l'altro come pasto fuori piano — tre schermate per
+ * una cosa che l'app aveva gia' calcolato.
+ *
+ * Ora si applica, e vale SOLO PER QUEL GIORNO. E' la stessa regola delle
+ * porzioni ed e' quella giusta: il pasto nel piano e' la ricetta, il diario
+ * dice cos'e' successo quel giorno. Sostituire il riso per sempre si fa
+ * nell'editor del pasto, che e' un'altra cosa e un altro posto.
+ *
+ * `ctx` porta il giorno e il codice del pasto. Senza, il foglio resta quello
+ * di prima e informa e basta: e' il caso di chi lo apre da un punto dove non
+ * c'e' una giornata a cui applicarlo.
+ */
+function sheetSwap(nome, qta, ctx) {
   const wrap = el('div');
   const a = D.alimenti[nome], src = foodM(nome, qta);
+  const attiva = ctx && typeof swapDelGiorno === 'function'
+    ? swapDelGiorno(ctx.code, ctx.k, ctx.slot ?? nome) : null;
+
   wrap.append(el('div', 'eyebrow', 'Sostituzioni equivalenti'));
   wrap.append(el('h2', 'sec',
-    `${nf(qta, qta % 1 ? 1 : 0)} ${a.unita} di ${esc(nome)}`));
+    `${nf(qta, qta % 1 ? 1 : 0)} ${a?.unita || 'g'} di ${esc(nome)}`));
   wrap.lastChild.style.marginTop = '0';
-  wrap.append(el('p', 'muted',
-    `${nf(src.kcal)} kcal · ${macroRiga(src)}`));
+  wrap.append(el('p', 'muted', `${nf(src.kcal)} kcal · ${macroRiga(src)}`));
 
-  const curated = D.sostituzioni_consigliate.filter(s => s.da === nome);
-  if (curated.length) {
-    wrap.append(el('h2', 'sec', 'Consigliate'));
-    for (const s of curated) wrap.append(el('div', 'swapopt',
-      `<div class="grow"><strong>${esc(s.a)}</strong>
-         <div class="d">${esc(s.nota || '')}</div></div>
-       <div class="mono">${nf(s.qta_a, s.qta_a % 1 ? 1 : 0)} g</div>`));
+  if (ctx) wrap.append(el('p', 'hint',
+    'Quello che scegli vale <strong>solo per oggi</strong>: il pasto nel piano '
+    + 'resta com\'e\' e domani torna al suo ingrediente. Per cambiarlo per sempre '
+    + 'si passa dall\'editor del pasto, in Piano.'));
+
+  if (attiva) {
+    const box = el('div', 'card flat');
+    box.append(el('div', 'eyebrow', 'Adesso al suo posto c\'e\''));
+    box.append(el('div', 'muted',
+      `<strong>${esc(attiva.a)}</strong> · ${nf(attiva.qta, attiva.qta % 1 ? 1 : 0)} `
+      + `${esc(D.alimenti[attiva.a]?.unita || 'g')}`));
+    const via = el('button', 'btn wide');
+    via.style.marginTop = '9px';
+    via.textContent = 'Rimetti ' + nome;
+    via.onclick = () => {
+      metteSwap(ctx.code, ctx.k, ctx.slot ?? nome, null);
+      closeSheet(); route(); toast('Rimesso ' + nome);
+    };
+    box.append(via);
+    wrap.append(box);
   }
 
-  wrap.append(el('h2', 'sec', 'Calcolate a parità di macro'));
+  /** Una riga scegliibile: se c'e' un giorno a cui applicarla, la applica. */
+  const opzione = (titolo, dettaglio, alimento, quanto) => {
+    const r = el(ctx ? 'button' : 'div', 'swapopt');
+    r.innerHTML = `<div class="grow"><strong>${esc(titolo)}</strong>
+         <div class="d">${dettaglio}</div></div>
+       <div class="mono">${nf(quanto, quanto % 1 ? 1 : 0)} ${
+         esc(D.alimenti[alimento]?.unita || 'g')}${ctx ? ' ›' : ''}</div>`;
+    if (ctx) r.onclick = () => {
+      metteSwap(ctx.code, ctx.k, ctx.slot ?? nome, alimento, quanto);
+      closeSheet(); route();
+      toast(alimento + ' al posto di ' + nome + ', solo per oggi');
+    };
+    wrap.append(r);
+  };
+
+  const curated = (D.sostituzioni_consigliate || []).filter(x => x.da === nome
+    && D.alimenti[x.a]);
+  if (curated.length) {
+    wrap.append(el('h2', 'sec', 'Consigliate'));
+    for (const x of curated) opzione(x.a, esc(x.nota || ''), x.a, x.qta_a);
+  }
+
+  wrap.append(el('h2', 'sec', 'Calcolate a parita’ di macro'));
   const list = swaps(nome, qta);
   if (!list.length) wrap.append(el('p', 'muted', 'Nessuna alternativa nella stessa categoria.'));
-  for (const s of list) {
+  for (const x of list) {
     // il motore riscala sul macro dominante, ma la sostituzione la paghi su
     // tutti e quattro: vedere solo lo scarto in proteine nasconde la meta'
     // dei casi in cui il cambio costa venti grammi di carboidrati
-    const dk = s.macro.kcal - src.kcal;
+    const dk = x.macro.kcal - src.kcal;
     const dd = ([id, l]) => {
-      const q = s.macro[id] - src[id];
+      const q = x.macro[id] - src[id];
       return `${q >= 0 ? '+' : '−'}${nf(Math.abs(q), 1)} ${l}`;
     };
-    wrap.append(el('div', 'swapopt',
-      `<div class="grow"><strong>${esc(s.nome)}</strong>
-         <div class="d">${dk >= 0 ? '+' : '−'}${nf(Math.abs(dk))} kcal ·
-           ${[['p', 'P'], ['c', 'C'], ['g', 'G'], ['fibre', 'fib']].map(dd).join(' · ')}${
-             s.fonte === 'stima' ? ' · valore stimato' : ''}</div></div>
-       <div class="mono">${nf(s.qta, s.qta < 20 ? 1 : 0)} ${s.unita}</div>`));
+    opzione(x.nome,
+      `${dk >= 0 ? '+' : '−'}${nf(Math.abs(dk))} kcal · `
+      + [['p', 'P'], ['c', 'C'], ['g', 'G'], ['fibre', 'fib']].map(dd).join(' · ')
+      + (x.fonte === 'stima' ? ' · valore stimato' : ''),
+      x.nome, x.qta);
   }
-  const b = el('button', 'btn wide pri', 'Chiudi'); b.style.marginTop = '14px';
-  b.onclick = closeSheet; wrap.append(b);
+
+  const b = el('button', 'btn wide pri', 'Chiudi');
+  b.style.marginTop = '14px';
+  b.onclick = closeSheet;
+  wrap.append(b);
   sheet(wrap);
 }
 

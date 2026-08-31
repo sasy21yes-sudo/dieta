@@ -1145,17 +1145,33 @@ function sezSettimana(v) {
     c.append(el('div', 'row between',
       `<strong style="font-family:var(--serif);font-size:16px">${esc(g.giorno)}</strong>
        <span class="mono muted" style="font-size:11px">${nf(g.totali.kcal)} kcal · ${macroRiga(g.totali)}</span>`));
+    const righe = [];
     for (const [si, s] of (g.pasti || []).entries()) {
       const pa = D.pasti[s.codice];
+      const senzOra = oraMinuti(s.ora) == null;
       // s.codice e' null finche' non assegni, ed esc(null) stampava "null":
       // con il piano vuoto erano sette giorni di righe che dicevano "null"
-      const r = el('button', 'prod' + (pa ? '' : ' vuoto'));
-      r.innerHTML = `<div class="grow"><div class="mt">${esc(s.slot)}${s.ora ? ' · ' + esc(s.ora) : ''}</div>
+      const r = el('button', 'prod riga-slot' + (pa ? '' : ' vuoto'));
+      r.innerHTML = `${senzOra ? '<span class="drag-h" aria-hidden="true">\u2261</span>' : ''}
+        <div class="grow"><div class="mt">${esc(s.slot)}${s.ora ? ' · ' + esc(s.ora) : ''}</div>
         <div class="nm">${pa ? esc(pa.nome || s.codice) : 'Da assegnare'}</div></div>
         <div class="kc">${pa ? nf(pa.macro.kcal) : '+'}</div>`;
-      r.onclick = () => cambiaSlot(gi, si);
+      r.onclick = () => {
+        // il tocco che ha appena trascinato la riga non deve anche aprirla
+        if (r.dataset.trascinata) { delete r.dataset.trascinata; return; }
+        cambiaSlot(gi, si);
+      };
+      righe.push(r);
       c.append(r);
     }
+    trascinaRighe(righe, i => oraMinuti(g.pasti[i].ora) == null, (from, to) => {
+      const p2 = piano();
+      p2.settimana ||= JSON.parse(JSON.stringify(
+        S.settings.pianoBase === 'esempio' ? DBASE.settimana : settimanaVuota()));
+      const arr = p2.settimana[gi].pasti;
+      arr.splice(to, 0, arr.splice(from, 1)[0]);
+      save(); fondiPiano(); route();
+    });
     const add = el('button', 'btn wide');
     add.style.marginTop = '10px';
     add.textContent = '+ Aggiungi un pasto a ' + g.giorno.toLowerCase();
@@ -1174,6 +1190,96 @@ function sezSettimana(v) {
   }
 }
 
+/* ------------------------------------------------- l'ordine dei pasti
+ *
+ * Un giorno si legge dall'alto in basso come lo si vive, quindi i pasti con
+ * un orario vanno in ordine di orario: aggiungere uno spuntino delle 16:30 e
+ * vederlo comparire dopo la cena e' il genere di cosa che fa riscrivere il
+ * giorno da capo.
+ *
+ * Ma non tutti i pasti hanno un'ora, e per quelli non esiste un ordine
+ * "giusto" da calcolare: l'unico che lo sa e' chi mangia. Quindi le voci
+ * senza orario NON si spostano da sole — restano dove sono state messe — e si
+ * riordinano trascinandole.
+ *
+ * Da cui la regola: si ordinano solo le voci con l'ora, e finiscono nelle
+ * posizioni che le voci con l'ora occupavano gia'. Le altre restano inchiodate
+ * al loro indice.
+ */
+function oraMinuti(ora) {
+  const m = /^\s*(\d{1,2})[:.](\d{2})\s*$/.exec(String(ora || ''));
+  if (!m) return null;
+  const h = +m[1], mi = +m[2];
+  return h < 24 && mi < 60 ? h * 60 + mi : null;
+}
+
+function ordinaSlotOrari(pasti) {
+  const dove = [], conOra = [];
+  pasti.forEach((s, i) => {
+    if (oraMinuti(s.ora) != null) { dove.push(i); conOra.push(s); }
+  });
+  conOra.sort((a, b) => oraMinuti(a.ora) - oraMinuti(b.ora));
+  dove.forEach((i, n) => { pasti[i] = conOra[n]; });
+  return pasti;
+}
+
+/**
+ * Riordino per trascinamento, con i pointer events.
+ *
+ * L'HTML5 drag-and-drop su iOS non esiste: col dito non parte proprio, e
+ * l'unico modo di spostare una riga su un telefono e' seguire il pointer a
+ * mano. Le altre righe si spostano davvero mentre trascini — senza, non si
+ * capisce dove andra' a finire quella che hai in mano.
+ */
+function trascinaRighe(righe, puoMuovere, onSposta) {
+  righe.forEach((r, i) => {
+    const h = r.querySelector('.drag-h');
+    if (!h || !puoMuovere(i)) return;
+    h.style.touchAction = 'none';
+    h.onpointerdown = ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      const rects = righe.map(x => x.getBoundingClientRect());
+      const passo = rects.length > 1 ? rects[1].top - rects[0].top : rects[i].height;
+      const y0 = ev.clientY;
+      let to = i, mosso = false;
+      // senza cattura il dito che esce dalla maniglia perde il trascinamento;
+      // se il browser la rifiuta si va avanti lo stesso invece di fermarsi qui
+      try { h.setPointerCapture(ev.pointerId); } catch { /* pazienza */ }
+      r.classList.add('trascino');
+
+      const muovi = e => {
+        const dy = e.clientY - y0;
+        if (Math.abs(dy) > 4) mosso = true;
+        r.style.transform = `translateY(${dy}px)`;
+        const cy = rects[i].top + rects[i].height / 2 + dy;
+        to = 0;
+        for (let j = 0; j < rects.length; j++) {
+          if (j === i) continue;
+          if (rects[j].top + rects[j].height / 2 < cy) to++;
+        }
+        righe.forEach((x, j) => {
+          if (j === i) return;
+          const su = i < to && j > i && j <= to;
+          const giu = to < i && j >= to && j < i;
+          x.style.transform = su ? `translateY(${-passo}px)`
+            : giu ? `translateY(${passo}px)` : '';
+        });
+      };
+      const finito = () => {
+        h.onpointermove = null; h.onpointerup = null; h.onpointercancel = null;
+        righe.forEach(x => { x.style.transform = ''; });
+        r.classList.remove('trascino');
+        // il tocco che ha trascinato non deve anche aprire la riga
+        if (mosso) r.dataset.trascinata = '1';
+        if (mosso && to !== i) onSposta(i, to);
+      };
+      h.onpointermove = muovi;
+      h.onpointerup = finito;
+      h.onpointercancel = finito;
+    };
+  });
+}
+
 /** Aggiunge un pasto a un giorno: il numero di pasti non e' fisso. */
 function nuovoSlot(gi) {
   const p = piano();
@@ -1189,13 +1295,19 @@ function nuovoSlot(gi) {
      <input type="text" id="ns-slot" placeholder="Spuntino del pomeriggio">`));
   w.append(el('div', 'field',
     `<label>A che ora <span class="muted">(facoltativo)</span></label>
-     <input type="text" id="ns-ora" placeholder="16:30">`));
+     <input type="text" inputmode="numeric" id="ns-ora" placeholder="16:30">
+     <div class="hint">Con l'ora il pasto si mette da solo al posto giusto nella
+     giornata. Senza, resta dove lo aggiungi e lo sposti trascinandolo.</div>`));
   const b = el('button', 'btn wide pri', 'Aggiungi');
   b.onclick = () => {
     const nome = $('#ns-slot').value.trim();
     if (!nome) { toast('Serve un nome'); return; }
-    g.pasti.push({ slot: nome, ora: $('#ns-ora').value.trim() || '', codice: null });
-    save(); fondiPiano(); closeSheet(); route(); toast('Pasto aggiunto');
+    const ora = $('#ns-ora').value.trim();
+    if (ora && oraMinuti(ora) == null) { toast('L\'ora si scrive cosi\': 16:30'); return; }
+    g.pasti.push({ slot: nome, ora, codice: null });
+    ordinaSlotOrari(g.pasti);
+    save(); fondiPiano(); closeSheet(); route();
+    toast(ora ? 'Aggiunto alle ' + ora : 'Aggiunto in fondo: trascinalo dove vuoi');
   };
   w.append(b);
   sheet(w);
@@ -1248,6 +1360,26 @@ function cambiaSlot(gi, si) {
     };
     w.append(r);
   }
+  /* L'ora si imposta qui, e cambiandola il pasto si rimette al posto giusto
+     nella giornata: un orario che non riordina niente e' solo un'etichetta. */
+  const fo = el('div', 'field',
+    `<label>A che ora <span class="muted">(facoltativo)</span></label>
+     <input type="text" inputmode="numeric" id="cs-ora" value="${esc(s.ora || '')}"
+            placeholder="16:30">`);
+  const bo = el('button', 'btn wide');
+  bo.style.marginTop = '4px';
+  bo.textContent = 'Salva l\'ora';
+  bo.onclick = () => {
+    const ora = $('#cs-ora').value.trim();
+    if (ora && oraMinuti(ora) == null) { toast('L\'ora si scrive cosi\': 16:30'); return; }
+    s.ora = ora;
+    ordinaSlotOrari(g.pasti);
+    save(); fondiPiano(); closeSheet(); route();
+    toast(ora ? 'Rimesso in ordine' : 'Ora tolta: lo sposti trascinandolo');
+  };
+  fo.append(bo);
+  w.append(fo);
+
   /* Svuotare l'assegnazione e togliere lo slot sono due cose diverse, e prima
      c'era solo la seconda: chi voleva solo cambiare idea si ritrovava senza
      la colazione del martedi'. */

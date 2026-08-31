@@ -235,7 +235,8 @@ non un dettaglio.
   totale residuo, registrazione pasti fuori piano senza tono colpevolizzante
 - **Sostituzioni** — motore che, dato un alimento e una quantità, cerca nella stessa
   categoria e riscala per far combaciare il macro dominante (proteine se danno >20%
-  delle calorie, altrimenti calorie), poi ordina per distanza sui quattro macro
+  delle calorie, altrimenti calorie), poi ordina per distanza sui quattro macro.
+  Si **applicano**, solo per quel giorno: vedi "La sostituzione si applica"
 - **Diario** — peso, acqua, Coca Zero, passi, sonno, allenamento, fame, energia,
   aderenza, sintomi gastrointestinali, checklist integratori
 - **Corpo** — target fisico e composizione stimata a confronto; figura SVG
@@ -1047,6 +1048,80 @@ Con dieci voci in lista il manubrio della revisione non poteva piu' fermarsi al
 ci si appoggiava, indistinguibile da chi stava esattamente li'. Ora l'asse
 cresce coi dati fino al 220%, oltre quello taglia **e lo scrive**.
 
+### La sostituzione si applica
+
+Per molto tempo il foglio delle sostituzioni era una tabella: diceva "al posto
+di 100 g di riso vanno 120 g di patate" e poi lasciava li'. Chi la sostituzione
+la faceva davvero doveva andare in "porzioni", azzerare l'ingrediente originale
+e aggiungere l'altro come pasto fuori piano — tre schermate per una cosa che
+l'app aveva gia' calcolato.
+
+Ora si applica, e **vale solo per quel giorno**. E' la stessa regola delle
+porzioni ed e' quella giusta: il pasto nel piano e' la ricetta, il diario dice
+cos'e' successo quel giorno. Sostituire il riso per sempre si fa nell'editor
+del pasto, che e' un'altra cosa e un altro posto.
+
+Il modello e' `S.log[k].swap[codice][ingredienteDelPiano] = { a, qta }`, e la
+chiave e' importante: **l'indice e' il nome dell'ingrediente del piano**, anche
+dopo la sostituzione. Quello e' il posto nella ricetta, e non cambia perche' ci
+hai messo dentro un'altra cosa — se l'indice diventasse il nome nuovo, togliere
+la sostituzione non saprebbe piu' a cosa tornare.
+
+`ingredientiGiorno(code, k)` fonde i due strati (`swap` e `porzioni`) e
+restituisce cosa c'era davvero in quel pasto quel giorno; `mealMGiorno()`,
+la lista su Oggi e il foglio delle porzioni passano tutti da li'. Togliendo una
+sostituzione sparisce anche la quantita' cambiata di quel posto: erano grammi
+dell'alimento sostituito, e riportarli sull'originale vorrebbe dire inventarsi
+una porzione che nessuno ha scelto.
+
+### I pasti del giorno vanno in ordine di orario
+
+Un giorno si legge dall'alto in basso come lo si vive. Aggiungere uno spuntino
+delle 16:30 e vederlo comparire sotto la cena e' il genere di cosa che fa
+riscrivere la settimana da capo.
+
+Ma non tutti i pasti hanno un'ora, e per quelli non esiste un ordine giusto da
+calcolare: l'unico che lo sa e' chi mangia. Da cui la regola di
+`ordinaSlotOrari()`: **si ordinano solo le voci con l'ora**, e finiscono nelle
+posizioni che le voci con l'ora occupavano gia'. Le altre restano inchiodate al
+loro indice, e si spostano trascinandole.
+
+Il trascinamento e' a pointer events e non HTML5 drag-and-drop, che su iOS non
+esiste: col dito non parte proprio. La maniglia e' un elemento a se' e non
+tutta la riga — toccando la riga si apre il pasto, e se il trascinamento
+partisse da ovunque non si potrebbe piu' scorrere la pagina con il dito sopra
+l'elenco. Le altre righe si spostano davvero mentre trascini: senza, non si
+capisce dove andra' a finire quella che si ha in mano.
+
+### Esercizi: una pagina, non un foglio
+
+"Esercizi" apriva un foglio con dentro solo i propri, e i 59 del catalogo non
+si vedevano da nessuna parte: per sapere se una cosa c'era gia' bisognava
+aprire una scheda e scorrere la tendina. Ora e' una sezione di Gym con tutto
+dentro, la ricerca sopra (nome, attrezzo e gruppo muscolare) e un **+** che
+apre le due strade — il catalogo online o la scrittura a mano.
+
+Il filtro non passa da `route()`: ridisegnare la vista a ogni lettera fa perdere
+il fuoco al campo, e su un telefono la tastiera si chiude.
+
+Nello stesso giro e' sparita l'ultima tendina rimasta, quella della riga di
+scheda: con 59 voci un `<select>` non e' piu' un selettore, e' un elenco da
+scorrere col pollice — e su iPhone la tendina di sistema copre mezzo schermo.
+Al suo posto lo stesso `selettoreCercabile()` degli alimenti.
+
+### Il catalogo esercizi
+
+59 voci in `data/palestra.json`. Le 25 aggiunte per ultime vengono da schede
+reali (varianti al multipower, ai cavi, con la trap bar, la panca Scott, i dips
+fra due panche). Restano fuori i doppioni di quello che c'e' gia': **un secondo
+id per lo stesso esercizio spezzerebbe in due lo storico dei carichi e il
+conteggio del volume**.
+
+Le varianti invece sono voci distinte, e non e' pignoleria: su "lat machine" e
+"lat con triangolo" i carichi sono diversi, e la progressione si legge per
+esercizio. Ogni voce dichiara primari e secondari fra i 13 gruppi del modello —
+uno che non colora niente non conta da nessuna parte.
+
 ### Il resoconto e' un documento clinico, non uno screenshot
 
 La prima versione conteneva quello che c'era sullo schermo: verdetto, numeri a
@@ -1267,6 +1342,19 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   dalla letteratura, come le costanti di Banister. La UI deve continuare a dirlo
 - Non fermare l'asse del manubrio a una costante: con dieci voci qualcuno
   finisce oltre il 135%, e un punto appoggiato al bordo dice una cosa falsa
+- Non indicizzare una sostituzione sul nome dell'alimento NUOVO: la chiave e'
+  il posto nella ricetta, cioe' l'ingrediente del piano. Altrimenti togliere la
+  sostituzione non sa piu' a cosa tornare
+- Non far cambiare al foglio delle sostituzioni il pasto nel piano: quello e'
+  la ricetta e vale per tutti i giorni. Una sostituzione vale per il giorno in
+  cui la fai, come le porzioni
+- Non ordinare da soli i pasti senza orario: per quelli non esiste un ordine
+  giusto da calcolare, e vanno lasciati dove sono con una maniglia per
+  spostarli
+- Non usare l'HTML5 drag-and-drop: su iOS col dito non parte. Pointer events, e
+  la maniglia deve essere un elemento a se' o la pagina non si scorre piu'
+- Non dare un id nuovo a un esercizio che esiste gia' con un altro nome: lo
+  storico dei carichi e il volume settimanale si spezzano in due
 - Non scrivere una sola delle due date del cruscotto: `datiIntervallo()` le
   prende tutte e due e ricalcola la lunghezza. Toccando solo la fine il periodo
   scivolava intero e anche la data di inizio si muoveva da sola — dall'esterno

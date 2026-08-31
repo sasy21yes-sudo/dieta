@@ -86,6 +86,27 @@
   font-family:var(--mono);font-size:10px;color:var(--ink-3)}
 .calscale i{width:11px;height:11px;border-radius:3px;display:block}
 
+/* --------- righe che si trascinano ---------
+   La maniglia e' un elemento a se' e non tutta la riga: toccando la riga si
+   apre il pasto, e se il trascinamento partisse da ovunque non si potrebbe
+   piu' scorrere la pagina con il dito sopra l'elenco. */
+/* il + che apre le due strade per aggiungere un esercizio: sta nella riga del
+   titolo, dove si guarda quando si cerca una cosa e non c'e' */
+.btn-piu{flex:none;width:34px;height:34px;border-radius:10px;font-size:21px;
+  line-height:1;padding:0;border:1px solid var(--pine-line);background:var(--pine-soft);
+  color:var(--pine);cursor:pointer;font-family:var(--sans)}
+.btn-piu:active{background:var(--pine);color:#fff}
+
+.drag-h{flex:none;width:24px;text-align:center;line-height:1;font-size:17px;
+  color:var(--ink-3);cursor:grab;touch-action:none;user-select:none;
+  align-self:stretch;display:flex;align-items:center;justify-content:center}
+.riga-slot{transition:transform .14s ease}
+.riga-slot.trascino{transition:none;position:relative;z-index:5;
+  background:var(--paper);border-radius:10px;border-bottom-color:transparent;
+  box-shadow:0 8px 22px rgba(0,0,0,.28)}
+.riga-slot.trascino .drag-h{cursor:grabbing;color:var(--pine)}
+@media (prefers-reduced-motion: reduce){ .riga-slot{transition:none} }
+
 /* ---------------- prodotti ---------------- */
 .prod{display:flex;align-items:center;gap:11px;padding:11px 0;
   border-bottom:1px solid var(--rule);width:100%;background:none;border-left:0;

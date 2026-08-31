@@ -565,8 +565,8 @@ function viewPalestra(v) {
     () => sheetSchede()));
 
   g.append(riquadroGym('esercizi', 'Esercizi',
-    `${P().esercizi.length} tuoi · ${catalogo().length} in tutto`,
-    () => sheetEsercizi()));
+    `${catalogo().length} in catalogo · ${P().esercizi.length} tuoi`,
+    () => { gymTab = 'esercizi'; route(); }));
 
   const sc2 = typeof scaricoConsigliato === 'function' ? scaricoConsigliato(k) : { dati: false };
   g.append(riquadroGym('carico', 'Carico e acciacchi',
@@ -604,7 +604,8 @@ function sezioneGym(v, k) {
   v.append(indietroGym());
   const st = statoMuscoli(k);
   ({ mappa: sezGymMappa, progressi: sezGymProgressi, cardio: sezGymCardio,
-     carico: sezGymCarico, storico: sezGymStorico }[gymTab] || sezGymMappa)(v, k, st);
+     carico: sezGymCarico, storico: sezGymStorico,
+     esercizi: sezGymEsercizi }[gymTab] || sezGymMappa)(v, k, st);
 }
 
 /* -------------------------------------------------------- le sezioni
@@ -1337,20 +1338,25 @@ function sheetRigaScheda(stato, idx, onChiudi) {
     : esc(esercizio(riga.ex)?.nome || riga.ex)));
   w.lastChild.style.marginTop = '0';
 
+  /* Con cinquantanove esercizi in catalogo una tendina non e' piu' un
+     selettore: e' un elenco da scorrere col pollice fino a trovare la voce
+     giusta, e su iPhone la tendina di sistema copre mezzo schermo. Lo stesso
+     campo cercabile degli alimenti risolve la stessa cosa. */
   if (nuovo) {
     const f = el('div', 'field', '<label>Quale esercizio</label>');
-    const sel = el('select');
-    sel.id = 'rg-ex';
-    sel.style.cssText = 'width:100%;padding:10px;border:1px solid var(--rule);'
-      + 'border-radius:9px;background:var(--paper);color:var(--ink);font:inherit';
-    for (const e of catalogo().slice().sort((a, b) => a.nome.localeCompare(b.nome)))
-      sel.append(new Option(`${e.nome} — ${e.attrezzo}`, e.id, false, e.id === riga.ex));
-    sel.onchange = () => {
-      const ex = esercizio(sel.value);
+    const opz = catalogo().slice()
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .map(e => ({ v: e.id, lab: e.nome,
+        sub: `${e.attrezzo} · ${(e.primari || []).join(', ') || 'nessun gruppo'}` }));
+    const applica = id => {
+      riga.ex = id;
+      const ex = esercizio(id);
       if (ex?.range) { $('#rg-lo').value = ex.range[0]; $('#rg-hi').value = ex.range[1]; }
     };
-    f.append(sel);
-    f.append(el('div', 'hint', 'Non lo trovi? Aggiungilo da "I tuoi esercizi" nella scheda Gym.'));
+    f.append(selettoreCercabile(opz, riga.ex, applica, 'panca, curl, squat…'));
+    f.append(el('div', 'hint',
+      'Scrivi due lettere e la lista si stringe. Non lo trovi? Aggiungilo da '
+      + '"Esercizi" nella scheda Gym, a mano o dal catalogo online.'));
     w.append(f);
   }
 
@@ -1424,12 +1430,14 @@ function sheetRigaScheda(stato, idx, onChiudi) {
 
   const ok = el('button', 'btn wide pri', nuovo ? 'Aggiungi alla scheda' : 'Salva');
   ok.onclick = () => {
+    // senza esercizio la riga punterebbe al nulla e la scheda si aprirebbe vuota
+    if (!riga.ex) { toast('Scegli prima un esercizio'); return; }
     const n = parseNum($('#rg-serie').value);
     if (!(n > 0 && n <= 12)) { toast('Da 1 a 12 serie'); return; }
     const lo = parseNum($('#rg-lo').value) ?? 8;
     const hi = parseNum($('#rg-hi').value) ?? lo;
     const rec = {
-      ex: nuovo ? $('#rg-ex').value : riga.ex,
+      ex: riga.ex,
       serie: Math.round(n), reps: Math.round(lo), repsMax: Math.round(Math.max(lo, hi)),
       kg: parseNum($('#rg-kg').value) ?? 0,
       tecnica: riga.tecnica || 'normale', superserie: !!riga.superserie
@@ -1791,36 +1799,145 @@ function bottoneEsecuzione(exId) {
 }
 
 /* ------------------------------------------------- esercizi personalizzati */
-function sheetEsercizi() {
+/* ------------------------------------------------------- tutti gli esercizi
+ *
+ * Prima "Esercizi" apriva un foglio con dentro solo i propri, e i cinquantanove
+ * del catalogo non si vedevano da nessuna parte: per sapere se una cosa c'era
+ * gia' bisognava aprire una scheda e scorrere la tendina. Ora e' una pagina,
+ * con tutto dentro e la ricerca sopra.
+ *
+ * Il filtro non passa da route(): ridisegnare la vista a ogni lettera fa
+ * perdere il fuoco al campo, e su un telefono la tastiera si chiude.
+ */
+function sezGymEsercizi(v) {
+  const c = el('div', 'cw');
+  const testa = el('div', 'row between');
+  testa.append(el('h3', null, 'Esercizi'));
+  const piu = el('button', 'btn-piu');
+  piu.textContent = '+';
+  piu.title = 'Aggiungi un esercizio';
+  piu.setAttribute('aria-label', 'Aggiungi un esercizio');
+  piu.onclick = () => sheetAggiungiEsercizio();
+  testa.append(piu);
+  c.append(testa);
+  c.append(el('div', 'sub',
+    `${catalogo().length} in tutto, di cui ${P().esercizi.length} tuoi. `
+    + 'Tocca una voce per vederne i gruppi muscolari; i tuoi si possono anche modificare.'));
+
+  const f = el('div', 'field');
+  const inp = el('input');
+  inp.type = 'search';
+  inp.placeholder = 'panca, curl, femorali, manubri…';
+  inp.autocomplete = 'off';
+  f.append(inp);
+  c.append(f);
+
+  const lista = el('div');
+  c.append(lista);
+
+  const nomeM = id => (typeof muscolo === 'function' && muscolo(id)?.nome) || id;
+  const disegna = () => {
+    const q = inp.value.trim().toLowerCase();
+    lista.innerHTML = '';
+    const tutti = catalogo().slice().sort((a, b) => a.nome.localeCompare(b.nome));
+    const mio = new Set(P().esercizi.map(e => e.id));
+    const trovati = tutti.filter(e => {
+      if (!q) return true;
+      const testo = [e.nome, e.attrezzo, ...(e.primari || []).map(nomeM),
+                     ...(e.secondari || []).map(nomeM)].join(' ').toLowerCase();
+      return q.split(/\s+/).every(t => testo.includes(t));
+    });
+    if (!trovati.length) {
+      lista.append(el('p', 'hint',
+        'Nessuna corrispondenza. Con il + qui sopra lo aggiungi, a mano o dal catalogo online.'));
+      return;
+    }
+    for (const e of trovati) {
+      const r = el('button', 'prod');
+      r.innerHTML = `<div class="grow"><div class="nm">${esc(e.nome)}</div>
+        <div class="mt">${esc(e.attrezzo)} · ${(e.primari || []).map(nomeM).join(', ')
+          || 'nessun gruppo'}</div></div>
+        ${mio.has(e.id) ? '<span class="pill ok">tuo</span>' : ''}`;
+      r.onclick = () => mio.has(e.id) ? sheetEsercizio(e.id) : sheetSchedaEsercizio(e.id);
+      lista.append(r);
+    }
+    lista.append(el('p', 'hint',
+      `${trovati.length} su ${tutti.length}.`));
+  };
+  inp.oninput = disegna;
+  disegna();
+  v.append(c);
+}
+
+/** Il + : le due strade per aggiungerne uno, dette per quello che sono. */
+function sheetAggiungiEsercizio() {
   const w = el('div');
-  w.append(el('div', 'eyebrow', 'Esercizi'));
-  w.append(el('h2', 'sec', 'I tuoi esercizi'));
+  w.append(el('div', 'eyebrow', 'Aggiungi'));
+  w.append(el('h2', 'sec', 'Un esercizio nuovo'));
   w.lastChild.style.marginTop = '0';
   w.append(el('p', 'muted',
-    'Aggiungi quello che fai e non e\' in catalogo. I gruppi muscolari servono alla mappa e al conteggio del volume: senza, l\'esercizio non colora niente.'));
-  const miei = P().esercizi;
-  if (!miei.length) w.append(el('p', 'hint', 'Nessun esercizio tuo, per ora.'));
-  for (const e of miei) {
-    const r = el('button', 'prod');
-    r.innerHTML = `<div class="grow"><div class="nm">${esc(e.nome)}</div>
-      <div class="mt">${esc(e.attrezzo)} · ${(e.primari || []).join(', ')}</div></div>`;
-    r.onclick = () => sheetEsercizio(e.id);
-    w.append(r);
-  }
-  const cerca = el('button', 'btn wide');
-  cerca.style.marginTop = '10px';
-  cerca.textContent = catalogoScaricato() ? 'Cerca nel catalogo online'
-                                          : 'Cerca in un catalogo online';
-  cerca.onclick = () => sheetCercaEsercizio(e => {
-    if (!e) { sheetEsercizi(); return; }
+    'I gruppi muscolari servono alla mappa e al conteggio del volume: senza, '
+    + 'l\'esercizio non colora niente e non conta da nessuna parte.'));
+
+  const online = el('button', 'btn wide pri');
+  online.textContent = catalogoScaricato()
+    ? 'Cerca nel catalogo online' : 'Cerca in un catalogo online';
+  online.onclick = () => sheetCercaEsercizio(e => {
+    if (!e) { sheetAggiungiEsercizio(); return; }
     sheetEsercizio(null, e);
   });
-  w.append(cerca);
+  w.append(online);
+  w.append(el('p', 'muted',
+    '873 esercizi con i gruppi muscolari gia\' assegnati. Si scarica una volta '
+    + 'e da li\' in poi funziona anche senza rete.'));
+  w.lastChild.style.margin = '6px 0 14px';
 
-  const b = el('button', 'btn wide pri', 'Nuovo esercizio');
-  b.style.marginTop = '8px';
-  b.onclick = () => sheetEsercizio(null);
-  w.append(b);
+  const mano = el('button', 'btn wide', 'Scrivilo a mano');
+  mano.onclick = () => sheetEsercizio(null);
+  w.append(mano);
+  w.append(el('p', 'muted',
+    'Nome, attrezzo, e i muscoli che lavorano. Serve per quello che il catalogo '
+    + 'non ha: le macchine della tua palestra, le varianti che ti ha dato qualcuno.'));
+  w.lastChild.style.margin = '6px 0 0';
+
+  const ch = el('button', 'btn wide', 'Chiudi');
+  ch.style.marginTop = '14px';
+  ch.onclick = closeSheet;
+  w.append(ch);
+  sheet(w);
+}
+
+/** La scheda di un esercizio del catalogo di base: si legge, non si modifica. */
+function sheetSchedaEsercizio(id) {
+  const e = esercizio(id);
+  if (!e) return;
+  const nomeM = x => (typeof muscolo === 'function' && muscolo(x)?.nome) || x;
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Catalogo'));
+  w.append(el('h2', 'sec', esc(e.nome)));
+  w.lastChild.style.marginTop = '0';
+  const r = el('div', 'read');
+  r.innerHTML = `<span>${esc(e.attrezzo)}</span>`
+    + `<span>${e.tipo === 'isolamento' ? 'isolamento' : 'multiarticolare'}</span>`
+    + (e.range ? `<span>${e.range[0]}–${e.range[1]} ripetizioni</span>` : '')
+    + (e.incremento ? `<span>+${nf(e.incremento, e.incremento % 1 ? 1 : 0)} kg per volta</span>` : '');
+  w.append(r);
+  w.append(el('p', 'muted',
+    `<strong>Primari:</strong> ${(e.primari || []).map(nomeM).join(', ') || '—'}`
+    + `<br><strong>Secondari:</strong> ${(e.secondari || []).map(nomeM).join(', ') || '—'}`));
+  w.append(el('p', 'hint',
+    'Range e incremento sono valori di partenza del catalogo, non calibrati su di te: '
+    + 'nella scheda li cambi come vuoi.'));
+
+  if (typeof sheetEsecuzione === 'function' && esecMappa()[id]) {
+    const b = el('button', 'btn wide', 'Come si esegue');
+    b.onclick = () => sheetEsecuzione(id);
+    w.append(b);
+  }
+  const ch = el('button', 'btn wide pri', 'Chiudi');
+  ch.style.marginTop = '8px';
+  ch.onclick = closeSheet;
+  w.append(ch);
   sheet(w);
 }
 

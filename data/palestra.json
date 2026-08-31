@@ -1,7 +1,7 @@
 {
  "meta": {
   "titolo": "Catalogo esercizi e modello di allenamento",
-  "versione": 1,
+  "versione": 2,
   "note": "I gruppi muscolari servono alla mappa e al conteggio del volume. Un esercizio conta 1 serie piena sui primari e mezza sui secondari, che e' la convenzione usata in letteratura per il volume settimanale."
  },
  "muscoli": [
@@ -649,6 +649,433 @@
     15
    ],
    "incremento": 0
+  },
+  {
+   "id": "lat-triangolo",
+   "nome": "Lat machine con triangolo",
+   "attrezzo": "macchina",
+   "tipo": "multi",
+   "primari": [
+    "dorsali"
+   ],
+   "secondari": [
+    "bicipiti"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "pullover-cavo",
+   "nome": "Pullover al cavo alto",
+   "attrezzo": "cavi",
+   "tipo": "isolamento",
+   "primari": [
+    "dorsali"
+   ],
+   "secondari": [
+    "petto",
+    "tricipiti"
+   ],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "rematore-tbar",
+   "nome": "Rematore T-bar",
+   "attrezzo": "bilanciere",
+   "tipo": "multi",
+   "primari": [
+    "dorsali"
+   ],
+   "secondari": [
+    "bicipiti",
+    "trapezi"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "pulley-inverso",
+   "nome": "Pulley basso presa inversa",
+   "attrezzo": "cavi",
+   "tipo": "multi",
+   "primari": [
+    "dorsali"
+   ],
+   "secondari": [
+    "bicipiti"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "stacco-trap-bar",
+   "nome": "Stacco da terra con trap bar",
+   "attrezzo": "bilanciere",
+   "tipo": "multi",
+   "primari": [
+    "quadricipiti",
+    "glutei"
+   ],
+   "secondari": [
+    "femorali",
+    "lombari",
+    "trapezi"
+   ],
+   "range": [
+    6,
+    10
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "alzate-90",
+   "nome": "Alzate a 90 gradi a corpo libero",
+   "attrezzo": "corpo libero",
+   "tipo": "isolamento",
+   "primari": [
+    "spalle"
+   ],
+   "secondari": [
+    "trapezi"
+   ],
+   "range": [
+    12,
+    15
+   ],
+   "incremento": 1
+  },
+  {
+   "id": "alzate-martello-panca",
+   "nome": "Alzate a martello su panca inclinata",
+   "attrezzo": "manubri",
+   "tipo": "isolamento",
+   "primari": [
+    "spalle"
+   ],
+   "secondari": [
+    "trapezi"
+   ],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 2
+  },
+  {
+   "id": "calf-pressa",
+   "nome": "Calf alla pressa 45 gradi",
+   "attrezzo": "macchina",
+   "tipo": "isolamento",
+   "primari": [
+    "polpacci"
+   ],
+   "secondari": [],
+   "range": [
+    15,
+    20
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "leg-curl-sdraiato",
+   "nome": "Leg curl sdraiato",
+   "attrezzo": "macchina",
+   "tipo": "isolamento",
+   "primari": [
+    "femorali"
+   ],
+   "secondari": [
+    "polpacci"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "lower-back",
+   "nome": "Panca lombare (lower back)",
+   "attrezzo": "corpo libero",
+   "tipo": "isolamento",
+   "primari": [
+    "lombari"
+   ],
+   "secondari": [
+    "glutei",
+    "femorali"
+   ],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 1
+  },
+  {
+   "id": "squat-sumo-multipower",
+   "nome": "Squat sumo al multipower",
+   "attrezzo": "macchina",
+   "tipo": "multi",
+   "primari": [
+    "quadricipiti",
+    "glutei"
+   ],
+   "secondari": [
+    "femorali"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "affondi-camminando",
+   "nome": "Affondi camminando",
+   "attrezzo": "manubri",
+   "tipo": "multi",
+   "primari": [
+    "quadricipiti",
+    "glutei"
+   ],
+   "secondari": [
+    "femorali"
+   ],
+   "range": [
+    10,
+    12
+   ],
+   "incremento": 2
+  },
+  {
+   "id": "leg-press-plie",
+   "nome": "Leg press 45 gradi piedi in plie",
+   "attrezzo": "macchina",
+   "tipo": "multi",
+   "primari": [
+    "quadricipiti",
+    "glutei"
+   ],
+   "secondari": [
+    "femorali"
+   ],
+   "range": [
+    10,
+    12
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "panca-inclinata-manubri",
+   "nome": "Panca inclinata con manubri",
+   "attrezzo": "manubri",
+   "tipo": "multi",
+   "primari": [
+    "petto"
+   ],
+   "secondari": [
+    "spalle",
+    "tricipiti"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 2
+  },
+  {
+   "id": "croci-inclinata",
+   "nome": "Croci su panca inclinata",
+   "attrezzo": "manubri",
+   "tipo": "isolamento",
+   "primari": [
+    "petto"
+   ],
+   "secondari": [
+    "spalle"
+   ],
+   "range": [
+    10,
+    12
+   ],
+   "incremento": 2
+  },
+  {
+   "id": "curl-scott",
+   "nome": "Curl su panca Scott",
+   "attrezzo": "bilanciere",
+   "tipo": "isolamento",
+   "primari": [
+    "bicipiti"
+   ],
+   "secondari": [],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "curl-alternato",
+   "nome": "Curl alternato con manubri",
+   "attrezzo": "manubri",
+   "tipo": "isolamento",
+   "primari": [
+    "bicipiti"
+   ],
+   "secondari": [
+    "avambracci"
+   ],
+   "range": [
+    10,
+    12
+   ],
+   "incremento": 2
+  },
+  {
+   "id": "reverse-curl",
+   "nome": "Reverse curl",
+   "attrezzo": "bilanciere",
+   "tipo": "isolamento",
+   "primari": [
+    "avambracci"
+   ],
+   "secondari": [
+    "bicipiti"
+   ],
+   "range": [
+    12,
+    15
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "lento-multipower",
+   "nome": "Lento avanti al multipower",
+   "attrezzo": "macchina",
+   "tipo": "multi",
+   "primari": [
+    "spalle"
+   ],
+   "secondari": [
+    "tricipiti"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 5
+  },
+  {
+   "id": "alzate-cavi-bassi",
+   "nome": "Alzate laterali ai cavi bassi",
+   "attrezzo": "cavi",
+   "tipo": "isolamento",
+   "primari": [
+    "spalle"
+   ],
+   "secondari": [],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "lento-martello",
+   "nome": "Lento con manubri presa neutra",
+   "attrezzo": "manubri",
+   "tipo": "multi",
+   "primari": [
+    "spalle"
+   ],
+   "secondari": [
+    "tricipiti"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 2
+  },
+  {
+   "id": "alzate-seduto",
+   "nome": "Alzate laterali seduto",
+   "attrezzo": "manubri",
+   "tipo": "isolamento",
+   "primari": [
+    "spalle"
+   ],
+   "secondari": [],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 2
+  },
+  {
+   "id": "panca-stretta",
+   "nome": "Panca presa stretta",
+   "attrezzo": "bilanciere",
+   "tipo": "multi",
+   "primari": [
+    "tricipiti"
+   ],
+   "secondari": [
+    "petto",
+    "spalle"
+   ],
+   "range": [
+    6,
+    10
+   ],
+   "incremento": 2.5
+  },
+  {
+   "id": "dips-panche",
+   "nome": "Dips fra due panche",
+   "attrezzo": "corpo libero",
+   "tipo": "multi",
+   "primari": [
+    "tricipiti"
+   ],
+   "secondari": [
+    "petto",
+    "spalle"
+   ],
+   "range": [
+    8,
+    12
+   ],
+   "incremento": 1
+  },
+  {
+   "id": "pushdown-fune",
+   "nome": "Push down con fune",
+   "attrezzo": "cavi",
+   "tipo": "isolamento",
+   "primari": [
+    "tricipiti"
+   ],
+   "secondari": [],
+   "range": [
+    10,
+    15
+   ],
+   "incremento": 2.5
   }
  ],
  "volume": {

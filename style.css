@@ -124,6 +124,12 @@ button.btn.sm{min-height:36px;padding:7px 11px;font-size:13px}
 .ings li .q{font-family:var(--mono);font-size:12px;color:var(--ink-3);
   white-space:nowrap}
 .ings li .swap{font-size:11px;color:var(--pine);font-weight:600}
+/* l'ingrediente sostituito per oggi: si vede che non e' quello del piano
+   senza doverlo aprire, e si vede al posto di cosa */
+.ings li.sost{background:var(--amber-soft);margin:0 -8px;padding-left:8px;
+  padding-right:8px;border-radius:7px}
+.ings li .dapiano{display:block;font-style:normal;font-family:var(--mono);
+  font-size:10px;color:var(--amber);margin-top:1px}
 
 /* ---------------- form ---------------- */
 .field{margin-bottom:13px}

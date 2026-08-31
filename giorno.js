@@ -8,22 +8,76 @@
  * seguire te e non il piano. Le porzioni cambiate stanno nel log del giorno,
  * quindi non toccano il pasto per tutti gli altri giorni.
  */
+/**
+ * Gli ingredienti di un pasto COME SONO STATI QUEL GIORNO.
+ *
+ * Due strati sopra il piano, tutti e due nel log del giorno e nessuno dei due
+ * nel pasto: le quantita' cambiate (`porzioni`) e gli alimenti sostituiti
+ * (`swap`). Sono chiavi diverse ma la stessa idea — il piano dice cosa era
+ * previsto, il diario dice cos'e' successo, e il secondo non riscrive il primo.
+ *
+ * Tutti e due sono indicizzati sul nome dell'ingrediente DEL PIANO, anche
+ * quando quell'ingrediente e' stato sostituito: quello e' il posto nella
+ * ricetta, e non cambia perche' ci hai messo dentro un'altra cosa.
+ */
+function ingredientiGiorno(code, k) {
+  const p = D.pasti[code];
+  if (!p?.ingredienti) return [];
+  const sw = S.log[k]?.swap?.[code] || {};
+  const por = S.log[k]?.porzioni?.[code] || {};
+  return p.ingredienti.map(i => {
+    const s = sw[i.alimento];
+    return {
+      slot: i.alimento,                       // il posto nella ricetta
+      alimento: s ? s.a : i.alimento,         // quello che c'e' finito davvero
+      qta: por[i.alimento] ?? (s ? s.qta : i.qta),
+      qtaPiano: i.qta,
+      alPostoDi: s ? i.alimento : null
+    };
+  });
+}
+
 function mealMGiorno(code, k) {
+  const sw = S.log[k]?.swap?.[code];
   const por = S.log[k]?.porzioni?.[code];
   const p = D.pasti[code];
-  if (!por || !p?.ingredienti || !Object.keys(por).length) return mealM(code);
+  const cambiato = (por && Object.keys(por).length) || (sw && Object.keys(sw).length);
+  if (!cambiato || !p?.ingredienti) return mealM(code);
   const m = M0();
-  for (const i of p.ingredienti) addM(m, foodM(i.alimento, por[i.alimento] ?? i.qta));
+  for (const i of ingredientiGiorno(code, k)) addM(m, foodM(i.alimento, i.qta));
   for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) m[x] = Math.round(m[x] * 10) / 10;
   return m;
 }
-/** Quante porzioni sono state cambiate in quel pasto, quel giorno. */
+
+/** Quante cose sono state cambiate in quel pasto, quel giorno. */
 function porzioniCambiate(code, k) {
-  const por = S.log[k]?.porzioni?.[code];
-  if (!por) return 0;
-  const p = D.pasti[code];
-  return (p?.ingredienti || []).filter(i => por[i.alimento] != null
-    && por[i.alimento] !== i.qta).length;
+  return ingredientiGiorno(code, k)
+    .filter(i => i.alPostoDi || i.qta !== i.qtaPiano).length;
+}
+
+/** La sostituzione attiva su quell'ingrediente, quel giorno. */
+function swapDelGiorno(code, k, slot) { return S.log[k]?.swap?.[code]?.[slot] || null; }
+
+/**
+ * Mette (o toglie) una sostituzione, solo per quel giorno.
+ *
+ * Togliendola sparisce anche la quantita' cambiata di quel posto: erano
+ * grammi dell'alimento sostituito, e riportarli sull'originale vorrebbe dire
+ * inventarsi una porzione che nessuno ha scelto.
+ */
+function metteSwap(code, k, slot, nuovo, qta) {
+  const d = day(k);
+  d.swap ||= {}; d.swap[code] ||= {};
+  if (!nuovo) {
+    delete d.swap[code][slot];
+    if (d.porzioni?.[code]) delete d.porzioni[code][slot];
+  } else {
+    d.swap[code][slot] = { a: nuovo, qta };
+    if (d.porzioni?.[code]) delete d.porzioni[code][slot];
+  }
+  if (!Object.keys(d.swap[code]).length) delete d.swap[code];
+  if (d.porzioni?.[code] && !Object.keys(d.porzioni[code]).length) delete d.porzioni[code];
+  save();
 }
 
 /* ------------------------------------------------- porzioni di un pasto */
@@ -51,9 +105,10 @@ function sheetPorzioni(k, code) {
   for (const f of [0.5, 0.75, 1, 1.25, 1.5, 2]) {
     const b = el('button', null, f === 1 ? 'piano' : '×' + nf(f, f % 1 ? 2 : 0));
     b.onclick = () => {
-      for (const i of (p.ingredienti || [])) {
-        const n = Math.max(0, Math.round(i.qta * f * 10) / 10);
-        if (n === i.qta) delete stato[i.alimento]; else stato[i.alimento] = n;
+      for (const i of ingOggi()) {
+        const base = i.alPostoDi ? i.qta : i.qtaPiano;
+        const n = Math.max(0, Math.round(base * f * 10) / 10);
+        if (n === base) delete stato[i.slot]; else stato[i.slot] = n;
       }
       disegna();
       if (typeof pulsa === 'function') pulsa(tot);
@@ -63,10 +118,12 @@ function sheetPorzioni(k, code) {
 
   const tot = el('div', 'read');
   const lista = el('div');
+  // gli ingredienti di oggi, non quelli del piano: se uno e' stato sostituito
+  // le quantita' si contano sull'alimento che c'e' davvero
+  const ingOggi = () => ingredientiGiorno(code, k);
   const macroOra = () => {
     const m = M0();
-    for (const i of (p.ingredienti || []))
-      addM(m, foodM(i.alimento, stato[i.alimento] ?? i.qta));
+    for (const i of ingOggi()) addM(m, foodM(i.alimento, stato[i.slot] ?? i.qta));
     return m;
   };
   const aggiorna = () => {
@@ -79,13 +136,15 @@ function sheetPorzioni(k, code) {
   };
   const disegna = () => {
     lista.innerHTML = '';
-    for (const i of (p.ingredienti || [])) {
+    for (const i of ingOggi()) {
       const a = D.alimenti[i.alimento];
-      const q = stato[i.alimento] ?? i.qta;
-      const cambiato = q !== i.qta;
+      const rif = i.alPostoDi ? i.qta : i.qtaPiano;
+      const q = stato[i.slot] ?? i.qta;
+      const cambiato = q !== rif;
       const riga = el('div', 'porz' + (cambiato ? ' mod' : ''));
       riga.innerHTML = `<span class="nm">${esc(i.alimento)}
-          ${cambiato ? `<em>piano: ${nf(i.qta)} ${esc(a?.unita || 'g')}</em>` : ''}</span>
+          ${i.alPostoDi ? `<em>al posto di ${esc(i.alPostoDi)}</em>` : ''}
+          ${cambiato ? `<em>piano: ${nf(rif)} ${esc(a?.unita || 'g')}</em>` : ''}</span>
         <button class="btn sm" data-d="-10">−</button>
         <input type="text" inputmode="decimal" value="${q}">
         <button class="btn sm" data-d="10">+</button>
@@ -93,13 +152,13 @@ function sheetPorzioni(k, code) {
       const inp = riga.querySelector('input');
       const setta = n => {
         n = Math.max(0, Math.round(n * 10) / 10);
-        if (n === i.qta) delete stato[i.alimento]; else stato[i.alimento] = n;
+        if (n === rif) delete stato[i.slot]; else stato[i.slot] = n;
         inp.value = n;
-        riga.classList.toggle('mod', n !== i.qta);
-        const em = riga.querySelector('em');
-        if (n !== i.qta && !em) riga.querySelector('.nm').insertAdjacentHTML('beforeend',
-          `<em>piano: ${nf(i.qta)} ${esc(a?.unita || 'g')}</em>`);
-        if (n === i.qta && em) em.remove();
+        riga.classList.toggle('mod', n !== rif);
+        const em = riga.querySelector('em.qta');
+        if (n !== rif && !em) riga.querySelector('.nm').insertAdjacentHTML('beforeend',
+          `<em class="qta">piano: ${nf(rif)} ${esc(a?.unita || 'g')}</em>`);
+        if (n === rif && em) em.remove();
         aggiorna();
       };
       riga.querySelectorAll('[data-d]').forEach(b => b.onclick = () =>
