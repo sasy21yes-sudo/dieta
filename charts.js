@@ -111,12 +111,14 @@ function mediaPeriodo(days, vals) {
  * non esiste un lato libero, e almeno la scritta si legge.
  */
 function righeRiferimento(s, g, o, media, vals) {
+  // le piastrine occupate, per chi disegna un'etichetta dopo di noi
+  const occupate = [];
   const righe = [
-    { v: o.target, col: 'var(--rif)', dash: '5 4', t: 'target' },
+    { v: o.target, col: 'var(--rif)', dash: '5 4', t: o.tTarget || 'target' },
     { v: media, col: 'var(--media)', dash: '2 4', t: 'media' }
   ].filter(r => r.v != null && r.v >= g.lo && r.v <= g.hi)
     .map(r => ({ ...r, y: g.y(r.v) }));
-  if (!righe.length) return;
+  if (!righe.length) return occupate;
 
   /** Quanto i dati di un lato stanno lontani dal valore v. */
   const distanza = (v, da, a) => {
@@ -154,6 +156,60 @@ function righeRiferimento(s, g, o, media, vals) {
       'font-size': 8.5, 'font-family': 'var(--mono)', fill: r.col });
     t.textContent = r.t;
     s.append(t);
+    occupate.push({ x1: sinistra ? x - 3 : x - larg + 3,
+                    x2: (sinistra ? x - 3 : x - larg + 3) + larg,
+                    y1: y - 8, y2: y + 3 });
+  }
+  return occupate;
+}
+
+/**
+ * Le etichette diritte in fondo alle serie, senza che si accavallino.
+ *
+ * Erano disegnate tutte all'ultimo punto della propria serie, e quando due
+ * serie finiscono vicine — che e' la norma, non l'eccezione: e' proprio
+ * quando le curve si toccano che si guarda il grafico — le due parole si
+ * stampavano una sopra l'altra. Su "forma e fatica" uscivano tre etichette e
+ * la riga della media tutte dentro venti pixel: illeggibile.
+ *
+ * Si risolve come si risolvono sempre queste cose: si parte dalla posizione
+ * voluta, si ordina, e si spinge via chi si sovrappone tenendo un margine
+ * minimo. In piu' si scansano le piastrine gia' occupate dalle righe di
+ * riferimento, che sono state disegnate prima.
+ */
+function etichetteSerie(s, g, voci, occupate = []) {
+  const ALT = 11, GAP = 1.5;
+  const basso = g.t + g.h - 2, alto = g.t + 9;
+  const lab = voci.map(v => ({ ...v, y: Math.min(basso, Math.max(alto, v.y)) }))
+    .sort((a, b) => a.y - b.y);
+
+  // spinta verso il basso, poi verso l'alto: due passate bastano perche' dopo
+  // la prima le etichette sono gia' in ordine e distanziate almeno una volta
+  for (let i = 1; i < lab.length; i++)
+    if (lab[i].y - lab[i - 1].y < ALT + GAP) lab[i].y = lab[i - 1].y + ALT + GAP;
+  const sfora = lab.length ? lab[lab.length - 1].y - basso : 0;
+  if (sfora > 0) for (const l of lab) l.y = Math.max(alto, l.y - sfora);
+
+  for (const l of lab) {
+    const larg = l.testo.length * 5.2 + 7;
+    let x = l.x;
+    let box = { x1: x - larg + 3, x2: x + 3, y1: l.y - 8, y2: l.y + 3 };
+    // se finisce sopra una piastrina gia' scritta, si sposta a sinistra
+    const tocca = b => occupate.some(o =>
+      b.x1 < o.x2 && b.x2 > o.x1 && b.y1 < o.y2 && b.y2 > o.y1);
+    let giri = 0;
+    while (tocca(box) && giri++ < 3) {
+      x -= larg + 6;
+      box = { x1: x - larg + 3, x2: x + 3, y1: l.y - 8, y2: l.y + 3 };
+    }
+    if (x - larg < g.l) x = l.x;               // meglio sovrapposto che fuori
+    s.append(mk('rect', { x: x - larg + 3, y: l.y - 8, width: larg, height: ALT,
+      rx: 3, fill: 'var(--paper)', opacity: .88 }));
+    const t = mk('text', { x, y: l.y, 'text-anchor': 'end',
+      'font-size': 9.5, 'font-family': 'var(--mono)', fill: l.col });
+    t.textContent = l.testo;
+    s.append(t);
+    occupate.push(box);
   }
 }
 
@@ -176,11 +232,14 @@ function riepilogo(o) {
   ];
   if (media != null) pezzi.push(`<span>media ${nf(media, dec)}</span>`);
   if (target != null) {
-    pezzi.push(`<span>target ${nf(target, dec)}</span>`);
+    // il nome della riga arriva da chi disegna: "target" su una soglia da non
+    // superare direbbe che ci vuoi arrivare
+    const nomeT = o.tTarget || 'target';
+    pezzi.push(`<span>${esc(nomeT)} ${nf(target, dec)}</span>`);
     if (media != null) {
       const d = media - target;
       pezzi.push(`<span class="${Math.abs(d) < Math.max(1, target * .04) ? 'good' : ''}">${
-        d > 0 ? '+' : ''}${nf(d, dec)} sul target</span>`);
+        d > 0 ? '+' : ''}${nf(d, dec)} ${o.tTarget ? 'dalla riga' : 'sul target'}</span>`);
     }
   }
   const r = el('div', 'riep');
@@ -344,13 +403,15 @@ function chartLine(o) {
       ? [{ n: o.puntiNome || 'valore del giorno', col: 'var(--ink-3)' },
          { n: o.maNome || 'media mobile a 7 giorni', col: 'var(--pine)' }]
       : [{ n: o.serieNome || 'valore registrato', col: 'var(--pine)' }];
-    if (o.target != null) voci.push({ n: 'target', col: 'var(--rif)' });
+    // non sempre la riga di riferimento e' un "target": su "quanta fatica hai
+    // addosso" e' una soglia, e chiamarla target direbbe che vuoi arrivarci
+    if (o.target != null) voci.push({ n: o.tTarget || 'target', col: 'var(--rif)' });
     if (media0 != null) voci.push({ n: 'media dei ' + o.days.length + ' giorni', col: 'var(--media)' });
     if (o.band) voci.push({ n: 'previsione con banda al 95%', col: 'var(--pine-soft)' });
     c.append(legenda(voci));
   }
   const rp = riepilogo({ days: o.days, vals: o.ma || o.vals, dec: o.dec,
-    unit: o.unit, target: o.target });
+    unit: o.unit, target: o.target, tTarget: o.tTarget });
   if (rp) c.append(rp);
   const read = el('div', 'read', `<span class="ph">Tocca il grafico per leggere un giorno</span>`);
   c.append(read);
@@ -478,7 +539,8 @@ function chartEmphasis(o) {
   s.append(grid(g));
   // la media della serie in evidenza: sulle altre sarebbe una riga per serie,
   // e tre righe orizzontali su un grafico a tre linee non le legge nessuno
-  righeRiferimento(s, g, o, mediaE, forteE.vals);
+  const occupate = righeRiferimento(s, g, o, mediaE, forteE.vals) || [];
+  const etich = [];
   for (const se of usabili) {
     const p = se.vals.map((v, i) => v == null ? null : { i, v }).filter(Boolean);
     if (p.length < 2) continue;
@@ -488,12 +550,10 @@ function chartEmphasis(o) {
       'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
     // etichetta diritta all'ultimo punto: l'identita' non e' solo colore
     const u = p[p.length - 1];
-    const t = mk('text', { x: g.x(u.i) - 2, y: g.y(u.v) - 5, 'text-anchor': 'end',
-      'font-size': 9.5, 'font-family': 'var(--mono)',
-      fill: se.forte ? 'var(--pine)' : 'var(--ink-3)' });
-    t.textContent = se.nome;
-    s.append(t);
+    etich.push({ testo: se.nome, x: g.x(u.i) - 2, y: g.y(u.v) - 5,
+      col: se.forte ? 'var(--pine)' : 'var(--ink-3)' });
   }
+  etichetteSerie(s, g, etich, occupate);
   s.append(xLabels(g, o.days));
   c.append(s);
   /* Questo grafico era l'unico senza legenda ne' riga di lettura, e in mezzo
@@ -1022,7 +1082,8 @@ function viewDati(v) {
   /* --- come stai --- */
   v.append(chartEmphasis({
     titolo: 'Fame ed energia',
-    sub: 'Da 1 a 5, come le hai dichiarate nel diario. Se la fame sale mentre l\'energia scende, il deficit e\' troppo aggressivo.',
+    // il diario chiede da 1 a 10, non da 1 a 5: la scritta diceva un'altra cosa
+    sub: 'Da 1 a 10, come le hai dichiarate nel diario. Se la fame sale mentre l\'energia scende, il deficit e\' troppo aggressivo.',
     days: giorni, dec: 0,
     serie: [
       { nome: 'energia', vals: giorni.map(d => val(d, x => x.energia)), forte: true },

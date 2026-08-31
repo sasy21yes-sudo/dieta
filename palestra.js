@@ -732,21 +732,51 @@ function sezGymMappa(v, k, st) {
     note: `I riferimenti sono regole pratiche (<em>${esc(V.fonte)}</em>), non misure su di te: ${esc(V.nota)}`
   }));
 
-  /* --- forma / fatica nel tempo --- */
+  /* --- quanta fatica hai ancora addosso ---
+   *
+   * Prima erano tre curve — forma, fatica, prontezza — in unita' arbitrarie,
+   * e alla domanda "cosa sta misurando?" non rispondeva niente: tre linee
+   * senza un'unita' e senza una soglia si guardano una volta e poi si
+   * saltano. Peggio: la prontezza di Banister e' SEMPRE positiva per chi si
+   * allena (tau 42 contro 7), quindi la curva piu' in evidenza era quella
+   * che non poteva dire di no.
+   *
+   * Il numero che decide qualcosa e' uno solo, ed e' quello che l'app usa
+   * gia' ovunque per dire "pronto": quanta fatica residua hai rispetto
+   * all'allenamento accumulato. Sotto il 55% il gruppo regge un altro
+   * stimolo forte. Un asse, una percentuale, una riga di riferimento.
+   */
   const focus = stanchi[0] || Object.values(st).sort((a, b) => b.forma - a.forma)[0];
-  if (focus && focus.forma > 0.05) {
+  if (focus && focus.forma > 0.5) {
     const gg = span(56, k);
     const ff = serieFormaFatica(focus.id, gg);
-    v.append(chartEmphasis({
-      titolo: `Forma e fatica — ${focus.nome.toLowerCase()}`,
-      sub: 'La fatica sale e scende in giorni, la forma resta per settimane. La prontezza e’ la differenza.',
-      days: gg, dec: 1,
-      serie: [
-        { nome: 'prontezza', vals: ff.map(x => x.prontezza), forte: true },
-        { nome: 'forma', vals: ff.map(x => x.forma) },
-        { nome: 'fatica', vals: ff.map(x => x.fatica) }
-      ],
-      note: 'Unita’ arbitrarie: conta la forma delle curve, non il valore. Costanti di tempo 42 giorni per la forma e 7 per la fatica, valori tipici di letteratura non calibrati su di te.'
+    // sotto una forma minima il rapporto esplode e non significa niente:
+    // dividere per quasi zero da' numeri enormi, non muscoli distrutti
+    const quota = ff.map(x => x.forma > 0.5 ? x.fatica / x.forma * 100 : null);
+    const ora = quota[quota.length - 1];
+    const c = el('div', 'card flat');
+    c.append(el('div', 'eyebrow', 'Recupero'));
+    c.append(el('div', 'muted', ora == null
+      ? `Servono ancora sedute su <strong>${esc(focus.nome.toLowerCase())}</strong> prima di poterlo dire.`
+      : `Sul <strong>${esc(focus.nome.toLowerCase())}</strong> hai addosso il `
+        + `<strong>${nf(ora)}%</strong> di fatica rispetto all’allenamento che hai `
+        + `accumulato: ${ora < 55 ? 'e’ pronto per un altro stimolo forte'
+          : 'sta ancora recuperando'}.`));
+    v.append(c);
+    v.append(chartLine({
+      titolo: `Quanta fatica hai addosso — ${focus.nome.toLowerCase()}`,
+      sub: 'Ogni seduta lascia due tracce: la fatica, che svanisce in circa una '
+        + 'settimana, e l’allenamento accumulato, che resta per sei. Questa riga '
+        + 'e’ la prima in percentuale del secondo.',
+      days: gg, vals: quota, unit: '%', dec: 0,
+      target: 55, tTarget: 'pronto sotto',
+      msg: 'Servono alcune sedute su questo gruppo.',
+      note: 'Sotto la riga il gruppo regge un altro stimolo forte, sopra sta '
+        + 'ancora recuperando — ed e’ la stessa soglia che l’app usa per dire '
+        + '"pronto" nella mappa qui sopra. Le due costanti di tempo (42 giorni e '
+        + '7) sono valori tipici di letteratura, non calibrati su di te: serve a '
+        + 'vedere l’andamento, non a decidere al posto tuo. Se un muscolo ti fa '
+        + 'male, vince il male.'
     }));
   }
 

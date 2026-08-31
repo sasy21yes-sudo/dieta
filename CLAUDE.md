@@ -321,6 +321,35 @@ cambia il peso: contiene già tutto il movimento, allenamenti compresi. Sommarlo
 di nuovo sarebbe contarlo due volte. Serve a misurare il carico di lavoro nel
 tempo, non a mangiare di più — e la UI deve continuare a dirlo.
 
+### "Forma e fatica" non diceva cosa stava misurando
+
+Erano tre curve — forma, fatica, prontezza — in unita' dichiaratamente
+arbitrarie, senza soglia e senza unita' di misura. Alla domanda "cosa sta
+misurando?" il grafico non rispondeva, e tre linee che non rispondono si
+guardano una volta e poi si saltano. Peggio: la curva messa **in evidenza**
+era la prontezza, che per costruzione e' sempre positiva per chi si allena
+(τ 42 contro 7) — cioe' la sola che non poteva dire di no.
+
+Il numero che decide qualcosa e' uno, ed e' quello che l'app usa gia' ovunque
+per scrivere "pronto": **quanta fatica residua hai rispetto all'allenamento
+accumulato**, in percentuale, con la riga a 55%. Un asse, un'unita', una
+soglia. Sotto la riga il gruppo regge un altro stimolo forte, sopra sta ancora
+recuperando — ed e' la stessa soglia di `statoMuscoli()`, o due schermate
+direbbero due cose diverse dello stesso muscolo lo stesso giorno.
+
+Sopra il grafico una riga in italiano dice lo stato di adesso, perche' la
+risposta non deve costringere a leggere un grafico.
+
+Due cautele restano scritte: sotto una forma minima (0,5) il rapporto non si
+calcola — dividere per quasi zero da' numeri enormi, non muscoli distrutti — e
+le due costanti di tempo sono valori tipici di letteratura, non calibrati
+sull'utente.
+
+Dettaglio di lingua che vale anche altrove: una riga di riferimento non e'
+sempre un "target". Su una soglia da **non** superare chiamarla target direbbe
+che ci vuoi arrivare, quindi `tTarget` le da' il nome giusto — qui "pronto
+sotto" — nella legenda, sulla piastrina e nella riga di riepilogo.
+
 ### I carichi non si dichiarano più
 
 `caricoTrend()` li calcola dalle schede invece di chiederli. Il massimale
@@ -707,10 +736,11 @@ Cosa prendere si decide altrove.
   rende confrontabili serie fatte con sforzo diverso. Sopra le 12 ripetizioni
   Epley sovrastima, e la UI lo dice
 - **Forma–fatica (Banister)**: ogni seduta lascia due tracce che decadono a
-  velocità diverse — fatica τ≈7 giorni, forma τ≈42. La prontezza è la
-  differenza pesata. L'impulso NON è il tonnellaggio (un leg press e un'alzata
-  laterale non sono confrontabili in chili) ma le serie pesate per
-  coinvolgimento del muscolo e per vicinanza al cedimento
+  velocità diverse — fatica τ≈7 giorni, forma τ≈42. L'impulso NON è il
+  tonnellaggio (un leg press e un'alzata laterale non sono confrontabili in
+  chili) ma le serie pesate per coinvolgimento del muscolo e per vicinanza al
+  cedimento. **Quello che si mostra è il rapporto, non le tre curve** — vedi
+  sotto
 - **Proiezione della forza**: regressione lineare, non Kalman. Qui le
   osservazioni sono poche e distanti e il segnale è molto più grande del
   rumore: una retta con banda e R² dice quanto serve senza fingere precisione
@@ -743,6 +773,20 @@ dove i dati riempiono tutto il riquadro un lato libero non esiste.
 E quando target e media quasi coincidono — proprio il caso in cui fa piacere
 vederlo — le due etichette finivano una sopra l altra: con target 2482 e media
 2488 usciva "tmegaea". Ora la piu bassa va sotto la sua riga.
+
+**Lo stesso identico problema c'era sulle etichette delle serie**, e li' era
+peggio: erano disegnate tutte all'ultimo punto della propria curva, e due
+curve che finiscono vicine — che e' la norma, perche' e' proprio quando si
+toccano che si guarda il grafico — stampavano due parole una sopra l'altra.
+Su "forma e fatica" ne uscivano tre piu' la riga della media dentro venti
+pixel: nero. Su "Misure", sei.
+
+`etichetteSerie()` fa la cosa che si fa sempre in questi casi: parte dalla
+posizione voluta, ordina, e spinge via chi si sovrappone tenendo undici pixel
+di margine, poi rientra dentro il riquadro se e' sfondato in basso. In piu'
+**si scansa le piastrine gia' occupate** dalle righe di riferimento, che sono
+disegnate prima — e per farlo `righeRiferimento()` ora restituisce i suoi
+rettangoli invece di non restituire niente.
 
 La tavolozza in `viz.css` **non e' stata scelta a occhio**: e' passata dal
 validatore della skill dataviz su tutti i controlli, in entrambi i temi —
@@ -1984,6 +2028,17 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Nei grafici a barre le etichette dell'asse x devono usare `g.xb` (centro della
   barra), non `g.x` (scala delle linee): lo scarto è mezza barra, invisibile su
   novanta giorni ed evidente su sette
+- Non disegnare le etichette delle serie all'ultimo punto e basta: due curve
+  che finiscono vicine stampano due parole una sopra l'altra, ed e' proprio
+  quando si toccano che si guarda il grafico. Passano da `etichetteSerie()`,
+  che le distanzia e scansa le piastrine gia' occupate
+- Non mettere in evidenza la prontezza di Banister: e' sempre positiva per chi
+  si allena, quindi e' la curva che non puo' dire di no. Quello che decide e'
+  il rapporto fatica/forma contro il 55%
+- Non chiamare "target" una riga di riferimento che e' una soglia da non
+  superare: dice che ci vuoi arrivare. C'e' `tTarget`
+- Non scrivere in un sottotitolo una scala che il diario non usa: fame ed
+  energia si dichiarano da 1 a 10, e il grafico diceva "da 1 a 5"
 - Non far vedere due serie su un grafico senza legenda: i punti grezzi lontani
   dalla media mobile sembrano un errore di allineamento, e non lo sono
 - Non usare `nf()` per riempire il valore di un `<input>`: formatta 2482 come
