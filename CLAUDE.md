@@ -908,6 +908,43 @@ forza. Il manubrio dà a ogni voce una riga di altezza fissa — collisione
 impossibile — e mette il movimento in orizzontale. Un asse solo: la percentuale
 del proprio target, l'unico metro che tiene sulla stessa figura i passi e i litri.
 
+### Una serie si corregge, non solo si butta
+
+Nello storico toccare una serie **la cancellava**, dopo una conferma. E' la
+stessa regola gia' imparata a caro prezzo sulle righe di scheda — *toccare una
+riga la apre* — che qui era rimasta com'era.
+
+Il punto non e' l'ergonomia: e' che nello storico una serie sbagliata quasi
+mai e' di troppo. E' **segnata male** — il carico rimasto quello della volta
+prima, dieci ripetizioni invece di otto scritte a memoria a fine seduta,
+l'esercizio preso dalla riga sopra nell'elenco — e l'unica uscita era buttarla
+e riscriverla da capo. Sono numeri che finiscono dentro il massimale stimato,
+la doppia progressione, il volume per muscolo e il verdetto sulla scheda:
+lasciarli sbagliati sporca tutto quello che ne esce.
+
+`sheetSerie(k, i)` apre la serie: carico, ripetizioni, RIR, gli scarichi uno
+per uno, e **l'esercizio**, che si puo' cambiare — e' l'errore piu' frequente
+di tutti ed e' l'unico che nessun'altra schermata sa riparare. Si lavora su
+una copia, cosi' "Annulla" non lascia niente; "Elimina questa serie" e'
+rimasta, dentro, dove uno la cerca dopo aver aperto.
+
+Tre conseguenze che sarebbero passate inosservate:
+
+- **`scordaFatica()`** — la forma-fatica e' memorizzata per muscolo e dopo
+  qualunque modifica risponderebbe coi numeri di prima. Era scritto a mano in
+  tre punti e mancava nel quarto, cioe' proprio nella cancellazione dalla
+  seduta libera. Ora e' una funzione sola;
+- **togliendo l'ultima serie la seduta sparisce**, e chi tornava indietro da
+  quella cancellazione trovava un oggetto che non esiste piu'. `sheetLibero()`
+  in quel caso torna alla schermata di scelta;
+- **le sedute vuote non sono sedute.** Aprire la schermata "come registri?"
+  crea la giornata anche se poi non ci si scrive niente, e nello storico
+  compariva una riga "Seduta · 0 serie". Quella e' la traccia di un tocco, non
+  di un allenamento: lo storico e il conteggio ora le saltano.
+
+E il bottone in testa non dice piu' "Continua quella di oggi" su una seduta di
+tre mesi fa: li' non si continua niente, si apre e si corregge.
+
 ### Una seduta si elimina
 
 Registrata il giorno sbagliato, o due volte la stessa, restava li' per sempre:
@@ -1974,6 +2011,16 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   backup, da un file di scambio e dall'editor della settimana, e per quelle
   strade nessuno passa dall'inserimento. Si ordina in lettura, in
   `fondiPiano()`, dove l'ordinamento e' idempotente
+- Non far cancellare una serie al tocco: nello storico una serie sbagliata
+  quasi mai e' di troppo, e' segnata male. Toccare apre, e dentro c'e' anche
+  l'esercizio — cambiarlo e' l'errore che nessun'altra schermata ripara
+- Non dimenticare `scordaFatica()` dopo aver toccato le serie: la forma-fatica
+  e' memorizzata per muscolo e continuerebbe a rispondere coi numeri di prima
+- Non far tornare `sheetLibero()` su una seduta che non esiste piu': togliendo
+  l'ultima serie la giornata sparisce dal registro
+- Non elencare nello storico le sedute senza serie: aprire la schermata di
+  scelta ne crea una, e quella e' la traccia di un tocco, non di un
+  allenamento
 - Non lasciare senza uscita una seduta registrata per sbaglio: entra nel
   volume, nella forma-fatica, nel monitoraggio della scheda e nel conteggio
   della revisione. E chi la elimina va avvisato che tocca solo la palestra

@@ -283,7 +283,7 @@ function sheetGuidata(k, schedaId) {
     s.serie.push(rec);
     s.guida = { scheda: sc.id, i: idx + 1 };
     s.scheda = sc.id; s.nome = sc.nome;
-    if (typeof _ffCache !== 'undefined' && _ffCache.clear) _ffCache.clear();
+    scordaFatica();
     save();
     /* Dentro una superserie il recupero non c'e': si va di la' e basta.
        E dopo l'ultima serie della seduta nemmeno: non c'e' niente da
@@ -313,7 +313,7 @@ function sheetGuidata(k, schedaId) {
       // correggere un numero sbagliato senza uscire dalla guida
       if (s.serie.length) s.serie.pop();
       s.guida = { scheda: sc.id, i: idx - 1 };
-      if (typeof _ffCache !== 'undefined' && _ffCache.clear) _ffCache.clear();
+      scordaFatica();
       save(); fermaRecupero(); sheetGuidata(k, sc.id);
     };
     w.append(ind);

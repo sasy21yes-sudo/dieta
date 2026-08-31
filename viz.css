@@ -769,6 +769,17 @@
 .gd-in{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px}
 .gd-in.due{grid-template-columns:1fr 1fr}
 .gd-in input{font-family:var(--mono);font-size:19px;text-align:center;padding:11px 6px}
+/* --------- una serie registrata ---------
+   E' un bottone, quindi le serve il reset: senza, al buio prende il fondo
+   chiaro di sistema e diventa un rettangolo bianco in mezzo all'elenco. */
+.serie-r{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:9px 10px;border:0;border-bottom:1px solid var(--rule);
+  background:none;color:var(--ink);font:inherit;font-size:12.5px;cursor:pointer}
+.serie-r:last-child{border-bottom:0}
+.serie-r .n{color:var(--ink-3);min-width:52px}
+.serie-r .go{margin-left:auto;color:var(--ink-3);font-size:15px}
+.serie-r:active{background:var(--wash)}
+
 /* le ripetizioni fatte, da toccare: intorno al bersaglio, dove finiscono
    quasi tutte le serie. Il campo resta per i casi fuori scala. */
 .gd-rip{margin:0 0 6px}

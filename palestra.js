@@ -118,6 +118,13 @@ function serieFormaFatica(mus, days) {
    stato, la stessa che usa gia' il motore di previsione: se registri una serie
    il numero cambia e la cache cade da sola. */
 const _ffCache = new Map();
+/**
+ * La forma-fatica e' memorizzata per muscolo: dopo qualunque modifica alle
+ * serie continuerebbe a rispondere coi numeri di prima. Era gia' scritto a
+ * mano in tre punti e mancava nel quarto — quello che cancellava una serie
+ * dalla seduta libera.
+ */
+function scordaFatica() { _ffCache.clear(); }
 function ffKey(k) {
   return k + '|' + Object.keys(P().sessioni || {}).length + '|' + (S.model?.rev || 0);
 }
@@ -587,7 +594,8 @@ function viewPalestra(v) {
       : acc.length ? acc.length + ' in corso' : 'sotto controllo',
     () => { gymTab = 'carico'; route(); }, sc2.serve || acc.length));
 
-  const nSed = Object.keys(P().sessioni).length;
+  const nSed = Object.keys(P().sessioni)
+    .filter(x => (P().sessioni[x]?.serie || []).length).length;
   g.append(riquadroGym('storico', 'Storico',
     nSed ? nSed + (nSed === 1 ? ' seduta' : ' sedute') : 'ancora niente',
     () => { gymTab = 'storico'; route(); }));
@@ -796,7 +804,12 @@ function sezGymCarico(v, k) {
 function sezGymStorico(v, k) {
   /* --- storico --- */
   // qui c'e' spazio: prima erano dodici perche' stavano in coda a tutto il resto
-  const sedute = Object.keys(P().sessioni).sort().reverse().slice(0, 60);
+  /* Aprire la schermata di scelta crea la giornata anche se poi non ci si
+     registra niente: una riga "Seduta · 0 serie" nello storico e' il segno di
+     un tocco, non di un allenamento. */
+  const sedute = Object.keys(P().sessioni)
+    .filter(x => (P().sessioni[x]?.serie || []).length)
+    .sort().reverse().slice(0, 60);
   if (sedute.length) {
     const c = el('div', 'card');
     c.append(el('h2', 'sec', 'Ultime sedute'));
@@ -1090,12 +1103,19 @@ function sheetSceltaModo(k) {
   w.lastChild.style.marginTop = '0';
 
   if (gia) {
+    // dallo storico si arriva qui su una seduta di tre mesi fa, e "continua
+    // quella di oggi" era la frase sbagliata: li' non si continua niente, si
+    // va a vedere cosa c'e' scritto e semmai si corregge
+    const oggi = k === today();
     const cont = el('button', 'btn wide pri',
-      `Continua quella di oggi — ${gia} serie registrate finora`);
+      oggi ? `Continua quella di oggi — ${gia} serie registrate finora`
+           : `Apri e correggi — ${gia} ${gia === 1 ? 'serie' : 'serie'} registrate`);
     cont.onclick = () => sheetLibero(k);
     w.append(cont);
-    w.append(el('p', 'hint',
-      'Scegliendo una scheda qui sotto, le serie registrate finora oggi vengono sostituite da quelle nuove.'));
+    w.append(el('p', 'hint', oggi
+      ? 'Scegliendo una scheda qui sotto, le serie registrate finora oggi vengono sostituite da quelle nuove.'
+      : 'Toccando una serie la apri: si correggono carico, ripetizioni, RIR e '
+        + 'anche l\'esercizio, se e\' stato scelto quello sbagliato.'));
   }
 
   const list = schede();
@@ -1142,7 +1162,7 @@ function sheetSceltaModo(k) {
     del.onclick = () => {
       if (!confirm(`Eliminare le ${gia} serie registrate il ${k}? Non si puo' annullare.`)) return;
       delete P().sessioni[k];
-      if (typeof _ffCache !== 'undefined' && _ffCache.clear) _ffCache.clear();
+      scordaFatica();
       save(); closeSheet(); route();
       toast('Seduta eliminata');
     };
@@ -1295,9 +1315,119 @@ function sheetDaScheda(k, schedaId) {
   sheet(w);
 }
 
+/**
+ * Una serie gia' registrata: si corregge.
+ *
+ * Il caso non e' raro ed e' diverso da "l'ho aggiunta per sbaglio": e' il
+ * carico rimasto quello della volta prima, le ripetizioni segnate a memoria a
+ * fine seduta, l'esercizio scelto dalla riga sopra nell'elenco. Sono tutti
+ * numeri che finiscono dentro il massimale stimato, la doppia progressione, il
+ * volume per muscolo e il verdetto sulla scheda: lasciarli sbagliati sporca
+ * tutto quello che ne esce, e l'unica alternativa era cancellare e riscrivere.
+ *
+ * L'esercizio si puo' cambiare perche' e' l'errore piu' frequente di tutti, e
+ * perche' e' quello che nessun'altra schermata sa riparare.
+ */
+function sheetSerie(k, i, onChiudi) {
+  const s = P().sessioni[k];
+  const x = s?.serie?.[i];
+  if (!x) return onChiudi ? onChiudi() : closeSheet();
+  const chiudi = onChiudi || (() => { closeSheet(); route(); });
+  // si lavora su una copia: uscendo con "annulla" non deve restare niente
+  const b = { ...x, drop: (x.drop || []).map(d => ({ ...d })) };
+
+  const w = el('div');
+  w.append(el('div', 'eyebrow', `${k === today() ? 'Oggi' : k} · serie ${i + 1}`));
+  w.append(el('h2', 'sec', esc(esercizio(x.ex)?.nome || x.ex)));
+  w.lastChild.style.marginTop = '0';
+
+  const f = el('div', 'field', '<label>Esercizio</label>');
+  const sel = selettoreCercabile(
+    catalogo().slice().sort((a, c) => a.nome.localeCompare(c.nome))
+      .map(e => ({ v: e.id, lab: e.nome, sub: e.attrezzo })),
+    b.ex, v => { b.ex = v; }, 'Cerca un esercizio…');
+  f.append(sel);
+  f.append(el('div', 'hint',
+    'Cambiarlo sposta questa serie da un esercizio all\'altro: lo storico dei '
+    + 'carichi e il volume per muscolo si aggiornano da soli.'));
+  w.append(f);
+
+  const g = el('div', 'gd-in');
+  g.innerHTML = `<div class="field"><label>kg</label>
+      <input type="text" inputmode="decimal" id="se-kg" value="${b.kg ?? ''}"></div>
+    <div class="field"><label>rip fatte</label>
+      <input type="text" inputmode="numeric" id="se-rp" value="${b.reps ?? ''}"></div>
+    <div class="field"><label>RIR</label>
+      <input type="text" inputmode="numeric" id="se-rr" value="${b.rir ?? 2}"></div>`;
+  w.append(g);
+
+  if (b.drop.length) {
+    const cd = el('div', 'gd-drop');
+    cd.append(el('div', 'lab', 'Scarichi'));
+    b.drop.forEach((d, j) => {
+      const fr = el('div', 'gd-in due');
+      fr.innerHTML = `<div class="field"><label>kg</label>
+          <input type="text" inputmode="decimal" id="se-dk-${j}" value="${d.kg ?? ''}"></div>
+        <div class="field"><label>rip</label>
+          <input type="text" inputmode="numeric" id="se-dr-${j}" value="${d.reps ?? ''}"></div>`;
+      cd.append(fr);
+    });
+    cd.append(el('div', 'hint',
+      'Svuotando le due caselle lo scarico sparisce. Ognuno conta mezza serie '
+      + 'nel volume.'));
+    w.append(cd);
+  }
+
+  const ok = el('button', 'btn wide pri', 'Salva la correzione');
+  ok.onclick = () => {
+    const reps = parseNum($('#se-rp').value);
+    if (!(reps > 0)) { toast('Quante ripetizioni?'); return; }
+    if (!b.ex) { toast('Scegli un esercizio'); return; }
+    x.ex = b.ex;
+    x.kg = parseNum($('#se-kg').value) ?? 0;
+    x.reps = reps;
+    x.rir = parseNum($('#se-rr').value) ?? 2;
+    const dr = [];
+    b.drop.forEach((d, j) => {
+      const kg = parseNum(($('#se-dk-' + j) || {}).value);
+      const rp = parseNum(($('#se-dr-' + j) || {}).value);
+      if (kg != null && rp > 0) dr.push({ kg, reps: rp });
+    });
+    if (dr.length) x.drop = dr; else delete x.drop;
+    scordaFatica();
+    save(); chiudi(); toast('Serie corretta');
+  };
+  w.append(ok);
+
+  const ann = el('button', 'btn wide', 'Annulla');
+  ann.style.marginTop = '8px';
+  ann.onclick = () => chiudi();
+  w.append(ann);
+
+  const del = el('button', 'btn wide', 'Elimina questa serie');
+  del.style.marginTop = '8px';
+  del.onclick = () => {
+    if (!confirm(`Togliere la serie ${i + 1} di ${esercizio(x.ex)?.nome || x.ex}?`)) return;
+    s.serie.splice(i, 1);
+    if (!s.serie.length) delete P().sessioni[k];
+    scordaFatica();
+    save(); chiudi(); toast('Serie eliminata');
+  };
+  w.append(del);
+  w.append(el('p', 'note',
+    'Correggere una serie rifa i conti che la usano: massimale stimato, '
+    + 'progressione, volume per muscolo e forma-fatica. Il resto della seduta '
+    + 'non si muove.'));
+  sheet(w);
+}
+
 /** Seduta libera: esercizio per esercizio, serie per serie. */
 function sheetLibero(k) {
-  const p = P(), s = p.sessioni[k];
+  const p = P();
+  // togliendo l'ultima serie la seduta sparisce dal registro: chi torna qui
+  // da quella cancellazione troverebbe un oggetto che non esiste piu'
+  if (!p.sessioni[k]) return sheetSceltaModo(k);
+  const s = p.sessioni[k];
   const w = el('div');
   w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
   w.append(el('h2', 'sec', 'Seduta libera'));
@@ -1322,16 +1452,19 @@ function sheetLibero(k) {
         lista.append(h);
         ultimo = ex.id;
       }
-      const r = el('div', 'cmp-r');
-      r.innerHTML = `<span class="mono">serie ${i + 1}</span>
+      /* Toccare una riga la APRE. Cancellarla al tocco era la stessa regola
+         gia' imparata sulle righe di scheda e qui era rimasta: nello storico
+         una serie sbagliata quasi sempre non e' di troppo — e' segnata male,
+         con il peso della volta prima o dieci ripetizioni invece di otto — e
+         l'unica uscita era buttarla e riscriverla da capo. */
+      const r = el('button', 'serie-r');
+      r.innerHTML = `<span class="mono n">serie ${i + 1}</span>
         <span class="mono">${nf(x.kg, 1)} kg</span>
         <span class="mono">${x.reps} rip</span>
-        <span class="mono muted">RIR ${x.rir}</span>`;
-      r.style.cursor = 'pointer';
-      r.onclick = () => {
-        if (!confirm('Togliere questa serie?')) return;
-        s.serie.splice(i, 1); save(); disegna();
-      };
+        <span class="mono muted">RIR ${x.rir}</span>
+        ${x.drop?.length ? `<span class="mono muted">+${x.drop.length}</span>` : ''}
+        <span class="go">&rsaquo;</span>`;
+      r.onclick = () => sheetSerie(k, i, () => sheetLibero(k));
       lista.append(r);
     });
   };
