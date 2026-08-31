@@ -82,6 +82,7 @@ salute.js       import di passi e sonno da un Comando iOS
 scambio.js      esporta/importa un pezzo solo: la dieta, le schede, o tutti e due
 pdf.js          generatore di PDF scritto a mano (font di base, WinAnsi)
 statistiche.js  i conti del resoconto: registro, settimana, pasti, fuori piano
+confronto.js    due alimenti a confronto: a parita' di peso, calorie, proteine
 sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
 giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
 piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
@@ -1049,6 +1050,30 @@ Con dieci voci in lista il manubrio della revisione non poteva piu' fermarsi al
 ci si appoggiava, indistinguibile da chi stava esattamente li'. Ora l'asse
 cresce coi dati fino al 220%, oltre quello taglia **e lo scrive**.
 
+### Il profilo ha una porta
+
+In cima a ogni schermata c'era l'icona della **fotocamera**, che portava dritta
+alle foto dei progressi: un pezzo solo dell'app promosso al posto piu' visibile
+che esista, mentre "chi sono, quale profilo sto usando, come mi vedo cambiare"
+non aveva nessuna porta. Ora quel posto e' del profilo, e le foto stanno dentro
+— dove uno le cerca quando pensa a se stesso, non in cima a ogni pagina.
+
+E il primo passo del piano ha cambiato ordine, che non e' gusto:
+
+1. **Le tue foto**, ma solo a profilo gia' compilato: e' l'unica parte della
+   schermata che parla di te e non dei tuoi dati. Al primo avvio sarebbe una
+   scatola vuota davanti a un modulo da riempire, quindi non c'e'.
+2. **I tuoi dati** — nome, eta', altezza, peso, sesso.
+3. **Cosa ti serve**, gli interruttori dei moduli, **per ultimi**.
+
+Prima i moduli venivano per primi: si apriva il primo passo del piano e la
+prima domanda era quali parti dell'app spegnere, cioe' una scelta che si puo'
+fare solo dopo aver capito cosa fanno.
+
+La carta delle foto non e' un doppione della scheda Foto: li' si scatta e si
+confronta, qui si vede se il filo c'e' ancora. Il numero che conta non e' quante
+foto hai ma **da quanto non ne fai una**, ed e' quello che mostra.
+
 ### La scheda si segue, e a un certo punto si cambia
 
 Una scheda non e' un elenco di esercizi: e' un esperimento con una durata. La
@@ -1081,6 +1106,35 @@ Le otto settimane sono **un intervallo di pratica comune, non una misura**, e la
 UI lo dice — come le costanti di Banister e le soglie di HYROX. E c'e' una
 ragione per cambiare scheda che l'app non conosce e non prova a indovinare: che
 sia diventata noiosa. Anche quello e' scritto.
+
+### Confrontare due alimenti
+
+"Quale dei due conviene" sembra una domanda semplice e non lo e', per un motivo
+solo: **dipende da cosa tieni fermo**. A parita' di peso vince sempre il piu'
+denso; a parita' di calorie chi ci mette dentro piu' proteine; a parita' di
+proteine chi costa meno calorie. Sono tre risposte diverse alla stessa domanda
+e sono tutte e tre vere, quindi la schermata le mette tutte e tre, dicendo ogni
+volta quale vincolo sta tenendo fermo.
+
+Nessun punteggio e nessun "meglio": questa app non da' voti al cibo, e fuori
+dal contesto in cui lo mangi un alimento non e' migliore di un altro.
+
+Sotto ai tre confronti stanno i rapporti che **non dipendono dalla porzione** —
+densita' calorica, proteine per 100 kcal, fibre per 100 kcal, quota di calorie
+per macro — che sono quelli che dicono di che tipo di alimento si tratta. E in
+fondo, sempre, **da dove vengono i numeri**: fra una stima e un'etichetta la
+differenza puo' essere piu' grande di quella che stai confrontando. Se i macro
+non tornano con le calorie dichiarate (oltre il 30%, la stessa soglia di
+`coerenza()`) il confronto lo scrive.
+
+Due dettagli del motore:
+
+- `confEquivalente()` torna **null** quando il vincolo non esiste: quanti
+  grammi di olio pareggiano le proteine del tofu non ha risposta, e dividere
+  per zero per produrne una sarebbe peggio del silenzio;
+- oltre i 1500 g il pareggio si segna come **fuori scala**: un chilo di
+  insalata per pareggiare le proteine di cento grammi di tofu e' un conto
+  giusto e una risposta inutile.
 
 ### Un elenco solo: gli alimenti
 
@@ -1519,6 +1573,14 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non stilare come `div` un elemento che e' diventato `button`: senza il reset
   prende il fondo chiaro di sistema, e al buio e' un rettangolo bianco in mezzo
   alla lista
+- Non chiedere di scrivere a mano una categoria che esiste gia': il motore
+  delle sostituzioni confronta stringhe, e "legumi" contro "Legumi" sono due
+  famiglie separate senza che nessuno se ne accorga. Si sceglie fra quelle in
+  uso, e scriverne una nuova e' la seconda strada
+- Non dare un verdetto su quale di due alimenti sia "meglio": dipende da cosa
+  tieni fermo, e le tre risposte vanno mostrate tutte e tre
+- Non inventare un equivalente dove il vincolo non esiste (proteine di un olio):
+  `null` e una riga che lo dice valgono piu' di un numero enorme
 - Non aprire una seconda schermata per gli alimenti: "Cosa mangi" e la voce di
   menu sono la stessa `elencoAlimenti()`. Due elenchi che si somigliano sono
   peggio di uno lungo

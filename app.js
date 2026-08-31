@@ -2515,6 +2515,76 @@ function sheetPause() {
 }
 
 /* --------------------------------------------------------------- menu */
+/**
+ * Il profilo, dalla testata.
+ *
+ * Al suo posto c'era l'icona della fotocamera, che portava dritta alle foto
+ * dei progressi: un solo pezzo dell'app promosso al posto piu' visibile che
+ * esiste, mentre "chi sono, quale profilo sto usando, come mi vedo cambiare"
+ * non aveva nessuna porta. Le foto stanno qui dentro, dove uno le cerca quando
+ * pensa a se stesso, e non in cima a ogni schermata.
+ */
+function sheetProfilo() {
+  const w = el('div');
+  const P0 = typeof profili === 'function' ? profili() : { lista: [], attivo: null };
+  const nome = D.profilo?.nome || (typeof profiloAttivo === 'function'
+    ? profiloAttivo()?.nome : '') || '';
+
+  w.append(el('div', 'eyebrow', 'Profilo'));
+  w.append(el('h2', 'sec', nome ? esc(nome) : 'Non hai ancora un nome'));
+  w.lastChild.style.marginTop = '0';
+
+  const d = [];
+  if (D.profilo?.eta) d.push(D.profilo.eta + ' anni');
+  if (D.profilo?.altezza_cm) d.push(nf(D.profilo.altezza_cm) + ' cm');
+  const pw = typeof lastWeight === 'function' ? lastWeight() : null;
+  if (pw) d.push(nf(pw, 1) + ' kg');
+  const gg = Object.keys(S.log || {}).length;
+  d.push(gg + (gg === 1 ? ' giorno registrato' : ' giorni registrati'));
+  w.append(el('p', 'muted', d.join(' · ')));
+
+  const vai = (t, sub2, fn) => {
+    const b = el('button', 'nav-r');
+    b.innerHTML = `<span class="body"><span class="t">${esc(t)}</span>
+      <span class="d">${esc(sub2)}</span></span><span class="go">›</span>`;
+    b.onclick = () => { closeSheet(); fn(); };
+    w.append(b);
+  };
+  vai('Foto dei progressi', 'Uno scatto al giorno nella stessa posa: e\' l\'unico modo '
+    + 'di vedere un cambiamento che sulla bilancia non si vede.',
+    () => { location.hash = '#/foto'; });
+  vai('Chi sei', 'Nome, eta\', altezza, peso di partenza, e quali parti dell\'app ti servono.',
+    () => { if (typeof pianoTab !== 'undefined') pianoTab = 'profilo';
+      location.hash = '#/piano'; route(); });
+  vai('Il piano', 'Target, alimenti, pasti, settimana: i cinque passi.',
+    () => { if (typeof pianoTab !== 'undefined') pianoTab = null;
+      location.hash = '#/piano'; });
+
+  /* --- i profili, se ce n'e' piu' di uno --- */
+  if (P0.lista.length > 1) {
+    const c = el('div', 'card flat');
+    c.append(el('div', 'eyebrow', 'Cambia profilo'));
+    c.append(el('div', 'muted',
+      'Ognuno ha il suo diario, il suo piano, le sue foto e la sua palestra, '
+      + 'separati del tutto.'));
+    const seg = el('div', 'seg wrap');
+    for (const x of P0.lista) {
+      const b = el('button', null, x.nome);
+      b.setAttribute('aria-pressed', String(x.id === P0.attivo));
+      if (x.id !== P0.attivo) b.onclick = () => cambiaProfilo(x.id);
+      seg.append(b);
+    }
+    c.append(seg);
+    w.append(c);
+  }
+
+  const ch = el('button', 'btn wide pri', 'Chiudi');
+  ch.style.marginTop = '12px';
+  ch.onclick = closeSheet;
+  w.append(ch);
+  sheet(w);
+}
+
 function sheetMenu() {
   const w = el('div');
   w.append(el('div', 'eyebrow', 'Impostazioni'));
@@ -2628,7 +2698,7 @@ async function init() {
     return;
   }
   $('#btn-menu').onclick = menuTendina;
-  $('#btn-foto').onclick = () => { location.hash = '#/foto'; };
+  $('#btn-profilo').onclick = () => sheetProfilo();
   $('#sheet-backdrop').onclick = closeSheet;
   addEventListener('hashchange', route);
   if (!location.hash) location.hash = '#/oggi';

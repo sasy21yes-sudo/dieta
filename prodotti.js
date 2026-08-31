@@ -167,12 +167,25 @@ function elencoAlimenti(v, opt = {}) {
   const c = el('div', 'cw');
   const testa = el('div', 'row between');
   testa.append(el('h3', null, opt.titolo || 'Quello che mangi'));
+  const azioni = el('div', 'row');
+  azioni.style.gap = '6px';
+  if (typeof sheetConfronta === 'function') {
+    const cf = el('button', 'btn-piu');
+    cf.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" class="ic-g">'
+      + '<path d="M6 20V9M12 20V4M18 20v-7M3 20h18" fill="none" stroke="currentColor"'
+      + ' stroke-width="1.7" stroke-linecap="round"/></svg>';
+    cf.title = 'Confronta due alimenti';
+    cf.setAttribute('aria-label', 'Confronta due alimenti');
+    cf.onclick = () => sheetConfronta();
+    azioni.append(cf);
+  }
   const piu = el('button', 'btn-piu');
   piu.textContent = '+';
   piu.title = 'Aggiungi';
   piu.setAttribute('aria-label', 'Aggiungi un alimento');
   piu.onclick = () => sheetAggiungiAlimento();
-  testa.append(piu);
+  azioni.append(piu);
+  testa.append(azioni);
   c.append(testa);
 
   const tutte = vociAlimentari();
@@ -240,6 +253,11 @@ function elencoAlimenti(v, opt = {}) {
         <div class="kc">${nf(a.kcal)}<br><span class="mt">/100${esc(a.unita || 'g')}</span></div>`;
       r.onclick = () => x.tipo === 'prodotto' ? sheetProdotto(x.prodotto)
                                               : sheetAlimento(x.nome);
+      // tenere premuto confronta: e' la seconda cosa che si vuole fare su una
+      // riga, e un secondo bottone per riga avrebbe riempito l'elenco
+      r.oncontextmenu = ev => { ev.preventDefault();
+        if (typeof sheetConfronta === 'function')
+          sheetConfronta(x.tipo === 'prodotto' ? 'p:' + x.prodotto.id : 'a:' + x.nome, null); };
       lista.append(r);
     }
     lista.append(el('p', 'hint', `${righe.length} su ${tutte.length}.`));

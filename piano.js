@@ -672,13 +672,42 @@ function pianoSezione(v) {
 }
 
 /* ------------------------------------------------------------ dati utente */
+/**
+ * Chi sei.
+ *
+ * L'ordine e' cambiato, e non e' un dettaglio di gusto. Prima veniva "cosa ti
+ * serve" — gli interruttori dei moduli — e solo dopo il nome e l'eta': si
+ * apriva il primo passo del piano e la prima domanda era quali parti dell'app
+ * spegnere, cioe' una scelta che si puo' fare solo dopo aver capito cosa fa.
+ *
+ * Ora: chi sei (le foto, se ci sei gia'), i dati che servono ai conti, e in
+ * fondo cosa ti serve — che e' la domanda giusta da fare per ultima, quando
+ * hai gia' visto il resto.
+ */
+function profiloCompilato() {
+  const p = D.profilo || {};
+  return !!(p.nome && p.altezza_cm > 0 && p.eta > 0);
+}
+
 function sezProfilo(v) {
   const p = piano();
-  v.append(cardModuli());
+  // le anteprime sono blob URL: senza questo se ne accumula una terna a ogni
+  // ridisegno della schermata
+  if (typeof liberaUrl === 'function') liberaUrl();
+
+  /* --- 1. tu, come ti vedi cambiare ---
+     Sta sopra ai numeri perche' e' l'unica parte di questa schermata che parla
+     di te e non dei tuoi dati. Compare solo a profilo fatto: al primo avvio
+     sarebbe una scatola vuota davanti a un modulo da riempire. */
+  if (profiloCompilato()) v.append(cardFotoProfilo());
+
+  /* --- 2. i dati anagrafici --- */
   const c = el('div', 'card');
-  c.append(el('h2', 'sec', 'Chi sei'));
+  c.append(el('h2', 'sec', 'I tuoi dati'));
   c.lastChild.style.marginTop = '0';
-  c.append(el('p', 'muted', 'Servono al calcolo del dispendio a riposo e alla figura in scala.'));
+  c.append(el('p', 'muted',
+    'Servono al calcolo del dispendio a riposo e alla figura in scala. '
+    + 'Restano su questo telefono: l\'app non ha un server a cui mandarli.'));
   const campo = (id, lab, val, unit) => el('div', 'field',
     `<label>${lab}${unit ? ` <span class="muted">(${unit})</span>` : ''}</label>
      <input type="text" inputmode="${id === 'nome' ? 'text' : 'decimal'}" id="pf-${id}"
@@ -701,7 +730,7 @@ function sezProfilo(v) {
   }
   fs.append(ss); c.append(fs);
   c.append(el('div', 'hint',
-    'Il sesso entra solo nella formula di Mifflin-St Jeor (+5 per gli uomini, −161 per le donne) e nella stima del grasso, che ha coefficienti diversi.'));
+    'Il sesso entra solo nella formula di Mifflin-St Jeor (+5 per gli uomini, −161 per le donne), nella stima del grasso — che ha coefficienti diversi — e nella silhouette della mappa muscolare.'));
 
   const b = el('button', 'btn wide pri', 'Salva');
   b.onclick = () => {
@@ -714,6 +743,80 @@ function sezProfilo(v) {
   };
   c.append(b);
   v.append(c);
+
+  /* --- 3. cosa ti serve, per ultimo --- */
+  v.append(cardModuli());
+}
+
+/**
+ * Le foto dei progressi, viste da qui.
+ *
+ * Non e' un doppione della scheda Foto: li' si scatta e si confronta, qui si
+ * vede a colpo d'occhio se il filo c'e' ancora. Il numero che conta non e'
+ * quante foto hai ma da quanto non ne fai una: e' la costanza a rendere
+ * confrontabili due scatti, non la qualita' del singolo.
+ */
+function cardFotoProfilo() {
+  const c = el('div', 'card');
+  c.append(el('div', 'row between',
+    '<div><div class="eyebrow">Come ti vedi cambiare</div>'
+    + '<div class="tname">Le tue foto</div></div>'));
+  const corpo = el('div');
+  c.append(corpo);
+  corpo.append(el('p', 'muted', 'Carico…'));
+
+  const vai = el('button', 'btn wide');
+  vai.style.marginTop = '10px';
+  vai.textContent = 'Apri le foto dei progressi';
+  vai.onclick = () => { location.hash = '#/foto'; };
+  c.append(vai);
+
+  if (typeof fotoTutte === 'function') fotoTutte().then(tutte => {
+    corpo.innerHTML = '';
+    if (!tutte.length) {
+      corpo.append(el('p', 'muted',
+        'Nessuno scatto ancora. Il primo e\' il riferimento: da li\' in poi ogni '
+        + 'confronto ha senso, e in un mese si vede quello che la bilancia non dice.'));
+      return;
+    }
+    const ultime = new Map();
+    for (const f of tutte) {
+      const q = ultime.get(f.posa);
+      if (!q || f.giorno > q.giorno) ultime.set(f.posa, f);
+    }
+    const ultimo = tutte.reduce((a, b2) => a.giorno >= b2.giorno ? a : b2);
+    const gg = Math.round((new Date(today()) - new Date(ultimo.giorno)) / 864e5);
+    corpo.append(el('div', 'read',
+      `<span><b>${tutte.length}</b> ${tutte.length === 1 ? 'scatto' : 'scatti'}</span>`
+      + `<span>${ultime.size} ${ultime.size === 1 ? 'posa' : 'pose'}</span>`
+      + `<span>${gg === 0 ? 'l\'ultimo oggi' : gg === 1 ? 'l\'ultimo ieri'
+        : gg + ' giorni dall\'ultimo'}</span>`));
+
+    const gr = el('div', 'foto-tris');
+    for (const [posa, lab] of (typeof POSE !== 'undefined' ? POSE : [])) {
+      const f = ultime.get(posa);
+      const fig = el('figure');
+      if (f) {
+        const u = URL.createObjectURL(f.blob);
+        if (typeof fotoUrls !== 'undefined') fotoUrls.push(u);
+        fig.innerHTML = `<img src="${u}" alt="${esc(lab)}">`
+          + `<figcaption>${esc(lab.toLowerCase())} · ${esc(f.giorno.slice(5))}</figcaption>`;
+      } else {
+        fig.className = 'vuota';
+        fig.innerHTML = `<figcaption>${esc(lab.toLowerCase())}<br>mai</figcaption>`;
+      }
+      gr.append(fig);
+    }
+    corpo.append(gr);
+    if (gg >= 14) corpo.append(el('div', 'hint',
+      `L'ultima e' di ${gg} giorni fa. Non c'e' una cadenza giusta, ma sotto le due `
+      + 'settimane fra uno scatto e l\'altro il confronto diventa rumore: il corpo '
+      + 'non cambia cosi\' in fretta.'));
+  }).catch(() => {
+    corpo.innerHTML = '';
+    corpo.append(el('p', 'muted', 'Archivio foto non disponibile su questo browser.'));
+  });
+  return c;
 }
 
 /* ---------------------------------------------------------------- target */
@@ -935,18 +1038,53 @@ function sheetAlimento(nome, pre) {
   g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px';
   g.append(campo('kcal', 'Calorie', cur?.kcal), campo('p', 'Proteine (g)', cur?.p),
            campo('c', 'Carboidrati (g)', cur?.c), campo('g', 'Grassi (g)', cur?.g),
-           campo('fibre', 'Fibre (g)', cur?.fibre),
-           campo('categoria', 'Categoria', cur?.categoria, 'text'));
+           campo('fibre', 'Fibre (g)', cur?.fibre));
   w.append(g);
-  // le categorie gia' in uso come suggerimento: il motore delle sostituzioni
-  // confronta stringhe, e "legumi" contro "Legumi" sarebbero due mondi separati
-  const dl = el('datalist'); dl.id = 'al-cats';
-  for (const cx of [...new Set(Object.values(D.alimenti).map(x => x.categoria).filter(Boolean))].sort())
-    dl.append(new Option(cx));
-  w.append(dl);
-  g.querySelector('#al-categoria')?.setAttribute('list', 'al-cats');
+
+  /* La categoria si sceglie fra quelle che esistono gia'.
+     Era un campo di testo con un datalist, cioe' in pratica da riscrivere ogni
+     volta — e il motore delle sostituzioni confronta stringhe, quindi "legumi"
+     e "Legumi" diventavano due famiglie separate senza che nessuno se ne
+     accorgesse. Scriverne una nuova si puo' ancora, ma e' la seconda strada e
+     non la prima. */
+  const fc = el('div', 'field', '<label>Categoria</label>');
+  const inCat = el('input');
+  inCat.type = 'text'; inCat.id = 'al-categoria';
+  inCat.value = cur?.categoria || '';
+  inCat.placeholder = 'come si chiama la famiglia';
+  inCat.style.display = 'none';
+  const cats = [...new Set(Object.values(D.alimenti).map(x => x.categoria).filter(Boolean))]
+    .sort((x, y) => x.localeCompare(y));
+  const chipsCat = el('div', 'seg wrap chips');
+  const segna = () => [...chipsCat.children].forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.cat === inCat.value)));
+  for (const cx of cats) {
+    const b = el('button', null, cx);
+    b.dataset.cat = cx;
+    b.onclick = () => { inCat.value = cx; inCat.style.display = 'none'; segna(); };
+    chipsCat.append(b);
+  }
+  const nuova = el('button', null, '+ nuova');
+  nuova.dataset.cat = '::nuova::';        // non coincide mai con una categoria vera
+  nuova.onclick = () => {
+    inCat.style.display = '';
+    inCat.value = '';
+    inCat.focus();
+    segna();
+    nuova.setAttribute('aria-pressed', 'true');
+  };
+  chipsCat.append(nuova);
+  fc.append(chipsCat, inCat);
+  // una categoria che non e' fra quelle note va mostrata nel campo, o
+  // aprendo l'alimento sembrerebbe che non ne abbia una
+  if (inCat.value && !cats.includes(inCat.value)) inCat.style.display = '';
+  segna();
+  w.append(fc);
   w.append(el('div', 'hint',
-    'La categoria serve al motore delle sostituzioni: cerca alternative solo dentro la stessa categoria.'));
+    'Serve al motore delle sostituzioni, che cerca alternative dentro la stessa '
+    + 'famiglia. Senza sceglierne una finisce in <strong>altro</strong>, insieme a '
+    + 'tutto quello che una famiglia sua non ce l\'ha: e\' un posto vero, non un '
+    + 'vuoto, e le alternative le cerchera\' li\' dentro.'));
 
   let confermato = false;
   if (pre?.origine) {

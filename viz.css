@@ -86,6 +86,47 @@
   font-family:var(--mono);font-size:10px;color:var(--ink-3)}
 .calscale i{width:11px;height:11px;border-radius:3px;display:block}
 
+/* le tre pose in fila dentro "Chi sei": piccole, perche' qui non si guarda la
+   foto, si guarda se il filo c'e' ancora */
+.foto-tris{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.foto-tris figure{margin:0;position:relative;aspect-ratio:3/4;border-radius:9px;
+  overflow:hidden;background:var(--wash);border:1px solid var(--rule)}
+.foto-tris img{width:100%;height:100%;object-fit:cover;display:block}
+.foto-tris figcaption{position:absolute;left:0;right:0;bottom:0;font-family:var(--mono);
+  font-size:9px;color:#fff;padding:10px 3px 3px;text-align:center;
+  background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.foto-tris figure.vuota{display:flex;align-items:center;justify-content:center}
+.foto-tris figure.vuota figcaption{position:static;background:none;color:var(--ink-3);
+  padding:0;line-height:1.5}
+
+/* --------- confronto fra due alimenti ---------
+   Quattro colonne: etichetta, primo, secondo, differenza. La differenza ha un
+   colore solo dove e' grande abbastanza da contare — sotto il 5% e' rumore di
+   arrotondamento e colorarla direbbe una cosa falsa. */
+.cf-r{display:grid;grid-template-columns:1fr 62px 62px 52px;gap:6px;align-items:baseline;
+  padding:7px 0;border-top:1px solid var(--rule);font-size:13px}
+.cf-r .l{color:var(--ink-2)}
+.cf-r .l em{display:block;font-style:normal;font-size:10.5px;color:var(--ink-3);
+  margin-top:1px}
+.cf-r .a,.cf-r .b,.cf-r .d{font-family:var(--mono);font-size:12px;text-align:right}
+.cf-r .a{color:var(--ink);font-weight:600}
+.cf-r .b{color:var(--ink)}
+.cf-r .d{color:var(--ink-3)}
+.cf-r .d.su{color:var(--pine)} .cf-r .d.giu{color:var(--amber)}
+.cf-r.cf-h{border-top:0;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--ink-3);padding-bottom:2px}
+.cf-r.cf-h .a,.cf-r.cf-h .b,.cf-r.cf-h .d{font-size:10px;color:var(--ink-3);
+  font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.cf-bars{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.cf-b{display:grid;grid-template-columns:46px 1fr;gap:8px;align-items:center}
+.cf-b .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);grid-row:span 2}
+.cf-b .s{height:9px;border-radius:3px;background:var(--wash);overflow:hidden}
+.cf-b .s i{display:block;height:100%;border-radius:3px}
+.cf-b .s i.a{background:var(--pine)}
+.cf-b .s i.b{background:var(--media)}
+
 /* --------- righe che si trascinano ---------
    La maniglia e' un elemento a se' e non tutta la riga: toccando la riga si
    apre il pasto, e se il trascinamento partisse da ovunque non si potrebbe
@@ -153,10 +194,10 @@
 
 /* ---------------- azioni nella topbar ---------------- */
 #top-actions{display:flex;align-items:center;gap:2px}
-#btn-foto{background:none;border:0;color:var(--ink-3);padding:4px 6px;cursor:pointer;
+#btn-profilo{background:none;border:0;color:var(--ink-3);padding:4px 6px;cursor:pointer;
   display:flex;align-items:center}
-#btn-foto svg{width:21px;height:21px;display:block}
-#btn-foto:active{color:var(--pine)}
+#btn-profilo svg{width:21px;height:21px;display:block}
+#btn-profilo:active{color:var(--pine)}
 
 /* ---------------- barre orizzontali ---------------- */
 .hb{display:grid;grid-template-columns:84px 1fr 38px;gap:9px;align-items:center;
