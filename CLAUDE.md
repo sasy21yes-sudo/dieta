@@ -1104,10 +1104,43 @@ apre le due strade — il catalogo online o la scrittura a mano.
 Il filtro non passa da `route()`: ridisegnare la vista a ogni lettera fa perdere
 il fuoco al campo, e su un telefono la tastiera si chiude.
 
+Accanto alla ricerca ci sono i **gruppi muscolari come pastiglie**, e non sono
+un doppione del campo di testo: la domanda vera non e' "come si chiama" ma
+"cosa ho per i femorali", e a quella si risponde toccando. Col filtro acceso
+ogni riga dice se quel gruppo e' primario o **secondario** — e' la differenza
+fra "allena i femorali" e "li usa un po'". Un gruppo senza esercizi non compare
+(sarebbe un bottone verso una lista vuota) e ritoccare quello scelto lo toglie,
+che e' piu' rapido di cercare un "azzera".
+
 Nello stesso giro e' sparita l'ultima tendina rimasta, quella della riga di
 scheda: con 59 voci un `<select>` non e' piu' un selettore, e' un elenco da
 scorrere col pollice — e su iPhone la tendina di sistema copre mezzo schermo.
 Al suo posto lo stesso `selettoreCercabile()` degli alimenti.
+
+### Il codice a barre sta dove hai in mano la confezione
+
+Il lettore c'era da tempo e non lo trovava nessuno: viveva dentro la pagina
+Prodotti, che si raggiunge dal menu in alto a destra — cioe' nel punto piu'
+lontano possibile da chi ha la scatola in mano e vuole registrarla.
+
+`leggiCodice(onValori)` lo rende richiamabile da ovunque: sceglie da solo fra
+fotocamera e digitazione, e **restituisce i valori** invece di finire per forza
+nel registro dei prodotti. Da li' il bottone e' entrato in **Piano → Cosa mangi
+→ Aggiungi un alimento**, accanto a "Cerca su internet".
+
+Tre cose che cambiano a seconda di dove arrivano i numeri, e non sono dettagli:
+
+- **prodotto gia' registrato** — i valori li ha scritti l'utente leggendo
+  l'etichetta, quindi niente `origine` e l'alimento nasce `verificato`;
+- **Open Food Facts** — `origine: 'openfoodfacts'`, quindi `stima` finche' non
+  si tocca "li ho controllati sulla confezione", e ci passa sopra `coerenza()`
+  come per la ricerca per nome: quei numeri li inseriscono le persone, e un
+  prodotto che dichiara 30 kcal con 20 g di proteine e' un errore di battitura;
+- **solo il codice** — l'utente scrive i valori qui, dall'etichetta: `verificato`.
+
+E quello che si era gia' scritto nel modulo non si perde ne' andando al lettore
+ne' tornando indietro: `compilato()` esisteva gia' per la ricerca online e vale
+anche qui.
 
 ### Il catalogo esercizi
 
@@ -1353,6 +1386,12 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   spostarli
 - Non usare l'HTML5 drag-and-drop: su iOS col dito non parte. Pointer events, e
   la maniglia deve essere un elemento a se' o la pagina non si scorre piu'
+- Non lasciare il lettore di codici a barre dentro una sola schermata: chi ha
+  la confezione in mano sta aggiungendo un alimento, non navigando il registro
+  dei prodotti. `leggiCodice()` si chiama da dove serve
+- Non marcare `verificato` un alimento arrivato da un codice a barre passando
+  per Open Food Facts: quei valori li inseriscono le persone. Da un prodotto
+  gia' nel proprio registro si', perche' li ha scritti l'utente dall'etichetta
 - Non dare un id nuovo a un esercizio che esiste gia' con un altro nome: lo
   storico dei carichi e il volume settimanale si spezzano in due
 - Non scrivere una sola delle due date del cruscotto: `datiIntervallo()` le

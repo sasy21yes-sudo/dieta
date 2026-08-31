@@ -1827,10 +1827,40 @@ function sezGymEsercizi(v) {
   const f = el('div', 'field');
   const inp = el('input');
   inp.type = 'search';
-  inp.placeholder = 'panca, curl, femorali, manubri…';
+  inp.placeholder = 'panca, curl, manubri…';
   inp.autocomplete = 'off';
   f.append(inp);
   c.append(f);
+
+  /* I gruppi come filtro a parte, e non solo dentro la ricerca a testo: la
+     domanda vera non e' "come si chiama" ma "cosa ho per i femorali", e a
+     quella si risponde toccando, non scrivendo. Un gruppo che non ha nessun
+     esercizio non compare: sarebbe un bottone che porta a una lista vuota. */
+  let gruppo = null;
+  const conta = new Map();
+  for (const e of catalogo())
+    for (const m of new Set([...(e.primari || []), ...(e.secondari || [])]))
+      conta.set(m, (conta.get(m) || 0) + 1);
+
+  const chips = el('div', 'seg wrap chips');
+  const chip = (id, lab) => {
+    const b = el('button', null, lab);
+    b.setAttribute('aria-pressed', String(gruppo === id));
+    b.onclick = () => {
+      // ritoccare il gruppo scelto lo toglie: e' il modo piu' rapido di
+      // tornare a vedere tutto senza cercare un bottone "azzera"
+      gruppo = gruppo === id ? null : id;
+      [...chips.children].forEach(x => x.setAttribute('aria-pressed',
+        String(x === b && gruppo !== null)));
+      chips.firstChild.setAttribute('aria-pressed', String(gruppo === null));
+      disegna();
+    };
+    chips.append(b);
+    return b;
+  };
+  chip(null, 'Tutti');
+  for (const m of muscoli()) if (conta.get(m.id)) chip(m.id, m.nome);
+  c.append(chips);
 
   const lista = el('div');
   c.append(lista);
@@ -1842,6 +1872,8 @@ function sezGymEsercizi(v) {
     const tutti = catalogo().slice().sort((a, b) => a.nome.localeCompare(b.nome));
     const mio = new Set(P().esercizi.map(e => e.id));
     const trovati = tutti.filter(e => {
+      if (gruppo && !(e.primari || []).includes(gruppo)
+          && !(e.secondari || []).includes(gruppo)) return false;
       if (!q) return true;
       const testo = [e.nome, e.attrezzo, ...(e.primari || []).map(nomeM),
                      ...(e.secondari || []).map(nomeM)].join(' ').toLowerCase();
@@ -1854,15 +1886,20 @@ function sezGymEsercizi(v) {
     }
     for (const e of trovati) {
       const r = el('button', 'prod');
+      // col filtro acceso si segna se quel gruppo e' primario o secondario:
+      // e' la differenza fra "allena i femorali" e "li usa un po'"
+      const ruolo = gruppo
+        ? ((e.primari || []).includes(gruppo) ? 'primario' : 'secondario') : null;
       r.innerHTML = `<div class="grow"><div class="nm">${esc(e.nome)}</div>
         <div class="mt">${esc(e.attrezzo)} · ${(e.primari || []).map(nomeM).join(', ')
           || 'nessun gruppo'}</div></div>
+        ${ruolo === 'secondario' ? '<span class="pill">secondario</span>' : ''}
         ${mio.has(e.id) ? '<span class="pill ok">tuo</span>' : ''}`;
       r.onclick = () => mio.has(e.id) ? sheetEsercizio(e.id) : sheetSchedaEsercizio(e.id);
       lista.append(r);
     }
-    lista.append(el('p', 'hint',
-      `${trovati.length} su ${tutti.length}.`));
+    lista.append(el('p', 'hint', `${trovati.length} su ${tutti.length}`
+      + (gruppo ? ` con ${nomeM(gruppo).toLowerCase()} fra i muscoli coinvolti` : '') + '.'));
   };
   inp.oninput = disegna;
   disegna();

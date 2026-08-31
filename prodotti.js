@@ -84,7 +84,7 @@ function viewProdotti(v) {
   // invece di sparire lasciando credere che la funzione non esista
   const bs = el('button', 'btn wide', 'Scansiona un codice a barre');
   bs.style.marginTop = '8px';
-  bs.onclick = () => BarcodeSupport() ? sheetScan() : sheetCodiceManuale();
+  bs.onclick = () => leggiCodice();
   v.append(bs);
 
   v.append(el('h2', 'sec', `I tuoi prodotti (${list.length})`));
@@ -210,7 +210,26 @@ function BarcodeSupport() {
       && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
 }
 
-function sheetScan() {
+/**
+ * Il punto d'ingresso del codice a barre, da qualunque parte lo si chiami.
+ *
+ * Stava solo dentro la pagina Prodotti, che si raggiunge dal menu in alto a
+ * destra: cioe' nel punto piu' lontano possibile da dove uno ha in mano la
+ * confezione. Ora chi vuole leggere un codice chiama questa, e riceve i valori
+ * indietro invece di finire per forza nel registro dei prodotti.
+ *
+ * `onValori` riceve `{ codice, nome, marca, kcal, p, c, g, fibre, unita,
+ * origine }` — con `origine: 'openfoodfacts'` quando i numeri vengono da li',
+ * che e' l'informazione da cui dipende se l'alimento nasce stima o verificato.
+ * Riceve `{ codice }` e basta se l'utente sceglie di scrivere lui i valori, e
+ * `null` se torna indietro. Senza callback il comportamento e' quello di
+ * prima: si finisce nel registro dei prodotti.
+ */
+function leggiCodice(onValori) {
+  return BarcodeSupport() ? sheetScan(onValori) : sheetCodiceManuale(onValori);
+}
+
+function sheetScan(onValori) {
   const w = el('div');
   w.append(el('div', 'eyebrow', 'Scansione'));
   w.append(el('h2', 'sec', 'Inquadra il codice'));
@@ -225,7 +244,7 @@ function sheetScan() {
   const chiudi = () => { vivo = false; if (stream) stream.getTracks().forEach(t => t.stop()); };
 
   const stop = el('button', 'btn wide', 'Annulla');
-  stop.onclick = () => { chiudi(); closeSheet(); };
+  stop.onclick = () => { chiudi(); if (onValori) onValori(null); else closeSheet(); };
   w.append(stop);
   sheet(w);
   $('#sheet-backdrop').addEventListener('click', chiudi, { once: true });
@@ -245,7 +264,7 @@ function sheetScan() {
           if (found.length) {
             const code = found[0].rawValue;
             chiudi();
-            trovato(code);
+            trovato(code, onValori);
             return;
           }
         } catch { /* fotogramma non leggibile, si riprova */ }
@@ -266,7 +285,7 @@ function sheetScan() {
  * dipendenza esterna, e questo progetto non ne ha nessuna. Nel frattempo il
  * codice si puo' digitare, e da li' in poi tutto funziona uguale.
  */
-function sheetCodiceManuale() {
+function sheetCodiceManuale(onValori) {
   const w = el('div');
   w.append(el('div', 'eyebrow', 'Codice a barre'));
   w.append(el('h2', 'sec', 'Digita il codice'));
@@ -283,15 +302,30 @@ function sheetCodiceManuale() {
   go.onclick = () => {
     const c = $('#bc-v').value.trim();
     if (!/^\d{6,14}$/.test(c)) { toast('Un codice a barre ha da 6 a 14 cifre'); return; }
-    trovato(c);
+    trovato(c, onValori);
   };
   w.append(go);
+  if (onValori) {
+    const ind = el('button', 'btn wide', 'Torna indietro');
+    ind.style.marginTop = '8px';
+    ind.onclick = () => onValori(null);
+    w.append(ind);
+  }
   sheet(w);
 }
 
-function trovato(code) {
+function trovato(code, onValori) {
   const noto = prodotti().find(p => p.barcode === code);
-  if (noto) { closeSheet(); sheetProdotto(noto); toast('Prodotto gia\' registrato'); return; }
+  if (noto) {
+    // gia' registrato: i valori li ha scritti l'utente leggendo l'etichetta,
+    // quindi non sono una stima e non portano `origine`
+    if (onValori) {
+      onValori({ codice: code, nome: noto.nome, marca: noto.marca, unita: noto.unita,
+                 kcal: noto.kcal, p: noto.p, c: noto.c, g: noto.g, fibre: noto.fibre });
+      return;
+    }
+    closeSheet(); sheetProdotto(noto); toast('Prodotto gia\' registrato'); return;
+  }
 
   const w = el('div');
   w.append(el('div', 'eyebrow', 'Codice letto'));
@@ -303,8 +337,19 @@ function trovato(code) {
     'La ricerca invia il solo codice a barre a openfoodfacts.org. Nessun tuo dato personale esce dal telefono, ma serve la rete e i valori di quell\'archivio sono inseriti dagli utenti: vanno confrontati con la confezione.'));
 
   const man = el('button', 'btn wide pri', 'Inserisco a mano');
-  man.onclick = () => { closeSheet(); sheetProdotto({ barcode: code, nuovo: true }); };
+  man.onclick = () => {
+    if (onValori) { onValori({ codice: code }); return; }
+    closeSheet(); sheetProdotto({ barcode: code, nuovo: true });
+  };
   w.append(man);
+
+  if (onValori) {
+    const ind = el('button', 'btn wide');
+    ind.style.marginTop = '8px';
+    ind.textContent = 'Torna indietro';
+    ind.onclick = () => onValori(null);
+    w.append(ind);
+  }
 
   const online = el('button', 'btn wide', 'Cerca su Open Food Facts');
   online.style.marginTop = '8px';
@@ -317,14 +362,18 @@ function trovato(code) {
       const j = await r.json();
       const n = j?.product?.nutriments;
       if (!j?.product || !n) throw new Error('non trovato');
-      closeSheet();
-      sheetProdotto({
-        nuovo: true, barcode: code,
+      const dati = {
         nome: j.product.product_name || '', marca: (j.product.brands || '').split(',')[0].trim(),
         kcal: Math.round(n['energy-kcal_100g'] ?? 0),
         p: n.proteins_100g ?? 0, c: n.carbohydrates_100g ?? 0,
         g: n.fat_100g ?? 0, fibre: n.fiber_100g ?? 0
-      });
+      };
+      if (onValori) {
+        onValori({ codice: code, unita: 'g', origine: 'openfoodfacts', ...dati });
+        return;
+      }
+      closeSheet();
+      sheetProdotto({ nuovo: true, barcode: code, ...dati });
       toast('Controlla i valori con l\'etichetta');
     } catch {
       online.disabled = false; online.textContent = 'Cerca su Open Food Facts';

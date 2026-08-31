@@ -860,6 +860,39 @@ function sheetAlimento(nome, pre) {
       kcal: v('kcal'), p: v('p'), c: v('c'), g: v('g'), fibre: v('fibre') };
   };
 
+  /* Il codice a barre sta qui, dove uno ha in mano la confezione. Prima era
+     solo dentro la pagina Prodotti, che si raggiunge dal menu in alto a
+     destra: la funzione c'era e non la trovava nessuno. */
+  if (!nome && typeof leggiCodice === 'function') {
+    const bc = el('button', 'btn wide');
+    bc.textContent = 'Leggi il codice a barre';
+    bc.style.marginBottom = '8px';
+    bc.onclick = () => {
+      const indietro = compilato();
+      leggiCodice(a => {
+        if (!a) { sheetAlimento(null, indietro); return; }
+        sheetAlimento(null, {
+          ...indietro,
+          nome: [a.nome, a.marca].filter(Boolean).join(' — ').slice(0, 60)
+                || indietro?.nome || '',
+          kcal: a.kcal ?? indietro?.kcal, p: a.p ?? indietro?.p,
+          c: a.c ?? indietro?.c, g: a.g ?? indietro?.g,
+          fibre: a.fibre ?? indietro?.fibre,
+          unita: a.unita || indietro?.unita,
+          categoria: indietro?.categoria || '',
+          barcode: a.codice, origine: a.origine || null,
+          /* Il controllo di coerenza vale anche qui: i valori di Open Food
+             Facts li inseriscono le persone, e un prodotto che dichiara 30
+             kcal con 20 g di proteine e' un errore di battitura, non un
+             alimento. Sui prodotti gia' registrati non serve: quei numeri li
+             ha scritti l'utente leggendo l'etichetta. */
+          avviso: a.origine && typeof coerenza === 'function' ? coerenza(a) : null
+        });
+      });
+    };
+    w.append(bc);
+  }
+
   /* la ricerca online: solo sui nuovi, e solo se il file c'e' */
   if (!nome && typeof sheetCercaAlimento === 'function') {
     const cerca = el('button', 'btn wide');

@@ -886,6 +886,12 @@
 .cd-live .u{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.09em;
   text-transform:uppercase;color:var(--ink-3);margin-top:3px}
 .seg.wrap{flex-wrap:wrap}
+/* i gruppi muscolari come pastiglie: quattordici voci su un telefono vanno a
+   capo da sole, e non devono diventare quattordici bottoni alti quaranta */
+.seg.chips{gap:5px;margin:2px 0 10px}
+.seg.chips button{flex:0 0 auto;min-height:30px;padding:0 10px;font-size:12px;
+  border-radius:15px;white-space:nowrap}
+
 /* con cinque voci "180 gg" si spezzava fra il numero e l'unita' */
 .seg.gg button{white-space:nowrap;min-width:46px;padding:0 5px;font-size:13px}
 
