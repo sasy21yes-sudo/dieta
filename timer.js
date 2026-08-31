@@ -20,18 +20,63 @@
 /** Recuperi tipici, in secondi. Non sono misure: sono valori di uso comune. */
 const REC_DEFAULT = { pesante: 180, multi: 120, isolamento: 75, tecnica: 45 };
 
+/** I recuperi che si scelgono davvero, in secondi. */
+const REC_SCELTE = [30, 45, 60, 90, 120, 180, 240];
+const recTesto = sec => sec % 60 === 0 && sec >= 60
+  ? (sec / 60) + '′' : sec >= 60
+    ? Math.floor(sec / 60) + '′' + (sec % 60) + '″' : sec + '″';
+
 /**
  * Quanto recupero suggerire per una riga di scheda.
- * La logica e' quella che userebbe chiunque in sala: piu' l'esercizio muove
- * carico e articolazioni, piu' tempo serve. Sotto le 6 ripetizioni si sta
- * lavorando sul sistema nervoso, e li' i tre minuti non sono un lusso.
+ *
+ * Tre livelli, dal piu' specifico al piu' generico, e vince il primo che c'e':
+ *
+ *   1. `riga.recupero`  — quello che hai scritto su QUESTO esercizio
+ *   2. `sc.recupero`    — quello della scheda, per non ripeterlo otto volte
+ *   3. il calcolo       — piu' l'esercizio muove carico e articolazioni, piu'
+ *                         tempo serve; sotto le 6 ripetizioni si lavora sul
+ *                         sistema nervoso e li' i tre minuti non sono un lusso
+ *
+ * Il terzo e' un valore di uso comune e non una misura su di te — ed e' il
+ * motivo per cui i primi due esistono: il recupero giusto lo sai tu.
  */
-function recupeoConsigliato(ex, riga) {
+function recupeoConsigliato(ex, riga, sc) {
+  if (riga?.recupero > 0) return riga.recupero;
+  if (sc?.recupero > 0) return sc.recupero;
   if (!ex) return REC_DEFAULT.multi;
   const lo = (riga?.reps ?? ex.range?.[0]) || 8;
   if (ex.tipo === 'multi' && lo <= 6) return REC_DEFAULT.pesante;
   if (ex.tipo === 'multi') return REC_DEFAULT.multi;
   return REC_DEFAULT.isolamento;
+}
+/** Da dove viene il numero, per poterlo dire invece di farlo indovinare. */
+function recupeoFonte(riga, sc) {
+  if (riga?.recupero > 0) return 'esercizio';
+  if (sc?.recupero > 0) return 'scheda';
+  return 'auto';
+}
+
+/**
+ * Il selettore del recupero: pastiglie, non un campo numerico.
+ * Nessuno scrive "105 secondi"; si sceglie fra i cinque valori che si usano,
+ * e "come dice l'app" resta il default perche' e' quello che serve a chi non
+ * ha ancora un'opinione.
+ */
+function campoRecupero(valore, onCambia, etichetta, notaAuto) {
+  const f = el('div', 'field', `<label>${etichetta || 'Recupero fra le serie'}</label>`);
+  const seg = el('div', 'seg chips');
+  const dipingi = () => [...seg.children].forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.v) === String(valore || 0)));
+  const voci = [[0, 'Auto']].concat(REC_SCELTE.map(x => [x, recTesto(x)]));
+  for (const [v, lab] of voci) {
+    const b = el('button', null, lab);
+    b.dataset.v = v;
+    b.onclick = () => { valore = v; onCambia(v || 0); dipingi(); };
+    seg.append(b);
+  }
+  f.append(seg); dipingi();
+  if (notaAuto) f.append(el('div', 'hint', notaAuto));
+  return f;
 }
 
 /* --------------------------------------------------------------- stato */
@@ -102,8 +147,26 @@ function fermaRecupero() {
   document.getElementById('recbar')?.remove();
   if (recTick) { clearInterval(recTick); recTick = null; }
 }
+/**
+ * +30 / -30.
+ *
+ * A timer in corso vuol dire quello che sembra: allunga o accorcia il
+ * recupero. A timer **gia' scaduto** no — e li' sommare trenta secondi a un
+ * recupero finito da un minuto e mezzo non cambiava niente sullo schermo, che
+ * e' il modo migliore di far credere che il bottone sia rotto. Chi lo tocca
+ * in quel momento sta chiedendo trenta secondi ancora **da adesso**, quindi il
+ * recupero riparte. E il "-30" a tempo scaduto non ha niente da accorciare:
+ * il bottone e' li' spento invece di non fare nulla in silenzio.
+ */
 function spostaRecupero(d) {
   const st = recStato(); if (!st) return;
+  if (recRestanti(st) === 0) {
+    if (d <= 0) return;
+    recScrivi({ t0: Date.now(), sec: Math.max(5, d), lab: st.lab,
+                suonato: false, tieni: st.tieni });
+    recDisegna();
+    return;
+  }
   st.sec = Math.max(5, st.sec + d);
   if (recRestanti(st) > 0) st.suonato = false;
   recScrivi(st);
@@ -137,6 +200,11 @@ function recBarra() {
 
 const recOltre = st => !st ? 0
   : Math.max(0, Math.round((Date.now() - st.t0) / 1000 - st.sec));
+/* Oltre un'ora quello non e' piu' un recupero, e' una barra dimenticata
+   accesa. La soglia e' la stessa che usa recRiprendi(): due regole diverse
+   per lo stesso stato erano una barra che spariva riaprendo l'app e restava
+   tenendola aperta. */
+const REC_OLTRE_MAX = 3600;
 
 function recDisegna() {
   const st = recStato(), b = document.getElementById('recbar');
@@ -146,11 +214,14 @@ function recDisegna() {
   // oltre il recupero il numero non si ferma a 0:00 — riparte col segno piu',
   // che e' l'unica cosa che dice "stai perdendo tempo" senza scriverlo
   const oltre = r === 0 && st.tieni ? recOltre(st) : 0;
+  if (oltre > REC_OLTRE_MAX) { fermaRecupero(); return; }
   b.querySelector('.rec-t').textContent = oltre ? '+' + mmss(oltre) : mmss(r);
   b.querySelector('.rec-l').textContent = st.lab || 'recupero';
   b.querySelector('.rec-fill').style.width = (100 * r / Math.max(1, st.sec)) + '%';
   b.classList.toggle('fatto', r === 0);
   b.classList.toggle('oltre', !!oltre);
+  const meno = b.querySelector('.rec-b[data-d="-30"]');
+  if (meno) meno.disabled = r === 0;
   /* Sotto un foglio aperto la barra non la vede nessuno, ed e' esattamente la
      situazione della seduta guidata: il foglio resta li' tutto il tempo. Con
      un foglio aperto la barra "tenuta" sale in cima e passa sopra. */
@@ -162,8 +233,16 @@ function recDisegna() {
     // dopo venti secondi si toglie da sola: e' un promemoria, non un allarme.
     // Non pero' dentro una seduta guidata, dove il tempo oltre il recupero e'
     // un dato e la barra deve restare finche' non parte la serie dopo
-    if (!st.tieni)
-      setTimeout(() => { const s2 = recStato(); if (s2 && s2.suonato) fermaRecupero(); }, 20000);
+    // La chiusura vale per QUESTO recupero: senza il confronto su t0, un
+    // timer partito dieci secondi dopo si vedeva chiudere la barra sotto il
+    // naso dal promemoria di quello prima
+    if (!st.tieni) {
+      const mio = st.t0;
+      setTimeout(() => {
+        const s2 = recStato();
+        if (s2 && s2.suonato && s2.t0 === mio) fermaRecupero();
+      }, 20000);
+    }
   }
 }
 
@@ -183,8 +262,8 @@ document.addEventListener('visibilitychange', () => {
  * Il bottone da mettere accanto a una serie. Fa una cosa sola: far partire
  * il recupero giusto per quell'esercizio, senza chiedere niente.
  */
-function bottoneRecupero(ex, riga) {
-  const sec = recupeoConsigliato(ex, riga);
+function bottoneRecupero(ex, riga, sc) {
+  const sec = recupeoConsigliato(ex, riga, sc);
   const b = el('button', 'rec-go');
   b.type = 'button';
   b.textContent = `⏱ ${sec >= 60 ? Math.round(sec / 60 * 10) / 10 + '′' : sec + '″'}`;

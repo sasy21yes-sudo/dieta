@@ -107,6 +107,10 @@ function sheetGuidata(k, schedaId) {
 
   /* --- finita --- */
   if (idx >= passi.length) {
+    // il recupero dell'ultima serie non serve piu' a niente: non c'e' una
+    // serie dopo da aspettare, e una barra che conta sulla schermata di fine
+    // chiede di stare fermi per un lavoro che non arrivera'
+    fermaRecupero();
     w.append(el('div', 'eyebrow', esc(sc.nome)));
     w.append(el('h2', 'sec', 'Seduta finita'));
     w.lastChild.style.marginTop = '0';
@@ -150,6 +154,10 @@ function sheetGuidata(k, schedaId) {
     `serie <b>${passo.si + 1}</b> di ${serieDiRiga(riga)}`,
     `bersaglio <b>${esc(bers)}</b> ${+bers === 1 ? 'ripetizione' : 'ripetizioni'}`];
   if (kgProp != null) sotto.push(`${nf(kgProp, 1)} kg l'ultima volta`);
+  // quanto durera' il recupero si sa prima di cominciare la serie, non dopo:
+  // e' meta' della decisione su come farla
+  if (passo.recupero && idx + 1 < passi.length)
+    sotto.push(`recupero <b>${recTesto(recupeoConsigliato(ex, riga, sc))}</b>`);
   w.append(el('div', 'read', sotto.map(x => `<span>${x}</span>`).join('')));
 
   const av = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(riga.ex, k) : null;
@@ -178,15 +186,43 @@ function sheetGuidata(k, schedaId) {
       + `<b>${esc(esercizio(passo.prossimo.ex)?.nome || '')}</b>, senza recupero.`));
   if (pp && passo.si === 0) w.append(el('div', 'hint', esc(pp.testo)));
 
-  /* --- i tre numeri --- */
+  /* --- i tre numeri ---
+     Il kg arriva gia' scritto perche' e' quello che hai messo sul bilanciere e
+     quasi sempre e' lo stesso della volta prima. Le ripetizioni no: quelle
+     sono l'unica cosa che la serie ti ha detto, e il bersaglio sta nel
+     segnaposto proprio perche' non venga scambiato per una risposta. Un
+     campo prevompilato col bersaglio registrerebbe quello che DOVEVI fare. */
   const g = el('div', 'gd-in');
   g.innerHTML = `<div class="field"><label>kg</label>
       <input type="text" inputmode="decimal" id="gd-kg" value="${kgProp ?? ''}"></div>
-    <div class="field"><label>ripetizioni</label>
+    <div class="field"><label>rip fatte</label>
       <input type="text" inputmode="numeric" id="gd-rp" placeholder="${esc(bers)}"></div>
     <div class="field"><label>RIR</label>
       <input type="text" inputmode="numeric" id="gd-rr" value="2"></div>`;
   w.append(g);
+
+  /* Le ripetizioni si toccano, non si scrivono: aprire la tastiera con le mani
+     sudate per un numero fra 5 e 15 e' il modo piu' lento di dire "otto". Le
+     pastiglie stanno intorno al bersaglio, che e' dove finiscono quasi tutte
+     le serie; il campo resta li' per i casi fuori scala. */
+  const centro = parseNum(bers) || riga.reps || 8;
+  const vicini = [];
+  for (let n = Math.max(1, centro - 3); n <= centro + 3; n++) vicini.push(n);
+  const chip = el('div', 'seg chips gd-rip');
+  const segna = n => {
+    $('#gd-rp').value = n;
+    [...chip.children].forEach(b => b.setAttribute('aria-pressed', +b.dataset.n === n));
+  };
+  for (const n of vicini) {
+    const b = el('button', null, String(n));
+    b.dataset.n = n;
+    b.onclick = () => segna(n);
+    chip.append(b);
+  }
+  w.append(chip);
+  w.append(el('div', 'hint',
+    'Quante ne hai fatte davvero, non quante ne chiedeva la scheda: e\' da '
+    + 'quel numero che escono il massimale stimato e la progressione.'));
 
   const drops = [];
   if (scar.length) {
@@ -219,10 +255,20 @@ function sheetGuidata(k, schedaId) {
   const fatto = el('button', 'btn wide pri gd-ok');
   fatto.textContent = passo.recupero ? 'Serie completata' : 'Fatta — vai al prossimo';
   fatto.onclick = () => {
-    const reps = parseNum($('#gd-rp').value) ?? parseNum(bers);
+    /* Senza ripetizioni non si registra. Prima il bersaglio faceva da
+       ripiego, e questo significava scrivere nel registro quello che la
+       scheda chiedeva invece di quello che e' successo — proprio il numero da
+       cui escono massimale stimato, doppia progressione e verdetto sulla
+       scheda. Se la serie non l'hai fatta c'e' "Salta questa serie". */
+    const reps = parseNum($('#gd-rp').value);
+    if (!(reps > 0)) {
+      toast('Quante ripetizioni hai fatto?');
+      $('#gd-rp').focus();
+      return;
+    }
     const rec = { ex: riga.ex,
       kg: parseNum($('#gd-kg').value) ?? 0,
-      reps: reps > 0 ? reps : (parseNum(bers) || 1),
+      reps,
       rir: parseNum($('#gd-rr').value) ?? 2 };
     if (riga.tecnica && riga.tecnica !== 'normale') rec.tecnica = riga.tecnica;
     else if (rp) rec.tecnica = 'rest-pause';
@@ -239,9 +285,12 @@ function sheetGuidata(k, schedaId) {
     s.scheda = sc.id; s.nome = sc.nome;
     if (typeof _ffCache !== 'undefined' && _ffCache.clear) _ffCache.clear();
     save();
-    // dentro una superserie il recupero non c'e': si va di la' e basta
-    if (passo.recupero) {
-      const sec = recupeoConsigliato(ex, riga);
+    /* Dentro una superserie il recupero non c'e': si va di la' e basta.
+       E dopo l'ultima serie della seduta nemmeno: non c'e' niente da
+       recuperare, e una barra che conta sulla schermata "seduta finita"
+       chiede di aspettare per una serie che non esiste. */
+    if (passo.recupero && idx + 1 < passi.length) {
+      const sec = recupeoConsigliato(ex, riga, sc);
       avviaRecupero(sec, ex.nome, true);
     }
     sheetGuidata(k, sc.id);

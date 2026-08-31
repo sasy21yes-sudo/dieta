@@ -769,6 +769,10 @@
 .gd-in{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px}
 .gd-in.due{grid-template-columns:1fr 1fr}
 .gd-in input{font-family:var(--mono);font-size:19px;text-align:center;padding:11px 6px}
+/* le ripetizioni fatte, da toccare: intorno al bersaglio, dove finiscono
+   quasi tutte le serie. Il campo resta per i casi fuori scala. */
+.gd-rip{margin:0 0 6px}
+.gd-rip button{min-height:34px}
 .gd-drop{margin:2px 0 6px;padding:8px 10px;border:1px dashed var(--rule);border-radius:11px}
 .gd-drop .lab,.gd-fatte .lab{font-family:var(--mono);font-size:9.5px;
   letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}

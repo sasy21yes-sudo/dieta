@@ -1213,7 +1213,7 @@ function sheetDaScheda(k, schedaId) {
     // in una superserie il recupero sta DOPO la coppia, non in mezzo:
     // se la riga dopo e' attaccata a questa, qui il timer non ci va
     if (!sc.esercizi[ei + 1]?.superserie)
-      cap.querySelector('span:last-child').before(bottoneRecupero(ex, riga));
+      cap.querySelector('span:last-child').before(bottoneRecupero(ex, riga, sc));
     cap.querySelector('span:last-child').before(bottoneEsecuzione(riga.ex));
     const av = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(riga.ex, k) : null;
     if (av) box.append(av);
@@ -1496,15 +1496,9 @@ function scarichiDiRiga(riga) {
   if ((riga.tecnica || 'normale') !== 'stripping') return [];
   return riga.strip?.length ? riga.strip.slice() : [null];
 }
-/**
- * Il rest-pause si puo' dichiarare sulla riga o su tutta la scheda.
- * Sull'intera scheda vale solo per le righe "normali": una riga che ha gia'
- * una tecnica sua l'ha scelta apposta, e sovrascriverla sarebbe decidere al
- * posto di chi l'ha scritta.
- */
+/** Il rest-pause e' una tecnica della riga, come lo stripping. */
 function usaRestPause(sc, riga) {
-  return (riga.tecnica || 'normale') === 'rest-pause'
-    || (!!sc?.restPause && (riga.tecnica || 'normale') === 'normale');
+  return (riga.tecnica || 'normale') === 'rest-pause';
 }
 function ripartenze(riga) { return Math.max(1, riga.rpMini || 2); }
 
@@ -1581,7 +1575,7 @@ function sheetScheda(id, statoPre) {
   // statoPre serve a tornare qui dall'editor di una riga senza perdere ne'
   // il nome che stavi scrivendo ne' le righe aggiunte e non ancora salvate
   const stato = statoPre
-    || { nome: sc.nome, restPause: !!sc.restPause,
+    || { nome: sc.nome, recupero: sc.recupero || 0,
          esercizi: sc.esercizi.map(x => ({ ...x })) };
 
   const w = el('div');
@@ -1594,28 +1588,15 @@ function sheetScheda(id, statoPre) {
     `<label>Nome della scheda</label>
      <input type="text" id="sk-nome" value="${esc(stato.nome)}" placeholder="Esempio: Push A">`));
 
-  /* Il rest-pause su tutta la scheda non e' un doppione di quello per riga:
-     ci sono programmi che lo dichiarano una volta in testa ("tutte le serie
-     in rest-pause") e dirlo otto volte, una per esercizio, e' otto volte la
-     stessa informazione. Vale pero' solo per le righe senza una tecnica
-     propria: chi ha scritto "stripping" su una riga l'ha scelto apposta. */
-  const frp = el('div', 'field', '<label>Rest-pause su tutta la scheda</label>');
-  const srp = el('div', 'seg');
-  for (const [val, lab] of [[false, 'No'], [true, 'Sì, tutte le serie']]) {
-    const b = el('button', null, lab);
-    b.setAttribute('aria-pressed', !!stato.restPause === val);
-    b.onclick = () => {
-      stato.restPause = val;
-      [...srp.children].forEach(x => x.setAttribute('aria-pressed', x.textContent === lab));
-      disegna();
-    };
-    srp.append(b);
-  }
-  frp.append(srp);
-  frp.append(el('div', 'hint',
-    'Le righe che hanno gia\' una tecnica loro — stripping, piramidale — non '
-    + 'cambiano: quella l\'hai scelta per quell\'esercizio.'));
-  w.append(frp);
+  /* Il recupero della scheda: quello che vale per tutti gli esercizi che non
+     dicono altro. Dichiararlo qui una volta e' il caso normale — chi si
+     allena in un certo modo recupera in un certo modo — e le eccezioni si
+     scrivono sulla riga, dove si vedono. */
+  w.append(campoRecupero(stato.recupero, v => { stato.recupero = v; disegna(); },
+    'Recupero fra le serie',
+    'Vale per tutta la scheda. "Auto" lascia decidere all\'app: piu\' lungo '
+    + 'sui fondamentali pesanti, piu\' corto sugli isolamenti. Un esercizio '
+    + 'puo\' avere il suo, e in quel caso vince il suo.'));
 
   const lista = el('div');
   const disegna = () => {
@@ -1637,14 +1618,15 @@ function sheetScheda(id, statoPre) {
         ? ' ' + listaTesto(riga.strip)
         : riga.tecnica === 'piramidale' && riga.piram?.length
           ? ' ' + listaTesto(riga.piram)
-        : usaRestPause(stato, riga) && (riga.tecnica || 'normale') === 'normale'
-          ? ' x' + ripartenze(riga) : '';
-      const nomeT = usaRestPause(stato, riga) && (riga.tecnica || 'normale') === 'normale'
-        ? 'rest-pause' : t.nome.toLowerCase();
+        : riga.tecnica === 'rest-pause' ? ' x' + ripartenze(riga) : '';
+      // il recupero compare solo se e' suo: quello della scheda e' scritto
+      // una volta sola qui sopra, e ripeterlo su ogni riga sarebbe rumore
+      const rec = riga.recupero > 0 ? ' · rec ' + recTesto(riga.recupero) : '';
       r.innerHTML = `<span class="g">${et[i].testo}</span>
         <span class="nm">${esc(ex?.nome || riga.ex)}
-          ${(riga.tecnica && riga.tecnica !== 'normale') || usaRestPause(stato, riga)
-            ? `<em>${esc(nomeT + dett)}</em>` : ''}</span>
+          ${riga.tecnica && riga.tecnica !== 'normale'
+            ? `<em>${esc(t.nome.toLowerCase() + dett + rec)}</em>`
+            : rec ? `<em>${esc(rec.replace(' · ', ''))}</em>` : ''}</span>
         <span class="v">${serieDiRiga(riga)}</span>
         <span class="v">${rangeTesto(riga)}</span>
         <span class="v">${riga.kg ? nf(riga.kg, 1) : '—'}</span>
@@ -1677,7 +1659,7 @@ function sheetScheda(id, statoPre) {
     if (!nome) { toast('Serve il nome della scheda'); return; }
     if (!stato.esercizi.length) { toast('Serve almeno un esercizio'); return; }
     const rec = { id: sc.id, nome, esercizi: stato.esercizi };
-    if (stato.restPause) rec.restPause = true;
+    if (stato.recupero > 0) rec.recupero = stato.recupero;
     const L = schede();
     const i = L.findIndex(x => x.id === rec.id);
     if (i >= 0) L[i] = rec; else L.push(rec);
@@ -1831,6 +1813,14 @@ function sheetRigaScheda(stato, idx, onChiudi) {
   ft.append(seg); ft.append(spieg); ft.append(extra); dipingi();
   w.append(ft);
 
+  /* Il recupero di QUESTO esercizio, che vince su quello della scheda.
+     "Auto" qui non vuol dire "calcolalo": vuol dire "vale quello della
+     scheda, e se la scheda non lo dice allora calcolalo". */
+  w.append(campoRecupero(riga.recupero, v => { riga.recupero = v; },
+    'Recupero di questo esercizio',
+    'Vale solo per lui. Con "Auto" segue la scheda, e se anche la scheda dice '
+    + 'auto lo decide l\'app.'));
+
   /* superserie */
   const primo = !nuovo && idx === 0;
   if (!primo) {
@@ -1904,6 +1894,7 @@ function sheetRigaScheda(stato, idx, onChiudi) {
       const rp = parseNum(($('#rg-rp') || {}).value);
       if (rp > 0) rec.rpMini = Math.round(rp);
     }
+    if (riga.recupero > 0) rec.recupero = riga.recupero;
     if (nuovo) stato.esercizi.push(rec); else stato.esercizi[idx] = rec;
     onChiudi();                        // torna alla scheda, non chiude tutto
   };

@@ -215,8 +215,9 @@ non un dettaglio.
   sul telefono senza librerie e senza server. Da dare a chi l'app non ce l'ha
 - **Controllo della versione** — quale versione stai usando, se ce n'e' una
   nuova, e un bottone per ricaricare. Su iPhone non c'era nessun altro modo
-- **Seduta guidata** — un esercizio alla volta, il bersaglio della serie, il
-  recupero che parte da solo e diventa rosso se lo superi; le superserie si
+- **Seduta guidata** — un esercizio alla volta, il bersaglio della serie, le
+  ripetizioni fatte a portata di pollice, e il recupero — tuo, della scheda o
+  calcolato — che parte da solo e diventa rosso se lo superi; le superserie si
   fanno alternate come in sala
 - **Timer di recupero**, **scarico automatico**, **dolori e infortuni** in Gym
 - **Dispensa** — quello che hai in casa si sottrae dalla lista della spesa
@@ -357,11 +358,30 @@ Tre campi nuovi sulla riga, tutti facoltativi:
 | `piram: [12, 10, 8]` | le ripetizioni serie per serie. Quante serie sono lo dice la lunghezza |
 | `rpMini: 2` | quante ripartenze in un rest-pause |
 
-Piu' `restPause` **sulla scheda intera**, perche' certi programmi lo dichiarano
-una volta in testa e ripeterlo su otto righe e' otto volte la stessa
-informazione. Vale pero' solo per le righe senza una tecnica loro: chi ha
-scritto "stripping" su una riga l'ha scelto apposta, e sovrascriverlo sarebbe
-decidere al posto suo.
+### Il recupero si dichiara, e a due livelli
+
+`recupeoConsigliato()` calcolava il recupero da attrezzo e ripetizioni e non
+si poteva contraddire: erano valori di uso comune spacciati per decisione.
+Ora sono tre livelli, e vince il primo che c'e':
+
+| | |
+|---|---|
+| `riga.recupero` | quello di **questo** esercizio |
+| `sc.recupero` | quello della **scheda**, per non ripeterlo otto volte |
+| il calcolo | piu' l'esercizio muove carico e articolazioni, piu' tempo serve; sotto le 6 ripetizioni si lavora sul sistema nervoso |
+
+Il terzo resta un valore di pratica comune, **non una misura**, ed e'
+esattamente il motivo per cui i primi due esistono: il recupero giusto lo sa
+chi si allena. `recupeoFonte()` dice da quale dei tre viene il numero, cosi'
+l'interfaccia puo' scriverlo invece di farlo indovinare.
+
+Si sceglie a **pastiglie** (Auto, 30″, 45″, 1′, 1′30″, 2′, 3′, 4′) e non con
+un campo numerico: nessuno scrive "105 secondi", e la tastiera aperta con le
+mani sudate e' il modo piu' lento di dire un minuto e mezzo.
+
+E la seduta guidata **lo annuncia prima della serie**, non dopo: quanto
+durera' il recupero e' meta' della decisione su come fare la serie che stai
+per cominciare.
 
 **Nessuna scheda gia' scritta cambia significato.** Una riga senza `strip`
 vale uno scarico senza bersaglio, che e' come si comportava prima; una senza
@@ -404,6 +424,21 @@ Tre cose che il modulo non sapeva fare:
 3. **ogni scarico ha la sua casella**, con le ripetizioni che la scheda si
    aspetta gia' nel segnaposto
 
+**Le ripetizioni sono quelle fatte, e sono obbligatorie.** Il campo nasce
+vuoto col bersaglio nel segnaposto, e "Serie completata" si rifiuta senza un
+numero. Prima il bersaglio faceva da ripiego, il che voleva dire scrivere nel
+registro **quello che la scheda chiedeva invece di quello che e' successo** —
+proprio il numero da cui escono massimale stimato, doppia progressione e
+verdetto sulla scheda. Se la serie non l'hai fatta c'e' "Salta questa serie".
+
+Il kg invece arriva gia' scritto, e non e' un'incoerenza: quello e' il peso
+che hai messo sul bilanciere, lo sai prima di cominciare ed e' quasi sempre
+lo stesso della volta prima. Le ripetizioni sono l'unica cosa che la serie ti
+dice **dopo**.
+
+Accanto al campo ci sono le pastiglie da bersaglio−3 a bersaglio+3: fra una
+serie e l'altra un numero fra 5 e 15 si tocca, non si digita.
+
 **Il timer diventa rosso quando lo superi.** Quello lanciato da un bottone
 resta un promemoria e dopo venti secondi se ne va; quello di una seduta
 guidata (`tieni`) no — li' il tempo oltre il recupero e' un dato, e se fra due
@@ -413,6 +448,28 @@ barra resta, conta all'insu' col segno piu' e diventa rossa.
 E sale **sopra il foglio**: durante una seduta guidata lo sheet e' sempre
 aperto, e la barra vive a `z-index 19`, cioe' sotto. Un timer che nessuno vede
 non e' un timer.
+
+Tre difetti trovati provandolo, non leggendolo:
+
+- **`+30` a tempo scaduto non faceva niente.** Sommare trenta secondi a un
+  recupero finito da un minuto e mezzo e' aritmeticamente corretto e
+  visivamente nullo: il numero non si muoveva, e un bottone che non muove
+  niente sembra rotto. Chi lo tocca in quel momento chiede trenta secondi
+  **da adesso**, quindi il recupero riparte. E `−30` a tempo scaduto non ha
+  niente da accorciare: e' spento, invece di non fare nulla in silenzio
+- **la chiusura automatica dei venti secondi uccideva il timer successivo.**
+  Il `setTimeout` non sapeva a quale recupero apparteneva: uno partito dieci
+  secondi dopo si vedeva chiudere la barra dal promemoria di quello prima.
+  Ora il timeout porta il `t0` a cui si riferisce
+- **oltre un'ora, due regole diverse per lo stesso stato**: la barra viva
+  continuava a contare (`+64:40`) mentre `recRiprendi()` si rifiutava di
+  ripristinarla. Ora la soglia e' una sola (`REC_OLTRE_MAX`), e oltre quella
+  la barra si chiude da sola: piu' di un'ora non e' un recupero, e' una barra
+  dimenticata accesa
+
+E l'ultima serie della seduta **non fa partire niente**: non c'e' una serie
+dopo da aspettare, e una barra che conta sulla schermata di fine chiede di
+stare fermi per un lavoro che non arrivera'.
 
 "Torna alla serie prima" **toglie l'ultima serie scritta**. Non e' un effetto
 collaterale: e' l'unico modo di correggere un numero sbagliato senza uscire
@@ -1936,6 +1993,22 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   non sanno che esiste un piramidale
 - Non scrivere "8–8": un range con gli estremi uguali non e' un range, e letto
   su una scheda sembra un errore di compilazione
+- Non registrare il bersaglio al posto delle ripetizioni fatte quando il campo
+  e' vuoto: il registro direbbe quello che la scheda chiedeva, e da quel numero
+  escono massimale stimato, progressione e verdetto sulla scheda
+- Non trattare `+30` a tempo scaduto come "allunga di trenta": non muove
+  niente sullo schermo. A recupero finito quel bottone vuol dire "altri trenta
+  da adesso"
+- Non chiudere una barra senza guardare a quale recupero appartiene: il
+  `setTimeout` dei venti secondi deve portarsi dietro il `t0`, o uccide il
+  timer partito dopo
+- Non tenere due soglie diverse per lo stesso stato: la barra viva e
+  `recRiprendi()` devono decidere allo stesso modo quando un recupero e'
+  scaduto da troppo
+- Non far partire il recupero dopo l'ultima serie della seduta: non c'e'
+  niente da recuperare
+- Non presentare il recupero calcolato come una misura: e' pratica comune, ed
+  e' il motivo per cui `sc.recupero` e `riga.recupero` esistono
 - Non far partire il recupero in mezzo a una superserie: le due righe si fanno
   attaccate, e il timer va sull'ultima del giro
 - Non far sparire dopo venti secondi il timer di una seduta guidata: li' il
