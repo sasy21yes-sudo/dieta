@@ -82,9 +82,19 @@ function recBip(n = 3) {
 /* ----------------------------------------------------------------- barra */
 let recTick = null;
 
-function avviaRecupero(sec, etichetta) {
+/**
+ * `tieni` = non sparire allo scadere.
+ *
+ * Il timer lanciato da un bottone e' un promemoria e dopo venti secondi si
+ * toglie da solo. Quello di una seduta guidata no: li' il tempo oltre il
+ * recupero e' un dato — se fra due serie sono passati quattro minuti invece di
+ * due, quella e' un'altra seduta — quindi la barra resta, diventa rossa e
+ * conta all'insu'. Sparisce quando parte la serie dopo, o quando la chiudi.
+ */
+function avviaRecupero(sec, etichetta, tieni) {
   recSbloccaAudio();
-  recScrivi({ t0: Date.now(), sec: Math.round(sec), lab: etichetta || '', suonato: false });
+  recScrivi({ t0: Date.now(), sec: Math.round(sec), lab: etichetta || '',
+              suonato: false, tieni: !!tieni });
   recBarra();
 }
 function fermaRecupero() {
@@ -125,28 +135,44 @@ function recBarra() {
   recDisegna();
 }
 
+const recOltre = st => !st ? 0
+  : Math.max(0, Math.round((Date.now() - st.t0) / 1000 - st.sec));
+
 function recDisegna() {
   const st = recStato(), b = document.getElementById('recbar');
   if (!st || !b) { fermaRecupero(); return; }
   const r = recRestanti(st);
-  b.querySelector('.rec-t').textContent =
-    Math.floor(r / 60) + ':' + String(r % 60).padStart(2, '0');
+  const mmss = n => Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0');
+  // oltre il recupero il numero non si ferma a 0:00 — riparte col segno piu',
+  // che e' l'unica cosa che dice "stai perdendo tempo" senza scriverlo
+  const oltre = r === 0 && st.tieni ? recOltre(st) : 0;
+  b.querySelector('.rec-t').textContent = oltre ? '+' + mmss(oltre) : mmss(r);
   b.querySelector('.rec-l').textContent = st.lab || 'recupero';
   b.querySelector('.rec-fill').style.width = (100 * r / Math.max(1, st.sec)) + '%';
   b.classList.toggle('fatto', r === 0);
+  b.classList.toggle('oltre', !!oltre);
+  /* Sotto un foglio aperto la barra non la vede nessuno, ed e' esattamente la
+     situazione della seduta guidata: il foglio resta li' tutto il tempo. Con
+     un foglio aperto la barra "tenuta" sale in cima e passa sopra. */
+  b.classList.toggle('sopra', !!st.tieni && !document.getElementById('sheet')?.hidden);
   if (r === 0 && !st.suonato) {
     st.suonato = true; recScrivi(st);
     recBip();
     if (typeof pulsa === 'function') pulsa(b, { scala: 1.03, dur: 420 });
-    // dopo venti secondi si toglie da sola: e' un promemoria, non un allarme
-    setTimeout(() => { const s2 = recStato(); if (s2 && s2.suonato) fermaRecupero(); }, 20000);
+    // dopo venti secondi si toglie da sola: e' un promemoria, non un allarme.
+    // Non pero' dentro una seduta guidata, dove il tempo oltre il recupero e'
+    // un dato e la barra deve restare finche' non parte la serie dopo
+    if (!st.tieni)
+      setTimeout(() => { const s2 = recStato(); if (s2 && s2.suonato) fermaRecupero(); }, 20000);
   }
 }
 
 /** Alla ripresa dell'app la barra torna da sola, con il tempo giusto. */
 function recRiprendi() {
   const st = recStato();
-  if (st && recRestanti(st) > 0) recBarra();
+  // una barra "tenuta" torna anche a tempo scaduto: e' li' apposta per dire
+  // da quanto sei fermo, e tornare dall'app in secondo piano non lo cancella
+  if (st && (recRestanti(st) > 0 || (st.tieni && recOltre(st) < 3600))) recBarra();
   else if (st) recScrivi(null);
 }
 document.addEventListener('visibilitychange', () => {

@@ -76,6 +76,7 @@ previsioni.js   proiezioni di misure, composizione e forza a 28 giorni
 cerca.js        selettore cercabile riusabile + dispensa
 peso.js         pesate anomale e ciclo mestruale: cio' che sporca la bilancia
 timer.js        timer di recupero fra le serie
+seduta.js       la seduta guidata: un passo alla volta, e il recupero da solo
 carico.js       scarico automatico + dolori e infortuni
 cardio.js       corsa e simili, tracciato GPS, cartolina PNG da condividere
 salute.js       import di passi e sonno da un Comando iOS
@@ -214,6 +215,9 @@ non un dettaglio.
   sul telefono senza librerie e senza server. Da dare a chi l'app non ce l'ha
 - **Controllo della versione** — quale versione stai usando, se ce n'e' una
   nuova, e un bottone per ricaricare. Su iPhone non c'era nessun altro modo
+- **Seduta guidata** — un esercizio alla volta, il bersaglio della serie, il
+  recupero che parte da solo e diventa rosso se lo superi; le superserie si
+  fanno alternate come in sala
 - **Timer di recupero**, **scarico automatico**, **dolori e infortuni** in Gym
 - **Dispensa** — quello che hai in casa si sottrae dalla lista della spesa
 - **Cerca un esercizio su internet** — catalogo pubblico di 873 esercizi con
@@ -336,6 +340,84 @@ Due regole di interfaccia imparate a caro prezzo:
   faceva sparire il lavoro in corso
 - il punto d'ingresso mostra **sempre** la scelta scheda/libera, anche se ci
   sono già serie registrate quel giorno
+
+### Le tecniche hanno un numero, non solo un nome
+
+`tecnica` diceva "stripping" e si fermava li': quante ripetizioni per ogni
+scarico te le ricordavi tu. Uguale il piramidale — "il carico sale e le
+ripetizioni scendono", ma quali? — e il rest-pause, che non diceva quante
+ripartenze. Il risultato e' che la scheda descriveva **il genere** di lavoro e
+non il lavoro.
+
+Tre campi nuovi sulla riga, tutti facoltativi:
+
+| Campo | Cosa dice |
+|---|---|
+| `strip: [6, 4]` | gli scarichi di uno stripping, in ripetizioni. "Stripping 3x8-6-4" = `serie 3, reps 8, strip [6,4]` |
+| `piram: [12, 10, 8]` | le ripetizioni serie per serie. Quante serie sono lo dice la lunghezza |
+| `rpMini: 2` | quante ripartenze in un rest-pause |
+
+Piu' `restPause` **sulla scheda intera**, perche' certi programmi lo dichiarano
+una volta in testa e ripeterlo su otto righe e' otto volte la stessa
+informazione. Vale pero' solo per le righe senza una tecnica loro: chi ha
+scritto "stripping" su una riga l'ha scelto apposta, e sovrascriverlo sarebbe
+decidere al posto suo.
+
+**Nessuna scheda gia' scritta cambia significato.** Una riga senza `strip`
+vale uno scarico senza bersaglio, che e' come si comportava prima; una senza
+`piram` usa il range. Le funzioni che leggono questi campi — `serieDiRiga`,
+`repsBersaglio`, `bersaglioTesto`, `scarichiDiRiga`, `usaRestPause` — sono
+l'unico posto in cui i campi si guardano, quindi una riga vecchia e una nuova
+si comportano uguale ovunque.
+
+Il piramidale si porta dietro una scelta di modello: `serie`, `reps` e
+`repsMax` **restano sincronizzati** sull'elenco (numero di gradini, minimo e
+massimo). Cosi' la doppia progressione, il monitoraggio della scheda e il
+volume continuano a leggere i campi di sempre senza sapere che esiste un
+piramidale.
+
+**E un range con gli estremi uguali non e' un range:** 3×8, non 3×8–8. Lo dice
+`rangeTesto()`, e il campo "Rip a" si puo' lasciare vuoto. Non e' cosmesi —
+"da 8 a 8" fa pensare a un errore di compilazione, e chi lo vede prova a
+correggerlo.
+
+### La seduta si fa un passo alla volta
+
+`sheetDaScheda` mette tutte le serie della scheda in una schermata sola. Va
+benissimo a fine seduta o per correggere, ed e' esattamente la cosa sbagliata
+da avere in mano **mentre** ti alleni: fra una serie e l'altra non serve
+vedere quaranta caselle, serve sapere cosa fare adesso.
+
+`seduta.js` e' una carta sola: l'esercizio, la serie, il bersaglio, tre numeri
+e un bottone. Toccato quello, la serie e' scritta **nel registro** — non in un
+buffer — e parte il recupero. Se l'app si chiude a meta' seduta quello che hai
+fatto e' gia' salvato: `s.guida` ricorda solo a che punto eri.
+
+Tre cose che il modulo non sapeva fare:
+
+1. **le superserie si fanno alternate.** Il modulo chiedeva tutte le serie di
+   A1 e poi tutte quelle di A2, che e' l'ordine in cui si *scrivono*, non
+   quello in cui si *fanno*. `passiScheda()` produce A1-1, A2-1, recupero,
+   A1-2, A2-2: dentro la coppia il timer non parte, parte sull'ultima del giro
+2. **il bersaglio e' quello della serie**, non il range generico: in un
+   piramidale 12-10-8 la seconda serie chiede 10, e lo scrive
+3. **ogni scarico ha la sua casella**, con le ripetizioni che la scheda si
+   aspetta gia' nel segnaposto
+
+**Il timer diventa rosso quando lo superi.** Quello lanciato da un bottone
+resta un promemoria e dopo venti secondi se ne va; quello di una seduta
+guidata (`tieni`) no — li' il tempo oltre il recupero e' un dato, e se fra due
+serie sono passati quattro minuti invece di due quella e' un'altra seduta. La
+barra resta, conta all'insu' col segno piu' e diventa rossa.
+
+E sale **sopra il foglio**: durante una seduta guidata lo sheet e' sempre
+aperto, e la barra vive a `z-index 19`, cioe' sotto. Un timer che nessuno vede
+non e' un timer.
+
+"Torna alla serie prima" **toglie l'ultima serie scritta**. Non e' un effetto
+collaterale: e' l'unico modo di correggere un numero sbagliato senza uscire
+dalla guida, e la riga di riepilogo in fondo — quello che hai gia' messo
+dentro — esiste perche' non ci si debba fidare a memoria.
 
 ### Il piano HYROX è tarato sull'atleta
 
@@ -834,7 +916,11 @@ sonno — piu' l'interruttore dell'allenamento. Tre non ci appartenevano piu':
 | **Allenamento** | Non si dichiara: si deduce |
 
 Restano **passi e sonno**, cioe' i due numeri che si scrivono davvero una
-volta al giorno e che nessun'altra parte dell'app conosce.
+volta al giorno e che nessun'altra parte dell'app conosce — e nemmeno loro
+hanno piu' un riquadro: due campi dentro una carta con un titolo sopra erano
+piu' cornice che contenuto. Stanno in cima a **"Com'e' andata"**, la carta che
+gia' chiede com'e' andata la giornata: il sonno di stanotte e' esattamente il
+primo pezzo di quella risposta.
 
 `allenatoIl(k)` e' la regola sola: la giornata conta come allenamento se ci
 sono serie in palestra, del cardio o una seduta HYROX registrata. Non e' una
@@ -852,6 +938,26 @@ com'era.
 La riga resta in Diario ma **in lettura**: dice cosa c'e' registrato quel
 giorno e porta in Gym. Toglierla del tutto avrebbe fatto pensare che
 l'allenamento non contasse piu'.
+
+### In avanti si guarda, non si scrive
+
+In Oggi la freccia in avanti non aveva un fondo: si poteva arrivare al 2027 e
+spuntare la colazione di un giovedi' che non e' mai esistito. Quel giorno
+sarebbe poi arrivato **con le caselle gia' segnate**, e il registro avrebbe
+detto una cosa che non e' successa.
+
+La risposta pero' non e' bloccare: *cosa mangio domani* e' una domanda
+legittima, e il piano esiste anche per rispondere a quella. Quindi in avanti
+si va, ma **in sola lettura** — spunta disattivata, niente sostituzioni,
+niente porzioni, niente fuori piano, e una carta in testa che dice che quella
+giornata non e' ancora arrivata.
+
+Il limite e' **sette giorni**, e non per prudenza: il piano e' settimanale,
+quindi l'ottavo giorno mostra esattamente quello che mostrava il primo. Oltre
+si scorrerebbe la stessa settimana all'infinito credendo di vedere altro.
+
+Il Diario resta invece bloccato a oggi, e la differenza non e' un'incoerenza:
+il Diario **e'** il registro, e per il futuro non ha niente da far vedere.
 
 ### Il peso e' in Corpo, grande
 
@@ -1816,6 +1922,25 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   della revisione. E chi la elimina va avvisato che tocca solo la palestra
 - Non far dimenticare a `_ffCache` una seduta cancellata: la forma-fatica e'
   memorizzata per muscolo e continuerebbe a rispondere coi numeri di prima
+- Non lasciare spuntare un pasto in un giorno che non e' arrivato: quel
+  giorno comincerebbe con le caselle gia' segnate. Ma nemmeno bloccare la
+  navigazione in avanti: "cosa mangio domani" e' una domanda legittima, e il
+  piano e' li' per rispondere. In avanti si legge, non si scrive
+- Non far scorrere Oggi oltre i sette giorni: il piano e' settimanale, e
+  l'ottavo giorno e' identico al primo
+- Non leggere `riga.strip`, `riga.piram` o `riga.rpMini` direttamente: passano
+  tutti da `serieDiRiga`, `bersaglioTesto`, `scarichiDiRiga` e `usaRestPause`,
+  che sono il posto in cui una scheda vecchia e una nuova si comportano uguale
+- Non lasciare `serie`, `reps` e `repsMax` sfasati rispetto a un `piram`: la
+  doppia progressione, il monitoraggio e il volume leggono quei tre campi e
+  non sanno che esiste un piramidale
+- Non scrivere "8–8": un range con gli estremi uguali non e' un range, e letto
+  su una scheda sembra un errore di compilazione
+- Non far partire il recupero in mezzo a una superserie: le due righe si fanno
+  attaccate, e il timer va sull'ultima del giro
+- Non far sparire dopo venti secondi il timer di una seduta guidata: li' il
+  tempo oltre il recupero e' un dato. E ricordarsi che sotto un foglio aperto
+  la barra non la vede nessuno — durante la guida deve stare sopra
 - Non tenere quattro copie della stessa regola: "mi sono allenato quel giorno"
   la calcolavano costanza, revisione, statistiche e resoconto, ognuna per conto
   suo. Ora e' `allenatoIl(k)`, e le quattro chiamano quella

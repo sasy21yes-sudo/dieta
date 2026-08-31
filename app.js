@@ -947,8 +947,19 @@ function route() {
 /* ---------------------------------------------------------- vista OGGI */
 let viewDate = today();
 
+/* Quanto in la' si puo' guardare.
+   Sette giorni, non perche' sia prudente ma perche' oltre non c'e' niente di
+   nuovo: il piano e' settimanale e l'ottavo giorno e' identico al primo. */
+const OGGI_AVANTI = 7;
+
 function viewOggi(v) {
   const k = viewDate, plan = D.settimana[dayIdx(k)], d = day(k);
+  /* In avanti si puo' andare, ma solo a leggere.
+     Guardare cosa si mangia domani e' una domanda legittima — il piano
+     esiste anche per quello — mentre spuntare un pasto che non e' ancora
+     stato mangiato non lo e': quella giornata arriverebbe con le caselle
+     gia' segnate, e il registro direbbe una cosa che non e' successa. */
+  const futuro = k > today();
 
   // selettore giorno
   const nav = el('div', 'card flat');
@@ -959,10 +970,32 @@ function viewOggi(v) {
              <div class="muted mono" style="font-size:11px">${k}${k === today() ? ' · oggi' : ''}</div>`),
            el('button', 'btn sm', '›'));
   r.children[0].onclick = () => { viewDate = addDays(viewDate, -1); route(); };
-  r.children[2].onclick = () => { viewDate = addDays(viewDate, 1); route(); };
+  r.children[2].onclick = () => {
+    if (viewDate >= addDays(today(), OGGI_AVANTI)) {
+      toast('Il piano si ripete: oltre una settimana rivedresti questi giorni');
+      return;
+    }
+    viewDate = addDays(viewDate, 1); route();
+  };
   r.children[1].style.textAlign = 'center';
   r.children[1].style.cursor = 'pointer';
   if (typeof sheetGiorno === 'function') r.children[1].onclick = () => sheetGiorno(k);
+  if (futuro) {
+    const q = Math.round((new Date(k) - new Date(today())) / 864e5);
+    const av = el('div', 'card flat futuro');
+    av.append(el('div', 'row between',
+      `<div><div class="eyebrow">Non e' ancora arrivato</div>
+         <div class="muted">${q === 1 ? 'Domani' : 'Fra ' + q + ' giorni'}: questo e'
+         il piano, non un registro. Le spunte e le sostituzioni si fanno il
+         giorno stesso — segnarle adesso scriverebbe qualcosa che non e'
+         successo.</div></div>`));
+    const t = el('button', 'btn wide');
+    t.style.marginTop = '10px';
+    t.textContent = 'Torna a oggi';
+    t.onclick = () => { viewDate = today(); route(); };
+    av.append(t);
+    v.append(av);
+  }
   nav.append(r); v.append(nav);
 
   if (k === today()) {
@@ -1063,7 +1096,8 @@ function viewOggi(v) {
     const m = el('div', 'meal' + (done ? ' done' : ''));
     const h = el('div', 'meal-h');
     const tick = el('button', 'tick', '✓');
-    tick.onclick = () => {
+    if (futuro) { tick.disabled = true; tick.title = 'Il giorno non e\' ancora arrivato'; }
+    else tick.onclick = () => {
       // il rimbalzo conferma il tocco prima che la pagina si ridisegni: senza,
       // su un telefono lento sembra che non sia successo niente
       if (!done && typeof pulsa === 'function') pulsa(tick, { scala: 1.35, dur: 320 });
@@ -1078,7 +1112,7 @@ function viewOggi(v) {
          ? ' <em class="mod-tag">al posto di ' + esc(D.pasti[s.codice]?.nome || s.codice) + '</em>'
          : typeof porzioniCambiate === 'function' && porzioniCambiate(s.codice, k)
          ? ' <em class="mod-tag">porzioni cambiate</em>' : ''}</div>`);
-    if (typeof sheetPorzioni === 'function' && p.ingredienti)
+    if (!futuro && typeof sheetPorzioni === 'function' && p.ingredienti)
       testa.onclick = () => sheetPorzioni(k, s.codice);
     h.append(tick, testa,
       el('div', 'meal-kcal', (() => {
@@ -1099,19 +1133,20 @@ function viewOggi(v) {
       const li = el('li', ing.alPostoDi ? 'sost' : null,
         `<span class="grow">${esc(ing.alimento)}
            ${ing.alPostoDi ? `<em class="dapiano">al posto di ${esc(ing.alPostoDi)}</em>` : ''}
-           <span class="swap">${ing.alPostoDi ? 'cambia' : 'sostituisci'}</span></span>
+           ${futuro ? '' : `<span class="swap">${ing.alPostoDi ? 'cambia' : 'sostituisci'}</span>`}</span>
          <span class="q">${nf(ing.qta, ing.qta % 1 ? 1 : 0)} ${
            typeof unitaIngrediente === 'function' ? esc(unitaIngrediente(ing))
              : (D.alimenti[ing.alimento]?.unita || 'g')}</span>`);
-      li.onclick = () => sheetSwap(ing.alimento, ing.qta,
+      if (!futuro) li.onclick = () => sheetSwap(ing.alimento, ing.qta,
         { k, code: s.codice, slot: ing.slot, prod: ing.prod });
       ul.append(li);
     }
     m.append(ul); v.append(m);
   }
 
-  // fuori piano
-  v.append(listaExtra(k, d, true));
+  // fuori piano: su un giorno che deve ancora arrivare non c'e' niente da
+  // aggiungere, e il bottone chiederebbe di registrare una cena di giovedi'
+  if (!futuro) v.append(listaExtra(k, d, true));
 }
 
 /**
@@ -1748,20 +1783,6 @@ function viewDiario(v) {
 
   v.append(cardAcqua(k));
 
-  /* Qui dentro erano rimaste cinque voci, e tre non ci appartenevano piu':
-     il peso ha una carta sua in Corpo, l'acqua e la Coca Zero si aggiungono
-     un bicchiere alla volta, e l'allenamento l'app lo deduce da quello che
-     hai registrato. Restano i due numeri che si scrivono davvero una volta
-     al giorno e che nessun'altra parte dell'app conosce. */
-  const c1 = el('div', 'card');
-  c1.append(el('h2', 'sec', 'Ogni giorno'));
-  c1.lastChild.style.marginTop = '0';
-  const grid = el('div'); grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px';
-  grid.append(num('passi', 'Passi', '', '100'), num('sonno', 'Sonno', 'ore', '0.5'));
-  c1.append(grid);
-  c1.append(el('p', 'hint',
-    'Il peso si registra in Corpo, l\'acqua e la Coca Zero qui sopra.'));
-  v.append(c1);
 
   /* L'allenamento non si dichiara piu': si legge. La riga resta perche' e'
      un dato della giornata e sparire del tutto sembrerebbe che non conti
@@ -1791,9 +1812,17 @@ function viewDiario(v) {
     + 'l\'app sapeva gia\' rispondere.'));
   v.append(ca);
 
+  /* Passi e sonno non hanno piu' un riquadro loro: erano due campi dentro una
+     carta con un titolo, cioe' piu' cornice che contenuto. Stanno qui, in cima
+     alla carta che gia' chiede com'e' andata la giornata — il sonno di stanotte
+     e' esattamente il primo pezzo di quella risposta. */
   const c2 = el('div', 'card');
-  c2.append(el('h2', 'sec', 'Come stai'));
+  c2.append(el('h2', 'sec', 'Com\'e\' andata'));
   c2.lastChild.style.marginTop = '0';
+  const grid = el('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px';
+  grid.append(num('passi', 'Passi', '', '100'), num('sonno', 'Sonno', 'ore', '0.5'));
+  c2.append(grid);
   for (const [id, lab] of [['fame', 'Fame'], ['energia', 'Energia']]) {
     const f = el('div', 'field', `<label>${lab} <span class="muted">1–10</span></label>`);
     const s = el('div', 'seg');

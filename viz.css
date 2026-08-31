@@ -726,6 +726,19 @@
 .rec-fill{position:absolute;inset:0 auto 0 0;background:var(--pine);opacity:.5;
   transition:width .25s linear}
 #recbar.fatto .rec-fill{width:100% !important;background:var(--amber);opacity:.85}
+/* Oltre il recupero il numero riparte col piu' e la barra diventa rossa: e'
+   l'unico modo di dire "sei fermo da troppo" senza scriverlo. Solo per il
+   timer della seduta guidata, che e' l'unico a restare li' dopo lo zero. */
+/* Il testo resta var(--paper) come nel resto della barra: e' una superficie
+   invertita, e quell'accoppiata gira col tema. Fissarlo a #fff andava bene
+   sul rosso scuro del tema chiaro e diventava illeggibile sul salmone di
+   quello scuro. */
+#recbar.oltre .rec-fill{background:var(--alert);opacity:.9}
+/* Durante una seduta guidata il foglio e' sempre aperto, e sotto di lui il
+   timer non lo vedrebbe nessuno: la barra sale in cima, sopra al foglio.
+   E' l'unica cosa che ha il diritto di stare li' — e' l'unica che cambia
+   da sola mentre guardi altro. */
+#recbar.sopra{z-index:60;top:calc(var(--safe-t) + 8px);bottom:auto}
 .rec-in{position:relative;display:flex;align-items:center;gap:8px;padding:8px 10px}
 .rec-mid{flex:1;text-align:center;line-height:1.15}
 .rec-t{display:block;font-family:var(--mono);font-size:20px;font-weight:700;
@@ -740,6 +753,32 @@
 .rec-go{background:var(--wash);color:var(--ink-2);border:1px solid var(--rule);
   border-radius:7px;font-family:var(--mono);font-size:11px;padding:4px 7px;
   cursor:pointer;flex:none;margin-left:auto;margin-right:8px}
+
+/* ---------------- la seduta guidata ----------------
+   Una carta sola, e i tre numeri grandi abbastanza da colpirli col pollice
+   sudato: fra una serie e l'altra non si prende la mira. */
+.guida .gd-prog{height:4px;border-radius:2px;background:var(--rule);margin:8px 0 2px;
+  overflow:hidden}
+.guida .gd-prog i{display:block;height:100%;background:var(--pine);
+  transition:width .3s ease}
+.guida .read{margin:6px 0 10px}
+.gd-tec{font-size:12.5px;line-height:1.45;color:var(--ink-2);background:var(--wash);
+  border-left:3px solid var(--pine-line);border-radius:0 9px 9px 0;
+  padding:8px 10px;margin:8px 0}
+.gd-tec.ss{border-left-color:var(--amber)}
+.gd-in{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px}
+.gd-in.due{grid-template-columns:1fr 1fr}
+.gd-in input{font-family:var(--mono);font-size:19px;text-align:center;padding:11px 6px}
+.gd-drop{margin:2px 0 6px;padding:8px 10px;border:1px dashed var(--rule);border-radius:11px}
+.gd-drop .lab,.gd-fatte .lab{font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+.gd-ok{margin-top:12px;font-size:16px;padding:15px}
+.gd-fatte{margin-top:14px;padding-top:10px;border-top:1px solid var(--rule)}
+.gd-fatte .r{display:flex;justify-content:space-between;gap:10px;
+  padding:4px 0;font-size:12.5px}
+.gd-fatte .r .n{color:var(--ink-2)}
+.gd-fatte .r .v{font-family:var(--mono);font-size:11px;color:var(--ink-3);
+  text-align:right}
 
 /* ---------------- scarico e acciacchi ---------------- */
 .card.scarico.on{border-left:3px solid var(--amber)}

@@ -1180,18 +1180,35 @@ function sheetDaScheda(k, schedaId) {
   w.append(el('p', 'muted',
     'Gli esercizi e le serie sono quelli della scheda. Scrivi solo cosa hai fatto davvero: se salti una serie, lascia vuote le ripetizioni.'));
 
+  /* Questo modulo va bene per registrare a fine seduta o per correggere. Ma
+     mentre ti alleni non serve un modulo con quaranta caselle: serve sapere
+     cosa fare adesso. Da qui si passa alla guida serie per serie. */
+  if (typeof sheetGuidata === 'function') {
+    const gd = el('button', 'btn wide pri', 'Guidami serie per serie');
+    gd.onclick = () => sheetGuidata(k, sc.id);
+    w.append(gd);
+    w.append(el('p', 'hint',
+      'Un esercizio alla volta, con il recupero che parte da solo quando segni '
+      + 'la serie come fatta. Questo modulo resta qui sotto per correggere '
+      + 'dopo, o per scrivere tutto in una volta a fine seduta.'));
+  }
+
   for (const [ei, riga] of sc.esercizi.entries()) {
     const ex = esercizio(riga.ex);
     if (!ex) continue;
     const prec = ultimoUso(riga.ex, k);
     const lo = riga.reps, hi = riga.repsMax || riga.reps;
     const t = tecnica(riga.tecnica);
+    const nSerie = serieDiRiga(riga);
+    const scar = scarichiDiRiga(riga);
+    const rp = usaRestPause(sc, riga);
 
     const box = el('div', 'card flat');
     box.style.marginBottom = '10px';
     const cap = el('div', 'row between');
     cap.innerHTML = `<strong><span class="sk-g">${et[ei].testo}</span> ${esc(ex.nome)}</strong>
-       <span class="mono muted" style="font-size:11px">${riga.serie} × ${lo}–${hi}</span>`;
+       <span class="mono muted" style="font-size:11px">${nSerie} × ${
+         riga.piram?.length ? esc(listaTesto(riga.piram)) : rangeTesto(riga)}</span>`;
     box.append(cap);
     // in una superserie il recupero sta DOPO la coppia, non in mezzo:
     // se la riga dopo e' attaccata a questa, qui il timer non ci va
@@ -1201,7 +1218,13 @@ function sheetDaScheda(k, schedaId) {
     const av = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(riga.ex, k) : null;
     if (av) box.append(av);
     if (riga.tecnica && riga.tecnica !== 'normale')
-      box.append(el('div', 'hint', `<strong>${esc(t.nome)}</strong> — ${esc(t.d)}`));
+      box.append(el('div', 'hint', `<strong>${esc(t.nome)}${
+        riga.tecnica === 'stripping' && riga.strip?.length
+          ? ' ' + esc(listaTesto(riga.strip)) : ''}</strong> — ${esc(t.d)}`));
+    else if (rp)
+      box.append(el('div', 'hint',
+        `<strong>Rest-pause ×${ripartenze(riga)}</strong> — dalla scheda intera. `
+        + 'Scrivi il totale delle ripetizioni, ripartenze comprese.'));
     if (riga.superserie && ei > 0)
       box.append(el('div', 'hint',
         `Subito dopo ${esc(esercizio(sc.esercizi[ei - 1].ex)?.nome || '')}, senza recupero.`));
@@ -1213,19 +1236,22 @@ function sheetDaScheda(k, schedaId) {
 
     box.append(el('div', 'setrow sethead',
       '<span class="n"></span><span>kg</span><span>rip</span><span>RIR</span>'));
-    for (let si = 0; si < riga.serie; si++) {
+    for (let si = 0; si < nSerie; si++) {
       const d = prec?.serie[si] || {};
       const row = el('div', 'setrow');
       row.innerHTML = `<span class="n">${si + 1}</span>
         <input type="text" inputmode="decimal" id="sc-${ei}-${si}-kg" value="${d.kg ?? riga.kg ?? ''}">
-        <input type="text" inputmode="numeric" id="sc-${ei}-${si}-rp" value="${d.reps ?? ''}" placeholder="${lo}–${hi}">
+        <input type="text" inputmode="numeric" id="sc-${ei}-${si}-rp" value="${d.reps ?? ''}" placeholder="${esc(bersaglioTesto(riga, si))}">
         <input type="text" inputmode="numeric" id="sc-${ei}-${si}-rr" value="${d.rir ?? 2}">`;
       box.append(row);
-      if (riga.tecnica === 'stripping') {
+      if (scar.length) {
+        // il campo resta uno solo e a testo libero, ma il segnaposto adesso
+        // dice quali scarichi la scheda si aspetta invece di un esempio a caso
+        const es = scar.map((r2, i2) => `${nf((d.kg ?? riga.kg ?? 50) * (1 - .2 * (i2 + 1)), 0)}x${r2 ?? '?'}`).join(', ');
         const sr = el('div', 'field');
         sr.style.margin = '4px 0 8px';
         sr.innerHTML = `<input type="text" id="sc-${ei}-${si}-dr"
-          value="${esc(scarichiTesto(d.drop))}" placeholder="scarichi: 50x6, 40x5">`;
+          value="${esc(scarichiTesto(d.drop))}" placeholder="scarichi: ${esc(es)}">`;
         box.append(sr);
       }
     }
@@ -1239,7 +1265,7 @@ function sheetDaScheda(k, schedaId) {
     const serie = [];
     for (const [ei, riga] of sc.esercizi.entries()) {
       if (!esercizio(riga.ex)) continue;
-      for (let si = 0; si < riga.serie; si++) {
+      for (let si = 0; si < serieDiRiga(riga); si++) {
         const reps = parseNum(($('#sc-' + ei + '-' + si + '-rp') || {}).value);
         if (!(reps > 0)) continue;                 // serie non fatta: si salta
         const rec = { ex: riga.ex,
@@ -1418,13 +1444,77 @@ const TECNICHE = [
   { id: 'normale', nome: 'Normale',
     d: 'Serie standard con recupero pieno fra una e l\'altra.' },
   { id: 'stripping', nome: 'Stripping',
-    d: 'Arrivi a fine serie, cali subito il peso e continui senza recupero. Ogni scarico conta come lavoro in piu\' nel volume settimanale.' },
+    d: 'Arrivi a fine serie, cali subito il peso e continui senza recupero. Scrivi qui sotto le ripetizioni di ogni scarico: "3 serie da 8, poi 6 e 4" si scrive serie 3, rip 8, scarichi 6-4. Ogni scarico conta mezza serie nel volume.' },
   { id: 'rest-pause', nome: 'Rest-pause',
-    d: 'Fine serie, 15-20 secondi di pausa, altre ripetizioni con lo stesso peso. Si registra come una serie sola col totale delle ripetizioni.' },
+    d: 'Fine serie, 15-20 secondi di pausa, altre ripetizioni con lo stesso peso. Quante ripartenze lo dici tu; si registra come una serie sola col totale delle ripetizioni.' },
   { id: 'piramidale', nome: 'Piramidale',
-    d: 'Il carico sale a ogni serie e le ripetizioni scendono. Il range indicato e\' quello dell\'ultima serie.' }
+    d: 'Il carico sale a ogni serie e le ripetizioni scendono. Scrivi le ripetizioni serie per serie — 12-10-8 — e il numero di serie viene da solo: il carico lo alzi tu mentre ti alleni.' }
 ];
 const tecnica = id => TECNICHE.find(t => t.id === id) || TECNICHE[0];
+
+/* ------------------------------------------- come si legge una riga di scheda
+ *
+ * Tre campi nuovi, tutti facoltativi, e nessuna scheda gia' scritta cambia di
+ * significato senza di loro:
+ *
+ *   strip:  [6, 4]      gli scarichi di uno stripping, in ripetizioni.
+ *                       "Stripping 3x8-6-4" = serie 3, reps 8, strip [6,4]
+ *   piram:  [12, 10, 8] le ripetizioni serie per serie di un piramidale.
+ *                       Quante serie sono lo dice la lunghezza dell'elenco
+ *   rpMini: 2           quante ripartenze in un rest-pause
+ *
+ * Le funzioni qui sotto sono l'unico posto in cui questi campi si leggono:
+ * chi disegna una scheda o guida una seduta chiede a loro e non guarda dentro
+ * la riga, cosi' una riga vecchia e una nuova si comportano uguale.
+ */
+
+/** Un range e' un range solo se i due estremi sono diversi: 3x8 non e' 3x8-8. */
+function rangeTesto(riga) {
+  const lo = riga.reps, hi = riga.repsMax || riga.reps;
+  return lo === hi ? String(lo) : `${lo}–${hi}`;
+}
+/** Quante serie ha davvero questa riga. */
+function serieDiRiga(riga) {
+  return riga.piram?.length ? riga.piram.length : Math.max(1, riga.serie || 1);
+}
+/** Le ripetizioni bersaglio della serie si, o null se vale il range. */
+function repsBersaglio(riga, si) {
+  if (riga.piram?.length) return riga.piram[Math.min(si, riga.piram.length - 1)];
+  return null;
+}
+/** Il bersaglio scritto per esteso: "8", "8-12", o il gradino del piramidale. */
+function bersaglioTesto(riga, si) {
+  const b = repsBersaglio(riga, si);
+  return b != null ? String(b) : rangeTesto(riga);
+}
+/**
+ * Gli scarichi di uno stripping. Una scheda vecchia non ha `strip` e dichiara
+ * solo la tecnica: vale uno scarico senza bersaglio, che e' esattamente come
+ * si comportava prima.
+ */
+function scarichiDiRiga(riga) {
+  if ((riga.tecnica || 'normale') !== 'stripping') return [];
+  return riga.strip?.length ? riga.strip.slice() : [null];
+}
+/**
+ * Il rest-pause si puo' dichiarare sulla riga o su tutta la scheda.
+ * Sull'intera scheda vale solo per le righe "normali": una riga che ha gia'
+ * una tecnica sua l'ha scelta apposta, e sovrascriverla sarebbe decidere al
+ * posto di chi l'ha scritta.
+ */
+function usaRestPause(sc, riga) {
+  return (riga.tecnica || 'normale') === 'rest-pause'
+    || (!!sc?.restPause && (riga.tecnica || 'normale') === 'normale');
+}
+function ripartenze(riga) { return Math.max(1, riga.rpMini || 2); }
+
+/** "12-10-8", "12, 10, 8", "12 10 8" -> [12, 10, 8]. */
+function parseLista(txt) {
+  if (!txt) return [];
+  return String(txt).split(/[^\d]+/).map(x => parseInt(x, 10))
+    .filter(n => Number.isFinite(n) && n > 0 && n <= 100);
+}
+const listaTesto = a => (a || []).join('-');
 
 /** Etichette A1/A2/B/C: le lettere raggruppano le superserie. */
 function etichetteScheda(esercizi) {
@@ -1490,7 +1580,9 @@ function sheetScheda(id, statoPre) {
   const sc = id ? scheda(id) : { id: uid(), nome: '', esercizi: [] };
   // statoPre serve a tornare qui dall'editor di una riga senza perdere ne'
   // il nome che stavi scrivendo ne' le righe aggiunte e non ancora salvate
-  const stato = statoPre || { nome: sc.nome, esercizi: sc.esercizi.map(x => ({ ...x })) };
+  const stato = statoPre
+    || { nome: sc.nome, restPause: !!sc.restPause,
+         esercizi: sc.esercizi.map(x => ({ ...x })) };
 
   const w = el('div');
   w.append(el('div', 'eyebrow', id ? 'Scheda' : 'Nuova scheda'));
@@ -1501,6 +1593,29 @@ function sheetScheda(id, statoPre) {
   w.append(el('div', 'field',
     `<label>Nome della scheda</label>
      <input type="text" id="sk-nome" value="${esc(stato.nome)}" placeholder="Esempio: Push A">`));
+
+  /* Il rest-pause su tutta la scheda non e' un doppione di quello per riga:
+     ci sono programmi che lo dichiarano una volta in testa ("tutte le serie
+     in rest-pause") e dirlo otto volte, una per esercizio, e' otto volte la
+     stessa informazione. Vale pero' solo per le righe senza una tecnica
+     propria: chi ha scritto "stripping" su una riga l'ha scelto apposta. */
+  const frp = el('div', 'field', '<label>Rest-pause su tutta la scheda</label>');
+  const srp = el('div', 'seg');
+  for (const [val, lab] of [[false, 'No'], [true, 'Sì, tutte le serie']]) {
+    const b = el('button', null, lab);
+    b.setAttribute('aria-pressed', !!stato.restPause === val);
+    b.onclick = () => {
+      stato.restPause = val;
+      [...srp.children].forEach(x => x.setAttribute('aria-pressed', x.textContent === lab));
+      disegna();
+    };
+    srp.append(b);
+  }
+  frp.append(srp);
+  frp.append(el('div', 'hint',
+    'Le righe che hanno gia\' una tecnica loro — stripping, piramidale — non '
+    + 'cambiano: quella l\'hai scelta per quell\'esercizio.'));
+  w.append(frp);
 
   const lista = el('div');
   const disegna = () => {
@@ -1516,12 +1631,22 @@ function sheetScheda(id, statoPre) {
       const ex = esercizio(riga.ex);
       const t = tecnica(riga.tecnica);
       const r = el('button', 'sk-r' + (et[i].inGruppo ? ' grp' : ''));
+      // la tecnica compare con il suo dettaglio: "stripping 6-4" dice cosa
+      // devi fare, "stripping" dice solo che qualcosa succedera'
+      const dett = riga.tecnica === 'stripping' && riga.strip?.length
+        ? ' ' + listaTesto(riga.strip)
+        : riga.tecnica === 'piramidale' && riga.piram?.length
+          ? ' ' + listaTesto(riga.piram)
+        : usaRestPause(stato, riga) && (riga.tecnica || 'normale') === 'normale'
+          ? ' x' + ripartenze(riga) : '';
+      const nomeT = usaRestPause(stato, riga) && (riga.tecnica || 'normale') === 'normale'
+        ? 'rest-pause' : t.nome.toLowerCase();
       r.innerHTML = `<span class="g">${et[i].testo}</span>
         <span class="nm">${esc(ex?.nome || riga.ex)}
-          ${riga.tecnica && riga.tecnica !== 'normale'
-            ? `<em>${esc(t.nome.toLowerCase())}</em>` : ''}</span>
-        <span class="v">${riga.serie}</span>
-        <span class="v">${riga.reps}–${riga.repsMax || riga.reps}</span>
+          ${(riga.tecnica && riga.tecnica !== 'normale') || usaRestPause(stato, riga)
+            ? `<em>${esc(nomeT + dett)}</em>` : ''}</span>
+        <span class="v">${serieDiRiga(riga)}</span>
+        <span class="v">${rangeTesto(riga)}</span>
         <span class="v">${riga.kg ? nf(riga.kg, 1) : '—'}</span>
         <span class="go">›</span>`;
       r.onclick = () => {
@@ -1552,6 +1677,7 @@ function sheetScheda(id, statoPre) {
     if (!nome) { toast('Serve il nome della scheda'); return; }
     if (!stato.esercizi.length) { toast('Serve almeno un esercizio'); return; }
     const rec = { id: sc.id, nome, esercizi: stato.esercizi };
+    if (stato.restPause) rec.restPause = true;
     const L = schede();
     const i = L.findIndex(x => x.id === rec.id);
     if (i >= 0) L[i] = rec; else L.push(rec);
@@ -1641,16 +1767,60 @@ function sheetRigaScheda(stato, idx, onChiudi) {
       <input type="text" inputmode="decimal" id="rg-kg" value="${riga.kg || ''}"></div>`;
   w.append(g);
   w.append(el('p', 'hint',
-    'Il range di ripetizioni serve alla doppia progressione: si sale di carico solo quando tutte le serie arrivano al numero piu\' alto.'));
+    'Il range di ripetizioni serve alla doppia progressione: si sale di carico '
+    + 'solo quando tutte le serie arrivano al numero piu\' alto. '
+    + '<strong>Se metti lo stesso numero da tutte e due le parti — 8 e 8 — non '
+    + 'c\'e\' range</strong>: la scheda dice 3×8 e la progressione si gioca sul '
+    + 'carico. Lasciando vuoto "Rip a" vale lo stesso numero di "Rip da".'));
 
-  /* tecnica */
+  /* tecnica, e i campi che ognuna si porta dietro.
+     Prima la tecnica era solo un'etichetta: dicevi "piramidale" e poi in sala
+     ti ricordavi tu che le ripetizioni scendevano. Ora ogni tecnica ha il suo
+     numero, e quel numero e' quello che la seduta guidata ti mette davanti. */
   const ft = el('div', 'field', '<label>Tecnica</label>');
   const seg = el('div', 'seg');
   const spieg = el('div', 'hint');
+  const extra = el('div');
   const dipingi = () => {
-    [...seg.children].forEach(b => b.setAttribute('aria-pressed',
-      b.dataset.t === (riga.tecnica || 'normale')));
-    spieg.textContent = tecnica(riga.tecnica).d;
+    const cor = riga.tecnica || 'normale';
+    [...seg.children].forEach(b => b.setAttribute('aria-pressed', b.dataset.t === cor));
+    spieg.textContent = tecnica(cor).d;
+    extra.innerHTML = '';
+    if (cor === 'stripping') {
+      const f = el('div', 'field',
+        `<label>Scarichi <span class="muted">(ripetizioni)</span></label>
+         <input type="text" inputmode="numeric" id="rg-strip"
+           value="${esc(listaTesto(riga.strip))}" placeholder="6-4">
+         <div class="hint">Uno per scarico, in ordine. Lasciandolo vuoto vale un
+           solo scarico, com'era prima.</div>`);
+      f.querySelector('input').oninput = e => { riga.strip = parseLista(e.target.value); };
+      extra.append(f);
+    }
+    if (cor === 'piramidale') {
+      const f = el('div', 'field',
+        `<label>Ripetizioni serie per serie</label>
+         <input type="text" inputmode="numeric" id="rg-piram"
+           value="${esc(listaTesto(riga.piram))}" placeholder="12-10-8">
+         <div class="hint">Il numero di serie lo decide questo elenco, e il campo
+           "Serie" qui sopra viene aggiornato da solo.</div>`);
+      f.querySelector('input').oninput = e => {
+        riga.piram = parseLista(e.target.value);
+        if (riga.piram.length) $('#rg-serie').value = riga.piram.length;
+      };
+      extra.append(f);
+    }
+    if (cor === 'rest-pause') {
+      const f = el('div', 'field',
+        `<label>Ripartenze <span class="muted">(dopo la serie)</span></label>
+         <input type="text" inputmode="numeric" id="rg-rp"
+           value="${riga.rpMini || 2}" placeholder="2">
+         <div class="hint">Quante volte riprendi dopo i 15-20 secondi di pausa.</div>`);
+      f.querySelector('input').oninput = e => {
+        const n = parseNum(e.target.value);
+        riga.rpMini = n > 0 ? Math.round(n) : 2;
+      };
+      extra.append(f);
+    }
   };
   for (const t of TECNICHE) {
     const b = el('button', null, t.nome);
@@ -1658,7 +1828,7 @@ function sheetRigaScheda(stato, idx, onChiudi) {
     b.onclick = () => { riga.tecnica = t.id; dipingi(); };
     seg.append(b);
   }
-  ft.append(seg); ft.append(spieg); dipingi();
+  ft.append(seg); ft.append(spieg); ft.append(extra); dipingi();
   w.append(ft);
 
   /* superserie */
@@ -1704,13 +1874,36 @@ function sheetRigaScheda(stato, idx, onChiudi) {
     const n = parseNum($('#rg-serie').value);
     if (!(n > 0 && n <= 12)) { toast('Da 1 a 12 serie'); return; }
     const lo = parseNum($('#rg-lo').value) ?? 8;
-    const hi = parseNum($('#rg-hi').value) ?? lo;
+    // "Rip a" vuoto non e' un errore: vuol dire che non c'e' un range
+    const hiTxt = ($('#rg-hi').value || '').trim();
+    const hi = hiTxt ? (parseNum(hiTxt) ?? lo) : lo;
+    const tec = riga.tecnica || 'normale';
     const rec = {
       ex: riga.ex,
       serie: Math.round(n), reps: Math.round(lo), repsMax: Math.round(Math.max(lo, hi)),
       kg: parseNum($('#rg-kg').value) ?? 0,
-      tecnica: riga.tecnica || 'normale', superserie: !!riga.superserie
+      tecnica: tec, superserie: !!riga.superserie
     };
+    if (tec === 'stripping') {
+      const st = parseLista(($('#rg-strip') || {}).value);
+      if (st.length) rec.strip = st;
+    }
+    if (tec === 'piramidale') {
+      const pi = parseLista(($('#rg-piram') || {}).value);
+      if (pi.length) {
+        rec.piram = pi;
+        // il numero di serie e la busta del range vengono dall'elenco: cosi'
+        // la doppia progressione e il monitoraggio continuano a leggere i
+        // campi di sempre senza sapere che esiste un piramidale
+        rec.serie = pi.length;
+        rec.reps = Math.min(...pi);
+        rec.repsMax = Math.max(...pi);
+      }
+    }
+    if (tec === 'rest-pause') {
+      const rp = parseNum(($('#rg-rp') || {}).value);
+      if (rp > 0) rec.rpMini = Math.round(rp);
+    }
     if (nuovo) stato.esercizi.push(rec); else stato.esercizi[idx] = rec;
     onChiudi();                        // torna alla scheda, non chiude tutto
   };
