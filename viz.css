@@ -711,6 +711,15 @@
 .rev-invito .g{display:inline-block;margin-top:9px;font-family:var(--mono);font-size:10px;
   letter-spacing:.1em;text-transform:uppercase;color:var(--pine)}
 
+/* Il manubrio si legge al tocco come tutti gli altri grafici: la fascia dice
+   quale riga stai guardando, e i numeri esatti finiscono nella riga sotto.
+   Prima il disegno diceva benissimo la direzione e nascondeva il numero. */
+.db-sel{opacity:0;transition:opacity .15s ease,y .15s ease}
+.db-sel.sel{opacity:1}
+@media (prefers-reduced-motion: reduce){ .db-sel{transition:none} }
+.read .su{color:var(--pine)}
+.read .giu{color:var(--amber)}
+
 /* pallino di legenda: il grafico a manubrio usa punti, non tratti */
 .legend{flex-wrap:wrap;row-gap:5px}
 .legend i.dt{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}

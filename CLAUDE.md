@@ -1079,6 +1079,16 @@ non per evidenza è tutta la differenza fra un elenco e un consiglio. La priorit
 è **una sola** — cambiarne cinque insieme rende impossibile capire cosa ha
 funzionato.
 
+**E si legge al tocco**, come tutti gli altri grafici. Il manubrio dice
+benissimo la direzione e nasconde il numero: si vede che le proteine sono
+salite, non che sono passate da 118 a 131 g. Toccando una riga i numeri esatti
+— adesso, prima, differenza, target, percentuale — finiscono nella riga
+`.read` sotto, e una fascia dice quale riga stai leggendo. La zona da toccare
+e' **tutta la riga e non il pallino**: un cerchio da quattro pixel su un
+telefono non lo prende nessuno, mentre la riga e' un bersaglio alto ventidue.
+E i rettangoli invisibili vanno aggiunti dopo i disegni, o coprirebbero i
+tocchi delle righe gia' fatte.
+
 Il grafico è a **manubrio**, non a pendenza. La pendenza sembrava la forma ovvia
 e alla prova non reggeva: otto metriche quasi tutte vicine al target si
 accalcavano in una banda alta trenta pixel e le etichette si sovrapponevano per
@@ -2237,6 +2247,9 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   scarto in tutte e due le direzioni
 - Non presentare il pavimento dei grassi come una misura: e' 0,6 g/kg preso
   dalla letteratura, come le costanti di Banister. La UI deve continuare a dirlo
+- Non lasciare un grafico senza modo di leggere il numero esatto: il manubrio
+  mostra la direzione e nasconde il valore. La lettura e' al tocco, e la zona
+  toccabile e' la riga intera, non il pallino
 - Non fermare l'asse del manubrio a una costante: con dieci voci qualcuno
   finisce oltre il 135%, e un punto appoggiato al bordo dice una cosa falsa
 - Non lasciare che una carta con i testi in bianco fisso prenda

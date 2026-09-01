@@ -672,6 +672,30 @@ function chartPendenza(metriche, per) {
       'font-family': 'var(--mono)', fill: forte ? 'var(--ink-2)' : 'var(--ink-3)' });
   }
 
+  /* La lettura al tocco. Il manubrio dice benissimo la direzione e nasconde
+     il numero: si vede che le proteine sono salite, non che sono passate da
+     118 a 131 g. Toccare una riga scrive i numeri qui sotto, che e' la stessa
+     riga `.read` di tutti gli altri grafici — su un telefono il passaggio del
+     mouse non esiste, e infilare dieci etichette dentro il disegno lo
+     renderebbe illeggibile. */
+  const read = el('div', 'read',
+    '<span class="ph">Tocca una riga per i numeri esatti</span>');
+  const scrivi = m => {
+    const q = m.ora / m.tgt;
+    const d = m.pre == null ? null : m.ora - m.pre;
+    read.innerHTML = `<span><b>${esc(m.lab)}</b></span>`
+      + `<span>${nf(m.ora, m.dec)}${m.unit ? ' ' + esc(m.unit) : ''} adesso</span>`
+      + (m.pre == null
+        ? `<span class="muted">niente ${esc(per?.primaNome || 'prima')}</span>`
+        : `<span>${nf(m.pre, m.dec)} ${esc(per?.primaNome || 'prima')}</span>`
+          + `<span class="${Math.abs(d) < Math.pow(10, -(m.dec || 0)) / 2 ? '' :
+              (m.verso === 'target'
+                ? (Math.abs(m.ora - m.tgt) < Math.abs(m.pre - m.tgt) ? 'su' : 'giu')
+                : (d > 0 ? 'su' : 'giu'))}">${d > 0 ? '+' : ''}${nf(d, m.dec)}</span>`)
+      + `<span>target ${nf(m.tgt, m.dec)}</span>`
+      + `<span>${nf(q * 100)}% del target</span>`;
+  };
+
   righe.forEach((m, i) => {
     const y = TOP + i * RH + RH / 2;
     const qb = m.ora / m.tgt, qa = m.pre == null ? null : m.pre / m.tgt;
@@ -688,8 +712,27 @@ function chartPendenza(metriche, per) {
         stroke: 'var(--ink-3)', 'stroke-width': 1.4 }));
     }
     s.append(mk('circle', { cx: X(qb), cy: y, r: 4, fill: tinta }));
+
+    /* La zona da toccare e' tutta la riga, non il pallino: un cerchio da
+       quattro pixel su un telefono non lo prende nessuno, e la riga e' un
+       bersaglio alto ventidue. Va aggiunta DOPO i disegni, o coprirebbe i
+       tocchi delle righe gia' fatte. */
+    const hit = mk('rect', { x: 0, y: y - RH / 2, width: W, height: RH,
+      fill: 'transparent', style: 'cursor:pointer' });
+    hit.addEventListener('pointerdown', () => {
+      scrivi(m);
+      evid.setAttribute('y', String(y - RH / 2));
+      evid.classList.add('sel');
+    });
+    s.append(hit);
   });
+  // la fascia che dice quale riga stai leggendo: sotto a tutto, e invisibile
+  // finche' non si tocca
+  const evid = mk('rect', { x: 0, y: 0, width: W, height: RH, rx: 5,
+    fill: 'var(--wash)', class: 'db-sel' });
+  s.insertBefore(evid, s.firstChild);
   box.append(s);
+  box.append(read);
 
   const leg = el('div', 'legend');
   leg.innerHTML = `<span><i class="dt vuoto"></i>${esc(per?.primaNome || 'il periodo prima')}</span>
