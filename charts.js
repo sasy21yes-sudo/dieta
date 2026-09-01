@@ -940,7 +940,7 @@ function viewDati(v) {
         + ` fra ${pm.orizzonte} giorni`;
   } catch { /* idem */ }
   azione('previsioni', 'Dove stai andando', statoPrev,
-    () => { location.hash = '#/previsioni'; });
+    () => { apri('#/previsioni'); });
 
   if (typeof scaricaResoconto === 'function')
     azione('pdf', 'Il resoconto in PDF',

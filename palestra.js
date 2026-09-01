@@ -692,7 +692,7 @@ function viewPalestra(v) {
     g.append(riquadroGym('hyrox', 'Road to HYROX',
       gg != null ? (gg > 0 ? gg + ' giorni alla gara' : gg === 0 ? 'oggi si corre' : 'gara passata')
                  : '8 km e 8 stazioni',
-      () => { location.hash = '#/hyrox'; }));
+      () => { apri('#/hyrox'); }));
   }
   v.append(g);
   if (typeof osserva === 'function')

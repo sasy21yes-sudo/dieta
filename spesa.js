@@ -106,7 +106,7 @@ function viewSpesa(v) {
     const b = el('button', 'btn wide pri', 'Accendi il piano alimentare');
     b.style.marginTop = '10px';
     b.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'profilo';
-      location.hash = '#/piano'; };
+      apri('#/piano'); };
     c.append(b);
     v.append(c);
     return;
@@ -454,7 +454,7 @@ function viewDispensa(v) {
        spesa fai entrare in dispensa quello che hai messo nel carrello.</div>`));
     const b = el('button', 'btn wide pri', 'Vai alla lista della spesa');
     b.style.marginTop = '10px';
-    b.onclick = () => { location.hash = '#/spesa'; };
+    b.onclick = () => { apri('#/spesa'); };
     v.append(b);
     return;
   }

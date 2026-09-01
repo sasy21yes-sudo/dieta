@@ -133,7 +133,7 @@ function cardPesataAnomala(k = today()) {
     save(); route(); toast('Rimessa nella tendenza');
   };
   const fix = el('button', 'btn', 'Correggila');
-  fix.onclick = () => { location.hash = '#/diario'; };
+  fix.onclick = () => { apri('#/diario'); };
   r.append(ok, fix);
   c.append(r);
   return c;

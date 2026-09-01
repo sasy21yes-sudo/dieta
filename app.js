@@ -932,6 +932,20 @@ const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
                  revisione: 'La settimana', importa: 'Importo da Salute',
                  salute: 'Dati dal telefono', previsioni: 'Dove stai andando' };
 
+/**
+ * Vai a `hash`, **anche se e' la pagina che hai gia' davanti**.
+ *
+ * Scrivere in `location.hash` un indirizzo identico a quello di adesso non fa
+ * scattare `hashchange`, quindi il router non ridisegna: il foglio si chiude e
+ * sullo schermo resta esattamente quello che c'era. Da fuori sembra un bottone
+ * rotto, ed e' il motivo per cui ogni navigazione passa da qui invece di
+ * scrivere l'indirizzo per conto suo.
+ */
+function apri(hash) {
+  if (location.hash === hash) route();
+  else location.hash = hash;
+}
+
 function route() {
   let name = (location.hash.replace('#/', '') || 'oggi').split('?')[0];
   // finche' non si e' scelto da cosa partire non si mostra il piano di nessuno
@@ -1013,7 +1027,7 @@ function viewOggi(v) {
         <span class="t">Guarda com'e' andata</span>
         <span class="d">Il confronto con la settimana prima, cosa non ha funzionato e la sola cosa da cambiare.</span>
         <span class="g">Apri la revisione &rsaquo;</span>`;
-      inv.onclick = () => { location.hash = '#/revisione'; };
+      inv.onclick = () => { apri('#/revisione'); };
       v.append(inv);
       if (typeof pulsa === 'function') setTimeout(() => pulsa(inv), 250);
     }
@@ -1078,7 +1092,7 @@ function viewOggi(v) {
     const b = el('button', 'btn wide pri', 'Apri il piano');
     b.style.marginTop = '10px';
     b.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'settimana';
-      location.hash = '#/piano'; };
+      apri('#/piano'); };
     av.append(b);
     v.append(av);
   }
@@ -1094,7 +1108,7 @@ function viewOggi(v) {
         <div class="meal-slot">${esc(s.slot)}${s.ora ? ' · ' + esc(s.ora) : ''}</div>
         <div class="meal-name">Da assegnare</div></div></div>`;
       vuoto.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'settimana';
-        location.hash = '#/piano'; };
+        apri('#/piano'); };
       v.append(vuoto);
       continue;
     }
@@ -1239,7 +1253,7 @@ function cardExtraEAggiungi(k, d, conPiano) {
     + '<span class="go">&rsaquo;</span>';
   if (typeof icona === 'function')
     b3.querySelector('.ic').append(icona('list', { size: 18 }));
-  b3.onclick = () => { location.hash = '#/prodotti'; };
+  b3.onclick = () => { apri('#/prodotti'); };
   az.append(b3);
   c.append(az);
 
@@ -1291,7 +1305,7 @@ function cardGiornoLibero(k, d) {
   b.style.marginTop = '10px';
   b.textContent = 'Accendi il piano alimentare';
   b.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'profilo';
-    location.hash = '#/piano'; };
+    apri('#/piano'); };
   c.append(b);
   box.append(c);
   return box;
@@ -1907,7 +1921,7 @@ function viewDiario(v) {
   const bg = el('button', 'btn wide');
   bg.style.marginTop = '10px';
   bg.textContent = pezzi.length ? 'Apri Gym' : 'Registra una seduta';
-  bg.onclick = () => { location.hash = '#/palestra'; };
+  bg.onclick = () => { apri('#/palestra'); };
   ca.append(bg);
   ca.append(el('p', 'note',
     'Non c\'e\' piu\' niente da spuntare: la giornata conta come allenamento se '
@@ -2024,7 +2038,7 @@ function viewDiario(v) {
   const bi = el('button', 'btn wide', 'Modifica cosa prendi');
   bi.style.marginTop = '10px';
   bi.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'integratori';
-    location.hash = '#/piano'; };
+    apri('#/piano'); };
   c3.append(bi);
   v.append(c3);
 }
@@ -2442,7 +2456,7 @@ function viewCorpo(v) {
       <span class="d">Misure, grasso e massa magra, forza: dove ti porta il ritmo
       delle ultime settimane, con la forbice dentro cui starai.</span>
       <span class="g">Apri le proiezioni &rsaquo;</span>`;
-    b.onclick = () => { location.hash = '#/previsioni'; };
+    b.onclick = () => { apri('#/previsioni'); };
     v.append(b);
   }
 }
@@ -3050,6 +3064,15 @@ function sheetProfilo() {
   d.push(gg + (gg === 1 ? ' giorno registrato' : ' giorni registrati'));
   w.append(el('p', 'muted', d.join(' · ')));
 
+  /* Le quattro voci del piano portano allo stesso indirizzo e cambiano solo
+     il passo, quindi il passo va scelto **prima** di chiedere il disegno: da
+     "#/piano" toccare "Ricette" non cambia l'indirizzo, e senza `apri()` il
+     foglio si chiudeva lasciando sullo schermo la pagina di prima. */
+  const porta = (hash, tab = null) => () => {
+    if (typeof pianoTab !== 'undefined') pianoTab = tab;
+    apri(hash);
+  };
+
   const vai = (t, sub2, fn) => {
     const b = el('button', 'nav-r');
     b.innerHTML = `<span class="body"><span class="t">${esc(t)}</span>
@@ -3057,18 +3080,28 @@ function sheetProfilo() {
     b.onclick = () => { closeSheet(); fn(); };
     w.append(b);
   };
+
+  /* L'ordine e' quello in cui un piano si costruisce e in cui ci si torna:
+     prima chi sei, poi come stai cambiando, poi la settimana, le ricette che
+     la riempiono e gli ingredienti che compongono le ricette. E ogni voce
+     nomina **una** schermata: "Il piano" e "Quello che mangi" erano etichette
+     a cui rispondevano tre pagine diverse. */
+  vai('Chi sei', 'Nome, eta\', altezza, peso di partenza, e quali parti dell\'app ti servono.',
+    porta('#/piano', 'profilo'));
   vai('Foto dei progressi', 'Uno scatto al giorno nella stessa posa: e\' l\'unico modo '
     + 'di vedere un cambiamento che sulla bilancia non si vede.',
-    () => { location.hash = '#/foto'; });
-  vai('Chi sei', 'Nome, eta\', altezza, peso di partenza, e quali parti dell\'app ti servono.',
-    () => { if (typeof pianoTab !== 'undefined') pianoTab = 'profilo';
-      location.hash = '#/piano'; route(); });
-  vai('Il piano', 'Target, alimenti, ricette, settimana: i cinque passi.',
-    () => { if (typeof pianoTab !== 'undefined') pianoTab = null;
-      location.hash = '#/piano'; });
-  vai('Quello che mangi', 'L\'elenco degli alimenti e dei prodotti, con da dove viene '
+    porta('#/foto'));
+  if (usaPiano()) {
+    vai('Piano settimanale', 'Quale ricetta in quale slot, nei sette giorni. Da qui '
+      + 'escono le barre della scheda Oggi e la lista della spesa.',
+      porta('#/piano', 'settimana'));
+    vai('Ricette', 'I piatti composti pesando gli ingredienti, con i macro calcolati '
+      + 'da soli mentre aggiungi.',
+      porta('#/piano', 'pasti'));
+  }
+  vai('Lista ingredienti', 'Tutto quello che mangi in un elenco solo, con da dove viene '
     + 'il numero di ognuno. Da qui si aggiunge e si confronta.',
-    () => { location.hash = '#/prodotti'; });
+    porta('#/prodotti'));
 
   /* --- i profili, se ce n'e' piu' di uno --- */
   if (P0.lista.length > 1) {
@@ -3112,11 +3145,11 @@ function sheetMenu() {
     mk('Lista della spesa',
        'Il fabbisogno della settimana, ordinato come le corsie del tuo negozio. '
        + 'Le quantita\' vengono dalle ricette assegnate ai giorni: non le scrivi tu.',
-       () => { closeSheet(); location.hash = '#/spesa'; });
+       () => { closeSheet(); apri('#/spesa'); });
     mk('Dispensa',
        'Quello che hai gia\' in casa, e per quante settimane ti basta. Si '
        + 'sottrae dalla lista della spesa.',
-       () => { closeSheet(); location.hash = '#/dispensa'; });
+       () => { closeSheet(); apri('#/dispensa'); });
   }
 
   mk('Scarica i promemoria (.ics)',
@@ -3125,7 +3158,7 @@ function sheetMenu() {
 
   mk('Passi e sonno dal telefono',
      'Nessuna pagina web puo\' leggere Salute — il permesso non esiste. Un Comando pero\' si\': legge il dato e apre l\'app col numero dentro l\'indirizzo. Qui c\'e\' la procedura.',
-     () => { closeSheet(); location.hash = '#/salute'; });
+     () => { closeSheet(); apri('#/salute'); });
 
   mk('Giorni che non contano',
      'Vacanza, influenza, trasferta: i dati restano tutti, ma la revisione settimanale e i punteggi di costanza saltano quei giorni.',

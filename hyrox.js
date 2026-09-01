@@ -428,7 +428,7 @@ function viewHyrox(v) {
     c.append(b);
     const i = el('button', 'btn wide', 'Torna in palestra');
     i.style.marginTop = '8px';
-    i.onclick = () => { location.hash = '#/palestra'; };
+    i.onclick = () => { apri('#/palestra'); };
     c.append(i);
     v.append(c);
     return;

@@ -440,7 +440,7 @@ function viewBenvenuto(v) {
       <span class="s">Consigliato · resta il database di ${Object.keys(DBASE.alimenti).length} alimenti per comporre i pasti</span>
     </span><span class="go">›</span>`;
   vuoto.onclick = () => { S.settings.pianoBase = 'vuoto'; save(); fondiPiano();
-    pianoTab = 'profilo'; location.hash = '#/piano'; route(); };
+    pianoTab = 'profilo'; apri('#/piano'); };
   v.append(vuoto);
 
   const esempio = el('button', 'step');
@@ -453,7 +453,7 @@ function viewBenvenuto(v) {
   esempio.onclick = () => {
     if (!confirm('Il piano di esempio porta con se\' profilo, target, ricette e misure di partenza di un\'altra persona. Li vedrai finche\' non li cambi. Procedo?')) return;
     S.settings.pianoBase = 'esempio'; save(); fondiPiano();
-    location.hash = '#/oggi'; route();
+    apri('#/oggi');
   };
   v.append(esempio);
 
@@ -777,7 +777,7 @@ function cardFotoProfilo() {
   const vai = el('button', 'btn wide');
   vai.style.marginTop = '10px';
   vai.textContent = 'Apri le foto dei progressi';
-  vai.onclick = () => { location.hash = '#/foto'; };
+  vai.onclick = () => { apri('#/foto'); };
   c.append(vai);
 
   if (typeof fotoTutte === 'function') fotoTutte().then(tutte => {
@@ -863,6 +863,12 @@ function sezTarget(v) {
 
   const eco = el('div', 'read');
   const ricalcola = () => {
+    // Il primo giro e' differito di un tick, e in quel tick la pagina puo'
+    // essere gia' stata sostituita: chi apre questo passo e tocca subito una
+    // voce che porta altrove lasciava dietro un TypeError. Nessuno se ne
+    // accorgeva — l'eco e' un di piu' e non lo aspetta nessuno — ma
+    // un'eccezione in console e' la cosa che nasconde quelle vere.
+    if (!$('#tg-kcal')) return;
     const k = parseNum($('#tg-kcal').value) || 0, pr = parseNum($('#tg-p').value) || 0;
     const ca = parseNum($('#tg-c').value) || 0, gr = parseNum($('#tg-g').value) || 0;
     const somma = pr * 4 + ca * 4 + gr * 9;

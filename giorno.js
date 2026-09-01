@@ -788,7 +788,7 @@ function sheetGiorno(k) {
 
   const vai = el('button', 'btn wide pri', 'Apri questo giorno');
   vai.style.marginTop = '14px';
-  vai.onclick = () => { viewDate = k; closeSheet(); location.hash = '#/oggi'; route(); };
+  vai.onclick = () => { viewDate = k; closeSheet(); apri('#/oggi'); };
   w.append(vai);
   sheet(w);
 }

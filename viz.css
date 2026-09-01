@@ -333,9 +333,8 @@
 #tabbar a{font-size:10px;letter-spacing:.02em;padding-left:0;padding-right:0}
 
 /* ---------------- azioni nella topbar ---------------- */
-#top-actions{display:flex;align-items:center;gap:2px}
-#btn-profilo{background:none;border:0;color:var(--ink-3);padding:4px 6px;cursor:pointer;
-  display:flex;align-items:center}
+#btn-profilo{justify-self:end;background:none;border:0;color:var(--ink-3);
+  padding:4px 6px;cursor:pointer;display:flex;align-items:center}
 #btn-profilo svg{width:21px;height:21px;display:block}
 #btn-profilo:active{color:var(--pine)}
 
@@ -615,7 +614,6 @@
 .meal.vuoto .meal-name{color:var(--ink-3);font-weight:400}
 
 /* ---------------- menu a tendina ---------------- */
-#top-actions{position:relative}
 #dropdown{position:absolute;top:100%;right:0;z-index:60;min-width:224px;
   background:var(--paper);border:1px solid var(--rule);border-radius:12px;
   box-shadow:0 8px 28px rgba(0,0,0,.16);overflow:hidden;margin-top:6px}

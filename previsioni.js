@@ -307,7 +307,7 @@ function viewPrevisioni(v) {
       + 'esatta e la forbice verrebbe zero, che sarebbe una certezza finta.'));
     const b = el('button', 'btn wide pri', 'Prendi le misure');
     b.style.marginTop = '10px';
-    b.onclick = () => { location.hash = '#/corpo'; };
+    b.onclick = () => { apri('#/corpo'); };
     cm.append(b);
   } else {
     cm.append(el('div', 'sub',
@@ -465,7 +465,7 @@ function viewPrevisioni(v) {
     + 'Sta nella scheda Corpo.'));
   const b = el('button', 'btn wide', 'Apri la previsione del peso');
   b.style.marginTop = '10px';
-  b.onclick = () => { location.hash = '#/corpo'; };
+  b.onclick = () => { apri('#/corpo'); };
   cp.append(b);
   v.append(cp);
 }

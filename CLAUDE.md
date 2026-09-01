@@ -1843,6 +1843,56 @@ stessa giornata — ma Oggi e' "cosa mangio adesso" e Diario e' "cosa registro
 sulla giornata": trecento righe di campi che dentro Oggi diventerebbero una
 pagina senza fondo.
 
+### La topbar ha un centro, e due lati con un mestiere
+
+Il titolo stava a sinistra e le due icone tutte e due a destra, appiccicate:
+un lato pieno e uno vuoto, e due bottoni che fanno cose lontanissime
+— "tu" e "l'app" — a tre millimetri l'uno dall'altro, cioe' alla distanza a
+cui il pollice sbaglia.
+
+Adesso: **tre puntini a sinistra, titolo al centro, profilo a destra.** Il
+titolo dice dove sei e sta dove si guarda per saperlo; le due porte stanno
+agli angoli opposti, che e' anche il modo di dire che non sono la stessa cosa.
+
+Non e' un flex con `space-between`: con quello il titolo si mette al centro
+**dello spazio che avanza**, che non e' il centro dello schermo, e basta un
+bottone piu' largo dell'altro per vederlo storto. Sono tre colonne di griglia
+con le due laterali larghe uguali — misurato, lo scarto fra il centro del
+titolo e il centro della barra e' di 0,0 px — e il titolo lungo taglia con i
+puntini invece di spingere via le icone.
+
+### Una voce deve arrivare dove dice
+
+`location.hash = '#/piano'` scritto quando sei **gia'** su `#/piano` non emette
+`hashchange`: il router non ridisegna, il foglio si chiude, e sullo schermo
+resta esattamente quello che c'era. Da fuori e' un bottone rotto.
+
+Succedeva a meta' delle voci: "Il piano" dal piano, "Lista della spesa" dalla
+spesa, "Corpo" da Corpo. Alcune chiamate se lo cavavano chiamando `route()`
+subito dopo, altre no, e quale delle due dipendeva da chi aveva scritto la
+riga.
+
+`apri(hash)` e' l'unico modo di cambiare pagina: se l'indirizzo e' diverso lo
+scrive, se e' lo stesso chiede il disegno. **Ventisette navigazioni** in dodici
+file passano da li'. Restano fuori due casi, e per un motivo: l'avvio (`if
+(!location.hash)`, dove il router parte comunque dopo) e l'indirizzo con la
+query dell'import da Salute, che rieseguito rifarebbe l'importazione.
+
+### Il profilo nomina cinque schermate
+
+Le voci erano quattro e due erano etichette, non destinazioni: **"Il piano"**
+apriva l'elenco dei passi — da cui sceglierne ancora uno — e **"Quello che
+mangi"** poteva voler dire gli alimenti, le ricette, o cosa c'e' su Oggi.
+
+Ora sono cinque, nell'ordine in cui un piano si costruisce e in cui ci si
+torna: **Chi sei**, **Foto dei progressi**, **Piano settimanale**, **Ricette**,
+**Lista ingredienti**. Ognuna nomina una schermata sola e ci arriva in un
+tocco, invece di lasciare a meta' strada.
+
+Le tre che dipendono dal piano alimentare spariscono quando il modulo e'
+spento: portare a un passo che in quella configurazione non esiste vuol dire
+consegnare una pagina con la navigazione avanti e indietro fuori posto.
+
 ### Confrontare due alimenti
 
 "Quale dei due conviene" sembra una domanda semplice e non lo e', per un motivo
@@ -2511,6 +2561,19 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non stilare come `div` un elemento che e' diventato `button`: senza il reset
   prende il fondo chiaro di sistema, e al buio e' un rettangolo bianco in mezzo
   alla lista
+- Non centrare un titolo con `justify-content:space-between`: si mette al
+  centro dello spazio che avanza, e basta un bottone piu' largo dell'altro
+  per vederlo storto. Tre colonne, le due laterali uguali
+- Non scrivere `location.hash` per cambiare pagina: se e' l'indirizzo che hai
+  gia', `hashchange` non scatta e il bottone sembra rotto. Si passa da
+  `apri()`, che quando l'indirizzo non cambia chiede il disegno
+- Non dare a una voce di menu un nome a cui rispondono tre schermate: "Il
+  piano" e "Quello che mangi" erano domande, non destinazioni
+- Non lasciare in un menu una voce che porta a un passo spento: con il piano
+  alimentare tolto, ricette e settimana non esistono
+- Non leggere un campo dentro un `setTimeout` senza controllare che ci sia
+  ancora: fra il tick e l'esecuzione la pagina puo' essere stata sostituita, e
+  quello che resta e' un'eccezione in console che nasconde quelle vere
 - Non aggiungere una terza superficie di navigazione: la persona e' "tu", il
   ⋯ e' "l'app e i dati", e una tendina in mezzo che porta dove portano gia'
   quelle due non aggiunge una destinazione

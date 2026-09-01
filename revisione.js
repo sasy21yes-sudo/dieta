@@ -542,7 +542,7 @@ function viewRevisione(v) {
     // "letta" vale per la settimana: chiudere un periodo scelto a mano non
     // deve zittire la revisione di domenica, che e' un'altra cosa
     if (!per.custom) { S.settings.revisioneLetta = today(); save(); }
-    location.hash = '#/oggi';
+    apri('#/oggi');
   };
   fine.append(b);
   v.append(fine);

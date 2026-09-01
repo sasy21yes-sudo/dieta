@@ -125,5 +125,5 @@ function fabbisognoNetto() {
    richiami: porta li'. */
 function sheetDispensa() {
   closeSheet();
-  location.hash = '#/dispensa';
+  apri('#/dispensa');
 }

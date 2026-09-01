@@ -77,7 +77,7 @@ function viewImporta(v) {
     osserva(c, () => { entrata([...c.children], { passo: 70 }); pulsa(c); });
 
   const b = el('button', 'btn wide pri', 'Vai a oggi');
-  b.onclick = () => { location.hash = '#/oggi'; };
+  b.onclick = () => { apri('#/oggi'); };
   v.append(b);
 
   if (scritti.length) {
@@ -87,7 +87,7 @@ function viewImporta(v) {
       for (const cc of CAMPI_SALUTE)
         if (prima[cc.id] == null) delete S.log[k][cc.id]; else S.log[k][cc.id] = prima[cc.id];
       S.model.rev = (S.model.rev || 0) + 1;
-      save(); location.hash = '#/oggi'; toast('Annullato');
+      save(); apri('#/oggi'); toast('Annullato');
     };
     v.append(u);
   }
