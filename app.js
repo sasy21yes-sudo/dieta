@@ -2478,16 +2478,28 @@ function viewCorpo(v) {
     const cmp = el('div', 'cmp');
     cmp.append(el('div', 'cmp-h',
       '<span></span><span>Ora</span><span>Target</span><span>Manca</span>'));
+    /* Senza fisico di riferimento le due colonne di destra non hanno un
+       contenuto: vanno lasciate vuote, non riempite con la sottrazione di un
+       numero che non c'e'. Con `nf` che ora tollera i null uscirebbe "—" in
+       tutte e due, che sembra un dato mancante invece di una scelta. */
     const rowC = (lab, now, tgt, dec, unit) => {
       if (now == null) return;
-      const d = tgt - now, vicino = Math.abs(d) <= Math.abs(tgt) * 0.03;
+      const noT = tgt == null || !isFinite(tgt);
+      const d = noT ? null : tgt - now;
+      const vicino = !noT && Math.abs(d) <= Math.abs(tgt) * 0.03;
       cmp.append(el('div', 'cmp-r',
         `<span>${lab}</span>
          <span class="mono">${nf(now, dec)}</span>
-         <span class="mono muted">${nf(tgt, dec)}</span>
-         <span class="mono ${vicino ? 'good' : ''}">${vicino ? '✓'
+         <span class="mono muted">${noT ? '—' : nf(tgt, dec)}</span>
+         <span class="mono ${vicino ? 'good' : ''}">${noT ? '—' : vicino ? '✓'
            : (d > 0 ? '+' : '') + nf(d, dec) + `<em>${unit}</em>`}</span>`));
     };
+    /* Il peso c'e', anche se sta grande in cima alla schermata: qui non e'
+       un doppione ma il totale di cui le due righe sotto sono le parti, e
+       una divisione senza il totale costringe a sommarla a mente. Quello che
+       era davvero un doppione — e infatti se n'e' andato — erano i rapporti
+       fra circonferenze, che composizione non sono. */
+    rowC('Peso', C.peso, C.t.peso, 1, ' kg');
     rowC('Grasso', C.bf, C.t.bf, 1, ' %');
     rowC('Massa magra', C.lbm, C.t.lbm, 1, ' kg');
     rowC('Massa grassa', C.fm, C.t.peso * C.t.bf / 100, 1, ' kg');

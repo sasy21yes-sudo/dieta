@@ -167,7 +167,17 @@ input:focus{outline:2px solid var(--pine);outline-offset:1px}
 
 /* confronto ora / target */
 .cmp{margin-top:10px}
-.cmp-h,.cmp-r{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;
+/* Le colonne sono FISSE e uguali per intestazione e righe.
+   Erano `1fr auto auto auto`, e `auto` significa "larga quanto il suo
+   contenuto": ma l'intestazione e ogni riga sono griglie separate, quindi
+   ognuna si dimensionava sui propri caratteri. Il risultato e' che "69,8"
+   stava sotto la parola ORA solo per caso, e una riga con "-11,3 %" spingeva
+   la sua colonna piu' in la' di tutte le altre. Il `min-width` che c'era
+   metteva un pavimento, non un allineamento — e per giunta solo sulle righe,
+   non sull'intestazione, che restava piu' stretta di tutto il resto.
+   Con tracce esplicite le quattro colonne cadono nello stesso punto in ogni
+   tabella dell'app, e i numeri incolonnati a destra allineano le unita'. */
+.cmp-h,.cmp-r{display:grid;grid-template-columns:1fr 58px 58px 64px;gap:8px;
   align-items:baseline;text-align:right}
 .cmp-h>span:first-child,.cmp-r>span:first-child{text-align:left}
 .cmp-h{font-family:var(--mono);font-size:10px;letter-spacing:.1em;
@@ -175,7 +185,10 @@ input:focus{outline:2px solid var(--pine);outline-offset:1px}
   border-bottom:1px solid var(--rule)}
 .cmp-r{padding:8px 0;border-bottom:1px solid var(--rule);font-size:14px}
 .cmp>.cmp-r:last-child,.cmp>div>.cmp-r:last-child{border-bottom:0}
-.cmp-r>span:nth-child(n+2){min-width:54px}
+/* i numeri non vanno mai a capo: una colonna stretta li spezza in due righe
+   e la tabella si disallinea in verticale invece che in orizzontale */
+.cmp-h>span,.cmp-r>span{min-width:0;overflow-wrap:normal}
+.cmp-r>span:nth-child(n+2){white-space:nowrap}
 .cmp-r em{font-style:normal;color:var(--ink-3);font-size:11px;margin-left:1px}
 .cmp-r .good{color:var(--pine);font-weight:600}
 .cmp-r em.up{color:var(--alert);margin-left:6px}

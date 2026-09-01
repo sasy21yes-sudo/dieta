@@ -1518,10 +1518,35 @@ sono **proporzioni**, e sono scese nella carta delle misure, sotto le
 circonferenze da cui escono.
 
 Quello che resta e' quello che la parola promette: come si divide il peso.
-Tre righe — grasso, magra, grassa — e sopra **due barre sulla stessa scala**,
-ora e target. La cosa che conta di una ricomposizione e' che il totale puo'
-restare fermo mentre le due parti si scambiano, e tre numeri incolonnati non
-lo fanno vedere.
+Quattro righe — peso, grasso, magra, grassa — e sopra **due barre sulla stessa
+scala**, ora e target. La cosa che conta di una ricomposizione e' che il totale
+puo' restare fermo mentre le due parti si scambiano, e quattro numeri
+incolonnati non lo fanno vedere.
+
+**Il peso e' tornato**, ed e' giusto cosi': non e' un doppione della carta in
+cima ma **il totale di cui le altre due righe sono le parti**, e una divisione
+senza il totale costringe a sommarla a mente. Il doppione vero — quello che se
+n'e' andato — erano i rapporti fra circonferenze, che composizione non sono.
+
+### Le colonne di una tabella non si allineano da sole
+
+Sotto ORA, TARGET e MANCA i numeri cadevano ognuno per conto suo, e non era
+un caso isolato: e' la stessa classe `.cmp` usata da **dodici tabelle** —
+Corpo, misure, previsioni, obiettivo, bioimpedenza, cruscotto, target,
+giorno.
+
+La causa: `grid-template-columns: 1fr auto auto auto`. `auto` vuol dire "larga
+quanto il suo contenuto", e l'intestazione e ogni riga sono **griglie
+separate**: ognuna si dimensionava sui propri caratteri. "69,8" finiva sotto
+la parola ORA solo per coincidenza, e una riga con "-11,3 %" spingeva la sua
+colonna piu' in la' di tutte le altre. Il `min-width: 54px` che c'era metteva
+un pavimento, non un allineamento — e per giunta solo sulle righe e non
+sull'intestazione, che restava percio' piu' stretta di tutto il resto.
+
+Con tracce esplicite (`1fr 58px 58px 64px`) le quattro colonne cadono nello
+stesso punto in ogni tabella dell'app. Verificato misurando il bordo destro di
+ogni cella contro quello della sua intestazione: **zero righe disallineate**
+su tutte e dodici.
 
 ### Un grafico del peso senza asse dice solo "sale"
 
@@ -2725,9 +2750,14 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   prende la percentuale
 - Non far valere una bioimpedenza per sempre: e' un punto nel tempo, e dopo
   un mese descrive il corpo di un mese fa. La formula si rimisura, lei no
-- Non mettere in una carta chiamata "Composizione" il peso, che sta gia'
-  grande in cima alla stessa schermata, ne' i rapporti fra circonferenze, che
-  sono proporzioni e stanno con le circonferenze
+- Non togliere il peso dalla tabella della composizione: li' non e' un
+  doppione della carta in cima, e' il totale di cui grasso e magra sono le
+  parti, e senza si somma a mente. Il doppione erano i rapporti fra
+  circonferenze, che sono proporzioni e stanno con le circonferenze
+- Non dimensionare con `auto` le colonne di una tabella la cui intestazione e
+  le cui righe sono griglie separate: ognuna si misura sul proprio contenuto,
+  e i numeri finiscono sotto la loro etichetta solo per coincidenza. Tracce
+  esplicite, uguali per l'intestazione e per le righe
 - Non lasciare un grafico senza griglia e senza numeri sull'asse quando la
   scala si adatta ai dati: mezzo chilo e tre chili disegnano la stessa curva
 - Non far contare a un'intestazione una cosa diversa da quella che sta
