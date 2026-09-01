@@ -330,20 +330,16 @@ guardano una volta e poi si saltano. Peggio: la curva messa **in evidenza**
 era la prontezza, che per costruzione e' sempre positiva per chi si allena
 (τ 42 contro 7) — cioe' la sola che non poteva dire di no.
 
-Il numero che decide qualcosa e' uno, ed e' quello che l'app usa gia' ovunque
-per scrivere "pronto": **quanta fatica residua hai rispetto all'allenamento
-accumulato**, in percentuale, con la riga a 55%. Un asse, un'unita', una
-soglia. Sotto la riga il gruppo regge un altro stimolo forte, sopra sta ancora
-recuperando — ed e' la stessa soglia di `statoMuscoli()`, o due schermate
-direbbero due cose diverse dello stesso muscolo lo stesso giorno.
+Il numero che decide qualcosa e' uno: **quanta fatica hai addosso rispetto a
+quella che porti di solito su quel muscolo**. 100 e' una giornata come le
+altre tue. Un asse, un'unita', un riferimento — e il riferimento sei tu.
 
 Sopra il grafico una riga in italiano dice lo stato di adesso, perche' la
 risposta non deve costringere a leggere un grafico.
 
-Due cautele restano scritte: sotto una forma minima (0,5) il rapporto non si
-calcola — dividere per quasi zero da' numeri enormi, non muscoli distrutti — e
-le due costanti di tempo sono valori tipici di letteratura, non calibrati
-sull'utente.
+Perche' non una soglia fissa: vedi "Il metro del recupero sei tu" piu' sotto.
+E' l'errore che questo file segnalava da sempre e che il codice faceva lo
+stesso.
 
 Dettaglio di lingua che vale anche altrove: una riga di riferimento non e'
 sempre un "target". Su una soglia da **non** superare chiamarla target direbbe
@@ -598,9 +594,10 @@ Tre regole che lo tengono onesto:
    dettaglio sta gia' in mappa muscolare, volume e progressi, e ripeterlo qui
    vorrebbe dire mantenere due versioni degli stessi conti.
 
-La soglia della prontezza e' la stessa di `statoMuscoli()` — fatica sotto il
-55% della forma — e non e' un caso: due schermate che usano soglie diverse
-direbbero due cose diverse dello stesso muscolo lo stesso giorno.
+Il metro della prontezza e' lo stesso di `statoMuscoli()` — la fatica di quel
+giorno divisa quella che quel muscolo porta di solito — e non e' un caso: due
+schermate che usano metri diversi direbbero due cose diverse dello stesso
+muscolo lo stesso giorno.
 
 Dallo storico una seduta si apre sul resoconto, e da li' si tocca una serie
 per correggerla: chi guarda una seduta di tre settimane fa vuole prima
@@ -1088,6 +1085,78 @@ accalcavano in una banda alta trenta pixel e le etichette si sovrapponevano per
 forza. Il manubrio dà a ogni voce una riga di altezza fissa — collisione
 impossibile — e mette il movimento in orizzontale. Un asse solo: la percentuale
 del proprio target, l'unico metro che tiene sulla stessa figura i passi e i litri.
+
+### Il metro del recupero sei tu
+
+Questo file scriveva da tempo che *"non si confronta la fatica di Banister con
+una soglia assoluta: con tau_forma 42 e tau_fatica 7 la prontezza di chi si
+allena e' sempre positiva, per costruzione"*. E poi il codice faceva
+esattamente quello: `pronto` era `fatica < forma * 0.55`, e con quelle due
+costanti il rapporto di regime sta intorno a 7/42 — cioe' **sempre** sotto
+qualunque soglia ragionevole. Misurato sul caso piu' ovvio possibile: il
+giorno dopo una seduta pesante di petto l'app scriveva "nessun gruppo e' in
+debito di recupero, pronti: petto".
+
+Il confronto giusto e' con se stessi. Ma **non sul rapporto fatica/forma**, ed
+e' l'errore in cui si cade subito dopo: quel rapporto ha un transitorio
+lunghissimo, perche' la forma ci mette 42 giorni a riempirsi e nelle prime
+settimane il rapporto vale 0,9 contro lo 0,2 di regime. Provato: con otto
+settimane di storia la mediana usciva 0,302 mentre il ciclo settimanale vero
+oscillava fra 0,15 e 0,31, e il giorno dopo una seduta pesante risultava
+*sotto* la norma.
+
+`caricoRelativo()` guarda quindi la **fatica** e basta, contro la fatica che
+quel muscolo porta di solito:
+
+- tau 7 vuol dire che si assesta in tre settimane invece che in tre mesi;
+- ha il senso giusto — "quanto sono pesto rispetto al mio normale";
+- resta autocalibrante: chi si allena tanto ha una fatica abituale alta e non
+  risulta perennemente distrutto per questo;
+- la finestra e' di **sei settimane**, cosi' segue i cambi di volume invece di
+  confrontarti con quello che facevi a marzo, ed e' la **mediana**, perche' i
+  picchi del giorno dopo sono proprio quello che non deve entrare nel metro
+  con cui li si misura.
+
+Sotto le tre settimane di storia su quel muscolo non si dice niente — `pronto`
+vale `null`, che non e' `false` — e chi legge quel campo deve distinguere i
+tre casi. Sullo stesso seme di prova: petto, spalle e tricipiti allenati ieri
+escono a 1,62× il loro solito, dorsali e bicipiti a 0,75×, gambe a 1,00×.
+
+Il metro e' uno per tutta la sezione: mappa muscolare, carta "cosa allenare
+oggi", grafico del carico, resoconto della seduta e pastiglie delle schede.
+
+### "Ci sta" o "meglio domani": la scheda, oggi
+
+La domanda arriva nel momento in cui si apre **registra pesi** con tre schede
+davanti. La mappa muscolare sapeva benissimo che i pettorali erano ancora
+carichi, ma quell'informazione stava due schermate piu' in la' e nessuno la
+andava a prendere con le mani sulla panca.
+
+`prontezzaScheda()` fa una media pesata, e **il peso conta**: una scheda che
+mette dodici serie sui pettorali e due sui polpacci non e' "meta' petto e
+meta' polpacci". Ogni gruppo entra per quanto quella scheda lo carica davvero
+— serie della riga per coinvolgimento dell'esercizio, cioe' lo stesso peso che
+usano gia' la mappa e il volume settimanale.
+
+Quattro casi, e le parole sono scelte: **"sconsigliata" sarebbe un giudizio su
+una scheda, e la scheda non ha fatto niente di male.** Quello che e' carico e'
+il corpo, e per oggi:
+
+| | |
+|---|---|
+| sotto 0,9× | ci sta |
+| 0,9–1,25× | nella norma |
+| 1,25–1,7× | gruppi carichi |
+| oltre 1,7× | meglio domani |
+
+Sotto la pastiglia c'e' **il perche'** — quali gruppi, e quanta parte del
+lavoro di quella scheda rappresentano — perche' un'etichetta senza il motivo
+e' una cosa che si impara a ignorare. E quando ce n'e' una chiaramente piu'
+fresca delle altre viene marcata, che e' l'unico consiglio vero: non "non
+allenarti", ma "oggi ti conviene questa".
+
+Senza abbastanza storico non compare niente e la nota lo dice, invece di
+inventare un verdetto.
 
 ### Una serie si corregge, non solo si butta
 
@@ -2070,7 +2139,14 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   che le distanzia e scansa le piastrine gia' occupate
 - Non mettere in evidenza la prontezza di Banister: e' sempre positiva per chi
   si allena, quindi e' la curva che non puo' dire di no. Quello che decide e'
-  il rapporto fatica/forma contro il 55%
+  la fatica contro la fatica che porti di solito
+- Non confrontare fatica o prontezza con una soglia fissa, nemmeno con una
+  scelta bene: il confronto e' con il proprio regime, e il regime si misura
+  sulla **fatica** e non sul rapporto fatica/forma — quel rapporto ha un
+  transitorio di mesi, perche' la forma ci mette 42 giorni a riempirsi
+- Non calcolare il regime su tutta la storia disponibile: le prime settimane
+  di allenamento hanno una forma ancora piccola e valori fuori scala, e
+  finiscono nella mediana con cui si giudicano tutti gli altri giorni
 - Non chiamare "target" una riga di riferimento che e' una soglia da non
   superare: dice che ci vuoi arrivare. C'e' `tTarget`
 - Non scrivere in un sottotitolo una scala che il diario non usa: fame ed
@@ -2215,6 +2291,14 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   backup, da un file di scambio e dall'editor della settimana, e per quelle
   strade nessuno passa dall'inserimento. Si ordina in lettura, in
   `fondiPiano()`, dove l'ordinamento e' idempotente
+- Non far scegliere una scheda al buio quando l'app sa gia' come stanno i
+  gruppi che allena: l'informazione c'era, stava due schermate piu' in la'
+- Non pesare i gruppi di una scheda tutti uguali: dodici serie di petto e due
+  di polpacci non sono meta' e meta'
+- Non scrivere "sconsigliata" su una scheda: la scheda non ha fatto niente di
+  male, e quello che e' carico e' il corpo, per oggi
+- Non mostrare una pastiglia senza il perche': un'etichetta senza motivo si
+  impara a ignorare
 - Non far cancellare una serie al tocco: nello storico una serie sbagliata
   quasi mai e' di troppo, e' segnata male. Toccare apre, e dentro c'e' anche
   l'esercizio — cambiarlo e' l'errore che nessun'altra schermata ripara

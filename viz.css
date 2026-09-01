@@ -794,6 +794,14 @@
 .gd-in{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px}
 .gd-in.due{grid-template-columns:1fr 1fr}
 .gd-in input{font-family:var(--mono);font-size:19px;text-align:center;padding:11px 6px}
+/* --------- la scheda, e se oggi ha senso ---------
+   La riga della scheda cresce di una riga sola: il perche'. Senza, la
+   pastiglia e' un'etichetta che nessuno sa da dove esce. */
+.prod.sk-p{align-items:flex-start}
+.prod.sk-p .nm{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.prod.sk-p .why{color:var(--ink-2);font-family:var(--sans);font-size:11.5px;
+  line-height:1.35;margin-top:3px;max-width:44ch}
+
 /* --------- il resoconto di una seduta ---------
    Quattro numeri in fila e poche righe sotto: il dettaglio sta gia' in mappa
    muscolare, volume e progressi, e ripeterlo qui vorrebbe dire mantenere due

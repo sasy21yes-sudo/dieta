@@ -49,6 +49,50 @@ function traiettoriaFaticaCalc(mus, fino, giorni) {
   return out;
 }
 
+/* =================================== quanto sei carico RISPETTO AL TUO SOLITO
+ *
+ * Il rapporto fatica/forma non si puo' confrontare con una soglia fissa, e
+ * questo file lo diceva gia' da tempo senza che nessuno lo applicasse: con
+ * tau 42 per la forma e 7 per la fatica, chi si allena con regolarita' ha un
+ * rapporto di regime intorno a 7/42, cioe' **sempre** sotto qualunque soglia
+ * ragionevole. Risultato: l'app scriveva "pronto" anche il giorno dopo una
+ * seduta pesante, che e' il momento in cui e' meno vero.
+ *
+ * Il confronto giusto e' con se stessi. Ma NON sul rapporto fatica/forma:
+ * misurato, quello ha un transitorio lunghissimo — la forma ha una costante
+ * di tempo di 42 giorni, quindi nelle prime settimane di allenamento il
+ * rapporto vale 0,9 contro lo 0,2 di regime, e quei valori gonfiano la
+ * mediana al punto che il giorno dopo una seduta pesante risultava "sotto la
+ * norma". Con questo seme: mediana 0,302 contro un ciclo vero che oscilla fra
+ * 0,15 e 0,31.
+ *
+ * Si guarda quindi la **fatica** e basta, contro la fatica che quel muscolo
+ * porta di solito: tau 7 vuol dire che si assesta in tre settimane, e ha il
+ * senso giusto — "quanto sono pesto rispetto al mio normale". Resta
+ * autocalibrante: chi si allena tanto ha una fatica abituale alta, e non
+ * risulta perennemente distrutto per questo.
+ *
+ * La finestra e' di sei settimane, cosi' segue i cambi di volume invece di
+ * confrontarti con quello che facevi a marzo, e la mediana e non la media
+ * perche' i picchi del giorno dopo sono proprio quello che non deve entrare
+ * nel metro con cui li si misura.
+ */
+function caricoRelativo(mus, k = today(), finestra = 42) {
+  const tr = typeof traiettoriaFatica === 'function'
+    ? traiettoriaFatica(mus, k, Math.max(90, finestra * 2)) : [];
+  if (!tr.length) return { dati: false, rel: null, oggi: null, regime: null };
+  const coda = tr.slice(-finestra);
+  const vals = coda.map(x => x.fatica);
+  const attivi = vals.filter(x => x > 0.01);
+  // meno di tre settimane di storia su quel muscolo: non c'e' un "solito"
+  if (attivi.length < 21) return { dati: false, rel: null, oggi: null, regime: null };
+  const regime = perc(vals, 0.5);
+  const oggi = tr[tr.length - 1].fatica;
+  if (!(regime > 0.01)) return { dati: false, rel: null, oggi, regime };
+  return { dati: true, oggi, regime, rel: oggi / regime,
+           serie: tr.map(x => ({ k: x.k, rel: x.fatica / regime })) };
+}
+
 /** Percentile su un elenco gia' filtrato dai nulli. */
 function perc(vals, q) {
   const v = vals.filter(x => x != null && !isNaN(x)).sort((a, b) => a - b);

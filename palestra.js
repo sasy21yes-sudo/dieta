@@ -172,6 +172,8 @@ function statoMuscoli(k = today()) {
   const out = {};
   for (const m of muscoli()) {
     const v = vol[m.id], f = ff[m.id];
+    const rl = typeof caricoRelativo === 'function'
+      ? caricoRelativo(m.id, k) : { dati: false, rel: null };
     out[m.id] = {
       id: m.id, nome: m.nome, serie: v.serie, tonn: v.tonn, sedute: v.sedute,
       forma: f.forma, fatica: f.fatica, prontezza: f.prontezza,
@@ -187,7 +189,13 @@ function statoMuscoli(k = today()) {
       stato: v.serie === 0 ? 'fermo'
            : v.serie < V.min_serie ? 'sotto'
            : v.serie > V.max_serie ? 'sopra' : 'ok',
-      pronto: f.fatica < f.forma * 0.55
+      /* "Pronto" era `fatica < forma * 0.55`, cioe' una soglia fissa su un
+         rapporto che per costruzione sta sempre sotto: l'app diceva pronto
+         anche il giorno dopo una seduta pesante. Ora il confronto e' con il
+         regime di quel muscolo — vedi caricoRelativo() — e senza abbastanza
+         storia non si dice niente invece di dire "pronto". */
+      rel: rl.rel, relDati: rl.dati,
+      pronto: rl.dati ? rl.rel < 1.25 : null
     };
   }
   return out;
@@ -746,8 +754,9 @@ function sezGymMappa(v, k, st) {
   box.append(mappaSVG(gymVista, st, gymModo, s => {
     read.innerHTML = `<span><b>${esc(s.nome)}</b></span>`
       + `<span>${nf(s.serie, 1)} serie/sett</span>`
-      + `<span>fatica ${nf(s.nFatica * 100)}%</span>`
-      + `<span>${s.pronto ? 'pronto' : 'in recupero'}</span>`;
+      + (s.relDati ? `<span>fatica <b>${nf(s.rel, 2)}×</b> il tuo solito</span>` : '')
+      + `<span>${s.pronto == null ? 'poca storia'
+        : s.pronto ? 'nella norma' : 'piu\' carico del solito'}</span>`;
   }));
   cm.append(box);
   cm.append(read);
@@ -777,8 +786,9 @@ function sezGymMappa(v, k, st) {
   v.append(cm);
 
   /* --- prontezza --- */
-  const pronti = Object.values(st).filter(s => s.pronto && s.forma > 0.2);
-  const stanchi = Object.values(st).filter(s => !s.pronto && s.fatica > 0.2)
+  // pronto puo' essere null (poca storia): quello non e' ne' pronto ne' stanco
+  const pronti = Object.values(st).filter(s => s.pronto === true && s.forma > 0.2);
+  const stanchi = Object.values(st).filter(s => s.pronto === false && s.fatica > 0.2)
     .sort((a, b) => b.nFatica - a.nFatica);
   const cp = el('div', 'card flat');
   cp.append(el('div', 'eyebrow', 'Cosa allenare oggi'));
@@ -787,13 +797,16 @@ function sezGymMappa(v, k, st) {
   } else {
     cp.append(el('div', 'muted',
       (stanchi.length
-        ? `Ancora in recupero: <strong>${stanchi.slice(0, 4).map(s => esc(s.nome.toLowerCase())).join(', ')}</strong>. `
-        : 'Nessun gruppo e’ in debito di recupero. ')
+        ? `Piu’ carichi del solito: <strong>${stanchi.slice(0, 4).map(s => esc(s.nome.toLowerCase())).join(', ')}</strong>. `
+        : 'Nessun gruppo porta piu’ fatica del suo solito. ')
       + (pronti.length
-        ? `Pronti: <strong>${pronti.slice(0, 5).map(s => esc(s.nome.toLowerCase())).join(', ')}</strong>.`
+        ? `Nella norma o meglio: <strong>${pronti.slice(0, 5).map(s => esc(s.nome.toLowerCase())).join(', ')}</strong>.`
         : '')));
     cp.append(el('div', 'hint',
-      'Un gruppo e’ "pronto" quando la fatica residua e’ scesa sotto il 55% della forma accumulata. E’ una soglia di modello, non una diagnosi: se un muscolo ti fa male, vince il male.'));
+      'Il confronto non e’ con una soglia fissa ma con il tuo solito su quel '
+      + 'muscolo: la fatica di oggi divisa quella che porti normalmente. Sopra '
+      + '1,25 e’ "piu’ carico del solito". E’ un modello, non una diagnosi: se '
+      + 'un muscolo ti fa male, vince il male.'));
   }
   v.append(cp);
 
@@ -821,36 +834,44 @@ function sezGymMappa(v, k, st) {
    * stimolo forte. Un asse, una percentuale, una riga di riferimento.
    */
   const focus = stanchi[0] || Object.values(st).sort((a, b) => b.forma - a.forma)[0];
-  if (focus && focus.forma > 0.5) {
+  const rl = focus && typeof caricoRelativo === 'function'
+    ? caricoRelativo(focus.id, k) : null;
+  if (focus && rl?.dati) {
     const gg = span(56, k);
-    const ff = serieFormaFatica(focus.id, gg);
-    // sotto una forma minima il rapporto esplode e non significa niente:
-    // dividere per quasi zero da' numeri enormi, non muscoli distrutti
-    const quota = ff.map(x => x.forma > 0.5 ? x.fatica / x.forma * 100 : null);
-    const ora = quota[quota.length - 1];
+    const dentro = new Set(gg);
+    // la serie arriva gia' divisa per il regime: 100 e' "come al solito"
+    const quota = gg.map(kk => {
+      const x = rl.serie.find(y => y.k === kk);
+      return x && x.rel != null ? x.rel * 100 : null;
+    });
+    void dentro;
+    const ora = rl.rel * 100;
     const c = el('div', 'card flat');
     c.append(el('div', 'eyebrow', 'Recupero'));
-    c.append(el('div', 'muted', ora == null
-      ? `Servono ancora sedute su <strong>${esc(focus.nome.toLowerCase())}</strong> prima di poterlo dire.`
-      : `Sul <strong>${esc(focus.nome.toLowerCase())}</strong> hai addosso il `
-        + `<strong>${nf(ora)}%</strong> di fatica rispetto all’allenamento che hai `
-        + `accumulato: ${ora < 55 ? 'e’ pronto per un altro stimolo forte'
-          : 'sta ancora recuperando'}.`));
+    c.append(el('div', 'muted',
+      `Sul <strong>${esc(focus.nome.toLowerCase())}</strong> porti `
+      + `<strong>${nf(rl.rel, 2)} volte</strong> la fatica che ti trovi addosso `
+      + `di solito: ${ora < 90 ? 'sei piu’ fresco del tuo standard'
+        : ora < 125 ? 'sei nella tua norma'
+        : ora < 170 ? 'un po’ piu’ carico del solito'
+        : 'parecchio piu’ carico del solito'}.`));
     v.append(c);
     v.append(chartLine({
-      titolo: `Quanta fatica hai addosso — ${focus.nome.toLowerCase()}`,
-      sub: 'Ogni seduta lascia due tracce: la fatica, che svanisce in circa una '
-        + 'settimana, e l’allenamento accumulato, che resta per sei. Questa riga '
-        + 'e’ la prima in percentuale del secondo.',
+      titolo: `Quanto sei carico — ${focus.nome.toLowerCase()}`,
+      sub: 'La fatica che ogni seduta lascia svanisce in circa una settimana. '
+        + 'Questa riga e’ quella di oggi divisa quella che porti di solito su '
+        + 'questo gruppo: 100 e’ una giornata come le tue altre.',
       days: gg, vals: quota, unit: '%', dec: 0,
-      target: 55, tTarget: 'pronto sotto',
+      target: 100, tTarget: 'il tuo solito',
       msg: 'Servono alcune sedute su questo gruppo.',
-      note: 'Sotto la riga il gruppo regge un altro stimolo forte, sopra sta '
-        + 'ancora recuperando — ed e’ la stessa soglia che l’app usa per dire '
-        + '"pronto" nella mappa qui sopra. Le due costanti di tempo (42 giorni e '
-        + '7) sono valori tipici di letteratura, non calibrati su di te: serve a '
-        + 'vedere l’andamento, non a decidere al posto tuo. Se un muscolo ti fa '
-        + 'male, vince il male.'
+      note: 'Il confronto e’ con te stesso e non con una soglia: chi si allena '
+        + 'con regolarita’ ha sempre della fatica addosso, e una soglia fissa '
+        + 'direbbe "pronto" anche il giorno dopo una seduta pesante. Il tuo '
+        + 'solito e’ la mediana delle ultime sei settimane, cosi’ segue i cambi '
+        + 'di volume invece di confrontarti con quello che facevi mesi fa. La '
+        + 'costante di tempo della fatica (7 giorni) e’ un valore tipico di '
+        + 'letteratura, non calibrato su di te: serve a vedere l’andamento, non '
+        + 'a decidere al posto tuo. Se un muscolo ti fa male, vince il male.'
     }));
   }
 
@@ -1161,6 +1182,75 @@ function monitoraggioScheda(id, k = today()) {
   };
 }
 
+/* ============================================ questa scheda, oggi, ha senso?
+ *
+ * La domanda arriva nel momento in cui si apre "registra pesi" con tre schede
+ * davanti, e fino a ora l'app la lasciava a chi si allena: la mappa muscolare
+ * sapeva benissimo che i pettorali erano ancora in debito di recupero, ma
+ * quella informazione stava due schermate piu' in la' e nessuno la andava a
+ * prendere con le mani sulla panca.
+ *
+ * Il conto e' una media pesata, e il peso conta: una scheda che mette dodici
+ * serie sui pettorali e due sui polpacci non e' "meta' petto e meta'
+ * polpacci". Ogni gruppo entra per quanto quella scheda lo carica davvero —
+ * serie della riga per coinvolgimento dell'esercizio, cioe' esattamente il
+ * peso che usano gia' la mappa e il volume settimanale.
+ *
+ * La soglia e' la stessa di tutto il resto (fatica sotto il 55% della forma),
+ * perche' due schermate che usano soglie diverse direbbero due cose diverse
+ * dello stesso muscolo lo stesso giorno. E resta quello che e': un modello,
+ * non una diagnosi. Se un muscolo fa male, vince il male — e la UI lo dice.
+ */
+function prontezzaScheda(sc, k = today(), stato) {
+  const st = stato || statoMuscoli(k);
+  const pesi = new Map();
+  for (const riga of (sc.esercizi || [])) {
+    const ex = esercizio(riga.ex); if (!ex) continue;
+    const n = typeof serieDiRiga === 'function' ? serieDiRiga(riga) : (riga.serie || 1);
+    for (const m of muscoli()) {
+      const w = pesoMuscolare(ex, m.id); if (!w) continue;
+      pesi.set(m.id, (pesi.get(m.id) || 0) + w * n);
+    }
+  }
+  if (!pesi.size) return null;
+
+  let somma = 0, tot = 0, storia = 0;
+  const gruppi = [];
+  for (const [id, peso] of pesi) {
+    const f = st[id];
+    if (!f) continue;
+    tot += peso;
+    // il metro e' il regime di quel muscolo, non una soglia: senza abbastanza
+    // storia il gruppo non entra nel giudizio invece di entrarci come fresco
+    const rel = f.relDati ? f.rel : null;
+    if (rel != null) { storia += peso; somma += peso * rel; }
+    gruppi.push({ id, nome: f.nome, peso, rel, stanco: rel != null && rel >= 1.25 });
+  }
+  if (!tot) return null;
+  if (storia < tot * 0.34) return { dati: false, gruppi };
+
+  const quota = somma / storia;          // media pesata sui gruppi che hanno storia
+  const stanchi = gruppi.filter(x => x.stanco).sort((a, b) => b.peso - a.peso);
+  const quotaStanca = stanchi.reduce((a, x) => a + x.peso, 0) / tot;
+
+  /* Quattro casi, e le parole contano: "sconsigliata" sarebbe un giudizio su
+     una scheda, e la scheda non ha fatto niente di male. Quello che e' carico
+     e' il corpo, e per oggi. */
+  const liv = quota < 0.9 ? 0 : quota < 1.25 ? 1 : quota < 1.7 ? 2 : 3;
+  const eti = ['ci sta', 'nella norma', 'gruppi carichi', 'meglio domani'][liv];
+  const cls = ['ok', 'ok', 'warn', 'bad'][liv];
+  const nomi = stanchi.slice(0, 3).map(x => x.nome.toLowerCase());
+  const perche = liv === 0
+    ? 'I gruppi che allena sono piu\' freschi del tuo solito.'
+    : liv === 1
+      ? 'I gruppi che allena stanno come stanno di solito.'
+      : `${nomi.length === 1 ? 'Porta ancora fatica' : 'Portano ancora fatica'} `
+        + `${nomi.join(', ')} — ${nf(quotaStanca * 100)}% del lavoro di questa `
+        + `scheda, a ${nf(quota, 2)}× il solito.`;
+
+  return { dati: true, quota, liv, eti, cls, perche, stanchi, gruppi, quotaStanca };
+}
+
 /**
  * Lo stesso quadro, sul programma intero.
  *
@@ -1284,16 +1374,38 @@ function sheetSceltaModo(k) {
   const list = schede();
   if (list.length) {
     w.append(el('p', 'muted', 'Con una scheda gli esercizi e il numero di serie sono gia\' fissati: tu aggiorni solo carico e ripetizioni.'));
-    for (const sc of list) {
-      const r = el('button', 'prod');
+    // lo stato dei muscoli si calcola una volta per tutte le schede: e' lo
+    // stesso corpo, e formaFatica gira su tredici gruppi per centoventi giorni
+    const stato = statoMuscoli(k);
+    const pron = list.map(sc => ({ sc, p: prontezzaScheda(sc, k, stato) }));
+    const buone = pron.filter(x => x.p?.dati).sort((a, b) => a.p.quota - b.p.quota);
+    for (const { sc, p } of pron) {
+      const r = el('button', 'prod sk-p');
       const nEx = sc.esercizi.length;
       const nSer = sc.esercizi.reduce((a, e) => a + (e.serie || 0), 0);
-      r.innerHTML = `<div class="grow"><div class="nm">${esc(sc.nome)}</div>
-        <div class="mt">${nEx} esercizi · ${nSer} serie</div></div>
+      const migliore = buone.length > 1 && buone[0].sc.id === sc.id && p.liv <= 1;
+      r.innerHTML = `<div class="grow">
+        <div class="nm">${esc(sc.nome)}${p?.dati
+          ? ` <span class="pill ${p.cls}">${esc(p.eti)}</span>` : ''}${
+          migliore ? ' <span class="pill ok">la piu\' fresca</span>' : ''}</div>
+        <div class="mt">${nEx} esercizi · ${nSer} serie</div>
+        ${p?.dati ? `<div class="mt why">${esc(p.perche)}</div>` : ''}</div>
         <div class="kc">usa &rsaquo;</div>`;
       r.onclick = () => sheetDaScheda(k, sc.id);
       w.append(r);
     }
+    if (pron.some(x => x.p?.dati))
+      w.append(el('p', 'note',
+        'La pastiglia guarda i gruppi che quella scheda allena davvero, pesati '
+        + 'per quanto li carica, e li confronta con <strong>il tuo solito su '
+        + 'quei gruppi</strong>: non con una soglia, che su questo modello '
+        + 'direbbe "pronto" sempre. E\' lo stesso metro della mappa muscolare, '
+        + 'ed e\' un modello e non una diagnosi: se hai voglia di allenarti, '
+        + 'allenati. Se un muscolo ti fa male, vince il male.'));
+    else if (list.length)
+      w.append(el('p', 'note',
+        'Fra qualche seduta qui comparira\' anche se i gruppi di ogni scheda '
+        + 'sono riposati o no: serve un po\' di storico per dirlo.'));
   } else {
     w.append(el('div', 'card flat',
       `<div class="eyebrow">Non hai ancora schede</div>

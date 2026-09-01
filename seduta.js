@@ -602,19 +602,16 @@ function resocontoSeduta(k) {
 
   /* su che gambe ci sei arrivato: la prontezza del muscolo piu' colpito,
      letta il giorno PRIMA — dopo la seduta la fatica e' quella della seduta */
-  /* La soglia e' la stessa di statoMuscoli() — fatica sotto il 55% della
-     forma — e non e' un caso: confrontare la prontezza di Banister con una
-     soglia assoluta non direbbe niente, perche' con tau 42 contro 7 chi si
-     allena ce l'ha sempre positiva. Vale il rapporto, e vale quello che gia'
-     usa la mappa muscolare, o due schermate direbbero due cose diverse dello
-     stesso muscolo lo stesso giorno. */
+  /* Il metro e' lo stesso di tutta la sezione: la fatica di quel giorno
+     divisa quella che quel muscolo porta di solito. Una soglia fissa sul
+     rapporto di Banister non direbbe niente — con tau 42 contro 7 sta sempre
+     bassa — e due schermate con metri diversi direbbero due cose diverse
+     dello stesso muscolo lo stesso giorno. */
   let prontezza = null;
-  if (muscoli_.length && typeof formaFatica === 'function') {
-    const ff = formaFatica(muscoli_[0].id, addDays(k, -1));
-    if (ff && ff.forma > 0.5)
-      prontezza = { mus: muscoli_[0].nome,
-                    pronto: ff.fatica < ff.forma * 0.55,
-                    quota: ff.fatica / ff.forma };
+  if (muscoli_.length && typeof caricoRelativo === 'function') {
+    const rl = caricoRelativo(muscoli_[0].id, addDays(k, -1));
+    if (rl?.dati)
+      prontezza = { mus: muscoli_[0].nome, pronto: rl.rel < 1.25, rel: rl.rel };
   }
 
   /* il titolo: un fatto, non un voto */
@@ -680,8 +677,8 @@ function cardResoconto(r) {
   if (r.prontezza)
     c.append(el('div', 'res-r',
       `<span class="l">Ci sei arrivato</span>${esc(r.prontezza.mus)}: `
-      + `${r.prontezza.pronto ? 'riposato' : 'con della fatica addosso'}, `
-      + `<b>${nf(r.prontezza.quota * 100)}%</b> di fatica sulla forma il giorno prima`));
+      + `${r.prontezza.pronto ? 'nella norma' : 'piu\' carico del solito'}, `
+      + `<b>${nf(r.prontezza.rel, 2)}×</b> la fatica che porti di solito`));
 
   c.append(el('p', 'note',
     (r.conf ? `Il confronto e’ con ${r.conf.quali}: ${r.conf.n} sedute, `
