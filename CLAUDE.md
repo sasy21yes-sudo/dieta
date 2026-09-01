@@ -69,6 +69,7 @@ app.js          stato, router, viste principali, motori. Caricato PER ULTIMO:
                 costruisce ROUTES e chiama init(), quindi le viste degli altri
                 file devono gia' esistere
 anim.js         toolkit di animazione (vedi sotto). Caricato PRIMA di charts.js
+icone.js        le icone prese da Feather/Lucide, ricopiate dentro (vedi sotto)
 charts.js       toolkit SVG dei grafici + vista Dati
 revisione.js    revisione settimanale: diagnosi, leve, impegno, priorita'
 target.js       il target che si ricalibra sul dispendio + rampa fibre
@@ -1877,6 +1878,63 @@ apposta e la UI lo dice — serve al motore delle sostituzioni, e sceglierla per
 conto dell'utente vorrebbe dire inventarsi in che famiglia sta una cosa che non
 abbiamo mai visto.
 
+### Il pasto si apre, e dentro si modifica
+
+Su Oggi ogni pasto srotolava i suoi ingredienti: cinque righe per pasto, per
+cinque pasti, facevano della schermata piu' consultata dell'app un elenco
+della spesa lungo due schermate — e quasi sempre non si stava cercando niente
+li' dentro. Adesso la riga dice il nome, i macro e **cosa e' cambiato**, e gli
+ingredienti stanno dietro un tocco, nello stesso posto in cui si modificano.
+
+Dentro la scheda del pasto ci sono le quattro cose che si vogliono fare a un
+pasto, tutte con la stessa regola di sempre — **valgono solo per quel giorno**:
+
+| | |
+|---|---|
+| **quantita'** | il contatore che c'era gia', piu' il moltiplicatore per scalare tutto |
+| **sostituisci** | apre il motore di sempre, ma **ci torna dentro**: prima riportava a Oggi, e chi stava lavorando su un pasto perdeva il posto |
+| **togli** | un ingrediente del piano si porta a **zero**, non si cancella: il piano e' la ricetta e vale anche domani. Il cestino diventa un "rimettilo", o l'unica strada indietro sarebbe riscrivere a mano la quantita' |
+| **aggiungi** | il quarto strato del giorno |
+
+**`S.log[k].aggiunti[code]`** e' quel quarto strato, e non poteva essere
+`extra`: quello e' il fuori piano, che sta *fuori* dai pasti e si conta a
+parte. Mettendolo li' il totale del pasto avrebbe continuato a dire il numero
+della ricetta mentre tu ci avevi messo dentro altro. Lo slot e' `agg:<id>` con
+un id stabile — non l'indice, o togliendo il primo si sposterebbero le
+quantita' di tutti gli altri — cosi' porzioni e sostituzioni sanno
+indirizzarlo come qualunque altra riga.
+
+Difetto trovato provandolo: `mealMGiorno()` decideva se ricalcolare guardando
+solo tre strati, quindi **aggiungendo un alimento e basta il pasto continuava
+a dichiarare le calorie del piano**. Un pasto che mente sulle calorie e'
+peggio di un pasto che non si puo' modificare.
+
+**E la differenza si vede.** In fondo alla scheda, sotto il totale, c'e' lo
+scarto rispetto al piano su tutti e cinque i valori — non solo le calorie:
+sostituendo un alimento le calorie tornano quasi sempre, perche' il motore
+riscala apposta, e quello che si sposta sono le proteine o i grassi. Dire solo
+"+12 kcal" nasconderebbe esattamente la parte che cambia. Su Oggi la stessa
+cosa in forma corta: `modificato +242 kcal` accanto al nome.
+
+### Le icone del momento della giornata
+
+Una lista di cinque pasti sono cinque righe uguali, e il primo modo in cui si
+riconosce un pasto non e' il nome ma **quando lo si mangia**. Da qui
+un'icona colorata per slot: alba, sole pieno, tramonto, luna, letto — piu' una
+tazza per gli spuntini fuori orario e un piatto per quando non si capisce.
+
+I tracciati vengono da **Feather Icons** (MIT) e **Lucide** (ISC), ricopiati
+dentro `icone.js` invece di essere caricati da un CDN: e' la stessa scelta di
+`data/corpo.json`, e per la stessa ragione — quest'app funziona offline, e una
+`<link>` a unpkg vorrebbe dire icone che spariscono in palestra dove non
+prende. Sono otto disegni, non una dipendenza, e la nota di licenza sta nel
+file.
+
+`slotIcona()` guarda **prima il nome e poi l'ora**: il nome dice l'intenzione
+("Pre-nanna" e' pre-nanna anche alle 21), l'ora e' un ripiego ragionevole per
+gli slot chiamati "Post workout". Se non dicono niente ne' l'uno ne' l'altra
+resta il piatto — meglio un'icona neutra di una sbagliata.
+
 ### La sostituzione si applica
 
 Per molto tempo il foglio delle sostituzioni era una tabella: diceva "al posto
@@ -2336,6 +2394,23 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   tre sedute: una giornata storta sposterebbe il verdetto da sola
 - Non presentare le otto settimane come una soglia misurata: e' pratica comune,
   come le costanti di Banister
+- Non srotolare gli ingredienti di ogni pasto su Oggi: cinque righe per cinque
+  pasti fanno un elenco della spesa lungo due schermate, e quasi mai si sta
+  cercando qualcosa li' dentro. Si aprono dove si modificano
+- Non aggiungere un alimento a un pasto dentro `extra`: quello e' il fuori
+  piano e si conta a parte, e il totale del pasto continuerebbe a dire il
+  numero della ricetta
+- Non indicizzare gli alimenti aggiunti sull'indice dell'array: togliendo il
+  primo si spostano le quantita' di tutti gli altri. Serve un id stabile
+- Non decidere se ricalcolare un pasto guardando solo tre dei quattro strati:
+  e' cosi' che un pasto arriva a mentire sulle proprie calorie
+- Non cancellare un ingrediente del piano dal diario: si porta a zero, perche'
+  il piano e' la ricetta e domani vale ancora. E il cestino deve diventare un
+  "rimettilo", o non c'e' strada indietro
+- Non far tornare a Oggi una sostituzione aperta dalla scheda del pasto: si
+  stava lavorando li', ed e' li' che si vuole vedere il risultato
+- Non caricare le icone da un CDN: l'app funziona offline. Si ricopiano
+  dentro, con la licenza, come i tracciati del corpo
 - Non indicizzare una sostituzione sul nome dell'alimento NUOVO: la chiave e'
   il posto nella ricetta, cioe' l'ingrediente del piano. Altrimenti togliere la
   sostituzione non sa piu' a cosa tornare

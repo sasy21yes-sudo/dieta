@@ -47,6 +47,8 @@ function mettePastoSwap(code, k, nuovo, scala = 1) {
   d.pastoSwap ||= {};
   if (d.swap?.[code]) delete d.swap[code];
   if (d.porzioni?.[code]) delete d.porzioni[code];
+  // e gli alimenti aggiunti a mano: erano stati messi dentro QUELLA ricetta
+  if (d.aggiunti?.[code]) delete d.aggiunti[code];
   if (!nuovo || nuovo === code) delete d.pastoSwap[code];
   else {
     d.pastoSwap[code] = nuovo;
@@ -70,7 +72,7 @@ function ingredientiGiorno(code, k) {
   if (!p?.ingredienti) return [];
   const sw = S.log[k]?.swap?.[code] || {};
   const por = S.log[k]?.porzioni?.[code] || {};
-  return p.ingredienti.map(i => {
+  const righe = p.ingredienti.map(i => {
     const s = sw[i.alimento];
     return {
       slot: i.alimento,                       // il posto nella ricetta
@@ -83,6 +85,52 @@ function ingredientiGiorno(code, k) {
       prod: s?.prod || null
     };
   });
+  /* Il quarto strato: quello che hai aggiunto al pasto solo per oggi.
+     Non poteva finire in `extra` — quello e' il fuori piano, che sta fuori
+     dai pasti e si conta a parte — o il totale del pasto avrebbe continuato a
+     dire il numero della ricetta mentre tu ci avevi messo dentro altro.
+     Lo slot e' `agg:<id>` cosi' porzioni e sostituzioni sanno indirizzarlo
+     come qualunque altra riga, e l'id resta stabile quando ne togli uno di
+     mezzo — con l'indice, togliere il primo sposterebbe le quantita' di
+     tutti gli altri. */
+  for (const a of (S.log[k]?.aggiunti?.[code] || [])) {
+    const slot = 'agg:' + a.id;
+    const s2 = sw[slot];
+    righe.push({
+      slot,
+      alimento: s2 ? s2.a : a.a,
+      qta: por[slot] ?? (s2 ? s2.qta : a.qta),
+      qtaPiano: 0,
+      alPostoDi: s2 ? a.a : null,
+      prod: s2 ? (s2.prod || null) : (a.prod || null),
+      aggiunto: true
+    });
+  }
+  return righe;
+}
+
+/** Aggiunge un alimento (o un prodotto) a un pasto, solo per quel giorno. */
+function aggiungiAlPasto(code, k, alimento, qta, prod) {
+  const d = day(k);
+  d.aggiunti ||= {};
+  d.aggiunti[code] ||= [];
+  d.aggiunti[code].push({ id: uid(), a: alimento, qta: Math.max(0, qta || 0),
+                          ...(prod ? { prod } : {}) });
+  save();
+}
+
+/** Toglie una riga aggiunta, e con lei le sue quantita' e sostituzioni. */
+function togliDalPasto(code, k, slot) {
+  const d = day(k);
+  const id = String(slot).replace(/^agg:/, '');
+  if (d.aggiunti?.[code]) {
+    d.aggiunti[code] = d.aggiunti[code].filter(x => x.id !== id);
+    if (!d.aggiunti[code].length) delete d.aggiunti[code];
+    if (!Object.keys(d.aggiunti).length) delete d.aggiunti;
+  }
+  if (d.porzioni?.[code]) delete d.porzioni[code][slot];
+  if (d.swap?.[code]) delete d.swap[code][slot];
+  save();
 }
 
 /**
@@ -115,9 +163,15 @@ function mealMGiorno(code, k) {
   const eff = pastoDelGiorno(code, k);
   const sw = S.log[k]?.swap?.[code];
   const por = S.log[k]?.porzioni?.[code];
+  const agg = S.log[k]?.aggiunti?.[code];
   const p = D.pasti[eff];
+  /* Gli aggiunti contano come gli altri tre strati. Mancavano, e la
+     conseguenza era la peggiore possibile: aggiungendo qualcosa a un pasto e
+     basta, il totale continuava a dire il numero della ricetta. Un pasto che
+     mente sulle calorie e' peggio di un pasto che non si puo' modificare. */
   const cambiato = eff !== code
-    || (por && Object.keys(por).length) || (sw && Object.keys(sw).length);
+    || (por && Object.keys(por).length) || (sw && Object.keys(sw).length)
+    || (agg && agg.length);
   if (!cambiato || !p?.ingredienti) return mealM(eff);
   const m = M0();
   for (const i of ingredientiGiorno(code, k)) addM(m, macroIngrediente(i));
@@ -242,7 +296,17 @@ function sheetPorzioni(k, code) {
   }
 
   const tot = el('div', 'read');
+  const diff = el('div', 'diffm');
+  diff.hidden = true;
   const lista = el('div');
+  /* Il metro del confronto e' il pasto come lo prevede il PIANO per questo
+     slot, non il pasto che c'e' oggi: se hai gia' cambiato l'intero pasto,
+     confrontarlo con se stesso direbbe sempre zero. */
+  const pianoM = () => {
+    const orig = D.pasti[code];
+    if (orig?.macro) return orig.macro;
+    return p.macro || M0();
+  };
   // gli ingredienti di oggi, non quelli del piano: se uno e' stato sostituito
   // le quantita' si contano sull'alimento che c'e' davvero
   const ingOggi = () => ingredientiGiorno(code, k);
@@ -251,44 +315,124 @@ function sheetPorzioni(k, code) {
     for (const i of ingOggi()) addM(m, macroIngrediente(i, stato[i.slot] ?? i.qta));
     return m;
   };
+  /* Il confronto con il piano su TUTTI i macro, non solo sulle calorie.
+     Sostituendo un alimento le calorie tornano quasi sempre — il motore
+     riscala apposta — e quello che si sposta sono le proteine o i grassi:
+     dire solo "+12 kcal" nasconde esattamente la parte che cambia. */
   const aggiorna = () => {
-    const m = macroOra(), base = p.macro || M0();
-    const dk = m.kcal - base.kcal;
-    tot.innerHTML = `<span><b>${nf(m.kcal)} kcal</b></span><span>${nf(m.p, 1)} P</span>`
-      + `<span>${nf(m.c, 1)} C</span><span>${nf(m.g, 1)} G</span>`
-      + `<span>${nf(m.fibre, 1)} fibre</span>`
-      + (Math.abs(dk) >= 1 ? `<span>${dk > 0 ? '+' : ''}${nf(dk)} sul piano</span>` : '');
+    const m = macroOra();
+    const base = pianoM();
+    tot.innerHTML = `<span><b>${nf(m.kcal)} kcal</b></span>`
+      + `<span>${nf(m.p, 1)} P</span><span>${nf(m.c, 1)} C</span>`
+      + `<span>${nf(m.g, 1)} G</span><span>${nf(m.fibre, 1)} fibre</span>`;
+    diff.innerHTML = '';
+    const voci = [['kcal', 'kcal', 0], ['p', 'P', 1], ['c', 'C', 1],
+                  ['g', 'G', 1], ['fibre', 'fibre', 1]]
+      .map(([id, l, dec]) => [l, (m[id] || 0) - (base[id] || 0), dec])
+      .filter(([, q, dec]) => Math.abs(q) >= (dec ? 0.5 : 1));
+    if (!voci.length) { diff.hidden = true; return; }
+    diff.hidden = false;
+    diff.innerHTML = '<span class="l">rispetto al piano</span>'
+      + voci.map(([l, q, dec]) => `<span class="${q > 0 ? 'su' : 'giu'}">`
+        + `${q > 0 ? '+' : '−'}${nf(Math.abs(q), dec)} ${esc(l)}</span>`).join('');
   };
+  /* Salvare le porzioni prima di uscire verso un altro foglio: senza,
+     aprendo "sostituisci" si perdevano le quantita' appena toccate. */
+  const tieni = () => {
+    if (Object.keys(stato).length) d.porzioni[code] = stato;
+    else delete d.porzioni[code];
+    save();
+  };
+
   const disegna = () => {
     lista.innerHTML = '';
-    for (const i of ingOggi()) {
+    const righe = ingOggi();
+    if (!righe.length)
+      lista.append(el('p', 'muted', 'Questo pasto non ha ingredienti.'));
+    for (const i of righe) {
       const unita = unitaIngrediente(i);
       const rif = i.alPostoDi ? i.qta : i.qtaPiano;
       const q = stato[i.slot] ?? i.qta;
-      const cambiato = q !== rif;
-      const riga = el('div', 'porz' + (cambiato ? ' mod' : ''));
+      const cambiato = q !== rif && !i.aggiunto;
+      const tolto = q === 0;
+      const riga = el('div', 'porz'
+        + (cambiato ? ' mod' : '') + (tolto ? ' tolto' : '')
+        + (i.aggiunto ? ' agg' : ''));
       riga.innerHTML = `<span class="nm">${esc(i.alimento)}
           ${i.alPostoDi ? `<em>al posto di ${esc(i.alPostoDi)}</em>` : ''}
-          ${cambiato ? `<em>piano: ${nf(rif)} ${esc(unita)}</em>` : ''}</span>
+          ${i.aggiunto ? '<em>aggiunto oggi</em>' : ''}
+          ${cambiato ? `<em class="qta">piano: ${nf(rif)} ${esc(unita)}</em>` : ''}</span>
         <button class="btn sm" data-d="-10">−</button>
         <input type="text" inputmode="decimal" value="${q}">
         <button class="btn sm" data-d="10">+</button>
         <span class="u">${esc(unita)}</span>`;
       const inp = riga.querySelector('input');
+      // il bottone si decide dopo, ma setta() deve poterlo aggiornare: a zero
+      // il cestino diventa un "rimettilo", o l'unico modo di tornare indietro
+      // sarebbe riscrivere a mano la quantita' del piano
+      let sincBottone = () => {};
       const setta = n => {
         n = Math.max(0, Math.round(n * 10) / 10);
         if (n === rif) delete stato[i.slot]; else stato[i.slot] = n;
         inp.value = n;
-        riga.classList.toggle('mod', n !== rif);
+        riga.classList.toggle('mod', n !== rif && !i.aggiunto);
+        riga.classList.toggle('tolto', n === 0);
         const em = riga.querySelector('em.qta');
-        if (n !== rif && !em) riga.querySelector('.nm').insertAdjacentHTML('beforeend',
-          `<em class="qta">piano: ${nf(rif)} ${esc(unita)}</em>`);
-        if (n === rif && em) em.remove();
+        if (n !== rif && !i.aggiunto && !em)
+          riga.querySelector('.nm').insertAdjacentHTML('beforeend',
+            `<em class="qta">piano: ${nf(rif)} ${esc(unita)}</em>`);
+        if ((n === rif || i.aggiunto) && em) em.remove();
+        sincBottone(n === 0);
         aggiorna();
       };
       riga.querySelectorAll('[data-d]').forEach(b => b.onclick = () =>
         setta((parseNum(inp.value) || 0) + (+b.dataset.d)));
       inp.oninput = () => { const n = parseNum(inp.value); if (n != null && n >= 0) setta(n); };
+
+      /* Le due azioni della riga. Stanno qui e non nella lista di Oggi
+         perche' e' qui che si ha il pasto davanti: fuori erano due tocchi
+         sulla riga sbagliata in mezzo a cinque ingredienti. */
+      const az = el('div', 'porz-az');
+      const bs = el('button', 'ico-b');
+      bs.title = 'Sostituisci questo alimento';
+      bs.setAttribute('aria-label', 'Sostituisci ' + i.alimento);
+      bs.append(icona('repeat', { size: 17 }));
+      bs.onclick = () => {
+        tieni();
+        sheetSwap(i.alimento, stato[i.slot] ?? i.qta,
+          { k, code, slot: i.slot, prod: i.prod, torna: () => sheetPorzioni(k, code) });
+      };
+      az.append(bs);
+
+      const bt = el('button', 'ico-b');
+      if (i.aggiunto) {
+        /* Una riga aggiunta oggi si cancella davvero: non ha un posto nella
+           ricetta a cui tornare, e lasciarla a zero sarebbe una riga vuota
+           che non serve a nessuno. */
+        bt.classList.add('rosso');
+        bt.title = 'Togli dal pasto';
+        bt.append(icona('trash', { size: 17 }));
+        bt.onclick = () => {
+          togliDalPasto(code, k, i.slot);
+          delete stato[i.slot];
+          disegna();
+        };
+      } else {
+        /* Un ingrediente del piano invece non si cancella: si porta a zero.
+           Il piano e' la ricetta e vale anche domani — quello che cambia e'
+           quanto ne hai mangiato oggi, e zero e' una quantita' come le altre. */
+        sincBottone = t => {
+          bt.innerHTML = '';
+          bt.classList.toggle('rosso', !t);
+          bt.title = t ? 'Rimettilo' : 'Togli per oggi';
+          bt.setAttribute('aria-label', (t ? 'Rimetti ' : 'Togli ') + i.alimento);
+          bt.append(icona(t ? 'undo' : 'trash', { size: 17 }));
+        };
+        sincBottone(tolto);
+        bt.onclick = () => setta((parseNum(inp.value) || 0) === 0 ? (rif || 1) : 0);
+      }
+      az.append(bt);
+      riga.append(az);
       lista.append(riga);
     }
     aggiorna();
@@ -297,7 +441,19 @@ function sheetPorzioni(k, code) {
   w.append(el('div', 'eyebrow', 'Scala tutto il pasto'));
   w.append(scale);
   w.append(lista);
+
+  const badd = el('button', 'btn wide agg-b');
+  badd.style.marginTop = '10px';
+  badd.append(icona('plus', { size: 17 }));
+  badd.append(el('span', null, 'Aggiungi un alimento a questo pasto'));
+  badd.onclick = () => {
+    tieni();
+    sheetAggiungiAlPasto(k, code);
+  };
+  w.append(badd);
+
   w.append(tot);
+  w.append(diff);
 
   const salva = el('button', 'btn wide pri', 'Salva per oggi');
   salva.style.marginTop = '12px';
@@ -314,6 +470,83 @@ function sheetPorzioni(k, code) {
     r.onclick = () => { delete d.porzioni[code]; save(); closeSheet(); route(); toast('Ripristinate'); };
     w.append(r);
   }
+  sheet(w);
+}
+
+/**
+ * Aggiungere un alimento a un pasto, solo per oggi.
+ *
+ * Diverso dal "fuori piano": quello e' cibo che non appartiene a nessun
+ * pasto e si conta a parte. Questo entra DENTRO il pasto, quindi il totale
+ * della scheda su Oggi e la spunta dicono la verita' — che e' il motivo per
+ * cui non si poteva riusare `extra`.
+ */
+function sheetAggiungiAlPasto(k, code) {
+  const p = D.pasti[pastoDelGiorno(code, k)];
+  const w = el('div');
+  w.append(el('div', 'eyebrow', esc(p?.nome || code)));
+  w.append(el('h2', 'sec', 'Aggiungi un alimento'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Entra dentro questo pasto e <strong>solo per oggi</strong>: il totale '
+    + 'della scheda lo conta, e domani il pasto torna quello del piano. Se '
+    + 'invece hai mangiato qualcosa fuori dai pasti, usa "fuori piano" su Oggi.'));
+
+  const scelto = { v: null };
+  // il selettore vuole {v, lab, sub}: mangiabili() parla un'altra lingua, ed
+  // e' la stessa conversione che fa gia' la sostituzione
+  const opz = (typeof mangiabili === 'function' ? mangiabili() : []).map(x => ({
+    v: x.id, lab: x.nome,
+    sub: `${x.fonte === 'prodotto' ? (x.marca ? x.marca + ' · ' : 'tuo prodotto · ') : ''}`
+      + `${nf(x.kcal)} kcal · ${nf(x.p, 1)} P per 100 ${x.unita}`
+  }));
+  const f = el('div', 'field', '<label>Cosa</label>');
+  const anteprima = el('div', 'read');
+  f.append(selettoreCercabile(opz, null, v => { scelto.v = v; stima(); }, 'Cerca…'));
+  w.append(f);
+
+  w.append(el('div', 'field',
+    `<label>Quanto</label>
+     <input type="text" inputmode="decimal" id="ag-q" value="100">
+     <div class="hint">Nell'unita' dell'alimento: grammi, millilitri o pezzi.</div>`));
+
+  /* Quanto pesa quello che stai per aggiungere, prima di aggiungerlo: e' la
+     differenza fra "metto la granola" e "metto duecento calorie". */
+  const stima = () => {
+    const x = scelto.v && typeof mangiabile === 'function' ? mangiabile(scelto.v) : null;
+    const q = parseNum(($('#ag-q') || {}).value);
+    if (!x || !(q > 0)) { anteprima.innerHTML = ''; return; }
+    const m = typeof macroMangiabile === 'function' ? macroMangiabile(scelto.v, q) : null;
+    if (!m) { anteprima.innerHTML = ''; return; }
+    anteprima.innerHTML = `<span><b>+${nf(m.kcal)} kcal</b></span>`
+      + `<span>+${nf(m.p, 1)} P</span><span>+${nf(m.c, 1)} C</span>`
+      + `<span>+${nf(m.g, 1)} G</span>`
+      + (x.stima ? '<span class="muted">valore stimato</span>' : '');
+  };
+  w.append(anteprima);
+  const campoQ = w.querySelector('#ag-q');
+  if (campoQ) campoQ.oninput = stima;
+
+  const ok = el('button', 'btn wide pri', 'Aggiungi');
+  ok.onclick = () => {
+    const v = scelto.v;
+    if (!v) { toast('Scegli prima un alimento'); return; }
+    const q = parseNum($('#ag-q').value);
+    if (!(q > 0)) { toast('Quanto?'); return; }
+    // un prodotto col codice a barre non ha un nome dentro il piano: si tiene
+    // il suo id, come fa gia' la sostituzione
+    const prod = String(v).startsWith('p:') ? String(v).slice(2) : null;
+    const x = typeof mangiabile === 'function' ? mangiabile(v) : null;
+    const nome = x?.nome || String(v).replace(/^a:/, '');
+    aggiungiAlPasto(code, k, nome, q, prod);
+    sheetPorzioni(k, code);
+    toast('Aggiunto per oggi');
+  };
+  w.append(ok);
+  const ann = el('button', 'btn wide', 'Annulla');
+  ann.style.marginTop = '8px';
+  ann.onclick = () => sheetPorzioni(k, code);
+  w.append(ann);
   sheet(w);
 }
 

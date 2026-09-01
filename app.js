@@ -1099,6 +1099,9 @@ function viewOggi(v) {
     const m = el('div', 'meal' + (done ? ' done' : ''));
     const h = el('div', 'meal-h');
     const tick = el('button', 'tick', '✓');
+    // l'icona del momento della giornata: un pasto lo si riconosce dall'ora
+    // prima che dal nome, e una lista di cinque righe uguali si legge peggio
+    if (typeof slotBadge === 'function') h.append(slotBadge(s.slot, s.ora));
     if (futuro) { tick.disabled = true; tick.title = 'Il giorno non e\' ancora arrivato'; }
     else tick.onclick = () => {
       // il rimbalzo conferma il tocco prima che la pagina si ridisegni: senza,
@@ -1109,12 +1112,27 @@ function viewOggi(v) {
     };
     // toccare il nome del pasto apre le porzioni DI QUEL GIORNO: il piano dice
     // 50 g di salsa, ma se oggi ne hai usati 100 il conto deve seguire te
+    /* Cosa e' cambiato rispetto al piano, in una parola e un numero.
+       Gli ingredienti non stanno piu' in questa lista — cinque righe per
+       pasto facevano di Oggi un elenco della spesa lungo due schermate, e
+       quasi sempre non si stava cercando niente li' dentro. Si aprono
+       toccando il pasto, che e' anche il posto in cui si modificano. */
+    const mgOggi = typeof mealMGiorno === 'function' ? mealMGiorno(s.codice, k) : p.macro;
+    const mgPiano = D.pasti[s.codice]?.macro || p.macro || null;
+    const dk = mgPiano ? Math.round((mgOggi.kcal || 0) - (mgPiano.kcal || 0)) : 0;
+    const toccato = eff !== s.codice
+      || (typeof porzioniCambiate === 'function' && porzioniCambiate(s.codice, k))
+      || !!(d.swap?.[s.codice] && Object.keys(d.swap[s.codice]).length)
+      || !!(d.aggiunti?.[s.codice] || []).length;
+    const tag = eff !== s.codice
+      ? 'al posto di ' + (D.pasti[s.codice]?.nome || s.codice)
+      : toccato ? 'modificato' : '';
     const testa = el('div', 'grow tap',
-      `<div class="meal-slot">${esc(s.slot)} · ${s.ora}</div>
-       <div class="meal-name">${esc(p.nome)}${eff !== s.codice
-         ? ' <em class="mod-tag">al posto di ' + esc(D.pasti[s.codice]?.nome || s.codice) + '</em>'
-         : typeof porzioniCambiate === 'function' && porzioniCambiate(s.codice, k)
-         ? ' <em class="mod-tag">porzioni cambiate</em>' : ''}</div>`);
+      `<div class="meal-slot">${esc(s.slot)}${s.ora ? ' · ' + esc(s.ora) : ''}</div>
+       <div class="meal-name">${esc(p.nome)}${tag
+         ? ` <em class="mod-tag">${esc(tag)}${
+             toccato && Math.abs(dk) >= 1 ? ` ${dk > 0 ? '+' : '−'}${nf(Math.abs(dk))} kcal` : ''}</em>`
+         : ''}</div>`);
     if (!futuro && typeof sheetPorzioni === 'function' && p.ingredienti)
       testa.onclick = () => sheetPorzioni(k, s.codice);
     h.append(tick, testa,
@@ -1125,26 +1143,17 @@ function viewOggi(v) {
         return `<b>${nf(mg.kcal)}</b> kcal<span class="mm">${macroRiga(mg)}</span>`;
       })()));
     m.append(h);
-    const ul = el('ul', 'ings');
-    // gli ingredienti di OGGI: se uno e' stato sostituito qui si vede quello
-    // che c'e' davvero, non quello che il piano prevedeva
-    const ingg = typeof ingredientiGiorno === 'function'
-      ? ingredientiGiorno(s.codice, k)
-      : p.ingredienti.map(i => ({ slot: i.alimento, alimento: i.alimento, qta: i.qta,
-                                  qtaPiano: i.qta, alPostoDi: null }));
-    for (const ing of ingg) {
-      const li = el('li', ing.alPostoDi ? 'sost' : null,
-        `<span class="grow">${esc(ing.alimento)}
-           ${ing.alPostoDi ? `<em class="dapiano">al posto di ${esc(ing.alPostoDi)}</em>` : ''}
-           ${futuro ? '' : `<span class="swap">${ing.alPostoDi ? 'cambia' : 'sostituisci'}</span>`}</span>
-         <span class="q">${nf(ing.qta, ing.qta % 1 ? 1 : 0)} ${
-           typeof unitaIngrediente === 'function' ? esc(unitaIngrediente(ing))
-             : (D.alimenti[ing.alimento]?.unita || 'g')}</span>`);
-      if (!futuro) li.onclick = () => sheetSwap(ing.alimento, ing.qta,
-        { k, code: s.codice, slot: ing.slot, prod: ing.prod });
-      ul.append(li);
+    // una riga sola sotto il nome: quanti ingredienti ci sono e come aprirli
+    const n = (typeof ingredientiGiorno === 'function'
+      ? ingredientiGiorno(s.codice, k) : (p.ingredienti || [])).length;
+    if (n && !futuro) {
+      const apri = el('button', 'meal-apri');
+      apri.innerHTML = `<span>${n} ${n === 1 ? 'ingrediente' : 'ingredienti'}</span>`
+        + '<span class="go">apri e modifica &rsaquo;</span>';
+      apri.onclick = () => sheetPorzioni(k, s.codice);
+      m.append(apri);
     }
-    m.append(ul); v.append(m);
+    v.append(m);
   }
 
   // fuori piano: su un giorno che deve ancora arrivare non c'e' niente da
@@ -1233,6 +1242,15 @@ function closeSheet() { $('#sheet').hidden = true; }
  */
 function sheetSwap(nome, qta, ctx) {
   const wrap = el('div');
+  /* Da dove si e' arrivati.
+     Aprendo la sostituzione dalla scheda del pasto, chiudere tutto e tornare
+     a Oggi vuol dire perdere il posto: si stava lavorando su quel pasto, e la
+     riga sostituita e' proprio quella che si vuole rivedere. E' la stessa
+     lezione dell'editor di una riga di scheda, dove `closeSheet()` faceva
+     sparire il lavoro in corso. */
+  const esci = () => {
+    if (ctx?.torna) ctx.torna(); else { closeSheet(); route(); }
+  };
   /* Quello che c'e' adesso in quel posto puo' essere un alimento del piano
      oppure un prodotto col codice a barre, che nel piano un nome non ce l'ha:
      i suoi valori si prendono dal registro dei prodotti. */
@@ -1273,7 +1291,7 @@ function sheetSwap(nome, qta, ctx) {
     via.textContent = 'Rimetti ' + nome;
     via.onclick = () => {
       metteSwap(ctx.code, ctx.k, ctx.slot ?? nome, null);
-      closeSheet(); route(); toast('Rimesso ' + nome);
+      esci(); toast('Rimesso ' + nome);
     };
     box.append(via);
     wrap.append(box);
@@ -1289,7 +1307,7 @@ function sheetSwap(nome, qta, ctx) {
          esc(D.alimenti[alimento]?.unita || 'g')}${ctx ? ' ›' : ''}</div>`;
     if (ctx) r.onclick = () => {
       metteSwap(ctx.code, ctx.k, ctx.slot ?? nome, alimento, quanto);
-      closeSheet(); route();
+      esci();
       toast(alimento + ' al posto di ' + nome + ', solo per oggi');
     };
     wrap.append(r);
@@ -1394,7 +1412,7 @@ function sheetSwap(nome, qta, ctx) {
       // i valori, visto che nel piano un nome non ce l'ha
       metteSwap(ctx.code, ctx.k, ctx.slot ?? nome, x.nome, qta2,
         x.fonte === 'prodotto' ? scelto.slice(2) : null);
-      closeSheet(); route();
+      esci();
       toast(x.nome + ' al posto di ' + nome + ', solo per oggi');
     };
     wrap.append(ok);

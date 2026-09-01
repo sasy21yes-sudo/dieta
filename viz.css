@@ -99,6 +99,42 @@
 .foto-tris figure.vuota figcaption{position:static;background:none;color:var(--ink-3);
   padding:0;line-height:1.5}
 
+/* --------- il pasto su Oggi ---------
+   Gli ingredienti non sono piu' in lista: la riga dice cosa e' cambiato e si
+   apre. L'icona a sinistra da' il momento della giornata prima del nome. */
+.slot-b{display:inline-flex;align-items:center;justify-content:center;
+  width:34px;height:34px;flex:none;border-radius:10px;
+  background:color-mix(in oklab, var(--tinta) 14%, transparent)}
+@supports not (color: color-mix(in oklab, red, blue)) {
+  .slot-b{background:var(--wash)}
+}
+.meal-h{gap:10px}
+.meal-apri{display:flex;width:100%;align-items:center;justify-content:space-between;
+  gap:10px;margin-top:8px;padding:8px 10px;border:0;border-radius:10px;
+  background:var(--wash);color:var(--ink-2);font:inherit;font-size:12px;
+  font-family:var(--mono);cursor:pointer;text-align:left}
+.meal-apri .go{color:var(--pine);white-space:nowrap}
+.meal-apri:active{background:var(--rule)}
+
+/* --------- dentro il pasto --------- */
+.porz-az{display:flex;gap:6px;grid-column:6;justify-self:end;flex:none}
+.ico-b{display:inline-flex;align-items:center;justify-content:center;
+  width:32px;height:32px;border-radius:9px;border:1px solid var(--rule);
+  background:var(--paper);color:var(--ink-2);cursor:pointer;flex:none}
+.ico-b:active{background:var(--wash)}
+.ico-b.rosso{color:var(--alert)}
+.porz.tolto .nm{text-decoration:line-through;opacity:.55}
+.porz.tolto input{opacity:.55}
+.porz.agg .nm em{color:var(--pine)}
+.agg-b{display:flex;align-items:center;justify-content:center;gap:8px}
+.diffm{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;
+  font-family:var(--mono);font-size:11.5px;margin-top:6px;
+  padding-top:7px;border-top:1px solid var(--rule)}
+.diffm .l{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink-3);width:100%}
+.diffm .su{color:var(--amber)}
+.diffm .giu{color:var(--media)}
+
 /* --------- il peso del giorno ---------
    Grande e al centro perche' e' il numero che si scrive per primo ogni
    mattina, e perche' e' quello attorno a cui girano tendenza, dispendio,
@@ -580,8 +616,14 @@
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ---------------- porzioni del giorno ---------------- */
-.porz{display:grid;grid-template-columns:1fr 34px 62px 34px 26px;gap:6px;
-  align-items:center;padding:8px 0;border-bottom:1px solid var(--rule)}
+/* Due righe di proposito, non per traboccamento: il nome sopra — che puo'
+   essere lungo e portarsi dietro "al posto di ..." — e sotto i comandi, che
+   sono sempre gli stessi cinque e stanno in fila. Su 390 px il nome, il
+   contatore e le due azioni sulla stessa riga non ci stavano, e mandarli a
+   capo da soli dava un blocco che sembrava rotto. */
+.porz{display:grid;grid-template-columns:34px 62px 34px 26px 1fr auto;gap:6px;
+  align-items:center;padding:9px 0;border-bottom:1px solid var(--rule)}
+.porz .nm{grid-column:1 / -1}
 .porz:last-child{border-bottom:0}
 .porz .nm{font-size:13px;overflow:hidden}
 .porz .nm em{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;
