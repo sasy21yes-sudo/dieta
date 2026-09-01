@@ -1561,12 +1561,37 @@ function sheetDaScheda(k, schedaId) {
   if (!sc) return sheetSceltaModo(k);
   const et = etichetteScheda(sc.esercizi);
 
+  /* **Le caselle mostrano quello che hai gia' registrato OGGI.**
+     Ci si arriva quasi sempre da "Correggi qualcosa a mano" a fine seduta
+     guidata, e li' il modulo veniva riempito da `ultimoUso(ex, k)` — che
+     esclude oggi apposta, perche' nasce per rispondere a "l'ultima volta
+     quanto avevi fatto?". Il risultato era che il modulo si apriva con i
+     numeri della settimana scorsa (o vuoto, se era la prima volta con quella
+     scheda) e "Salva la seduta", che fa `s.serie = serie`, li scriveva sopra
+     al lavoro appena fatto. Correggere una serie cancellava le altre venti.
+
+     Le serie di oggi si consumano **in ordine e con un cursore per
+     esercizio**, non con l'indice della riga: una scheda puo' avere lo stesso
+     esercizio su due righe, e leggere tutte e due dalla stessa posizione le
+     farebbe apparire duplicate. */
+  const serieOggi = {};
+  for (const x of (p.sessioni[k]?.serie || [])) (serieOggi[x.ex] ||= []).push(x);
+  const gia = Object.keys(serieOggi).length > 0;
+  const cursore = {};
+  const daOggi = (exId, si, nSerie) => {
+    const base = cursore[exId] ?? 0;
+    if (si === nSerie - 1) cursore[exId] = base + nSerie;   // dopo l'ultima
+    return (serieOggi[exId] || [])[base + si] || null;
+  };
+
   const w = el('div');
   w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
   w.append(el('h2', 'sec', esc(sc.nome)));
   w.lastChild.style.marginTop = '0';
-  w.append(el('p', 'muted',
-    'Gli esercizi e le serie sono quelli della scheda. Scrivi solo cosa hai fatto davvero: se salti una serie, lascia vuote le ripetizioni.'));
+  w.append(el('p', 'muted', gia
+    ? 'Le caselle sono gia\' piene con quello che hai registrato oggi: correggi '
+      + 'quello che serve e salva. Una serie che lasci vuota viene tolta.'
+    : 'Gli esercizi e le serie sono quelli della scheda. Scrivi solo cosa hai fatto davvero: se salti una serie, lascia vuote le ripetizioni.'));
 
   /* Questo modulo va bene per registrare a fine seduta o per correggere. Ma
      mentre ti alleni non serve un modulo con quaranta caselle: serve sapere
@@ -1625,7 +1650,8 @@ function sheetDaScheda(k, schedaId) {
     box.append(el('div', 'setrow sethead',
       '<span class="n"></span><span>kg</span><span>rip</span><span>RIR</span>'));
     for (let si = 0; si < nSerie; si++) {
-      const d = prec?.serie[si] || {};
+      // prima quello di oggi, poi l'ultima volta, poi il peso della scheda
+      const d = daOggi(riga.ex, si, nSerie) || prec?.serie[si] || {};
       const row = el('div', 'setrow');
       row.innerHTML = `<span class="n">${si + 1}</span>
         <input type="text" inputmode="decimal" id="sc-${ei}-${si}-kg" value="${d.kg ?? riga.kg ?? ''}">
@@ -1648,17 +1674,26 @@ function sheetDaScheda(k, schedaId) {
 
   w.append(el('p', 'hint', RIR_SPIEGA));
 
-  const salva = el('button', 'btn wide pri', 'Salva la seduta');
+  const salva = el('button', 'btn wide pri', gia ? 'Salva le correzioni' : 'Salva la seduta');
   salva.onclick = () => {
     const serie = [];
+    // il cursore riparte da zero: la lettura e' la stessa del disegno, e le
+    // serie di oggi vanno riappaiate nello stesso ordine
+    for (const key of Object.keys(cursore)) cursore[key] = 0;
     for (const [ei, riga] of sc.esercizi.entries()) {
       if (!esercizio(riga.ex)) continue;
-      for (let si = 0; si < serieDiRiga(riga); si++) {
+      const nS = serieDiRiga(riga);
+      for (let si = 0; si < nS; si++) {
+        // il recupero vero non sta nel modulo, ma e' un dato registrato dalla
+        // guida: da li' escono la durata della seduta e il recupero medio del
+        // resoconto. Correggere il carico non deve buttarlo via
+        const orig = daOggi(riga.ex, si, nS);
         const reps = parseNum(($('#sc-' + ei + '-' + si + '-rp') || {}).value);
         if (!(reps > 0)) continue;                 // serie non fatta: si salta
         const rec = { ex: riga.ex,
           kg: parseNum(($('#sc-' + ei + '-' + si + '-kg') || {}).value) ?? 0,
           reps, rir: parseNum(($('#sc-' + ei + '-' + si + '-rr') || {}).value) ?? 2 };
+        if (orig?.rec_s > 0) rec.rec_s = orig.rec_s;
         if (riga.tecnica && riga.tecnica !== 'normale') rec.tecnica = riga.tecnica;
         if (riga.superserie) rec.superserie = true;
         const dr = parseScarichi(($('#sc-' + ei + '-' + si + '-dr') || {}).value);
@@ -1666,13 +1701,26 @@ function sheetDaScheda(k, schedaId) {
         serie.push(rec);
       }
     }
-    if (!serie.length) { toast('Non hai compilato nessuna serie'); return; }
+    /* Svuotare tutte le caselle e salvare vuol dire "cancella la seduta", ed
+       e' una cosa troppo grossa per farla di sfuggita quando qui dentro c'era
+       gia' del lavoro registrato. */
+    if (!serie.length) {
+      if (!gia) { toast('Non hai compilato nessuna serie'); return; }
+      if (!confirm('Hai lasciato vuote tutte le caselle: la seduta di oggi '
+        + 'verrebbe eliminata. Vuoi davvero?')) return;
+      delete p.sessioni[k];
+      scordaFatica(); save(); closeSheet(); route();
+      toast('Seduta eliminata'); return;
+    }
     // la giornata nasce qui, con la prima serie vera dentro: aprendo il
     // modulo e uscendo non deve restare niente nel registro
     const s = p.sessioni[k] ||= { nome: '', serie: [] };
     s.serie = serie;
     s.nome = sc.nome;
     s.scheda = sc.id;
+    // le serie sono cambiate: la forma-fatica e' memorizzata per muscolo e
+    // continuerebbe a rispondere con i numeri di prima
+    if (typeof scordaFatica === 'function') scordaFatica();
     save(); closeSheet(); route();
     const nDrop = serie.reduce((a, x) => a + (x.drop?.length || 0), 0);
     toast(`${serie.length} serie registrate${nDrop ? ` + ${nDrop} scarichi` : ''}`);

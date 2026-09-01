@@ -517,6 +517,37 @@ collaterale: e' l'unico modo di correggere un numero sbagliato senza uscire
 dalla guida, e la riga di riepilogo in fondo — quello che hai gia' messo
 dentro — esiste perche' non ci si debba fidare a memoria.
 
+### "Correggi qualcosa a mano" cancellava la seduta
+
+A fine seduta guidata c'e' un bottone che porta al modulo della scheda, ed e'
+la cosa giusta da avere li': una serie segnata male si ripara meglio vedendole
+tutte insieme. Solo che il modulo si apriva **con i numeri della settimana
+scorsa**, e salvando li scriveva sopra al lavoro appena fatto.
+
+La causa e' una funzione che faceva esattamente il suo mestiere nel posto
+sbagliato. `ultimoUso(ex, k)` **esclude `k` apposta**, perche' nasce per
+rispondere a *"l'ultima volta quanto avevi fatto?"* — la domanda giusta quando
+apri una scheda per cominciare. Ma dopo una seduta guidata la domanda e'
+un'altra, ed e' *"cosa ho appena registrato?"*. Il modulo pescava dalla prima e
+`s.serie = serie` sostituisce l'intera giornata: correggere una serie ne
+cancellava altre venti. Con quella scheda mai usata prima, il modulo si apriva
+**vuoto** e salvando spariva tutto — che e' il caso in cui ci si accorge del
+problema.
+
+Adesso le caselle mostrano **quello che hai registrato oggi**, e il modulo lo
+dice in testa. Tre dettagli che sarebbero passati inosservati:
+
+- **le serie di oggi si consumano con un cursore per esercizio**, non con
+  l'indice della riga: una scheda puo' avere lo stesso esercizio su due righe,
+  e leggere tutte e due dalla stessa posizione le farebbe apparire duplicate;
+- **il recupero vero non sta nel modulo** ma e' un dato registrato dalla guida
+  (`rec_s`), e da li' escono la durata della seduta e il recupero medio del
+  resoconto. Correggere un carico non deve buttarlo via: si ricopia dalla
+  serie originale;
+- **svuotare tutte le caselle e salvare chiede conferma**, perche' su una
+  giornata che conteneva gia' del lavoro quella e' una cancellazione, non un
+  salvataggio.
+
 ### Il recupero e' la schermata, non una barra sopra
 
 Prima il recupero era una barra che compariva sopra il foglio **mentre la
@@ -2942,6 +2973,17 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   male, e quello che e' carico e' il corpo, per oggi
 - Non mostrare una pastiglia senza il perche': un'etichetta senza motivo si
   impara a ignorare
+- Non riempire il modulo di una scheda con `ultimoUso()` quando oggi c'e'
+  gia' qualcosa registrato: quella funzione esclude oggi **apposta**, e
+  siccome il salvataggio sostituisce l'intera giornata, correggere una serie
+  ne cancella venti. Con una scheda mai usata prima il modulo si apre vuoto e
+  sparisce tutto
+- Non riappaiare le serie di oggi con l'indice della riga di scheda: lo stesso
+  esercizio puo' comparire su due righe. Serve un cursore per esercizio
+- Non ricostruire una serie dai soli campi del modulo: `rec_s` non c'e' dentro,
+  e da li' escono la durata della seduta e il recupero medio del resoconto
+- Non trattare un modulo svuotato come un salvataggio: su una giornata che
+  conteneva del lavoro e' una cancellazione, e si chiede
 - Non far cancellare una serie al tocco: nello storico una serie sbagliata
   quasi mai e' di troppo, e' segnata male. Toccare apre, e dentro c'e' anche
   l'esercizio — cambiarlo e' l'errore che nessun'altra schermata ripara
