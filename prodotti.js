@@ -99,7 +99,7 @@ function prodottoInAlimento(pr) {
  *
  * Per molto tempo ce n'erano due, e non si capiva quale fosse quale.
  *
- * - "Cosa mangi", nel piano: gli alimenti, cioe' i nomi che le ricette usano.
+ * - "Lista ingredienti", nel piano: gli alimenti, cioe' i nomi che le ricette usano.
  * - "I tuoi prodotti", dal menu: i prodotti reali col codice a barre, che si
  *   collegano a un alimento per sostituirne i valori stimati.
  *
@@ -156,7 +156,7 @@ const FILTRI_ALIMENTI = [
 ];
 
 /**
- * L'elenco, con la ricerca e i filtri. Lo usano sia il passo "Cosa mangi" del
+ * L'elenco, con la ricerca e i filtri. Lo usano sia il passo "Lista ingredienti" del
  * piano sia la voce del menu: e' letteralmente la stessa schermata, cosi' non
  * si puo' piu' arrivare in due posti diversi e trovare due cose diverse.
  *
@@ -166,7 +166,7 @@ const FILTRI_ALIMENTI = [
 function elencoAlimenti(v, opt = {}) {
   const c = el('div', 'cw');
   const testa = el('div', 'row between');
-  testa.append(el('h3', null, opt.titolo || 'Quello che mangi'));
+  testa.append(el('h3', null, opt.titolo || 'Lista ingredienti'));
   const azioni = el('div', 'row');
   azioni.style.gap = '6px';
   if (typeof sheetConfronta === 'function') {
@@ -316,7 +316,7 @@ function sheetAggiungiAlimento() {
 
 /**
  * La vecchia schermata "I tuoi prodotti" e' diventata questa, ed e' la stessa
- * del passo "Cosa mangi". Resta raggiungibile dal menu e da un vecchio
+ * del passo "Lista ingredienti". Resta raggiungibile dal menu e da un vecchio
  * segnalibro: e' lo stesso posto, non uno parallelo.
  */
 function viewProdotti(v) {

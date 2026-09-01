@@ -5,13 +5,13 @@
  * essere caricati da un CDN. Il motivo e' lo stesso per cui i tracciati del
  * corpo stanno in `data/corpo.json`: quest'app funziona offline e non ha un
  * build step, e una `<link>` a unpkg vorrebbe dire icone che spariscono in
- * palestra dove non prende. Sono otto disegni, non una dipendenza.
+ * palestra dove non prende. Sono dodici disegni, non una dipendenza.
  *
  * Copyright (c) 2013-2024 Cole Bemis e i contributori di Lucide.
  * Feather: MIT. Lucide: ISC. Entrambe permettono la copia con questa nota.
  *
  * Tutte condividono la stessa griglia 24×24 e lo stesso tratto da 2, che e'
- * quello che le fa sembrare una famiglia invece di otto disegni presi in giro
+ * quello che le fa sembrare una famiglia invece di dodici disegni presi in giro
  * — la stessa ragione per cui le icone di Gym sono disegnate a mano tutte con
  * sette tratti e lo stesso arrotondamento.
  */
@@ -47,7 +47,10 @@ const ICONE = {
                'M10 11v6', 'M14 11v6'] },
   repeat: { d: ['M17 1l4 4-4 4', 'M3 11V9a4 4 0 0 1 4-4h14',
                 'M7 23l-4-4 4-4', 'M21 13v2a4 4 0 0 1-4 4H3'] },
-  undo: { d: ['M3 7v6h6', 'M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13'] }
+  undo: { d: ['M3 7v6h6', 'M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13'] },
+  // l'elenco: tre righe e i loro pallini
+  list: { d: ['M8 6h13', 'M8 12h13', 'M8 18h13',
+              'M3 6h.01', 'M3 12h.01', 'M3 18h.01'] }
 };
 
 function icona(nome, { size = 20, col = 'currentColor', cls = '' } = {}) {

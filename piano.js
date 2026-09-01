@@ -507,7 +507,7 @@ function pianoPassi() {
       mio: Object.keys(p.integratori).length > 0,
       stato: D.integratori.length ? D.integratori.length + ' voci' : 'nessuna' },
     ...(usaPiano() ? [
-    { id: 'alimenti', t: 'Cosa mangi',
+    { id: 'alimenti', t: 'Lista ingredienti',
       d: 'Tutto quello che mangi, in un elenco solo: a mano, col codice a barre o da internet.',
       perche: 'Sono i mattoni delle ricette. Puoi saltare questo passo: i ' + baseAli + ' del piano di partenza bastano per cominciare.',
       mio: nAli > 0,
@@ -910,7 +910,7 @@ function sezTarget(v) {
 
 /* -------------------------------------------------------------- alimenti */
 /**
- * "Cosa mangi" e la vecchia pagina "I tuoi prodotti" sono la stessa schermata.
+ * "Lista ingredienti" e la vecchia pagina "I tuoi prodotti" sono la stessa schermata.
  *
  * Erano due, con due bottoni "aggiungi", due ricerche su internet e due
  * lettori di codici a barre, e la differenza fra un "alimento" e un "prodotto"
@@ -920,7 +920,7 @@ function sezTarget(v) {
  */
 function sezAlimenti(v) {
   if (typeof elencoAlimenti === 'function') {
-    elencoAlimenti(v, { titolo: 'Quello che mangi' });
+    elencoAlimenti(v, { titolo: 'Lista ingredienti' });
     v.append(el('div', 'card flat',
       `<div class="eyebrow">Come si legge</div>
        <div class="muted">I ${Object.keys(DBASE.alimenti).length} del piano di

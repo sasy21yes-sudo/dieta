@@ -1225,6 +1225,20 @@ function cardExtraEAggiungi(k, d, conPiano) {
     b2.querySelector('.ic').append(icona('utensils', { size: 18 }));
   b2.onclick = () => sheetExtra(k);
   az.append(b2);
+
+  /* La terza strada e' l'unica che non registra niente: porta all'elenco.
+     E' il posto giusto in cui metterla — chi cerca un alimento e non lo
+     trova sta guardando proprio qui, e finora l'unica via era il menu del
+     profilo, cioe' due tocchi in un posto che con la giornata non c'entra. */
+  const b3 = el('button', 'ex-b');
+  b3.innerHTML = '<span class="ic quieto"></span>'
+    + '<span class="grow"><span class="n">Lista ingredienti</span>'
+    + '<span class="d">aggiungi un alimento che non c\'e\', o correggi i suoi valori</span></span>'
+    + '<span class="go">&rsaquo;</span>';
+  if (typeof icona === 'function')
+    b3.querySelector('.ic').append(icona('list', { size: 18 }));
+  b3.onclick = () => { location.hash = '#/prodotti'; };
+  az.append(b3);
   c.append(az);
 
   /* --- e in fondo quello che registri sempre: un tocco e basta ---

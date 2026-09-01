@@ -1815,6 +1815,10 @@ cose che mangio, e quanto fanno* — e adesso la risposta e' una schermata sola,
 `elencoAlimenti()`, renderizzata sia dal passo del piano sia dalla voce di menu.
 Non due che si somigliano: la stessa.
 
+Il passo si chiama **"Lista ingredienti"** — prima "Cosa mangi", che era una
+domanda e non il nome di un elenco, e per giunta rispondeva alla stessa
+domanda della scheda Oggi.
+
 Quello che ogni riga dice non e' a quale registro interno appartiene, ma **da
 dove viene il suo numero**: `etichetta` se e' stato letto sulla confezione,
 `stima` se e' una media di categoria, `tuo` se l'hai aggiunto, `fuori piano` se
@@ -1972,6 +1976,13 @@ strade per aggiungerne dell'altro, e in fondo le pastiglie:
 3. **le pastiglie di quello che registri sempre** — un tocco, niente domande.
    `extraFrequenti()` esisteva gia' e lo usava soltanto il foglio del fuori
    piano, cioe' l'ultimo posto in cui si arriva. Qui basta un tocco.
+
+C'e' anche una terza riga, **"Lista ingredienti"**, e non registra niente: e'
+l'unica che porta altrove. Sta qui perche' e' qui che serve — chi cerca un
+alimento e non lo trova sta guardando proprio questa carta, e finora l'unica
+strada era il menu del profilo, cioe' due tocchi in un posto che con la
+giornata non c'entra. Il suo quadratino e' grigio e non verde: le due sopra
+aggiungono qualcosa a oggi, questa no.
 
 Il codice a barre **non** e' in questa carta, ed e' una rinuncia meditata:
 `leggiCodice()` puo' tornare col solo codice — quando l'utente sceglie di
