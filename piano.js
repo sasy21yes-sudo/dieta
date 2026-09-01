@@ -913,23 +913,51 @@ function sezTarget(v) {
   c.append(el('p', 'hint',
     'I macro non devono per forza tornare esatti alle calorie: 4 kcal per grammo di proteine e carboidrati e 9 per i grassi sono valori di tabella, e gli alimenti reali si discostano. Uno scarto sotto le 60 kcal e\' normale.'));
 
-  // Il target e la settimana pianificata sono due cose diverse: le barre della
-  // scheda Oggi vengono dalla somma dei pasti previsti, non da qui. Se i due
-  // numeri divergono l'app lo deve dire, altrimenti si insegue un target che
-  // nessun pasto del piano puo' centrare.
-  const mediaPiano = avg(D.settimana.map(g => g.totali.kcal));
-  const scarto = mediaPiano - (D.target.kcal || 0);
-  if (Math.abs(scarto) > (D.target.kcal || 1) * 0.08) {
-    c.append(el('div', 'flag warn',
-      `<div class="ico">!</div><div class="grow"><h4>Il piano non centra questo target</h4>
-       <p>I pasti assegnati nella settimana fanno in media <strong>${nf(mediaPiano)} kcal</strong>,
-       cioe' ${scarto > 0 ? nf(scarto) + ' in piu' : nf(-scarto) + ' in meno'} del target che hai
-       impostato. Le barre della scheda Oggi seguono i pasti, non questo numero: per farli
-       coincidere cambia i pasti nella scheda Settimana, oppure riporta il target
-       a ${nf(mediaPiano)}.</p></div>`));
-  } else {
-    c.append(el('div', 'read',
-      `<span>Settimana pianificata: <b>${nf(mediaPiano)} kcal</b> di media</span><span>coerente col target</span>`));
+  /* Il target e la settimana pianificata sono due cose diverse: le barre
+     della scheda Oggi vengono dalla somma dei pasti previsti, non da qui. Se i
+     due numeri divergono l'app lo deve dire, altrimenti si insegue un target
+     che nessun pasto del piano puo' centrare.
+
+     Qui resta la **media**, che risponde alla domanda di questo passo ("il
+     numero che ho scritto e' quello che il piano produce?"). Il giorno per
+     giorno sta nel passo della settimana, dove i giorni si compongono. */
+  const cp = typeof controlloPiano === 'function' ? controlloPiano() : null;
+  if (cp && cp.pieni) {
+    const sotto = cp.sottoPavimento.length;
+    if (Math.abs(cp.scartoMedia ?? 0) > 0.08) {
+      const f = el('div', 'flag warn');
+      /* Il vecchio testo offriva "oppure riporta il target a <media>". Con una
+         media sotto il pavimento quello e' un consiglio sbagliato: propone di
+         adeguare il metro alla fame, ed e' esattamente il modo in cui un'app
+         smette di protestare proprio quando la situazione peggiora. */
+      f.innerHTML = `<div class="ico">!</div><div class="grow">
+        <h4>Il piano non centra questo target</h4>
+        <p>I pasti assegnati fanno in media <strong>${nf(cp.media)} kcal</strong>,
+        cioe' ${cp.media > cp.tgt ? nf(cp.media - cp.tgt) + ' in piu\''
+          : nf(cp.tgt - cp.media) + ' in meno'} del target che hai impostato. Le barre
+        della scheda Oggi seguono i pasti, non questo numero.
+        ${cp.media < cp.pav.pavimento
+          ? `E quella media e\' sotto il tuo pavimento di ${nf(cp.pav.pavimento)} kcal:
+             la strada non e\' abbassare il target fin li\', sono i pasti.`
+          : `Per farli coincidere cambia i pasti nella settimana, oppure riporta il
+             target a ${nf(cp.media)}.`}</p></div>`;
+      c.append(f);
+    } else {
+      c.append(el('div', 'read',
+        `<span>Settimana pianificata: <b>${nf(cp.media)} kcal</b> di media</span>`
+        + '<span>coerente col target</span>'));
+    }
+    if (sotto) {
+      const b = el('button', 'flag bad tap');
+      b.innerHTML = `<div class="ico">!</div><div class="grow">
+        <h4>${sotto === 1 ? 'Un giorno del piano e\' sotto il minimo'
+          : sotto + ' giorni del piano sono sotto il minimo'}</h4>
+        <p>${esc(cp.sottoPavimento.map(g => g.giorno).join(', '))}: sotto le
+        ${nf(cp.pav.pavimento)} kcal calcolate sul tuo corpo. Tocca per vedere
+        quali e sistemarli.</p></div>`;
+      b.onclick = () => { pianoTab = 'settimana'; route(); };
+      c.append(b);
+    }
   }
 
   v.append(c);
@@ -1376,6 +1404,13 @@ function sezSettimana(v) {
     b.onclick = () => { pianoTab = 'pasti'; route(); };
     av.append(b);
     v.append(av);
+  }
+  /* Il controllo sta qui, in cima, perche' qui i giorni si compongono: e'
+     il punto in cui un giorno da 600 kcal viene creato, e quindi il punto in
+     cui va detto. */
+  if (typeof cardControlloPiano === 'function') {
+    const cc = cardControlloPiano(today(), true);
+    if (cc) v.append(cc);
   }
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Come funziona</div>

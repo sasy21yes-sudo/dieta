@@ -979,6 +979,74 @@ secondo bottone, **"tieni solo l'obiettivo, non i target"**, per chi i numeri
 li ha da qualcun altro: l'app sa cosa stai cercando di fare senza toccare
 quello che segui.
 
+### Il piano regge? Giorno per giorno, non in media
+
+**L'app giudicava sempre in relativo, e questo era un buco di struttura.** Ogni
+regola confronta con `D.target`, e `D.target` e' una variabile che decide
+l'utente: esisteva quindi un modo per far tacere l'app su qualunque cosa —
+abbassare il target. Misurato: registrando 1200 kcal contro un target di 2482
+l'app produce otto segnalazioni, quattro rosse; **portando il target a 1200 ne
+spariscono due** (calorie e proteine) e la barra scrive *"in linea col
+target"*. Un'app che smette di protestare proprio quando la situazione
+peggiora e' peggio di una che non protesta mai, perche' il silenzio sembra un
+via libera.
+
+E il controllo che c'era guardava la **media della settimana**, che nasconde
+esattamente il caso che conta: sei giorni a 2800 e uno a 600 fanno 2482 di
+media, cioe' "coerente col target". Il giorno da 600 non lo vedeva nessuno.
+
+`controlloPiano()` guarda i **sette giorni uno per uno** e risponde a tre
+domande diverse:
+
+| | |
+|---|---|
+| **il pavimento** | assoluto rispetto alle tue scelte, relativo al tuo corpo. E' l'unico che non si zittisce abbassando il target |
+| **lo scarto dal target** | oltre il 10% su un singolo giorno: le barre di Oggi seguono i pasti, non il target, e in quei giorni direbbero "in linea" quando non lo sei |
+| **la direzione** | un piano sotto il dispendio mentre vuoi crescere non e' sbagliato di poco: va dall'altra parte |
+
+**Il pavimento non e' una costante tipo "mai sotto le 1200".** Quella sarebbe
+la classica soglia inventata che questo progetto vieta ovunque: 1500 kcal per
+un uomo di cento chili sono fame nera, per una persona di cinquanta sedentaria
+sono quasi mantenimento. E' `max(BMR x 1,1, dispendio x 0,75)` — il metro sei
+tu, come per la prontezza muscolare — e la carta scrive tutti e due i numeri
+invece di consegnare una soglia calata dall'alto.
+
+**La direzione si misura sul dispendio, non sul target**, cosi' vale anche per
+chi ha scelto "tieni solo l'obiettivo, non i target": l'obiettivo *e'* una
+posizione rispetto a quello che spendi.
+
+Due dettagli che sarebbero passati inosservati:
+
+- **un giorno vuoto non e' un giorno povero.** E' un giorno a cui non hai
+  ancora assegnato niente, e trattarlo da allarme darebbe sette righe rosse a
+  chiunque cominci da zero. Sta nella striscia in grigio e fuori da tutti i
+  conti, media compresa;
+- **il vecchio avviso offriva la strada sbagliata.** Diceva *"oppure riporta il
+  target a <media del piano>"*: con una media sotto il pavimento quello e' un
+  invito ad adeguare il metro alla fame. Adesso quella meta' della frase
+  sparisce quando il numero e' sotto il pavimento, e al suo posto c'e' scritto
+  che la strada sono i pasti.
+
+**Chi ha un medico** ha un interruttore, dentro l'avviso stesso: una dieta
+ipocalorica sotto controllo esiste, e chi te l'ha data ti ha visto. L'avviso
+non sparisce — diventa una nota, e il pavimento calcolato resta scritto,
+perche' e' un'informazione vera in tutti e due i casi. Farlo sparire del tutto
+sarebbe stata la scappatoia piu' comoda per zittire l'app, cioe' esattamente
+il comportamento che questa carta esiste per impedire.
+
+### Senza target non si giudica niente
+
+Con `D.target.kcal` a zero — il primo avvio, finche' il profilo non c'e' — le
+regole dell'analisi dividono per zero, e chi registrava 1200 kcal si vedeva
+scrivere **"Mangi piu' del piano"**. Letteralmente falso, ed e' la peggiore
+delle risposte possibili: non un dato mancante, ma un verdetto inventato al
+contrario. Nessuna matrice lo prendeva, perche' a schermo non compariva ne'
+`NaN` ne' `Infinity` — solo una frase sbagliata.
+
+Ora `analyse()` si ferma e lo dice, e la carta della settimana in Sintesi non
+disegna otto barre contro un target che non esiste: dice che manca il metro e
+porta dove si imposta.
+
 ### Gli idoli sono dichiarazioni, e vanno riportati sulla tua altezza
 
 `target_fisico` era **una persona sola, uguale per tutti**, scritta in
@@ -2748,6 +2816,26 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   ricalcola sul ritmo di adesso — e che quindi può anche allungarsi — è un'altra
   cosa, ed è quello che fa `tempoAlTarget()`. Con una regola sopra tutte: quando
   l'intervallo del ritmo contiene lo zero, non si scrive un numero
+- Non giudicare **solo** in relativo al target: il target lo decide l'utente,
+  quindi abbassarlo e' un modo per far tacere l'app. Misurato: portando il
+  target da 2482 a 1200 spariscono due dei quattro allarmi rossi e la barra
+  scrive "in linea". Serve un metro che non dipende da quella scelta
+- Non controllare il piano sulla media della settimana: sei giorni a 2800 e
+  uno a 600 fanno 2482 di media, cioe' "coerente col target"
+- Non mettere una soglia calorica fissa tipo 1200: 1500 kcal per un uomo di
+  cento chili sono fame nera e per una persona di cinquanta sedentaria quasi
+  mantenimento. Il pavimento e' `max(BMR x 1,1, dispendio x 0,75)`, e la UI
+  scrive tutti e due i numeri
+- Non trattare un giorno senza ricette assegnate come un giorno povero: e' un
+  giorno vuoto, e sette righe rosse al primo avvio fanno chiudere l'app
+- Non proporre di abbassare il target fino alla media del piano quando quella
+  media e' sotto il pavimento: e' un invito ad adeguare il metro alla fame
+- Non far sparire del tutto l'avviso a chi dichiara una prescrizione medica:
+  diventa una nota, e il pavimento calcolato resta scritto. Sparire sarebbe la
+  scappatoia piu' comoda per zittire l'app
+- Non far giudicare l'analisi con `D.target.kcal` a zero: le regole dividono
+  per il target, e chi mangiava 1200 si vedeva scrivere "Mangi piu' del piano".
+  Senza metro si dice che manca il metro
 - Non dare per scontato che chi usa l'app abbia un professionista che gli ha
   detto quante calorie mangiare: e' il caso raro. Ma chi ce l'ha deve poter
   ignorare il motore in un colpo solo, e la carta glielo dice per prima cosa

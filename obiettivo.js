@@ -116,14 +116,7 @@ function pianoCalorico(idObiettivo, pctScelta, k = today()) {
   const kgSett = peso * pct;
   const grezzo = tdee + (kgSett * (D.modello?.kcal_per_kg || 7700)) / 7;
 
-  /* Due pavimenti, e vince il piu' alto.
-     Il primo e' il metabolismo a riposo per 1,1, che c'era gia'. Il secondo e'
-     il 25% sotto il dispendio: sotto quella soglia il problema non e' piu' la
-     ricomposizione, e il file di progetto lo scriveva da tempo senza che
-     nessuno lo applicasse davvero. */
-  const pav1 = Math.round(bmr * 1.1);
-  const pav2 = Math.round(tdee * 0.75);
-  const pavimento = Math.max(pav1, pav2);
+  const { pavimento } = pavimentoCalorico(k);
   const kcal = Math.round(Math.max(pavimento, grezzo) / 10) * 10;
   const tagliato = kcal > grezzo + 5;
 
@@ -151,6 +144,107 @@ function pianoCalorico(idObiettivo, pctScelta, k = today()) {
     quotaTdee: tdee ? (kcal - tdee) / tdee : 0,
     macro: { kcal, p, c, g, fibre },
     gPavimento: gPav, pPerKg: ob.p_per_kg
+  };
+}
+
+/**
+ * Il pavimento calorico: sotto non si scende, e il numero e' **tuo**.
+ *
+ * Due soglie e vince la piu' alta: il metabolismo a riposo per 1,1 e il 25%
+ * sotto il dispendio. Non e' una costante tipo "mai sotto le 1200": quella
+ * sarebbe la classica soglia inventata che questo progetto vieta ovunque —
+ * 1500 kcal per un uomo di cento chili sono fame nera, per una persona di
+ * cinquanta sedentaria sono quasi mantenimento. Il metro sei tu, come per la
+ * prontezza muscolare e per tutto il resto qui dentro.
+ *
+ * Sta in una funzione sua perche' lo guardano in tre: la proposta del motore,
+ * il controllo del piano settimanale e l'analisi. Tre copie di una soglia
+ * prima o poi diventano tre soglie.
+ */
+function pavimentoCalorico(k = today()) {
+  const peso = lastWeight() ?? trendW(k) ?? D.profilo.peso_iniziale_kg ?? 70;
+  const bmr = bmrDi(peso, D.profilo.altezza_cm, D.profilo.eta, D.profilo.sesso);
+  const E = typeof energyModel === 'function' ? energyModel(k) : { tdee: null, n: 0 };
+  const misurato = E.n >= 2 && E.tdee > 0;
+  const tdee = misurato ? E.tdee : Math.round(bmr * (D.modello?.laf || 1.35));
+  const daBmr = Math.round(bmr * 1.1), daTdee = Math.round(tdee * 0.75);
+  return {
+    bmr, tdee, misurato, daBmr, daTdee,
+    pavimento: Math.max(daBmr, daTdee),
+    quale: daBmr >= daTdee ? 'bmr' : 'tdee'
+  };
+}
+
+/* ================================================ il piano regge? giorno per giorno
+ *
+ * PERCHE' GIORNO PER GIORNO. Il controllo che c'era guardava la **media della
+ * settimana** contro il target, e una media nasconde esattamente il caso che
+ * conta: sei giorni a 2800 e uno a 600 fanno 2482 di media, cioe' "coerente
+ * col target". Il giorno da 600 non lo vede nessuno.
+ *
+ * E guarda tre cose diverse, che non sono la stessa domanda:
+ *
+ *   1. **il pavimento** — assoluto rispetto alle tue scelte, relativo al tuo
+ *      corpo. E' l'unico che non si puo' zittire abbassando il target;
+ *   2. **lo scarto dal target** — la coerenza fra quello che hai pianificato e
+ *      il metro con cui l'app giudica le giornate;
+ *   3. **la direzione contro l'obiettivo** — un piano sotto il dispendio
+ *      mentre stai cercando di crescere non e' "sbagliato di poco": va
+ *      dall'altra parte.
+ *
+ * Un giorno **vuoto** non e' un giorno povero: e' un giorno a cui non hai
+ * ancora assegnato niente, e trattarlo da allarme darebbe sette righe rosse a
+ * chiunque cominci da zero.
+ */
+const PIANO_SCARTO = 0.10;   // per giorno, la stessa soglia che usa analyse()
+
+/* I giorni nel file di dominio sono in maiuscolo, che va bene per
+   un'intestazione e non dentro una frase: "MERCOLEDI' sta sotto le 1874"
+   grida una cosa che non e' un grido. */
+const nomeGiorno = g => String(g || '').charAt(0).toUpperCase()
+  + String(g || '').slice(1).toLowerCase();
+
+function controlloPiano(k = today()) {
+  if (typeof usaPiano === 'function' && !usaPiano()) return null;
+  const pav = pavimentoCalorico(k);
+  const tgt = D.target.kcal || 0;
+  const att = obiettivoAttivo();
+
+  const giorni = (D.settimana || []).map(g => {
+    const kcal = g.totali?.kcal || 0;
+    const assegnati = (g.pasti || []).filter(x => D.pasti[x.codice]).length;
+    const vuoto = assegnati === 0;
+    const scarto = tgt > 0 ? (kcal - tgt) / tgt : null;
+    let stato = 'ok';
+    if (vuoto) stato = 'vuoto';
+    else if (kcal < pav.pavimento) stato = 'basso';
+    else if (scarto != null && scarto < -PIANO_SCARTO) stato = 'sotto';
+    else if (scarto != null && scarto > PIANO_SCARTO) stato = 'sopra';
+    return { giorno: g.giorno, kcal, assegnati, vuoto, scarto, stato };
+  });
+
+  const pieni = giorni.filter(x => !x.vuoto);
+  const media = pieni.length ? pieni.reduce((a, x) => a + x.kcal, 0) / pieni.length : 0;
+
+  /* La direzione: un obiettivo si definisce rispetto al DISPENDIO, non al
+     target — che potrebbe essere vecchio o messo a mano. Cosi' il controllo
+     vale anche per chi ha detto "tieni solo l'obiettivo, non i target". */
+  let direzione = null;
+  if (att && pieni.length) {
+    const q = (media - pav.tdee) / pav.tdee;
+    const vuole = att.pct < 0 ? 'giu' : att.pct > 0 ? 'su' : 'pari';
+    const fa = q < -0.05 ? 'giu' : q > 0.05 ? 'su' : 'pari';
+    if (vuole !== fa) direzione = { vuole, fa, q, media, ob: att };
+  }
+
+  return {
+    giorni, pieni: pieni.length, media, tgt, pav, ob: att, direzione,
+    sottoPavimento: giorni.filter(x => x.stato === 'basso'),
+    fuoriTarget: giorni.filter(x => x.stato === 'sotto' || x.stato === 'sopra'),
+    vuoti: giorni.filter(x => x.vuoto).length,
+    // la media della settimana contro il target: il vecchio controllo, che
+    // resta valido ma non basta piu' da solo
+    scartoMedia: tgt > 0 && pieni.length ? (media - tgt) / tgt : null
   };
 }
 
@@ -426,6 +520,149 @@ function sheetObiettivo(id, k = today()) {
   disegna();
   w.append(dis);
   sheet(w);
+}
+
+/**
+ * La carta: il piano regge, giorno per giorno.
+ *
+ * Sta nel passo della settimana, che e' **dove il problema si crea** — e in
+ * forma corta nel passo del target, che e' dove si guarda il metro.
+ */
+function cardControlloPiano(k = today(), corta = false) {
+  const c = controlloPiano(k);
+  if (!c || !c.giorni.length) return null;
+
+  // niente da dire a chi non ha ancora assegnato niente: un piano vuoto non e'
+  // un piano sbagliato, e sette righe rosse al primo avvio sono un modo
+  // eccellente di far chiudere l'app
+  if (!c.pieni) return null;
+
+  const gravi = c.sottoPavimento.length;
+  const fuori = c.fuoriTarget.length;
+  const dir = c.direzione;
+  const tutto = !gravi && !fuori && !dir;
+
+  const box = el('div', 'card');
+  box.append(el('div', 'eyebrow', 'Il piano regge?'));
+
+  /* --- la riga dei sette giorni: la si legge prima di leggere --- */
+  const max = Math.max(c.tgt || 0, ...c.giorni.map(g => g.kcal)) || 1;
+  const gr = el('div', 'pl-g');
+  for (const g of c.giorni) {
+    const col = el('div', 'pl-d ' + g.stato);
+    col.title = `${g.giorno}: ${g.vuoto ? 'niente assegnato' : nf(g.kcal) + ' kcal'}`;
+    const b = el('i');
+    b.style.height = g.vuoto ? '3px' : Math.max(4, g.kcal / max * 52).toFixed(0) + 'px';
+    col.append(b);
+    col.append(el('span', 'n', g.giorno.slice(0, 2).toLowerCase()));
+    gr.append(col);
+  }
+  box.append(gr);
+  // la riga del target sopra le barre direbbe di piu' di qualsiasi legenda
+  if (c.tgt > 0) {
+    const rif = el('div', 'pl-rif');
+    rif.style.bottom = (c.tgt / max * 52 + 16).toFixed(0) + 'px';
+    gr.style.position = 'relative';
+    gr.append(rif);
+    box.append(el('div', 'pl-leg',
+      `<span>- - target ${nf(c.tgt)}</span><span>media ${nf(c.media)} kcal</span>`));
+  }
+
+  if (tutto) {
+    box.append(el('div', 'read',
+      `<span>${c.pieni} giorni pieni</span><span>nessuno sotto il pavimento</span>`
+      + `<span>media ${nf(c.media)} kcal</span>`));
+    if (c.vuoti) box.append(el('p', 'hint',
+      `${c.vuoti} ${c.vuoti === 1 ? 'giorno non ha' : 'giorni non hanno'} ancora nessuna `
+      + 'ricetta assegnata: quelli non entrano nei conti.'));
+    return box;
+  }
+
+  /* --- 1. sotto il pavimento: e' l'unico che non dipende dal target --- */
+  if (gravi) {
+    const presc = !!S.settings.prescritto;
+    const nomi = c.sottoPavimento.map(g => nomeGiorno(g.giorno)).join(', ');
+    const peggio = c.sottoPavimento.reduce((a, x) => x.kcal < a.kcal ? x : a);
+    const f = el('div', 'flag ' + (presc ? 'warn' : 'bad'));
+    f.innerHTML = `<div class="ico">!</div><div class="grow">
+      <h4>${gravi === 1 ? 'Un giorno' : gravi + ' giorni'} sotto il minimo</h4>
+      <p>${esc(nomi)} ${gravi === 1 ? 'sta' : 'stanno'} sotto le
+      <strong>${nf(c.pav.pavimento)} kcal</strong>${gravi > 1
+        ? ` — il piu\' basso e\' ${esc(nomeGiorno(peggio.giorno))} con ${nf(peggio.kcal)}`
+        : ` (${nf(peggio.kcal)})`}. Quel numero non e\' una soglia
+      generica: e\' il piu\' alto fra il <strong>tuo</strong> metabolismo a riposo
+      per 1,1 (${nf(c.pav.daBmr)}) e il 25% sotto il <strong>tuo</strong> dispendio
+      (${nf(c.pav.daTdee)}${c.pav.misurato ? ', misurato sui tuoi dati' : ', ancora da formula'}).
+      Sotto quella quota non stai ricomponendo: stai mangiando poco, e il corpo
+      risponde spegnendo cose prima di cedere il grasso.</p></div>`;
+    box.append(f);
+
+    /* L'interruttore sta qui, dove serve, e non fa sparire niente: l'avviso
+       diventa una nota e il numero resta scritto. Una dieta ipocalorica sotto
+       controllo medico esiste, ma il pavimento calcolato e' un'informazione
+       vera in tutti e due i casi — e chi ha un medico non ha bisogno che
+       l'app finga che sia normale. */
+    const sw = el('button', 'sw-r' + (presc ? ' on' : ''));
+    sw.innerHTML = `<span class="body"><span class="t">Me l\'ha prescritto un medico</span>
+      <span class="d">L\'avviso resta, ma smette di essere un allarme: sotto controllo
+      una dieta ipocalorica ha senso, e chi te l\'ha data ti ha visto.</span></span>
+      <span class="box">${presc ? '&check;' : ''}</span>`;
+    sw.onclick = () => {
+      S.settings.prescritto = !presc; save(); route();
+    };
+    box.append(sw);
+  }
+
+  /* --- 2. fuori target, ma sopra il pavimento --- */
+  if (fuori) {
+    const giu = c.fuoriTarget.filter(g => g.stato === 'sotto');
+    const su = c.fuoriTarget.filter(g => g.stato === 'sopra');
+    const dett = [];
+    if (giu.length) dett.push(`${giu.map(g => nomeGiorno(g.giorno)).join(', ')} sotto`);
+    if (su.length) dett.push(`${su.map(g => nomeGiorno(g.giorno)).join(', ')} sopra`);
+    box.append(el('div', 'flag warn',
+      `<div class="ico">!</div><div class="grow">
+       <h4>${fuori === 1 ? 'Un giorno lontano' : fuori + ' giorni lontani'} dal target</h4>
+       <p>${esc(dett.join(' · '))} di piu\' del 10% rispetto alle
+       ${nf(c.tgt)} kcal del target. Le barre della scheda Oggi seguono i pasti
+       assegnati, non il target: in quei giorni ti diranno che sei in linea
+       quando non lo sei, o il contrario.</p></div>`));
+  }
+
+  /* --- 3. la direzione: il piano va dall'altra parte --- */
+  if (dir) {
+    // due tabelle e non una: "pari a quello che spendi" e' giusto, "pari a il
+    // tuo dispendio" no. E' la stessa sbavatura delle preposizioni articolate
+    // gia' sistemata nel periodo della revisione
+    const verso = { giu: 'sotto', su: 'sopra', pari: 'pari a' };
+    const versoArt = { giu: 'sotto il', su: 'sopra il', pari: 'pari al' };
+    box.append(el('div', 'flag warn',
+      `<div class="ico">!</div><div class="grow">
+       <h4>Il piano va dall\'altra parte</h4>
+       <p>Hai scelto <strong>${esc(dir.ob.n.toLowerCase())}</strong>, che vuol dire stare
+       ${esc(verso[dir.vuole])} quello che spendi. Il piano ti mette in media
+       <strong>${nf(dir.media)} kcal</strong>, cioe\' ${esc(versoArt[dir.fa])} tuo
+       dispendio di ${nf(c.pav.tdee)}${dir.fa === 'pari' ? '' : ` (${dir.q > 0 ? '+' : ''}${nf(dir.q * 100, 0)}%)`}.
+       ${dir.vuole === 'su' && dir.fa !== 'su'
+         ? 'Allenarsi senza il materiale per costruire e\' il modo piu\' comune di non crescere.'
+         : dir.vuole === 'giu' && dir.fa !== 'giu'
+           ? 'Senza un deficit il grasso non se ne va, per quanto bene si mangi.'
+           : 'A peso fermo il piano dovrebbe stare intorno al dispendio, non spostarsi.'}</p></div>`));
+  }
+
+  if (!corta) {
+    const b = el('button', 'btn wide');
+    b.style.marginTop = '4px';
+    b.textContent = 'Vai alla settimana e sistema i giorni';
+    b.onclick = () => { pianoTab = 'settimana'; route(); };
+    box.append(b);
+  }
+  box.append(el('p', 'note',
+    'Un giorno storto ogni tanto non e\' un problema: il bilancio e\' settimanale, e '
+    + 'questa carta guarda il <strong>piano</strong>, cioe\' quello che hai deciso di '
+    + 'mangiare — non quello che hai mangiato davvero, che sta in Andamento. '
+    + 'Le soglie sono di pratica comune, non misure su di te.'));
+  return box;
 }
 
 /* ==================================================== il fisico di riferimento */

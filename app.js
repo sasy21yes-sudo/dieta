@@ -687,6 +687,22 @@ function analyse(k = today()) {
     return F;
   }
 
+  /* Senza un target non si giudica niente.
+     Quasi tutte le regole qui sotto sono uno scarto dal target, e con
+     `T.kcal` a zero la divisione da' Infinity: chi mangiava 1200 kcal con il
+     target ancora vuoto si vedeva scrivere **"Mangi piu' del piano"**, che e'
+     letteralmente falso ed e' la peggiore delle risposte possibili. Il target
+     e' zero solo al primo avvio, finche' il profilo non c'e': e li' la cosa
+     onesta da dire e' che manca il metro, non un verdetto. */
+  if (!(T.kcal > 0)) {
+    F.push(['warn', '!', 'Manca il target',
+      'Senza calorie e macro da centrare non c\'e\' niente con cui confrontare '
+      + 'quello che registri, e ogni giudizio sarebbe inventato. Si calcolano da '
+      + 'soli appena metti peso, altezza ed eta\' in "Chi sei", e da li\' si '
+      + 'scelgono in "Quanto mangiare".']);
+    return F;
+  }
+
   // --- calorie e proteine effettive (dai pasti spuntati)
   const cons = d7.map(x => S.log[x] ? consumed(x) : null).filter(Boolean)
                  .filter(m => m.kcal > 400);
@@ -3147,7 +3163,8 @@ function sezSintesi(v) {
      con niente di visibile, e per giunta "1 cose".
      Le voci senza dato sono il terzo stato e vanno dette: sono la ragione per
      cui la somma non fa otto, e sono anche la cosa da sistemare per prima. */
-  const M = typeof metriche === 'function' ? metriche(k, 7) : [];
+  const M = (typeof metriche === 'function' && D.target.kcal > 0)
+    ? metriche(k, 7) : [];
   const dentro = m => m.val != null && m.tgt
     && Math.abs(m.val - m.tgt) <= m.tgt * (m.tolleranza ?? 0.1);
   const senza = M.filter(m => m.val == null).length;
@@ -3160,8 +3177,21 @@ function sezSintesi(v) {
        plur(fuori, 'fuori target', 'fuori target')}</span></div>`
      + (senza ? `<div class="vuoto"><b>${senza}</b><span>${
        plur(senza, 'senza dato', 'senza dato')}</span></div>` : '');
-  testa.append(r);
+  if (M.length) testa.append(r);
   for (const m of M) testa.append(meter(m));
+  /* Otto barre contro un target che non c'e' disegnerebbero otto volte lo
+     stesso nulla, e i contatori direbbero "6 fuori target" senza un target. */
+  if (!M.length) {
+    testa.append(el('p', 'muted',
+      'Non c\'e\' ancora un target con cui confrontare questi sette giorni. '
+      + 'Si calcola da solo appena il profilo e\' compilato.'));
+    const b2 = el('button', 'btn wide');
+    b2.style.marginTop = '8px';
+    b2.textContent = 'Imposta quanto mangiare';
+    b2.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'target';
+      apri('#/piano'); };
+    testa.append(b2);
+  }
   v.append(testa);
 
   const daDire = trovati.filter(f => f[0] !== 'ok').length;

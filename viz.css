@@ -1493,3 +1493,41 @@ button.sp-h{cursor:pointer}
 
 /* un ritmo che il pavimento taglia si vede prima di sceglierlo */
 .seg button.bloc{text-decoration:line-through;color:var(--ink-3)}
+
+/* ---------------- il piano regge? sette giorni a colpo d'occhio ----------------
+   Le barre non sono un grafico: sono un indice. Servono a vedere QUALE giorno
+   e' storto prima di leggere quale, e per questo portano la sigla sotto. */
+.pl-g{display:flex;gap:6px;align-items:flex-end;height:72px;margin:10px 0 2px}
+.pl-d{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:flex-end;gap:4px;min-width:0}
+.pl-d i{display:block;width:100%;border-radius:3px;background:var(--s2)}
+.pl-d .n{font-family:var(--mono);font-size:9px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--ink-3)}
+/* i quattro stati, e il vuoto non e' uno di quelli storti */
+.pl-d.basso i{background:var(--alert)}
+.pl-d.sotto i,.pl-d.sopra i{background:var(--amber)}
+.pl-d.vuoto i{background:var(--rule)}
+.pl-d.basso .n{color:var(--alert)}
+.pl-d.sotto .n,.pl-d.sopra .n{color:var(--amber)}
+.pl-rif{position:absolute;left:0;right:0;height:0;
+  border-top:1px dashed var(--rif);pointer-events:none}
+.pl-leg{display:flex;justify-content:space-between;gap:10px;
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-3);margin-bottom:8px}
+
+/* l'interruttore "me l'ha prescritto un medico": sta dentro l'avviso, dove
+   serve, e non e' un bottone d'azione — e' una dichiarazione */
+.sw-r{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;
+  background:none;border:1px solid var(--rule);border-radius:11px;
+  padding:10px 12px;margin-top:8px;font:inherit;color:inherit;cursor:pointer}
+.sw-r.on{border-color:var(--pine);background:var(--pine-soft)}
+.sw-r .body{flex:1;min-width:0}
+.sw-r .t{display:block;font-weight:600;font-size:13px}
+.sw-r .d{display:block;color:var(--ink-2);font-size:12px;line-height:1.35;
+  margin-top:2px}
+.sw-r .box{flex:0 0 20px;height:20px;border:1.5px solid var(--rule);
+  border-radius:6px;display:flex;align-items:center;justify-content:center;
+  color:var(--pine);font-size:13px;margin-top:1px}
+.sw-r.on .box{border-color:var(--pine)}
+/* un avviso che si tocca deve sembrare toccabile */
+button.flag.tap{width:100%;text-align:left;font:inherit;cursor:pointer}
+button.flag.tap:active{opacity:.75}
