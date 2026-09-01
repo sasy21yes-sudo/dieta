@@ -2113,7 +2113,29 @@ e non sono neanche sue. Da qui `scambio.js`, con quattro decisioni:
 Il diario non viene toccato in nessun caso, e la UI lo dice due volte.
 
 Un backup completo caricato qui per sbaglio non e' un errore dell'utente: e' un
-file giusto nella porta sbagliata, e il messaggio dice quale e' quella giusta.
+file giusto nella porta sbagliata. E la cortesia deve valere **nelle due
+direzioni**: per un po' non e' stato cosi'. Il carica-scambio riconosceva un
+backup e lo rimandava indietro, mentre l'importa-backup davanti a un file di
+scambio diceva "formato non riconosciuto" — un vicolo cieco, e per giunta
+falso, perche' quel formato l'app lo conosce benissimo. Segnalato da chi ci e'
+finito dentro esportando le schede su un secondo dispositivo.
+
+Adesso nessuna delle due rimanda a cercare un altro bottone: **apre quella
+giusta**. Chi ha scelto un file lo vuole importare, e sapere quale dei due
+pulsanti l'app si aspettava non e' un problema suo.
+
+**Le righe che puntano al nulla si dicono prima.** Gli esercizi del catalogo
+di base non viaggiano nel file — ce li ha gia' chiunque abbia l'app, e
+spedirne cinquantanove sarebbe solo peso — ma "chiunque" vale finche' i due
+dispositivi hanno lo stesso `data/palestra.json`. Uno fermo a una versione
+vecchia e la riga arriva senza il suo esercizio. `orfani()` li conta e
+l'anteprima li nomina: non e' un motivo per rifiutare il file, e' un motivo
+per dire perche' quella scheda si aprira' con delle righe vuote — e che di
+solito si risolve aggiornando l'app.
+
+Nota di robustezza trovata nello stesso giro: `riassuntoBackup()` dava per
+scontato `o.profili.lista`, e un backup troncato faceva morire l'anteprima a
+meta' foglio invece di dire che il file non conteneva niente.
 
 ### Passi e sonno senza scriverli
 
@@ -2467,6 +2489,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   quattordici font di base il file resta di venti kB, e senza le metriche vere
   il ritorno a capo va a occhio e il testo esce dal foglio
 - Non generare il PDF con i colori del tema scuro: si stampa su carta bianca
+- Non rispondere "formato non riconosciuto" a un formato che l'app conosce: se
+  il file e' dell'altra porta, si apre l'altra porta. Vale nelle due direzioni
+- Non dare per scontato che il catalogo esercizi sia lo stesso sui due
+  dispositivi: gli id di base non viaggiano nel file, e uno fermo a una
+  versione vecchia riceve righe che puntano al nulla. Si contano e si dicono
 - Non far sostituire l'archivio a un file di scambio: quello e' il mestiere del
   backup. Un piano che arriva da fuori si **aggiunge**, e sui doppioni si chiede
 - Non esportare lo strato `S.piano` come se fosse il piano: chi sta sul piano di

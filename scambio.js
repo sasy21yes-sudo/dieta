@@ -116,6 +116,23 @@ const SCAMBIO_PARTI = {
       const mie = schede();
       return (d.schede || []).map(s => s.nome).filter(n => mie.some(x => x.nome === n));
     },
+    /* Gli esercizi del catalogo di base non viaggiano nel file: ce li ha gia'
+       chiunque abbia l'app, e spedirne cinquantanove sarebbe solo peso. Ma
+       "chiunque" vale finche' i due dispositivi hanno lo stesso
+       data/palestra.json — uno fermo a una versione vecchia, o un id
+       personalizzato che l'export non ha allegato, e la riga arriva puntando
+       al nulla. Non e' un motivo per rifiutare il file: e' un motivo per
+       dirlo, perche' altrimenti la scheda si apre con delle righe vuote e non
+       si capisce di chi sia la colpa. */
+    orfani(d) {
+      const noti = new Set(catalogo().map(x => x.id)
+        .concat((d.esercizi || []).map(x => x.id)));
+      const out = new Set();
+      for (const sc of (d.schede || []))
+        for (const r of (sc.esercizi || []))
+          if (r.ex && !noti.has(r.ex)) out.add(r.ex);
+      return [...out];
+    },
     applica(d, opz) {
       const mie = schede(), cat = P().esercizi;
       let n = 0;
@@ -230,9 +247,14 @@ function sheetCaricaScambio(f) {
   // un backup completo finito qui per sbaglio non e' un errore dell'utente:
   // e' un file giusto nella porta sbagliata, e va detto quale e' quella giusta
   if (f.formato !== SCAMBIO_FMT) {
-    toast(f.log || f.profili || f.formato === 2
-      ? 'Questo e\' un backup completo: usa "Importa backup"'
-      : 'Formato non riconosciuto');
+    // e nella direzione opposta si fa lo stesso: si apre quello giusto invece
+    // di mandare a cercare un bottone
+    if ((f.log || f.profili || f.formato === 2) && typeof sheetImport === 'function') {
+      toast('Questo e\' un backup completo: te lo apro di la\'');
+      sheetImport(f);
+      return;
+    }
+    toast('Formato non riconosciuto');
     return;
   }
   const parti = Object.entries(f.parti || {}).filter(([t]) => SCAMBIO_PARTI[t]);
@@ -248,6 +270,18 @@ function sheetCaricaScambio(f) {
     w.append(el('div', 'imp-riga', `<span class="n">${n} ${esc(l)}</span>`));
 
   const opz = { sovrascrivi: false, settimana: false, target: false };
+
+  /* --- le righe che qui non hanno un esercizio --- */
+  const orfani = parti.flatMap(([t, d]) =>
+    SCAMBIO_PARTI[t].orfani ? SCAMBIO_PARTI[t].orfani(d) : []);
+  if (orfani.length)
+    w.append(el('div', 'hint acciacco',
+      `<strong>${orfani.length} ${orfani.length === 1 ? 'esercizio non esiste'
+        : 'esercizi non esistono'} su questo dispositivo</strong>: `
+      + `${esc(orfani.slice(0, 4).join(', '))}${orfani.length > 4 ? ' e altri' : ''}. `
+      + 'Le schede si caricano lo stesso, ma quelle righe resteranno vuote. '
+      + 'Di solito vuol dire che qui l\'app e\' a una versione piu\' vecchia: '
+      + 'aggiornala dal menu e ricarica il file.'));
 
   /* --- i doppioni si dicono prima --- */
   const scontri = parti.flatMap(([t, d]) => SCAMBIO_PARTI[t].scontri(d));

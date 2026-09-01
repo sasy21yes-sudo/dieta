@@ -794,7 +794,10 @@ function riassuntoBackup(o) {
     righe.push({ nome, giorni: gg.length, da: gg[0], a: gg[gg.length - 1], pesate, sedute });
   };
   if (o.formato === 2) {
-    for (const p of o.profili.lista) conta(p.nome, o.stati[p.id]);
+    // un backup troncato o scritto a mano puo' non avere l'elenco dei profili:
+    // meglio zero righe — che l'anteprima sa gia' raccontare — di un errore
+    // che lascia il foglio a meta'
+    for (const p of (o.profili?.lista || [])) conta(p.nome, o.stati?.[p.id]);
   } else {
     conta('Profilo unico', o);
   }
@@ -2845,6 +2848,19 @@ function download(name, text, type = 'text/plain') {
  * intervallo di date, pesate, sedute — e solo dopo si decide.
  */
 function sheetImport(grezzo) {
+  /* Un file di scambio finito nella porta del backup non e' un errore
+     dell'utente: sono due bottoni che chiedono tutti e due un .json, e da
+     fuori si somigliano. Il carica-scambio la cortesia la faceva gia' — "e'
+     un backup completo, usa l'altro" — e qui mancava: usciva "formato non
+     riconosciuto", che e' un vicolo cieco e per giunta falso, perche' il
+     formato l'app lo conosce benissimo. Ora non si rimanda a cercare un
+     altro bottone: si apre direttamente quello giusto. */
+  if (grezzo && typeof SCAMBIO_FMT === 'string' && grezzo.formato === SCAMBIO_FMT
+      && typeof sheetCaricaScambio === 'function') {
+    toast('Questo e\' un file di piano o schede: te lo apro di la\'');
+    sheetCaricaScambio(grezzo);
+    return;
+  }
   const v2 = grezzo && grezzo.formato === 2 && grezzo.stati;
   const o = v2 ? grezzo : migra(grezzo);
   if (!o) { toast('Formato non riconosciuto'); return; }
