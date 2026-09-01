@@ -74,7 +74,8 @@ charts.js       toolkit SVG dei grafici + vista Dati
 revisione.js    revisione settimanale: diagnosi, leve, impegno, priorita'
 target.js       il target che si ricalibra sul dispendio + rampa fibre
 previsioni.js   proiezioni di misure, composizione e forza a 28 giorni
-cerca.js        selettore cercabile riusabile + dispensa
+cerca.js        selettore cercabile riusabile
+spesa.js        la lista della spesa e la dispensa (vedi sotto)
 peso.js         pesate anomale e ciclo mestruale: cio' che sporca la bilancia
 timer.js        timer di recupero fra le serie
 seduta.js       la seduta guidata, il recupero ad anello, il resoconto di una seduta
@@ -1408,6 +1409,56 @@ scesa sotto la figura, che e' dove la sagoma di riferimento si vede.
   allarga l'incertezza dell'osservazione sulle finestre che cambiano fase: su
   ventotto giorni ne tocca quattro e lascia stare le altre ventiquattro
 
+### Una lista della spesa non si legge, si cammina
+
+Era un elenco per categoria del file di dominio — legumi, cereali, verdura —
+con una spunta e un peso: l'ordine con cui i dati stanno **scritti**, non
+l'ordine in cui uno attraversa il negozio. E la dispensa era un foglio con
+dentro tutti i quarantaquattro alimenti del piano e un campo numerico per
+ciascuno: un modulo, e infatti restava vuoto.
+
+Guardando cosa fanno le app che questo mestiere lo fanno da anni — AnyList,
+Bring!, Apple Promemoria, Out of Milk — quattro cose ricorrono e valgono la
+pena di essere prese:
+
+| Da dove | Cosa |
+|---|---|
+| **AnyList** | l'ordine delle corsie si sistema **una volta** e la lista diventa il percorso |
+| **Apple Promemoria** (dalla iOS 13) | quello che prendi **scende in fondo**: davanti resta solo quello che manca |
+| chiunque | una **barra di completamento**, l'unica cosa che su una lista lunga dice "ci siamo quasi" |
+| **Bring!** | un **colore per corsia**, cosi' scorrendo si riconosce la sezione prima di leggerla |
+
+Due cose invece le facciamo meglio, e sono quelle che nessuna di quelle app
+puo' fare perche' non sa cosa mangi:
+
+1. **le quantita' non le scrivi tu.** Escono dalla somma delle ricette
+   assegnate ai sette giorni — che e' il motivo per cui la pagina esiste;
+2. **la dispensa chiude il cerchio.** "Ne ho gia'" sta sulla riga della spesa,
+   dove la domanda nasce — davanti allo scaffale, o davanti alla lista prima
+   di uscire — e non dentro un modulo da compilare a freddo. E a fine spesa
+   quello che hai preso **entra in dispensa con un tocco**, cosi' la lista
+   della settimana dopo lo sottrae.
+
+Su quest'ultima il file di progetto e' sempre stato netto — *"un inventario
+che non torna e' peggio di nessun inventario"* — e resta valido: la dispensa
+**non** si scala da sola mentre spunti le ricette. Ma "ho comprato queste
+cose" e' un fatto che dichiari tu, non una deduzione, e quella meta' del
+cerchio si poteva chiudere senza tradire la regola.
+
+Dettagli che non sono cosmetici:
+
+- l'ordine delle corsie sta in `S.settings.corsie` e **regge i cambi di
+  piano**: le categorie nuove finiscono in fondo, quelle sparite si ignorano
+  invece di lasciare buchi;
+- il colore di una corsia **si calcola dal nome** invece di stare in una
+  tabella: una categoria nuova nel piano ha subito la sua tinta, e nessuno
+  deve ricordarsi di aggiungerla da qualche parte;
+- l'app conosce **un negozio solo**, e la nota lo dichiara invece di far
+  scoprire il limite a chi ne frequenta due;
+- la dispensa dice **per quanto ti basta** — "copre 2,4 settimane", "copre 4
+  giorni su 7" — che e' un conto che nessuna app di inventario fa, perche'
+  per farlo bisogna sapere cosa mangi.
+
 ### Cercare un alimento su internet
 
 Il bottone sta in **Piano → Cosa mangi → Aggiungi un alimento**, e interroga
@@ -2465,6 +2516,16 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   quelle due non aggiunge una destinazione
 - Non rompere `#/dati`, `#/analisi` e `#/revisione`: sono diventati viste di
   Andamento ma restano indirizzi validi, e ci puntano parecchi link interni
+- Non ordinare la lista della spesa come stanno scritti i dati: una lista si
+  cammina, e l'ordine delle corsie lo conosce solo chi entra in quel negozio
+- Non chiedere di compilare un modulo di quarantaquattro righe per la
+  dispensa: la domanda "quanto ne ho" nasce sulla riga della spesa, ed e' li'
+  che va fatta
+- Non far scalare la dispensa da sola mentre si spuntano le ricette: resta
+  vero che un inventario che non torna e' peggio di nessun inventario. Ma "ho
+  comprato queste cose" e' dichiarato, non dedotto, e quella meta' si chiude
+- Non mettere i colori delle corsie in una tabella: si calcolano dal nome, o
+  una categoria nuova resta grigia finche' qualcuno non se ne ricorda
 - Non chiedere di scrivere a mano una categoria che esiste gia': il motore
   delle sostituzioni confronta stringhe, e "legumi" contro "Legumi" sono due
   famiglie separate senza che nessuno se ne accorga. Si sceglie fra quelle in

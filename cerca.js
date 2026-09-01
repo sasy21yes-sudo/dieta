@@ -117,69 +117,13 @@ function fabbisognoNetto() {
   return out;
 }
 
+/* La vecchia dispensa era un foglio con dentro TUTTI gli alimenti del piano e
+   un campo numerico per ciascuno: quarantaquattro righe da compilare, e
+   infatti restava vuota. Ora la domanda "quanto ne ho" si fa dalla riga della
+   spesa, dove nasce, e la dispensa e' una pagina che mostra solo quello che
+   hai davvero — vedi `spesa.js`. Questa resta come ponte per i vecchi
+   richiami: porta li'. */
 function sheetDispensa() {
-  const disp = dispensa();
-  const byCat = shoppingList();
-  const w = el('div');
-  w.append(el('div', 'eyebrow', 'Cosa hai gia\''));
-  w.append(el('h2', 'sec', 'Dispensa'));
-  w.lastChild.style.marginTop = '0';
-  w.append(el('p', 'muted',
-    'Scrivi quanto ne hai in casa. La lista della spesa toglie questa quantita\' '
-    + 'da quella che serve, e ti resta davanti solo quello che devi davvero comprare.'));
-
-  const tutte = [];
-  for (const items of Object.values(byCat)) tutte.push(...items);
-  tutte.sort((a, b) => a.nome.localeCompare(b.nome));
-
-  const cerca = el('input');
-  cerca.type = 'text'; cerca.placeholder = 'Filtra…'; cerca.className = 'sel-i';
-  cerca.style.marginBottom = '10px';
-  w.append(cerca);
-
-  const lista = el('div');
-  const disegna = () => {
-    lista.innerHTML = '';
-    const q = piatto(cerca.value);
-    for (const it of tutte) {
-      if (q && !piatto(it.nome).includes(q)) continue;
-      const r = el('div', 'porz');
-      const ho = +disp[it.nome] || 0;
-      r.innerHTML = `<span class="nm">${esc(it.nome)}<em>serve ${nf(it.q)} ${esc(it.unita)}</em></span>
-        <button class="btn sm" data-d="-50">−</button>
-        <input type="text" inputmode="decimal" value="${ho || ''}" placeholder="0">
-        <button class="btn sm" data-d="50">+</button>
-        <span class="u">${esc(it.unita)}</span>`;
-      const inp = r.querySelector('input');
-      const setta = n => {
-        n = Math.max(0, Math.round(n * 10) / 10);
-        if (n) disp[it.nome] = n; else delete disp[it.nome];
-        inp.value = n || '';
-        r.classList.toggle('mod', n > 0);
-        save();
-      };
-      r.classList.toggle('mod', ho > 0);
-      r.querySelectorAll('[data-d]').forEach(b => b.onclick = () =>
-        setta((parseNum(inp.value) || 0) + (+b.dataset.d)));
-      inp.oninput = () => { const n = parseNum(inp.value); if (n != null && n >= 0) setta(n); };
-      lista.append(r);
-    }
-    if (!lista.children.length) lista.append(el('p', 'muted', 'Niente che corrisponda.'));
-  };
-  cerca.oninput = disegna;
-  disegna();
-  w.append(lista);
-
-  const az = el('button', 'btn wide', 'Svuota la dispensa');
-  az.style.marginTop = '12px';
-  az.onclick = () => {
-    if (!confirm('Azzerare tutte le quantita\' in casa?')) return;
-    S.dispensa = {}; save(); closeSheet(); route();
-  };
-  w.append(az);
-  const ok = el('button', 'btn wide pri', 'Fatto');
-  ok.style.marginTop = '8px';
-  ok.onclick = () => { save(); closeSheet(); route(); };
-  w.append(ok);
-  sheet(w);
+  closeSheet();
+  location.hash = '#/dispensa';
 }

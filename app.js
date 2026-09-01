@@ -918,14 +918,16 @@ function cardConsiglio(k) {
 /* --------------------------------------------------------------- router */
 const ROUTES = { oggi: viewOggi, diario: viewDiario, corpo: viewCorpo,
                  palestra: viewPalestra, andamento: viewAndamento,
-                 spesa: viewSpesa, prodotti: viewProdotti, foto: viewFoto,
+                 spesa: viewSpesa, dispensa: viewDispensa,
+                 prodotti: viewProdotti, foto: viewFoto,
                  piano: viewPiano, hyrox: viewHyrox, benvenuto: viewBenvenuto,
                  importa: viewImporta, salute: viewSalute,
                  previsioni: viewPrevisioni };
 const TITLES = { oggi: 'Oggi', diario: 'Diario', corpo: 'Corpo',
                  palestra: 'Palestra', dati: 'Dati', analisi: 'Analisi',
                  andamento: 'Andamento',
-                 spesa: 'Spesa', prodotti: 'Alimenti', foto: 'Foto',
+                 spesa: 'Spesa', dispensa: 'Dispensa',
+                 prodotti: 'Lista ingredienti', foto: 'Foto',
                  piano: 'Piano', hyrox: 'Road to HYROX', benvenuto: 'Benvenuto',
                  revisione: 'La settimana', importa: 'Importo da Salute',
                  salute: 'Dati dal telefono', previsioni: 'Dove stai andando' };
@@ -2831,67 +2833,8 @@ function shoppingList() {
   return byCat;
 }
 
-function viewSpesa(v) {
-  if (!usaPiano()) {
-    const c = el('div', 'card');
-    c.append(el('div', 'eyebrow', 'Serve il piano'));
-    c.append(el('div', 'muted',
-      'La lista della spesa e\' la somma degli ingredienti delle ricette assegnate ai sette '
-      + 'giorni. Con il piano alimentare spento quelle ricette non esistono, e non c\'e\' niente '
-      + 'da sommare.'));
-    const b = el('button', 'btn wide pri', 'Accendi il piano alimentare');
-    b.style.marginTop = '10px';
-    b.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'profilo';
-      location.hash = '#/piano'; };
-    c.append(b);
-    v.append(c);
-    return;
-  }
-  const conDisp = typeof fabbisognoNetto === 'function';
-  const inCasa = conDisp ? Object.keys(dispensa()).length : 0;
-  v.append(el('div', 'card flat',
-    `<div class="eyebrow">Fabbisogno settimanale</div>
-     <div class="muted">Quantità totali dei 7 giorni${
-       inCasa ? ', meno quello che hai gia\' in dispensa' : ''}. Arrotonda per eccesso alle confezioni intere.</div>`));
-
-  if (conDisp) {
-    const bd = el('button', 'btn wide');
-    bd.textContent = inCasa ? `Dispensa · ${inCasa} voci in casa` : 'Cosa hai gia\' in casa';
-    bd.style.marginBottom = '12px';
-    bd.onclick = sheetDispensa;
-    v.append(bd);
-  }
-
-  const byCat = conDisp ? fabbisognoNetto() : shoppingList();
-  const qta = (n, u) => u === 'ml' ? `${nf(n)} ml`
-    : n >= 1000 ? `${nf(n / 1000, 2)} kg` : `${nf(n, n % 1 ? 1 : 0)} g`;
-  for (const [cat, items] of Object.entries(byCat)) {
-    // una categoria interamente coperta dalla dispensa non va mostrata vuota:
-    // si dice che e' a posto
-    const daComprare = items.filter(it => (it.compra ?? it.q) > 0);
-    v.append(el('h2', 'sec', cat[0].toUpperCase() + cat.slice(1)));
-    const c = el('div', 'card');
-    if (!daComprare.length) {
-      c.append(el('div', 'muted', 'Tutto gia\' in casa.'));
-      v.append(c); continue;
-    }
-    for (const it of daComprare) {
-      const got = !!S.spesa[it.nome];
-      const row = el('div', 'buy' + (got ? ' got' : ''));
-      const nm = el('div', 'grow nm');
-      nm.innerHTML = esc(it.nome) + (it.ho > 0
-        ? `<em class="gia">serve ${qta(it.q, it.unita)}, in casa ${qta(it.ho, it.unita)}</em>` : '');
-      row.append(el('div', 'box', '✓'), nm,
-                 el('span', 'qt', qta(it.compra ?? it.q, it.unita)));
-      row.onclick = () => { S.spesa[it.nome] = !got; save(); route(); };
-      c.append(row);
-    }
-    v.append(c);
-  }
-  const b = el('button', 'btn wide', 'Azzera la lista');
-  b.onclick = () => { S.spesa = {}; save(); route(); };
-  v.append(b);
-}
+/* viewSpesa e viewDispensa stanno in spesa.js: la lista della spesa e la
+   dispensa sono un dominio loro, e questo file era gia' il piu' lungo. */
 
 /* ------------------------------------------------ calendario (notifiche) */
 function icsFile() {
@@ -3165,10 +3108,16 @@ function sheetMenu() {
     w.lastChild.style.margin = '0 0 14px';
   };
 
-  if (usaPiano()) mk('Lista della spesa',
-     'Il fabbisogno della settimana sommato per categoria, con la spunta. Nasce dai '
-     + 'ricette assegnate ai giorni: senza piano non avrebbe niente da sommare.',
-     () => { closeSheet(); location.hash = '#/spesa'; });
+  if (usaPiano()) {
+    mk('Lista della spesa',
+       'Il fabbisogno della settimana, ordinato come le corsie del tuo negozio. '
+       + 'Le quantita\' vengono dalle ricette assegnate ai giorni: non le scrivi tu.',
+       () => { closeSheet(); location.hash = '#/spesa'; });
+    mk('Dispensa',
+       'Quello che hai gia\' in casa, e per quante settimane ti basta. Si '
+       + 'sottrae dalla lista della spesa.',
+       () => { closeSheet(); location.hash = '#/dispensa'; });
+  }
 
   mk('Scarica i promemoria (.ics)',
      'iOS non permette a una web app di programmare notifiche locali. Questo file crea gli eventi ricorrenti nel Calendario: pasti, integratori, pesata e revisione domenicale. Aprilo una volta e le notifiche arrivano native, senza server.',

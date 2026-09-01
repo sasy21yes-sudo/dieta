@@ -1028,6 +1028,91 @@
 .buy .nm em.gia{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-3);
   font-style:normal;margin-top:1px}
 
+/* ================= la spesa =================
+   Una lista della spesa non si legge, si cammina: le corsie sono sezioni con
+   un colore stabile, quello che prendi scende in fondo, e la barra in testa
+   dice quanto manca senza doverlo contare. */
+.card.sp-testa .sp-num{display:flex;gap:16px;margin:8px 0 10px}
+.sp-num > div{flex:1;min-width:0}
+.sp-num b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;
+  color:var(--pine);line-height:1}
+.sp-num span{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);display:block;margin-top:2px;
+  line-height:1.25}
+.sp-bar{height:6px;border-radius:3px;background:var(--wash);overflow:hidden;
+  border:1px solid var(--rule)}
+.sp-bar i{display:block;height:100%;background:var(--pine);border-radius:3px;
+  transition:width .3s ease}
+@media (prefers-reduced-motion: reduce){ .sp-bar i{transition:none} }
+.sp-sotto{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);margin-top:6px}
+
+/* la testata di una corsia: il pallino colorato e' l'ancora visiva */
+.sp-h{display:flex;align-items:center;gap:9px;width:100%;padding:2px 0 8px;
+  border:0;background:none;color:inherit;font:inherit;text-align:left}
+button.sp-h{cursor:pointer}
+.sp-h .dot{width:10px;height:10px;border-radius:50%;background:var(--tinta,var(--pine));
+  flex:none}
+.sp-h .dot.fatto{background:var(--ink-3)}
+.sp-h .nm{font-weight:600;font-size:14px;letter-spacing:-.01em}
+.sp-h .n{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.sp-h .go{font-family:var(--mono);font-size:13px;color:var(--ink-3);margin-left:8px}
+
+.sp-r{display:flex;align-items:center;gap:10px;padding:9px 0;
+  border-top:1px solid var(--rule)}
+.sp-r .grow{min-width:0;cursor:pointer}
+.sp-r .n{display:block;font-size:14px;line-height:1.25}
+.sp-r .d{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-3);
+  margin-top:2px}
+.sp-r .sp-q{font-family:var(--mono);font-size:13px;font-weight:600;
+  white-space:nowrap;flex:none}
+.sp-box{width:26px;height:26px;flex:none;border-radius:8px;
+  border:1.5px solid var(--rule);background:var(--paper);color:transparent;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.sp-r.preso .sp-box{background:var(--pine);border-color:var(--pine);color:#fff}
+.sp-r.preso .n{text-decoration:line-through;opacity:.5}
+.sp-r.preso .sp-q{opacity:.5}
+.sp-casa{width:30px;height:30px;flex:none;border-radius:9px;border:1px solid var(--rule);
+  background:none;color:var(--ink-3);display:flex;align-items:center;
+  justify-content:center;cursor:pointer;padding:0}
+.sp-casa:active{background:var(--wash)}
+
+.sp-cop-l{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}
+.sp-cop-l .tag{display:inline-flex;gap:5px;align-items:baseline;
+  background:var(--wash);border:1px solid var(--rule);border-radius:8px;
+  padding:5px 9px;font-size:12.5px}
+.sp-cop-l .tag em{font-style:normal;font-family:var(--mono);font-size:10px;
+  color:var(--ink-3)}
+.card.sp-fine{border-left:3px solid var(--pine)}
+
+/* l'ordine delle corsie: le stesse maniglie dei pasti nella settimana */
+.riga-slot.sp-ord{display:flex;align-items:center;gap:10px}
+.sp-ord .dot{width:9px;height:9px;border-radius:50%;background:var(--tinta);flex:none}
+.sp-ord .n{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+
+/* il foglio "quanto ne ho in casa" */
+.ho-r{display:flex;align-items:center;justify-content:center;gap:18px;margin:10px 0 2px}
+.ho-v{display:flex;align-items:baseline;gap:4px}
+.ho-v .n{font-family:var(--mono);font-size:40px;font-weight:600;letter-spacing:-.03em;
+  line-height:1}
+.ho-v em{font-style:normal;font-size:14px;color:var(--ink-3)}
+.ho-resta{text-align:center;font-family:var(--mono);font-size:11px;
+  color:var(--ink-3);margin-bottom:12px}
+
+/* ================= la dispensa ================= */
+.dp-r{display:grid;grid-template-columns:1fr auto;gap:0 12px;align-items:center;
+  padding:10px 0;border-top:1px solid var(--rule);cursor:pointer}
+.dp-r .grow{min-width:0}
+.dp-r .dp-bar{grid-column:1 / -1}
+.dp-r .n{display:block;font-size:14px;font-weight:600;line-height:1.2}
+.dp-r .d{display:block;font-family:var(--mono);font-size:10.5px;
+  color:var(--ink-3);margin-top:2px}
+.dp-r .q{font-family:var(--mono);font-size:13px;font-weight:600;flex:none;
+  white-space:nowrap}
+.dp-bar{display:block;height:3px;border-radius:2px;background:var(--rule);
+  margin-top:6px;overflow:hidden}
+.dp-bar i{display:block;height:100%;background:var(--amber);border-radius:2px}
+.dp-bar i.pieno{background:var(--pine)}
+
 /* ---------------- confronto a cursore ---------------- */
 .cfr{position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;
   background:var(--wash);margin-top:8px;touch-action:none;cursor:ew-resize;

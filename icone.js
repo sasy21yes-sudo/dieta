@@ -50,7 +50,10 @@ const ICONE = {
   undo: { d: ['M3 7v6h6', 'M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13'] },
   // l'elenco: tre righe e i loro pallini
   list: { d: ['M8 6h13', 'M8 12h13', 'M8 18h13',
-              'M3 6h.01', 'M3 12h.01', 'M3 18h.01'] }
+              'M3 6h.01', 'M3 12h.01', 'M3 18h.01'] },
+  // la spunta della spesa e la casa della dispensa
+  check: { d: ['M20 6L9 17l-5-5'] },
+  home: { d: ['M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', 'M9 22V12h6v10'] }
 };
 
 function icona(nome, { size = 20, col = 'currentColor', cls = '' } = {}) {
