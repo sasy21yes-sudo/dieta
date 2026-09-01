@@ -265,12 +265,12 @@ function sheetPorzioni(k, code) {
   w.append(el('h2', 'sec', esc(p.nome || code)));
   w.lastChild.style.marginTop = '0';
   w.append(el('p', 'muted',
-    'Cambia le quantita\' solo per questo giorno. Il pasto nel piano resta com\'e\': domani torna alle sue.'));
+    'Cambia le quantita\' solo per questo giorno. La ricetta nel piano resta com\'e\': domani torna alle sue.'));
 
   // la via d'uscita per chi quel pasto non lo mangia proprio
   const cambia = el('button', 'btn wide');
   cambia.style.marginBottom = '12px';
-  cambia.textContent = 'Sostituisci tutto il pasto \u203a';
+  cambia.textContent = 'Cambia la ricetta \u203a';
   cambia.onclick = () => sheetCambiaPasto(k, code);
   w.append(cambia);
 
@@ -348,7 +348,7 @@ function sheetPorzioni(k, code) {
     lista.innerHTML = '';
     const righe = ingOggi();
     if (!righe.length)
-      lista.append(el('p', 'muted', 'Questo pasto non ha ingredienti.'));
+      lista.append(el('p', 'muted', 'Questa ricetta non ha ingredienti.'));
     for (const i of righe) {
       const unita = unitaIngrediente(i);
       const rif = i.alPostoDi ? i.qta : i.qtaPiano;
@@ -410,7 +410,7 @@ function sheetPorzioni(k, code) {
            ricetta a cui tornare, e lasciarla a zero sarebbe una riga vuota
            che non serve a nessuno. */
         bt.classList.add('rosso');
-        bt.title = 'Togli dal pasto';
+        bt.title = 'Togli dalla ricetta';
         bt.append(icona('trash', { size: 17 }));
         bt.onclick = () => {
           togliDalPasto(code, k, i.slot);
@@ -438,14 +438,14 @@ function sheetPorzioni(k, code) {
     aggiorna();
   };
   disegna();
-  w.append(el('div', 'eyebrow', 'Scala tutto il pasto'));
+  w.append(el('div', 'eyebrow', 'Scala tutta la ricetta'));
   w.append(scale);
   w.append(lista);
 
   const badd = el('button', 'btn wide agg-b');
   badd.style.marginTop = '10px';
   badd.append(icona('plus', { size: 17 }));
-  badd.append(el('span', null, 'Aggiungi un alimento a questo pasto'));
+  badd.append(el('span', null, 'Aggiungi un alimento a questa ricetta'));
   badd.onclick = () => {
     tieni();
     sheetAggiungiAlPasto(k, code);
@@ -482,15 +482,25 @@ function sheetPorzioni(k, code) {
  * cui non si poteva riusare `extra`.
  */
 function sheetAggiungiAlPasto(k, code) {
-  const p = D.pasti[pastoDelGiorno(code, k)];
+  /* `code` a null vuol dire "chiedimi anche dove": e' la scorciatoia da Oggi,
+     dove si sa cosa si e' mangiato ma non si e' ancora deciso se appartiene a
+     un pasto del piano o al fuori piano. Con un codice invece la destinazione
+     e' gia' quella, e chiederla sarebbe una domanda con una risposta sola. */
+  const dest = { code };
+  const slots = usaPiano()
+    ? (D.settimana[dayIdx(k)]?.pasti || []).filter(x => D.pasti[x.codice]) : [];
+  if (!code && !slots.length) dest.code = null;      // resta il fuori piano
+
+  const p = code ? D.pasti[pastoDelGiorno(code, k)] : null;
   const w = el('div');
-  w.append(el('div', 'eyebrow', esc(p?.nome || code)));
+  w.append(el('div', 'eyebrow', code ? esc(p?.nome || code) : (k === today() ? 'Oggi' : k)));
   w.append(el('h2', 'sec', 'Aggiungi un alimento'));
   w.lastChild.style.marginTop = '0';
-  w.append(el('p', 'muted',
-    'Entra dentro questo pasto e <strong>solo per oggi</strong>: il totale '
-    + 'della scheda lo conta, e domani il pasto torna quello del piano. Se '
-    + 'invece hai mangiato qualcosa fuori dai pasti, usa "fuori piano" su Oggi.'));
+  w.append(el('p', 'muted', code
+    ? 'Entra dentro questa ricetta e <strong>solo per oggi</strong>: il totale '
+      + 'della scheda lo conta, e domani la ricetta torna quella del piano.'
+    : 'Scegli cosa, quanto e dove finisce. Vale <strong>solo per oggi</strong>: '
+      + 'dentro una ricetta il piano non cambia, e domani torna quella prevista.'));
 
   const scelto = { v: null };
   // il selettore vuole {v, lab, sub}: mangiabili() parla un'altra lingua, ed
@@ -527,6 +537,39 @@ function sheetAggiungiAlPasto(k, code) {
   const campoQ = w.querySelector('#ag-q');
   if (campoQ) campoQ.oninput = stima;
 
+  /* --- dove finisce --- */
+  if (!code && slots.length) {
+    const fd = el('div', 'field', '<label>Dove</label>');
+    const seg = el('div', 'seg chips');
+    const voci = slots.map(x => [x.codice,
+      `${x.slot}${x.ora ? ' ' + x.ora : ''}`]).concat([[null, 'Fuori piano']]);
+    // il pasto piu' vicino all'ora di adesso e' quasi sempre quello giusto:
+    // chi registra qualcosa lo fa mentre lo sta mangiando
+    const ora = new Date().getHours() * 60 + new Date().getMinutes();
+    let best = null, dist = 1e9;
+    for (const x of slots) {
+      const m = typeof oraMinuti === 'function' ? oraMinuti(x.ora) : null;
+      if (m == null) continue;
+      const dd = Math.abs(m - ora);
+      if (dd < dist) { dist = dd; best = x.codice; }
+    }
+    dest.code = k === today() ? best : null;
+    const dipingi = () => [...seg.children].forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.c || '') === String(dest.code || '')));
+    for (const [c, lab] of voci) {
+      const b = el('button', null, lab);
+      b.dataset.c = c || '';
+      b.onclick = () => { dest.code = c; dipingi(); };
+      seg.append(b);
+    }
+    fd.append(seg);
+    fd.append(el('div', 'hint',
+      'Dentro una ricetta conta nel totale di quella ricetta; nel fuori piano resta '
+      + 'una voce a se\'. Parte gia\' scelto quello piu\' vicino a adesso.'));
+    w.append(fd);
+    dipingi();
+  }
+
   const ok = el('button', 'btn wide pri', 'Aggiungi');
   ok.onclick = () => {
     const v = scelto.v;
@@ -538,14 +581,23 @@ function sheetAggiungiAlPasto(k, code) {
     const prod = String(v).startsWith('p:') ? String(v).slice(2) : null;
     const x = typeof mangiabile === 'function' ? mangiabile(v) : null;
     const nome = x?.nome || String(v).replace(/^a:/, '');
-    aggiungiAlPasto(code, k, nome, q, prod);
-    sheetPorzioni(k, code);
-    toast('Aggiunto per oggi');
+    if (dest.code) {
+      aggiungiAlPasto(dest.code, k, nome, q, prod);
+      if (code) { sheetPorzioni(k, code); toast('Aggiunto per oggi'); }
+      else { closeSheet(); route(); toast(nome + ' in ' + (D.pasti[pastoDelGiorno(dest.code, k)]?.nome || 'quel pasto')); }
+    } else {
+      // fuori piano: i macro si calcolano, non si chiedono
+      const m = typeof macroMangiabile === 'function' ? macroMangiabile(v, q) : null;
+      if (!m) { toast('Non riesco a calcolare i macro'); return; }
+      day(k).extra.push({ nome: `${nome} ${nf(q)} ${x?.unita || 'g'}`,
+        kcal: Math.round(m.kcal), p: m.p, c: m.c, g: m.g, fibre: m.fibre });
+      save(); closeSheet(); route(); toast('Registrato fuori piano');
+    }
   };
   w.append(ok);
   const ann = el('button', 'btn wide', 'Annulla');
   ann.style.marginTop = '8px';
-  ann.onclick = () => sheetPorzioni(k, code);
+  ann.onclick = () => { if (code) sheetPorzioni(k, code); else { closeSheet(); route(); } };
   w.append(ann);
   sheet(w);
 }
@@ -564,7 +616,7 @@ function sheetCambiaPasto(k, code) {
   const src = D.pasti[eff];
   if (!src) return;
   const w = el('div');
-  w.append(el('div', 'eyebrow', 'Tutto il pasto'));
+  w.append(el('div', 'eyebrow', 'Tutta la ricetta'));
   w.append(el('h2', 'sec', esc(src.nome)));
   w.lastChild.style.marginTop = '0';
   w.append(el('p', 'muted', `${nf(src.macro.kcal)} kcal · ${macroRiga(src.macro)}`));
@@ -580,10 +632,10 @@ function sheetCambiaPasto(k, code) {
     box.append(el('div', 'muted', `<strong>${esc(D.pasti[code]?.nome || code)}</strong>`));
     const via = el('button', 'btn wide');
     via.style.marginTop = '9px';
-    via.textContent = 'Rimetti quello del piano';
+    via.textContent = 'Rimetti la ricetta del piano';
     via.onclick = () => {
       mettePastoSwap(code, k, null);
-      closeSheet(); route(); toast('Rimesso il pasto del piano');
+      closeSheet(); route(); toast('Rimessa la ricetta del piano');
     };
     box.append(via);
     w.append(box);
@@ -593,8 +645,8 @@ function sheetCambiaPasto(k, code) {
   w.append(el('h2', 'sec', 'A parita’ di macro'));
   if (!list.length) {
     w.append(el('p', 'muted',
-      'Non ci sono altri pasti composti fra cui scegliere. Si compongono in '
-      + 'Piano, passo "Come li combini".'));
+      'Non ci sono altre ricette composte fra cui scegliere. Si compongono in '
+      + 'Piano, passo "Le tue ricette".'));
   }
   for (const x of list) {
     const dk = x.macro.kcal - src.macro.kcal;
@@ -619,7 +671,7 @@ function sheetCambiaPasto(k, code) {
   w.append(el('p', 'note',
     'Il moltiplicatore riscala tutti gli ingredienti per far combaciare le '
     + 'calorie, e si ferma fra ×0,6 e ×1,6: oltre quei limiti mezza porzione '
-    + 'di un pasto non e’ piu’ quel pasto. Le quantita’ restano modificabili '
+    + 'di una ricetta non e’ piu’ quella ricetta. Le quantita’ restano modificabili '
     + 'una per una qui accanto.'));
 
   const ch = el('button', 'btn wide pri', 'Chiudi');

@@ -2,7 +2,7 @@
  *
  * data/dieta.json resta la fonte di verita' di BASE — quel piano e' stato
  * costruito e verificato a monte, e non va toccato. Quello che l'utente crea
- * si sovrappone come strato: alimenti aggiunti, pasti composti, target propri,
+ * si sovrappone come strato: alimenti aggiunti, ricette composte, target propri,
  * settimana riorganizzata. D e' la fusione dei due, ricostruita a ogni
  * modifica. Cosi' un secondo utente puo' avere una dieta completamente diversa
  * senza che il file di partenza cambi di una virgola.
@@ -361,7 +361,7 @@ function totaliGiorno(g) {
   return t;
 }
 
-/** Macro di un pasto composto: somma degli ingredienti pesati. */
+/** Macro di un ricetta composta: somma degli ingredienti pesati. */
 function macroDaIngredienti(ing) {
   const t = M0();
   for (const i of ing) addM(t, foodM(i.alimento, i.qta));
@@ -411,8 +411,8 @@ function cardModuli() {
   };
 
   voce('piano', 'Piano alimentare',
-    'Pasti assegnati ai sette giorni, lista della spesa, sostituzioni. La scheda Oggi ti dice cosa mangiare.',
-    'Nessun pasto assegnato: scrivi giorno per giorno quello che mangi e l\'app lo confronta con i tuoi target. Niente lista della spesa.');
+    'Ricette assegnate ai sette giorni, lista della spesa, sostituzioni. La scheda Oggi ti dice cosa mangiare.',
+    'Nessuna ricetta assegnata: scrivi giorno per giorno quello che mangi e l\'app lo confronta con i tuoi target. Niente lista della spesa.');
   voce('hyrox', 'Road to HYROX',
     'Conto alla rovescia, programma fino alla gara, stazioni e simulazioni dentro la scheda Gym.',
     'La sezione non compare in Gym. La palestra funziona lo stesso, con tutto il resto.');
@@ -451,7 +451,7 @@ function viewBenvenuto(v) {
       <span class="s">Attenzione: contiene i dati di un'altra persona (eta', altezza, peso, misure). Cambiali dal passo "Chi sei".</span>
     </span><span class="go">›</span>`;
   esempio.onclick = () => {
-    if (!confirm('Il piano di esempio porta con se\' profilo, target, pasti e misure di partenza di un\'altra persona. Li vedrai finche\' non li cambi. Procedo?')) return;
+    if (!confirm('Il piano di esempio porta con se\' profilo, target, ricette e misure di partenza di un\'altra persona. Li vedrai finche\' non li cambi. Procedo?')) return;
     S.settings.pianoBase = 'esempio'; save(); fondiPiano();
     location.hash = '#/oggi'; route();
   };
@@ -509,16 +509,16 @@ function pianoPassi() {
     ...(usaPiano() ? [
     { id: 'alimenti', t: 'Cosa mangi',
       d: 'Tutto quello che mangi, in un elenco solo: a mano, col codice a barre o da internet.',
-      perche: 'Sono i mattoni dei pasti. Puoi saltare questo passo: i ' + baseAli + ' del piano di partenza bastano per cominciare.',
+      perche: 'Sono i mattoni delle ricette. Puoi saltare questo passo: i ' + baseAli + ' del piano di partenza bastano per cominciare.',
       mio: nAli > 0,
       stato: nAli ? `${nAli} tuoi, oltre ai ${baseAli} di base` : `${baseAli} di base, nessuno tuo` },
-    { id: 'pasti', t: 'Come li combini',
-      d: 'Componi i pasti pesando gli ingredienti.',
-      perche: 'I macro si calcolano da soli mentre aggiungi. Un pasto composto qui puoi assegnarlo a qualunque giorno della settimana.',
+    { id: 'pasti', t: 'Le tue ricette',
+      d: 'Componi le ricette pesando gli ingredienti.',
+      perche: 'I macro si calcolano da soli mentre aggiungi. Una ricetta composta qui puoi assegnarla a qualunque giorno della settimana.',
       mio: nPas > 0,
       stato: nPas ? `${nPas} tuoi, oltre ai ${basePas} di base` : `${basePas} di base, nessuno tuo` },
     { id: 'settimana', t: 'Quando li mangi',
-      d: 'Assegna i pasti agli slot dei sette giorni.',
+      d: 'Assegna le ricette agli slot dei sette giorni.',
       perche: 'E’ quello che vedi nella scheda Oggi: da qui escono le barre dei macro, il totale residuo e la lista della spesa.',
       mio: !!p.settimana,
       stato: p.settimana ? 'riorganizzata da te' : 'quella del piano di partenza' }
@@ -603,7 +603,7 @@ function viewPiano(v) {
   base.append(el('div', 'eyebrow', 'Piano di partenza'));
   base.append(el('div', 'muted', S.settings.pianoBase === 'esempio'
     ? 'Stai usando il piano vegano di esempio come base.'
-    : 'Stai costruendo il piano da zero: nessun pasto preimpostato.'));
+    : 'Stai costruendo il piano da zero: nessuna ricetta preimpostata.'));
   const alt = el('button', 'btn wide');
   alt.style.marginTop = '8px';
   alt.textContent = S.settings.pianoBase === 'esempio'
@@ -623,7 +623,7 @@ function viewPiano(v) {
   const sc = el('div', 'card flat');
   sc.append(el('div', 'eyebrow', 'Passalo a qualcuno'));
   sc.append(el('div', 'muted',
-    'Un file JSON con il piano e basta: target, alimenti tuoi, pasti, settimana, '
+    'Un file JSON con il piano e basta: target, alimenti tuoi, ricette, settimana, '
     + 'integratori. Non il diario, non le pesate, non le foto — quelli sono tuoi '
     + 'e non servono a chi riceve il piano. Caricandone uno si aggiunge al tuo: '
     + 'sui nomi che esistono gia’ te lo chiede prima.'));
@@ -1148,7 +1148,7 @@ function sheetAlimento(nome, pre) {
 /* ----------------------------------------------------------------- pasti */
 function sezPasti(v) {
   const p = piano();
-  const b = el('button', 'btn wide pri', 'Componi un pasto');
+  const b = el('button', 'btn wide pri', 'Componi una ricetta');
   b.onclick = () => sheetPasto(null);
   v.append(b);
 
@@ -1191,7 +1191,7 @@ function sheetPasto(id) {
   };
 
   const w = el('div');
-  w.append(el('div', 'eyebrow', id ? 'Modifica pasto' : 'Nuovo pasto'));
+  w.append(el('div', 'eyebrow', id ? 'Modifica ricetta' : 'Nuova ricetta'));
   w.append(el('h2', 'sec', 'Composizione'));
   w.lastChild.style.marginTop = '0';
   w.append(el('div', 'field',
@@ -1308,7 +1308,7 @@ function sheetPasto(id) {
   add.append(ba);
   w.append(add);
 
-  const salva = el('button', 'btn wide pri', 'Salva il pasto');
+  const salva = el('button', 'btn wide pri', 'Salva la ricetta');
   salva.style.marginTop = '10px';
   salva.onclick = () => {
     const nome = $('#pt-nome').value.trim();
@@ -1317,14 +1317,14 @@ function sheetPasto(id) {
     p.pasti[stato.codice] = {
       nome, ingredienti: stato.ing, macro: macroDaIngredienti(stato.ing)
     };
-    save(); fondiPiano(); closeSheet(); route(); toast('Pasto salvato');
+    save(); fondiPiano(); closeSheet(); route(); toast('Ricetta salvata');
   };
   w.append(salva);
   if (id && p.pasti[id]) {
     const del = el('button', 'btn wide', 'Elimina');
     del.style.marginTop = '8px';
     del.onclick = () => {
-      if (!confirm('Eliminare questo pasto?')) return;
+      if (!confirm('Eliminare questa ricetta?')) return;
       delete p.pasti[id]; save(); fondiPiano(); closeSheet(); route(); toast('Eliminato');
     };
     w.append(del);
@@ -1339,12 +1339,12 @@ function sezSettimana(v) {
   // meglio dirlo prima che dopo aver toccato uno slot a vuoto
   if (!Object.keys(D.pasti).length) {
     const av = el('div', 'card');
-    av.append(el('div', 'eyebrow', 'Prima i pasti'));
+    av.append(el('div', 'eyebrow', 'Prima le ricette'));
     av.append(el('div', 'muted',
-      'La settimana e\' l\'ultimo passo: assegna ai giorni i pasti che hai composto. '
+      'La settimana e\' l\'ultimo passo: assegna ai giorni le ricette che hai composto. '
       + 'Non ne hai ancora nessuno, quindi qui per ora c\'e\' solo la struttura degli '
       + 'orari.'));
-    const b = el('button', 'btn wide pri', 'Vai a comporre un pasto');
+    const b = el('button', 'btn wide pri', 'Vai a comporre una ricetta');
     b.style.marginTop = '10px';
     b.onclick = () => { pianoTab = 'pasti'; route(); };
     av.append(b);
@@ -1352,9 +1352,9 @@ function sezSettimana(v) {
   }
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Come funziona</div>
-     <div class="muted">Ogni giorno ha i suoi pasti. Tocca un pasto per cambiare
-     quello assegnato o per toglierlo, oppure aggiungine uno: <strong>il numero di
-     pasti puo essere diverso da un giorno all altro</strong>. I totali si
+     <div class="muted">Ogni giorno ha i suoi slot. Tocca uno slot per cambiare
+     la ricetta assegnata o per toglierla, oppure aggiungine uno: <strong>il numero
+     di ricette puo essere diverso da un giorno all altro</strong>. I totali si
      ricalcolano da soli.</div>`));
 
   for (const [gi, g] of sett.entries()) {
@@ -1391,7 +1391,7 @@ function sezSettimana(v) {
     });
     const add = el('button', 'btn wide');
     add.style.marginTop = '10px';
-    add.textContent = '+ Aggiungi un pasto a ' + g.giorno.toLowerCase();
+    add.textContent = '+ Aggiungi una ricetta a ' + g.giorno.toLowerCase();
     add.onclick = () => nuovoSlot(gi);
     c.append(add);
     v.append(c);
@@ -1505,7 +1505,7 @@ function nuovoSlot(gi) {
   const g = p.settimana[gi];
   const w = el('div');
   w.append(el('div', 'eyebrow', esc(g.giorno)));
-  w.append(el('h2', 'sec', 'Nuovo pasto'));
+  w.append(el('h2', 'sec', 'Nuova ricetta'));
   w.lastChild.style.marginTop = '0';
   w.append(el('div', 'field',
     `<label>Come si chiama</label>
@@ -1538,7 +1538,7 @@ function cambiaSlot(gi, si) {
   const g = p.settimana[gi], s = g.pasti[si];
   const w = el('div');
   w.append(el('div', 'eyebrow', `${esc(g.giorno)} · ${esc(s.slot)}`));
-  w.append(el('h2', 'sec', 'Scegli il pasto'));
+  w.append(el('h2', 'sec', 'Scegli la ricetta'));
   w.lastChild.style.marginTop = '0';
 
   /* Con il piano vuoto D.pasti e' vuoto, e questo foglio mostrava il titolo,
@@ -1548,11 +1548,11 @@ function cambiaSlot(gi, si) {
   const quanti = Object.keys(D.pasti).length;
   if (!quanti) {
     w.append(el('p', 'muted',
-      'Non hai ancora composto nessun pasto, quindi non c\'e\' niente da assegnare a '
-      + 'questo slot. I pasti si costruiscono nel passo <strong>"Come li combini"</strong>: '
+      'Non hai ancora composto nessuna ricetta, quindi non c\'e\' niente da assegnare a '
+      + 'questo slot. Le ricette si costruiscono nel passo <strong>"Le tue ricette"</strong>: '
       + 'scegli gli alimenti e le quantita\', i macro si calcolano da soli, e da li\' in '
-      + 'poi quel pasto lo metti in qualunque giorno.'));
-    const vai = el('button', 'btn wide pri', 'Vai a comporre un pasto');
+      + 'poi quella ricetta la metti in qualunque giorno.'));
+    const vai = el('button', 'btn wide pri', 'Vai a comporre una ricetta');
     vai.onclick = () => { pianoTab = 'pasti'; closeSheet(); route(); };
     w.append(vai);
     const ind = el('button', 'btn wide', 'Torna alla settimana');
@@ -1560,7 +1560,7 @@ function cambiaSlot(gi, si) {
     ind.onclick = closeSheet;
     w.append(ind);
     w.append(el('p', 'note',
-      'Lo slot resta dov\'e\': un giorno con gli orari gia\' impostati e i pasti ancora '
+      'Lo slot resta dov\'e\': un giorno con gli orari gia\' impostati e le ricette ancora '
       + 'da scegliere e\' un piano a meta\', non un piano rotto.'));
     sheet(w);
     return;
@@ -1613,11 +1613,11 @@ function cambiaSlot(gi, si) {
 
   const via = el('button', 'btn wide');
   via.style.marginTop = '8px';
-  via.textContent = 'Togli questo pasto dal giorno';
+  via.textContent = 'Togli questa ricetta dal giorno';
   via.onclick = () => {
     if (!confirm(`Tolgo "${s.slot}" da ${g.giorno}?`)) return;
     g.pasti.splice(si, 1);
-    save(); fondiPiano(); closeSheet(); route(); toast('Pasto tolto');
+    save(); fondiPiano(); closeSheet(); route(); toast('Ricetta tolta');
   };
   w.append(via);
   sheet(w);

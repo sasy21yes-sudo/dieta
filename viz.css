@@ -116,6 +116,13 @@
 .meal-apri .go{color:var(--pine);white-space:nowrap}
 .meal-apri:active{background:var(--rule)}
 
+/* --------- la scorciatoia su Oggi ---------
+   Sta subito sotto "restano N kcal", cioe' nel punto in cui uno pensa "ho
+   mangiato una cosa": prima bisognava scorrere fino in fondo alla pagina o
+   aprire il pasto giusto. */
+.card.veloce .chips{margin-top:6px}
+.card.veloce .agg-b{display:flex;align-items:center;justify-content:center;gap:8px}
+
 /* --------- dentro il pasto --------- */
 .porz-az{display:flex;gap:6px;grid-column:6;justify-self:end;flex:none}
 .ico-b{display:inline-flex;align-items:center;justify-content:center;

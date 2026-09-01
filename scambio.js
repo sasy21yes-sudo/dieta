@@ -30,7 +30,7 @@ const SCAMBIO_FMT = 'dieta-scambio/1';
 const SCAMBIO_PARTI = {
   dieta: {
     n: 'Il piano alimentare',
-    d: 'Target, alimenti tuoi, pasti composti, la settimana, gli integratori.',
+    d: 'Target, alimenti tuoi, ricette composte, la settimana, gli integratori.',
     breve: 'dieta',
     raccogli() {
       const solomiei = {};
@@ -54,7 +54,7 @@ const SCAMBIO_PARTI = {
       const i = (d.integratori || []).length;
       return [
         [a, a === 1 ? 'alimento tuo' : 'alimenti tuoi'],
-        [p, p === 1 ? 'pasto composto' : 'pasti composti'],
+        [p, p === 1 ? 'ricetta composta' : 'ricette composte'],
         [g, g === 1 ? 'giorno di settimana' : 'giorni di settimana'],
         [i, i === 1 ? 'integratore' : 'integratori']
       ];
@@ -321,8 +321,8 @@ function sheetCaricaScambio(f) {
   };
   if (dieta && (dieta.settimana || []).length)
     inter('Prendi anche la settimana',
-      'Rifa\' l\'assegnazione dei pasti ai sette giorni con quella del file. Senza, '
-      + 'i pasti arrivano e li metti dove vuoi tu.',
+      'Rifa\' l\'assegnazione delle ricette ai sette giorni con quella del file. Senza, '
+      + 'le ricette arrivano e le metti dove vuoi tu.',
       v => { opz.settimana = v; });
   if (dieta && Object.keys(dieta.target || {}).length)
     inter('Prendi anche i target',

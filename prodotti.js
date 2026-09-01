@@ -330,7 +330,7 @@ function viewProdotti(v) {
       `${stime.length} voci hanno valori <strong>stimati</strong>: medie di `
       + 'categoria, non l\'etichetta di quello che compri davvero. Aprendone una e '
       + 'leggendo il codice a barre, o copiando i numeri dalla confezione, tutti i '
-      + 'conti dell\'app cominciano a usare quelli veri — pasti, sostituzioni, '
+      + 'conti dell\'app cominciano a usare quelli veri — ricette, sostituzioni, '
       + 'analisi e previsione.'));
     v.append(c);
   }
@@ -388,7 +388,7 @@ function sheetProdotto(p) {
   }
   f.append(el('div', 'hint',
     'Collegandolo, l\'app usa <strong>questi</strong> valori al posto di quelli del '
-    + 'piano in tutti i conti: pasti, sostituzioni, analisi, previsione. Senza '
+    + 'piano in tutti i conti: ricette, sostituzioni, analisi, previsione. Senza '
     + 'collegamento il prodotto resta registrato ma le ricette non lo vedono — '
     + 'compare solo quando scrivi un pasto fuori piano.'));
   w.append(f);
@@ -408,7 +408,7 @@ function sheetProdotto(p) {
     };
     w.append(dentro);
     w.append(el('div', 'hint',
-      'Finche\' resta solo un prodotto, i pasti del piano non possono usarlo: '
+      'Finche\' resta solo un prodotto, le ricette del piano non possono usarlo: '
       + 'compare quando scrivi un pasto fuori piano o quando sostituisci un '
       + 'ingrediente, ma non nelle ricette. Aggiungendolo agli alimenti diventa '
       + 'un nome che il piano sa usare, con i valori della sua etichetta.'));

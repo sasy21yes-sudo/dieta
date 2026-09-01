@@ -1099,7 +1099,7 @@ function pdfResoconto(per) {
     const top = pst.pasti.filter(r => r.previsti >= 3).slice(0, 8);
     if (top.length > 1) {
       doc.y += 4;
-      tabella(['Pasto del piano', 'Previsto', 'Consumato', 'Quota'],
+      tabella(['Ricetta del piano', 'Previsto', 'Consumato', 'Quota'],
         top.map(r => [r.nome, String(r.previsti), String(r.spuntati), pct(r.quota)]),
         [3, 1, 1, 1]);
     }

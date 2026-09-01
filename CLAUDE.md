@@ -1916,6 +1916,60 @@ riscala apposta, e quello che si sposta sono le proteine o i grassi. Dire solo
 "+12 kcal" nasconderebbe esattamente la parte che cambia. Su Oggi la stessa
 cosa in forma corta: `modificato +242 kcal` accanto al nome.
 
+### Si chiamano ricette
+
+Per tutta la vita dell'app il piatto composto — quello che si costruisce
+pesando gli ingredienti, si assegna a uno slot e si puo' sostituire — si e'
+chiamato "pasto". Ma "pasto" nell'app vuol dire **due cose**, e la seconda e'
+il momento in cui si mangia: "il pasto che salti piu' spesso", "pasto fuori
+piano", "pasti spuntati". Chiamarle con la stessa parola costringeva ogni
+frase a chiarire di quale delle due stesse parlando.
+
+Adesso il piatto composto e' una **ricetta**, e il pasto resta il momento. La
+linea passa esattamente li':
+
+| Ricetta | Pasto |
+|---|---|
+| "Componi una ricetta", "Nuova ricetta", "Salva la ricetta" | "Aggiungi pasto fuori piano" |
+| "Assegna le ricette agli slot dei sette giorni" | "il pasto che salti piu' spesso" |
+| "Cambia la ricetta", "Scala tutta la ricetta" | "pasti spuntati", "giorni senza pasti" |
+| il passo del piano, che ora si chiama **"Le tue ricette"** | i promemoria del calendario |
+
+**Nessun sed alla cieca**, e per due ragioni concrete trovate strada facendo:
+"pastigl**ia**" contiene "pasti", e "pasto fuori piano" sarebbe diventato
+"ricetta fuori piano", che e' sbagliato. Cinquantotto stringhe riviste una a
+una, con l'elenco esplicito e un'asserzione per ciascuna.
+
+E **i dati non si toccano**: `D.pasti`, `d.pasti`, `pastoDelGiorno`,
+`pastoSwap`, `pianoTab = 'pasti'`, il prefisso `pasto-` degli id restano
+com'erano. Rinominare le chiavi vorrebbe dire rompere ogni backup gia'
+esportato per un cambio di etichetta.
+
+### La scorciatoia per registrare
+
+L'azione piu' frequente dell'app — "ho mangiato una cosa, la scrivo" — aveva
+due strade, tutte e due lunghe: scorrere fino in fondo a Oggi, dove sta il
+fuori piano, oppure aprire la ricetta giusta e cercare dentro.
+
+Ora c'e' una carta **subito sotto "restano 2456 kcal"**, che e' il punto
+esatto in cui uno pensa di doverlo fare. Due livelli, dal piu' corto al piu'
+lungo:
+
+1. **le pastiglie di quello che registri sempre** — un tocco, niente domande.
+   `extraFrequenti()` esisteva gia' e lo usava soltanto il foglio del fuori
+   piano, cioe' l'ultimo posto in cui si arriva. Qui e' il primo;
+2. **"Aggiungi un alimento"**, che chiede cosa, quanto e **dove**: dentro una
+   ricetta del giorno oppure nel fuori piano. La destinazione parte gia'
+   scelta sulla ricetta piu' vicina all'ora di adesso, perche' chi registra
+   qualcosa quasi sempre lo sta mangiando.
+
+Il codice a barre **non** e' in questa carta, ed e' una rinuncia meditata:
+`leggiCodice()` puo' tornare col solo codice — quando l'utente sceglie di
+inserire i valori a mano — e i suoi macro sono per 100 g. Registrare "un
+prodotto, forse cento grammi, forse zero calorie" vorrebbe dire inventare due
+numeri per risparmiare un tocco. Resta dov'e' accolto da un modulo: in
+"aggiungi un alimento" dentro il piano.
+
 ### Le icone del momento della giornata
 
 Una lista di cinque pasti sono cinque righe uguali, e il primo modo in cui si
@@ -2394,6 +2448,13 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   tre sedute: una giornata storta sposterebbe il verdetto da sola
 - Non presentare le otto settimane come una soglia misurata: e' pratica comune,
   come le costanti di Banister
+- Non rinominare "pasto" in "ricetta" con una sostituzione globale:
+  "pastiglia" contiene "pasti", e "pasto fuori piano" non e' una ricetta. E
+  non toccare le chiavi dei dati per un cambio di etichetta: `D.pasti`,
+  `pastoDelGiorno`, `pastoSwap` e il prefisso `pasto-` reggono i backup gia'
+  esportati
+- Non lasciare la registrazione di un alimento in fondo alla pagina: e'
+  l'azione piu' frequente dell'app, e va dove si guarda quanto manca
 - Non srotolare gli ingredienti di ogni pasto su Oggi: cinque righe per cinque
   pasti fanno un elenco della spesa lungo due schermate, e quasi mai si sta
   cercando qualcosa li' dentro. Si aprono dove si modificano

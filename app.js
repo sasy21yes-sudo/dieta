@@ -1063,6 +1063,14 @@ function viewOggi(v) {
   box.lastChild.style.marginTop = '10px';
   v.append(box);
 
+  /* La scorciatoia, e sta qui per un motivo: e' subito sotto "restano 2456
+     kcal", cioe' nel punto esatto in cui uno pensa "ho mangiato una cosa".
+     Prima per registrare qualcosa bisognava scorrere fino in fondo alla
+     pagina — dove sta il fuori piano — oppure aprire il pasto giusto e
+     cercare dentro. Due strade lunghe per l'azione piu' frequente dell'app.
+     Le pastiglie sono quello che registri di solito: un tocco solo. */
+  if (!futuro) v.append(cardAggiungiVeloce(k, d));
+
   // pasti — solo se il piano e' acceso
   if (!usaPiano()) {
     v.append(cardGiornoLibero(k, d));
@@ -1072,7 +1080,7 @@ function viewOggi(v) {
     const av = el('div', 'card flat');
     av.append(el('div', 'eyebrow', 'Giornata da comporre'));
     av.append(el('div', 'muted',
-      'A questo giorno non e ancora assegnato nessun pasto. Vai in Piano, passo "Quando li mangi", e scegli cosa mettere in ogni slot.'));
+      'A questo giorno non e ancora assegnata nessuna ricetta. Vai in Piano, passo "Quando li mangi", e scegli cosa mettere in ogni slot.'));
     const b = el('button', 'btn wide pri', 'Apri il piano');
     b.style.marginTop = '10px';
     b.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'settimana';
@@ -1162,6 +1170,52 @@ function viewOggi(v) {
 }
 
 /**
+ * La scorciatoia per registrare un alimento, in cima a Oggi.
+ *
+ * Due livelli, dal piu' corto al piu' lungo: le cose che registri sempre —
+ * un tocco, niente domande — e il bottone che apre la scelta completa, dove
+ * si decide anche se finisce dentro un pasto o nel fuori piano.
+ *
+ * `extraFrequenti()` esisteva gia' e lo usava solo il foglio del fuori piano,
+ * cioe' l'ultimo posto in cui si arriva. Qui e' il primo.
+ */
+function cardAggiungiVeloce(k, d) {
+  const c = el('div', 'card veloce');
+  c.append(el('div', 'eyebrow', 'Aggiungi in fretta'));
+
+  const freq = typeof extraFrequenti === 'function' ? extraFrequenti(k, 5) : [];
+  if (freq.length) {
+    const chips = el('div', 'chips');
+    for (const f of freq) {
+      const b = el('button', 'chip');
+      b.innerHTML = `<span class="n">${esc(f.nome)}</span>`
+        + `<span class="k">${nf(f.kcal)} kcal</span>`;
+      b.onclick = () => {
+        const { nome, kcal, p, c: cc, g: gr, fibre } = f;
+        day(k).extra.push({ nome, kcal, p, c: cc || 0, g: gr || 0, fibre: fibre || 0 });
+        save(); route(); toast(nome + ' registrato');
+      };
+      chips.append(b);
+    }
+    c.append(chips);
+  }
+
+  /* Niente codice a barre qui, ed e' una rinuncia meditata: `leggiCodice()`
+     puo' tornare col solo codice — quando l'utente sceglie di inserire i
+     valori a mano — e i suoi macro sono per 100 g. Registrare "un prodotto,
+     forse 100 g, forse 0 kcal" sarebbe inventare due numeri per risparmiare
+     un tocco. Il codice a barre resta dove c'e' un modulo che lo accoglie:
+     in "aggiungi un alimento" dentro il piano. */
+  const b1 = el('button', 'btn wide pri agg-b');
+  b1.style.marginTop = freq.length ? '10px' : '4px';
+  if (typeof icona === 'function') b1.append(icona('plus', { size: 17 }));
+  b1.append(el('span', null, 'Aggiungi un alimento'));
+  b1.onclick = () => sheetAggiungiAlPasto(k, null);
+  c.append(b1);
+  return c;
+}
+
+/**
  * L'elenco di quello che hai mangiato scrivendolo a mano.
  * Con il piano acceso e' il "fuori piano", l'eccezione. Con il piano spento
  * e' l'unico registro che c'e', e allora cambia nome e tono: non c'e' niente
@@ -1201,7 +1255,7 @@ function cardGiornoLibero(k, d) {
   const c = el('div', 'card flat');
   c.append(el('div', 'eyebrow', 'Stai andando a mano libera'));
   c.append(el('div', 'muted',
-    'Il piano alimentare e\' spento: nessun pasto assegnato ai giorni, nessuna lista '
+    'Il piano alimentare e\' spento: nessuna ricetta assegnata ai giorni, nessuna lista '
     + 'della spesa. Le barre qui sopra misurano quello che registri contro i target '
     + 'della scheda "Quanto mangiare", e tutto il resto — peso, previsione, palestra, '
     + 'revisione settimanale — funziona esattamente come prima.'));
@@ -1276,9 +1330,9 @@ function sheetSwap(nome, qta, ctx) {
     + (pr ? ' · <span class="mono">dalla tua etichetta</span>' : '')));
 
   if (ctx) wrap.append(el('p', 'hint',
-    'Quello che scegli vale <strong>solo per oggi</strong>: il pasto nel piano '
+    'Quello che scegli vale <strong>solo per oggi</strong>: la ricetta nel piano '
     + 'resta com\'e\' e domani torna al suo ingrediente. Per cambiarlo per sempre '
-    + 'si passa dall\'editor del pasto, in Piano.'));
+    + 'si passa dall\'editor della ricetta, in Piano.'));
 
   if (attiva) {
     const box = el('div', 'card flat');
@@ -2756,8 +2810,8 @@ function viewSpesa(v) {
     const c = el('div', 'card');
     c.append(el('div', 'eyebrow', 'Serve il piano'));
     c.append(el('div', 'muted',
-      'La lista della spesa e\' la somma degli ingredienti dei pasti assegnati ai sette '
-      + 'giorni. Con il piano alimentare spento quei pasti non esistono, e non c\'e\' niente '
+      'La lista della spesa e\' la somma degli ingredienti delle ricette assegnate ai sette '
+      + 'giorni. Con il piano alimentare spento quelle ricette non esistono, e non c\'e\' niente '
       + 'da sommare.'));
     const b = el('button', 'btn wide pri', 'Accendi il piano alimentare');
     b.style.marginTop = '10px';
@@ -3040,7 +3094,7 @@ function sheetProfilo() {
   vai('Chi sei', 'Nome, eta\', altezza, peso di partenza, e quali parti dell\'app ti servono.',
     () => { if (typeof pianoTab !== 'undefined') pianoTab = 'profilo';
       location.hash = '#/piano'; route(); });
-  vai('Il piano', 'Target, alimenti, pasti, settimana: i cinque passi.',
+  vai('Il piano', 'Target, alimenti, ricette, settimana: i cinque passi.',
     () => { if (typeof pianoTab !== 'undefined') pianoTab = null;
       location.hash = '#/piano'; });
   vai('Quello che mangi', 'L\'elenco degli alimenti e dei prodotti, con da dove viene '
@@ -3087,7 +3141,7 @@ function sheetMenu() {
 
   if (usaPiano()) mk('Lista della spesa',
      'Il fabbisogno della settimana sommato per categoria, con la spunta. Nasce dai '
-     + 'pasti assegnati ai giorni: senza piano non avrebbe niente da sommare.',
+     + 'ricette assegnate ai giorni: senza piano non avrebbe niente da sommare.',
      () => { closeSheet(); location.hash = '#/spesa'; });
 
   mk('Scarica i promemoria (.ics)',
