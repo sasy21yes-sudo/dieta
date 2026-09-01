@@ -1241,12 +1241,50 @@ Tre conseguenze che sarebbero passate inosservate:
   quella cancellazione trovava un oggetto che non esiste piu'. `sheetLibero()`
   in quel caso torna alla schermata di scelta;
 - **le sedute vuote non sono sedute.** Aprire la schermata "come registri?"
-  crea la giornata anche se poi non ci si scrive niente, e nello storico
+  creava la giornata anche se poi non ci si scriveva niente, e nello storico
   compariva una riga "Seduta · 0 serie". Quella e' la traccia di un tocco, non
-  di un allenamento: lo storico e il conteggio ora le saltano.
+  di un allenamento: lo storico e il conteggio la saltano — e adesso non nasce
+  piu' (vedi sotto).
 
 E il bottone in testa non dice piu' "Continua quella di oggi" su una seduta di
 tre mesi fa: li' non si continua niente, si apre e si corregge.
+
+### Aprire non registra
+
+`sheetSeduta()` cominciava con `p.sessioni[k] ||= { nome: '', serie: [] }`:
+la giornata di palestra **nasceva nel momento in cui si guardava** la
+schermata di scelta. Bastava toccare "Registra pesi", cambiare idea e
+chiudere per lasciarsi dietro una seduta a zero serie.
+
+Da li' in poi due cose sbagliate insieme, che e' anche il motivo per cui era
+difficile da riconoscere:
+
+1. la carta di Gym decideva l'etichetta del bottone sull'**esistenza** della
+   seduta, non sulle serie: scriveva **"Continua la seduta"** e sotto
+   "Seduta — 0 serie, 0 kg" a chi non aveva ancora fatto niente;
+2. e quel bottone **non continuava niente** — non poteva, non c'era nulla da
+   continuare: riportava alla schermata di scelta, cioe' esattamente dove si
+   era gia'. Da fuori sembrava che non funzionasse, ed era una descrizione
+   giusta.
+
+La seduta ora la creano i **due punti in cui una serie viene scritta
+davvero**: la guida (che gia' lo faceva) e il salvataggio del modulo da
+scheda. La schermata di scelta non tocca il registro, e per simmetria, chi la
+apre su una giornata rimasta vuota se la vede cancellare.
+
+Due conseguenze da non correggere per errore:
+
+- **la seduta libera ha bisogno di dire che sta cominciando.** Ci si entra in
+  due modi opposti: scegliendola dalla schermata di scelta — e li' la
+  giornata nasce — oppure tornandoci dopo aver cancellato una serie, e se era
+  l'ultima la seduta e' sparita apposta. Ricrearla in quel caso rimetterebbe
+  dentro proprio quello che si e' appena tolto, quindi il primo caso lo
+  dichiara (`sheetLibero(k, true)`) e il secondo torna alla scelta.
+- **le sedute vuote gia' in giro si buttano all'avvio.** Chi ha usato l'app
+  finora se le ritrova nel registro, e non sono innocue: entrano nel
+  conteggio delle sedute della revisione. `normalize()` le toglie una volta
+  sola — e togliere una seduta senza serie non perde nessun dato, perche' un
+  dato dentro non c'e'.
 
 ### Una seduta si elimina
 
@@ -2672,9 +2710,18 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   e' memorizzata per muscolo e continuerebbe a rispondere coi numeri di prima
 - Non far tornare `sheetLibero()` su una seduta che non esiste piu': togliendo
   l'ultima serie la giornata sparisce dal registro
-- Non elencare nello storico le sedute senza serie: aprire la schermata di
-  scelta ne crea una, e quella e' la traccia di un tocco, non di un
-  allenamento
+- Non far nascere una seduta dall'aver **guardato** la schermata di scelta:
+  la giornata la creano i punti in cui una serie viene scritta davvero. Una
+  seduta a zero serie faceva scrivere "Continua la seduta" a chi non aveva
+  cominciato, e quel bottone non poteva continuare niente
+- Non decidere l'etichetta di un bottone sull'esistenza di un oggetto quando
+  quello che conta e' se dentro c'e' qualcosa: `serie.length`, non
+  `sessioni[k]`
+- Non far ricreare la seduta a `sheetLibero()` quando ci si torna dopo aver
+  cancellato l'ultima serie: rimetterebbe dentro quello che si e' appena
+  tolto. L'ingresso vero lo dichiara, il ritorno no
+- Non elencare nello storico le sedute senza serie: la traccia di un tocco non
+  e' un allenamento
 - Non far riprendere una guida che non ha registrato niente: aprire una
   scheda e richiuderla lascia uno stato a zero serie, e riproporlo ogni volta
   e' una domanda su un lavoro mai iniziato

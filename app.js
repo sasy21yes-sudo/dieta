@@ -87,6 +87,13 @@ function normalize() {
   S.settings.pause ||= [];
   S.model ||= {}; S.model.prev ||= []; S.prodotti ||= [];
   S.palestra ||= {}; S.palestra.sessioni ||= {}; S.palestra.esercizi ||= [];
+  // Le sedute a zero serie sono la traccia di un tocco, non di un
+  // allenamento: per un po' aprire la schermata di scelta ne creava una, e
+  // chi ci e' passato se le ritrova nel registro. Entrano nel conteggio
+  // delle sedute della revisione e fanno scrivere "Continua la seduta" a chi
+  // non ha ancora cominciato. Si buttano una volta sola, all'avvio.
+  for (const [k, s] of Object.entries(S.palestra.sessioni))
+    if (!s || !s.serie?.length) delete S.palestra.sessioni[k];
   S.palestra.schede ||= []; S.palestra.acciacchi ||= [];
   S.palestra.esec ||= {}; S.palestra.cardio ||= {};   // esercizio -> esecuzione nel catalogo pubblico
   // dedotto dai dati la prima volta, poi e' una scelta dell'utente

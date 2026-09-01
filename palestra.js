@@ -577,7 +577,13 @@ function viewPalestra(v) {
   const st = statoMuscoli(k);
 
   /* --- cosa hai fatto oggi, e il bottone per farne --- */
-  const oggi = P().sessioni[k];
+  /* Una seduta senza serie non e' una seduta: e' la traccia di un tocco.
+     La stessa regola dello storico, che gia' le salta. Qui reggeva
+     l'etichetta del bottone e la riga di riepilogo, e diceva "Continua la
+     seduta" (poi "Seduta — 0 serie, 0 kg") a chi non aveva ancora fatto
+     niente. */
+  const sess = P().sessioni[k];
+  const oggi = sess?.serie?.length ? sess : null;
   const card2 = typeof cardioDi === 'function' ? cardioDi(k) : [];
   const testa = el('div', 'card');
   testa.append(el('div', 'eyebrow', 'Oggi'));
@@ -1381,7 +1387,18 @@ function monitoraggioProgramma(ids, k = today()) {
  */
 function sheetSeduta(k) {
   const p = P();
-  p.sessioni[k] ||= { nome: '', serie: [] };
+  /* **Aprire non registra.** Qui stava `p.sessioni[k] ||= {...}`, cioe' la
+     giornata di palestra nasceva nel momento in cui si guardava la schermata
+     di scelta: bastava toccare "Registra pesi" e chiudere per lasciarsi
+     dietro una seduta a zero serie, che da li' in poi faceva scrivere
+     "Continua la seduta" sulla carta di Gym e "Seduta — 0 serie" nel
+     riepilogo. Un bottone che promette di continuare un lavoro mai
+     cominciato, e che infatti riportava alla schermata di scelta senza
+     continuare niente.
+     Adesso la seduta la creano i due punti in cui una serie viene scritta
+     davvero: la guida e il salvataggio del modulo. */
+  const sVecchia = p.sessioni[k];
+  if (sVecchia && !sVecchia.serie?.length) { delete p.sessioni[k]; save(); }
   /* Una seduta guidata lasciata a meta' riprende da dove era.
      Chiudere il foglio per sbaglio — o perche' e' suonato il telefono — non
      e' una decisione: e' un incidente, e passare di nuovo da "come registri?"
@@ -1395,7 +1412,7 @@ function sheetSeduta(k) {
      riprendere una seduta che non era mai cominciata. Una guida senza
      nemmeno una serie non e' un lavoro interrotto: e' un tocco, e si
      cancella invece di trascinarsela dietro. */
-  const g = p.sessioni[k].guida;
+  const g = p.sessioni[k]?.guida;
   if (g && !p.sessioni[k].serie.length) { delete p.sessioni[k].guida; save(); }
   else if (g?.scheda && scheda(g.scheda) && typeof sheetGuidata === 'function')
     return sheetGuidata(k, g.scheda);
@@ -1499,7 +1516,7 @@ function sheetSceltaModo(k) {
   const b2 = el('button', 'btn wide' + (gia ? '' : ' pri'),
     'Seduta libera, esercizio per esercizio');
   b2.style.marginTop = '8px';
-  b2.onclick = () => sheetLibero(k);
+  b2.onclick = () => sheetLibero(k, true);
   w.append(b2);
 
   /* Una seduta registrata per sbaglio — il giorno sbagliato, due volte la
@@ -1542,7 +1559,6 @@ const scarichiTesto = d => (d || []).map(x => `${nf(x.kg, 1)}x${x.reps}`).join('
 function sheetDaScheda(k, schedaId) {
   const p = P(), sc = scheda(schedaId);
   if (!sc) return sheetSceltaModo(k);
-  const s = p.sessioni[k];
   const et = etichetteScheda(sc.esercizi);
 
   const w = el('div');
@@ -1651,6 +1667,9 @@ function sheetDaScheda(k, schedaId) {
       }
     }
     if (!serie.length) { toast('Non hai compilato nessuna serie'); return; }
+    // la giornata nasce qui, con la prima serie vera dentro: aprendo il
+    // modulo e uscendo non deve restare niente nel registro
+    const s = p.sessioni[k] ||= { nome: '', serie: [] };
     s.serie = serie;
     s.nome = sc.nome;
     s.scheda = sc.id;
@@ -1774,10 +1793,15 @@ function sheetSerie(k, i, onChiudi) {
 }
 
 /** Seduta libera: esercizio per esercizio, serie per serie. */
-function sheetLibero(k) {
+function sheetLibero(k, crea = false) {
   const p = P();
-  // togliendo l'ultima serie la seduta sparisce dal registro: chi torna qui
-  // da quella cancellazione troverebbe un oggetto che non esiste piu'
+  /* Qui si entra in due modi opposti, e vanno distinti:
+     - **scegliendo "seduta libera"** dalla schermata di scelta: e' l'inizio
+       di una giornata, e la giornata nasce adesso (`crea`);
+     - **tornando da una serie cancellata**: se era l'ultima, la seduta e'
+       sparita dal registro, e ricrearla vuota rimetterebbe dentro proprio
+       quello che si e' appena tolto. Li' si torna alla scelta. */
+  if (crea) p.sessioni[k] ||= { nome: '', serie: [] };
   if (!p.sessioni[k]) return sheetSceltaModo(k);
   const s = p.sessioni[k];
   const w = el('div');
