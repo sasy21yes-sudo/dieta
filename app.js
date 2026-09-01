@@ -10,8 +10,17 @@ let S = null;                 // stato utente
 const $ = (s, r = document) => r.querySelector(s);
 const el = (t, c, h) => { const e = document.createElement(t);
   if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
-const nf = (n, d = 0) => n.toLocaleString('it-IT',
-  { minimumFractionDigits: d, maximumFractionDigits: d });
+/* Un numero che non c'e' si scrive "—", non fa esplodere la pagina.
+   `nf(null)` lanciava (`Cannot read properties of null`), e siccome nf sta in
+   qualche centinaio di punti bastava un dato mancante in uno solo di quelli
+   per lasciare mezza schermata non disegnata — con l'eccezione in console,
+   dove non la legge nessuno. Il trattino e' gia' quello che le tabelle usano
+   per "non misurato", quindi non introduce un simbolo nuovo. Lo zero resta
+   zero: e' un valore, non un buco. */
+const nf = (n, d = 0) => (n == null || (typeof n === 'number' && !isFinite(n)))
+  ? '—'
+  : Number(n).toLocaleString('it-IT',
+      { minimumFractionDigits: d, maximumFractionDigits: d });
 const esc = s => String(s).replace(/[&<>"]/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const dkey = d => { const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
@@ -377,7 +386,11 @@ function tutteBia() {
  * guardando, e chi legge deve saperlo.
  */
 function composition(k = today()) {
-  const h = D.profilo.altezza_cm, TF = D.target_fisico;
+  // il fisico di riferimento si sceglie, e chi non l'ha scelto non ha una
+  // colonna "target": `t` resta un oggetto di null, cosi' chi legge non deve
+  // sapere se c'e' o no, e le righe che non hanno un termine di paragone
+  // spariscono da sole
+  const h = D.profilo.altezza_cm, TF = D.target_fisico || {};
   const vita = lastMeas('vita'), collo = lastMeas('collo'), torace = lastMeas('torace');
   const peso = trendW(k) ?? lastWeight() ?? D.profilo.peso_iniziale_kg;
   // un collo fuori scala falsa tutto: 7 cm di errore valgono 5 punti di grasso
@@ -404,10 +417,13 @@ function composition(k = today()) {
     peso, vita, collo, torace, colloSospetto, bf, lbm, fm, bia, stima, fonte,
     vitaAltezza: vita ? vita / h : null,
     toraceVita: torace && vita ? torace / vita : null,
-    t: { peso: TF.peso_kg, bf: TF.bf_pct, lbm: TF.massa_magra_kg,
-         vitaAltezza: TF.rapporti.vita_altezza, toraceVita: TF.rapporti.torace_vita },
-    dLbm: lbm != null ? TF.massa_magra_kg - lbm : null,
-    dFm: fm != null ? fm - (TF.peso_kg * TF.bf_pct / 100) : null
+    conTarget: !!D.target_fisico,
+    t: { peso: TF.peso_kg ?? null, bf: TF.bf_pct ?? null,
+         lbm: TF.massa_magra_kg ?? null,
+         vitaAltezza: TF.rapporti?.vita_altezza ?? null,
+         toraceVita: TF.rapporti?.torace_vita ?? null },
+    dLbm: lbm != null && TF.massa_magra_kg != null ? TF.massa_magra_kg - lbm : null,
+    dFm: fm != null && TF.peso_kg != null ? fm - (TF.peso_kg * TF.bf_pct / 100) : null
   };
 }
 
@@ -2121,7 +2137,10 @@ const FIG = { W: 240, H: 520, CX: 120,
 const TPL = { collo: 17.5, torace: 46, vita: 37, fianchi: 43, coscia: 22, braccio: 14.5 };
 
 function widths(m) {
-  const R = D.target_fisico.misure;
+  // senza fisico di riferimento il template resta se stesso: e' gia' una
+  // figura ben proporzionata, e modularla per rapporto contro il nulla
+  // vorrebbe dire inventarsi un riferimento
+  const R = D.target_fisico?.misure || {};
   const w = {};
   for (const id of Object.keys(TPL))
     w[id] = TPL[id] * (m[id] > 0 && R[id] > 0 ? m[id] / R[id] : 1);
@@ -2395,7 +2414,7 @@ function sheetPeso(k) {
 }
 
 function viewCorpo(v) {
-  const k = today(), C = composition(k), TF = D.target_fisico;
+  const k = today(), C = composition(k), TF = D.target_fisico || {};
   ledgerRecord(k);
 
   /* In cima c'e' il peso, che e' il numero che si scrive tutti i giorni.
@@ -2408,20 +2427,34 @@ function viewCorpo(v) {
   const curM = figMeas(Object.fromEntries(D.misure.map(m => [m.id, lastMeas(m.id)])));
   const cf = el('div', 'card');
   cf.append(el('div', 'bodywrap', bodySVG(curM, TF.misure)));
+  // senza riferimento la tratteggiata non c'e', e allora non va nemmeno
+  // nominata in legenda: una voce che indica una cosa che non si vede fa
+  // cercare un difetto del disegno
   cf.append(el('div', 'legend',
-    `<span><i class="sw sw-now"></i>Ora</span>
-     <span><i class="sw sw-tgt"></i>Target</span>`));
+    '<span><i class="sw sw-now"></i>Ora</span>'
+    + (TF.misure ? '<span><i class="sw sw-tgt"></i>Riferimento</span>' : '')));
   cf.append(el('p', 'hint',
     'La sagoma è disegnata sulle circonferenze registrate: cambia quando cambiano i numeri. È schematica, serve a leggere le proporzioni.'));
   // la nota sulla provenienza del target segue il target, che ora e' solo qui
   // e nella tabella: presentare come rilevato cio' che e' stimato sarebbe la
   // stessa bugia anche detta in un punto diverso
-  cf.append(el('p', 'note',
-    'La tratteggiata e\' il fisico di riferimento. Non e\' un obiettivo di peso: '
-    + 'fra qui e li\' la bilancia cambia poco e cambiano le proporzioni.'
-    + (TF.fonte === 'stima'
-      ? ' I suoi numeri sono stimati e non rilevati: danno una direzione, non '
+  if (TF.misure) cf.append(el('p', 'note',
+    `La tratteggiata e\' <strong>${esc(TF.nome || 'il fisico di riferimento')}</strong>. `
+    + 'Non e\' un obiettivo di peso: fra qui e li\' la bilancia cambia poco e '
+    + 'cambiano le proporzioni.'
+    + (TF.fonte === 'stima' || TF.fonte === 'dichiarazione'
+      ? ' I suoi numeri sono dichiarati e non rilevati: danno una direzione, non '
         + 'una soglia da centrare al decimo.' : '')));
+  else {
+    cf.append(el('p', 'note',
+      'Non hai scelto un fisico di riferimento, quindi c\'e\' solo la tua sagoma. '
+      + 'Va benissimo cosi\': il confronto piu\' utile e\' con te di un mese fa.'));
+    const bf = el('button', 'btn wide');
+    bf.style.marginTop = '4px';
+    bf.textContent = 'Scegline uno';
+    bf.onclick = () => { if (typeof sheetFisici === 'function') sheetFisici(k); };
+    cf.append(bf);
+  }
   v.append(cf);
 
   /* --- composizione --- */

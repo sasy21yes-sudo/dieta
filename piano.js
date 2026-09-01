@@ -111,8 +111,25 @@ function fondiPiano() {
     settimana: p.settimana || (esempio ? DBASE.settimana : settimanaVuota()),
     // i valori di partenza delle misure sono di quella persona, non di chi installa
     misure: esempio ? DBASE.misure : DBASE.misure.map(m => ({ ...m, base: null })),
-    integratori: fondiIntegratori(esempio)
+    integratori: fondiIntegratori(esempio),
+    /* Il fisico di riferimento e' una SCELTA, non un default.
+       Finora `target_fisico` arrivava da `...DBASE` per tutti, quindi anche chi
+       cominciava da zero si ritrovava addosso il fisico di una persona reale
+       scelta da qualcun altro — la stessa cosa che questo file vieta per il
+       nome, l'eta' e le misure di partenza. Con il piano vuoto non c'e'
+       nessuno finche' non lo scegli, e la colonna "Manca" resta vuota. */
+    target_fisico: p.fisico
+      ? { ...p.fisico, rapporti: p.fisico.rapporti || DBASE.target_fisico.rapporti }
+      : (esempio ? DBASE.target_fisico : null)
   };
+  /* Le misure del riferimento vivono anche su `D.misure[].target`: da li'
+     escono la colonna "Manca" di Corpo e la sagoma tratteggiata. Vanno tenute
+     insieme al fisico, o la figura di riferimento sarebbe di uno e la tabella
+     di un altro. */
+  const mt = p.misureTarget || (D.target_fisico ? D.target_fisico.misure : null);
+  D.misure = D.misure.map(m => ({
+    ...m, target: mt ? (mt[m.id] ?? null) : (esempio ? m.target : null)
+  }));
   /* L'ordine per orario si applica QUI, in lettura, e non solo quando si
      aggiunge uno slot: cosi' vale per il piano di esempio, per una settimana
      arrivata da un file di scambio e per qualunque altra strada — e vale
@@ -831,6 +848,10 @@ function cardFotoProfilo() {
 /* ---------------------------------------------------------------- target */
 function sezTarget(v) {
   const p = piano();
+  /* L'obiettivo viene PRIMA di tutto: e' la domanda a cui gli altri numeri
+     sono la risposta, e finora non la faceva nessuno. */
+  if (typeof cardObiettivo === 'function') v.append(cardObiettivo());
+  if (typeof cardFisico === 'function') v.append(cardFisico());
   if (typeof cardTarget === 'function') v.append(cardTarget());
   if (typeof cardRampaFibre === 'function') { const rf = cardRampaFibre(); if (rf) v.append(rf); }
   const c = el('div', 'card');

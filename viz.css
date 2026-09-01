@@ -1452,3 +1452,44 @@ button.sp-h{cursor:pointer}
 .prod.vuoto{border-left:3px solid var(--rule)}
 .prod.vuoto .nm{color:var(--ink-3);font-weight:500}
 .prod.vuoto .kc{color:var(--pine);font-weight:700}
+
+/* ---------------- l'obiettivo e il fisico di riferimento ----------------
+   Le righe dell'obiettivo hanno la forma delle pastiglie del ritmo in
+   target.js (.tg-r): sono la stessa domanda a due livelli di dettaglio, e
+   due disegni diversi le farebbero sembrare due cose che non c'entrano. */
+.ob-r{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;
+  background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+  padding:11px 13px;margin-top:8px;font:inherit;color:inherit;cursor:pointer}
+.ob-r.on{border-color:var(--pine);background:var(--pine-soft)}
+.ob-r .k{flex:0 0 62px;font-family:var(--mono);font-size:17px;font-weight:600;
+  color:var(--pine);line-height:1.1}
+.ob-r .k em{display:block;font-style:normal;font-size:9px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:1px}
+.ob-r .body{flex:1;min-width:0}
+.ob-r .t{display:block;font-weight:600;font-size:14px}
+.ob-r .d{display:block;color:var(--ink-2);font-size:12.5px;line-height:1.35;
+  margin-top:2px}
+.ob-r .s{display:block;font-family:var(--mono);font-size:10.5px;
+  color:var(--ink-3);margin-top:4px}
+
+.fis-h{display:flex;flex-direction:column;margin:2px 0 8px}
+.fis-h .t{font-weight:600;font-size:15px}
+.fis-h .d{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:2px}
+.fis-r{display:flex;gap:10px;align-items:center;width:100%;text-align:left;
+  background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+  padding:11px 13px;margin-top:8px;font:inherit;color:inherit;cursor:pointer}
+.fis-r.on{border-color:var(--pine);background:var(--pine-soft)}
+.fis-r .body{flex:1;min-width:0}
+.fis-r .t{display:block;font-weight:600;font-size:14px}
+.fis-r .d{display:block;color:var(--ink-3);font-size:11.5px;margin-top:1px}
+.fis-r .n{display:block;font-size:11px;color:var(--ink-2);margin-top:4px}
+.fis-r .s{display:block;font-size:11.5px;color:var(--ink-2);margin-top:3px;
+  line-height:1.35}
+.fis-r .go{color:var(--ink-3);font-size:18px;flex:0 0 auto}
+/* la pastiglia intermedia: "al limite naturale" non e' un errore ma non e'
+   nemmeno un via libera, e non aveva un colore suo */
+.pill.amb{background:var(--amber-soft);color:var(--amber)}
+
+/* un ritmo che il pavimento taglia si vede prima di sceglierlo */
+.seg button.bloc{text-decoration:line-through;color:var(--ink-3)}

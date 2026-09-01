@@ -72,6 +72,7 @@ anim.js         toolkit di animazione (vedi sotto). Caricato PRIMA di charts.js
 icone.js        le icone prese da Feather/Lucide, ricopiate dentro (vedi sotto)
 charts.js       toolkit SVG dei grafici + vista Dati
 revisione.js    revisione settimanale: diagnosi, leve, impegno, priorita'
+obiettivo.js    l'obiettivo (cut/ricomp/mantenimento/bulk) e il fisico a cui punti
 target.js       il target che si ricalibra sul dispendio + rampa fibre
 previsioni.js   proiezioni di misure, composizione e forza a 28 giorni
 cerca.js        selettore cercabile riusabile
@@ -101,6 +102,7 @@ data/dieta.json IL DOMINIO alimentare — vedi sotto
 data/palestra.json catalogo esercizi, gruppi muscolari, modello forma-fatica
 data/sfide.json 38 sfide giornaliere + 23 traguardi
 data/corpo.json tracciati anatomici della mappa muscolare (MIT, vedi sotto)
+data/fisici.json 11 fisici di riferimento — dichiarazioni di stampa, non misure
 icons/          180 (apple-touch), 192, 512, maskable
 ```
 
@@ -906,6 +908,88 @@ grande di qualsiasi segnale reale. Il motore quindi prevede la **linea di tenden
 su orizzonti di 7 e 28 giorni con banda al 95%, e mostra separatamente la forbice della
 bilancia di domani per far vedere perché il numero del mattino non va letto. Nessuna
 proiezione a data fissa: sarebbe un conto alla rovescia, che questo file vieta.
+
+### Chi non e' seguito da nessuno non sa da che numero partire
+
+**E' il caso normale, e l'app lo trattava come se non esistesse.** Chi ha un
+nutrizionista i suoi numeri ce li ha gia': glieli ha dati una persona che l'ha
+visto, e nessuna formula qui dentro ne sa di piu' — la carta glielo dice come
+prima cosa e non insiste. Ma chi apre l'app senza nessuno alle spalle si
+trovava davanti una casella "Calorie" da riempire, e nient'altro.
+
+Quello che c'era rispondeva a meta' della domanda e sempre troppo tardi:
+`targetNeutro()` calcolava Mifflin-St Jeor per il livello di attivita' senza
+mai chiedere **per fare cosa**, e `cardTarget()` — che il numero lo corregge
+benissimo — si rifiuta di parlare finche' non ci sono due settimane di
+registro. Cioe' nell'unico momento in cui la domanda si pone davvero, non
+c'era niente.
+
+`obiettivo.js` fa tre passaggi, in quest'ordine:
+
+1. **L'obiettivo** — perdere grasso, ricomporsi, mantenere, crescere. La
+   ricomposizione e' una voce a se' e non un sinonimo di mantenimento: le
+   calorie sono le stesse, ma le proteine no e il metro con cui si giudica la
+   riuscita nemmeno (li' la bilancia non deve muoversi, ed e' il punto).
+2. **Il ritmo, in percentuale del peso a settimana.** Non in chili fissi:
+   mezzo chilo a 55 kg e mezzo chilo a 100 kg sono due deficit completamente
+   diversi, e un elenco di ritmi in kg dice la cosa giusta a una persona sola.
+3. **I macro, dall'obiettivo e non solo dalle calorie.** Le proteine salgono in
+   deficit — 2,2 g/kg contro 1,8 in mantenimento — perche' e' li' che la massa
+   magra e' a rischio.
+
+**Due pavimenti, e vince il piu' alto:** il metabolismo a riposo per 1,1, che
+c'era gia', e il **25% sotto il dispendio**, che questo file prescriveva da
+tempo senza che nessuno lo applicasse. E un ritmo che il pavimento taglia si
+vede **barrato prima di sceglierlo**: un bottone che promette −0,7 kg a
+settimana e consegna le calorie di −0,35 e' un bottone che mente.
+
+Come tutto il resto: la proposta si accetta, non si applica da sola. E c'e' un
+secondo bottone, **"tieni solo l'obiettivo, non i target"**, per chi i numeri
+li ha da qualcun altro: l'app sa cosa stai cercando di fare senza toccare
+quello che segui.
+
+### Gli idoli sono dichiarazioni, e vanno riportati sulla tua altezza
+
+`target_fisico` era **una persona sola, uguale per tutti**, scritta in
+`data/dieta.json` — e arrivava da `...DBASE` anche a chi cominciava da zero,
+cioe' esattamente la cosa che questo file vieta per il nome, l'eta' e le
+misure di partenza. Con il piano vuoto adesso non c'e' nessuno finche' non lo
+scegli, e la colonna "Manca" resta vuota invece di misurarti contro qualcuno
+che non hai scelto.
+
+`data/fisici.json` ne tiene **undici**, sette uomini e quattro donne, e ogni
+riga porta le sue avvertenze. Quattro regole li tengono onesti:
+
+1. **Sono dichiarazioni, non misure.** Interviste, schede promozionali,
+   articoli: nessuno ha mai messo il metro addosso a Brad Pitt. `fonte` vale
+   `dichiarazione` su tutti, e la UI lo scrive dove i numeri si vedono.
+2. **Si riportano sulla tua altezza.** E' la parte che rende la cosa una
+   proporzione invece di un poster: i centimetri di qualcuno alto 1,90 non
+   dicono niente a chi e' alto 1,60. Le circonferenze scalano con l'altezza,
+   **la massa magra con il suo quadrato** — che e' la definizione dell'FFMI —
+   ed e' anche il motivo per cui il peso finale puo' venire molto diverso da
+   quello dichiarato senza che nessuno abbia sbagliato i conti.
+3. **L'FFMI dice se e' roba che un corpo costruisce da solo.** Massa magra
+   diviso il quadrato dell'altezza, normalizzata a 1,80 m. Sopra 25 (uomini) o
+   22 (donne) si esce da quello che si raggiunge senza aiuti: il riferimento
+   viene dallo studio di Kouri del 1995 su atleti prima e dopo l'era degli
+   steroidi, ed e' **pratica comune, non una legge** — come le costanti di
+   Banister. Non blocca niente: dice. Misurato su un profilo di 1,80 m,
+   Chris Hemsworth esce a 25,2 ed e' marcato *oltre il limite naturale*,
+   Brad Pitt a 18,6 ed e' marcato *raggiungibile*.
+4. **Nessuna previsione di quanto ci vuole.** E' la regola di sempre: una data
+   qui sarebbe una scadenza da mancare, e su un obiettivo che richiede anni
+   sarebbe anche falsa. La scheda lo scrive, e rimanda a "Dove stai andando",
+   che sul tempo risponde come intervallo e si rifiuta quando i dati non
+   bastano.
+
+E il **numero citato non e' sempre quello operativo**: il 5-6% di grasso che
+gira su Fight Club e' condizione da giorno di riprese, non uno stato in cui si
+vive. Dove la differenza esiste il file tiene tutti e due (`bf_pct` e
+`bf_pct_citato`) e la scheda spiega perche' ne usa uno.
+
+Si puo' anche **non averne nessuno**, ed e' un bottone esplicito: restano i
+tuoi numeri e come si muovono, che e' l'unico confronto davvero tuo.
 
 ### Il target che si ricalibra
 
@@ -2579,6 +2663,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   energia si dichiarano da 1 a 10, e il grafico diceva "da 1 a 5"
 - Non far vedere due serie su un grafico senza legenda: i punti grezzi lontani
   dalla media mobile sembrano un errore di allineamento, e non lo sono
+- Non passare a `nf()` un numero che puo' non esserci aspettandosi un errore:
+  adesso scrive "—" invece di lanciare. Lanciava, e siccome `nf` sta in
+  qualche centinaio di punti bastava un dato mancante in uno solo per lasciare
+  mezza schermata non disegnata, con l'eccezione in console dove non la legge
+  nessuno
 - Non usare `nf()` per riempire il valore di un `<input>`: formatta 2482 come
   "2.482" e rileggerlo dà 2,482
 - Non mettere le foto nel backup JSON: sono in IndexedDB perché in localStorage
@@ -2603,6 +2692,29 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   ricalcola sul ritmo di adesso — e che quindi può anche allungarsi — è un'altra
   cosa, ed è quello che fa `tempoAlTarget()`. Con una regola sopra tutte: quando
   l'intervallo del ritmo contiene lo zero, non si scrive un numero
+- Non dare per scontato che chi usa l'app abbia un professionista che gli ha
+  detto quante calorie mangiare: e' il caso raro. Ma chi ce l'ha deve poter
+  ignorare il motore in un colpo solo, e la carta glielo dice per prima cosa
+- Non esprimere un ritmo in chili fissi: mezzo chilo a 55 kg e mezzo chilo a
+  100 kg sono due deficit diversi. La percentuale del peso e' la stessa cosa
+  per tutti
+- Non mostrare un ritmo che il pavimento calorico taglia senza dirlo prima:
+  promettere −0,7 kg a settimana e consegnare le calorie di −0,35 e' un
+  bottone che mente
+- Non scalare le proteine con le calorie nemmeno qui: dipendono dall'obiettivo
+  e dal peso, e in deficit salgono invece di scendere
+- Non dare a tutti lo stesso fisico di riferimento: `target_fisico` arrivava da
+  `...DBASE` anche a chi cominciava da zero, che e' la stessa cosa vietata per
+  il nome e le misure di partenza. Si sceglie, o non c'e'
+- Non presentare le misure di un personaggio pubblico come rilevate: sono
+  dichiarazioni di stampa, e vanno riportate sull'altezza di chi le guarda —
+  le circonferenze in proporzione, la massa magra col quadrato
+- Non offrire un fisico di riferimento senza dire quanta massa magra chiede:
+  l'FFMI e' l'unica informazione che distingue "impegnativo" da "non succede",
+  e non averla e' il motivo per cui si insegue per anni una cosa che non
+  arriva. Ma resta una soglia di pratica comune, non un divieto
+- Non promettere quanto ci vuole ad arrivare a un fisico: dipende da quanti
+  anni ti alleni, e una data sarebbe una scadenza da mancare
 - Non presentare come misurato ciò che è stimato. Il grasso corporeo esce da una
   formula su vita, collo e altezza e sbaglia di ±3–4 punti; le misure di Brad Pitt
   sono dichiarazioni di stampa (`fonte: "stima"`). Servono a dare una direzione,

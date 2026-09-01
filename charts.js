@@ -906,8 +906,10 @@ function viewDati(v) {
 
   const vita = lastMeas('vita');
   kpis.append(tile({ k: 'Vita', v: vita != null ? nf(vita, 1) : '—', unit: 'cm',
-    d: vita != null ? `${nf(Math.abs(vita - D.target_fisico.misure.vita), 1)} cm dal target`
-                    : 'mai misurata', dir: 'flat' }));
+    d: vita == null ? 'mai misurata'
+      : D.target_fisico?.misure?.vita
+        ? `${nf(Math.abs(vita - D.target_fisico.misure.vita), 1)} cm dal target`
+        : 'nessun riferimento scelto', dir: 'flat' }));
   v.append(kpis);
 
   /* --- le due schermate che nascono da questi numeri ---
