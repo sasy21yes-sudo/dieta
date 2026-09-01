@@ -717,6 +717,9 @@
 .db-sel{opacity:0;transition:opacity .15s ease,y .15s ease}
 .db-sel.sel{opacity:1}
 @media (prefers-reduced-motion: reduce){ .db-sel{transition:none} }
+/* nella lettura della mappa il numero del modo acceso e' in evidenza: il
+   colore che hai davanti e il numero che leggi devono restare legati */
+.read .ev,.read .ev b{color:var(--pine)}
 .read .su{color:var(--pine)}
 .read .giu{color:var(--amber)}
 

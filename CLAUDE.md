@@ -706,6 +706,21 @@ non quattro colori che sulla mappa non esistono piu'. E la nota dice che il
 colore e' relativo alla settimana, non una quota assoluta: per i riferimenti
 c'e' il volume settimanale sotto.
 
+**La lettura al tocco dice tutti e tre i numeri**, non solo quello del modo
+acceso: sono le tre domande che i tre bottoni pongono — quanto lo alleno,
+quanto e' stanco, quanto sta crescendo — e toccando un muscolo le si vuole
+sapere insieme. Prima usciva una frase generica ("nella norma") senza dire a
+cosa si riferisse. Quello del modo acceso e' in tinta, cosi' il numero e il
+colore che hai davanti restano legati.
+
+Le tre percentuali seguono la stessa regola del colore: **ognuna e' rispetto
+al gruppo che guida quella classifica**, non una quota assoluta. "Stanchezza
+100%" vuol dire "il piu' stanco di oggi", non "distrutto" — e la nota lo
+scrive, perche' e' esattamente il tipo di numero che si legge come un voto.
+Il moltiplicatore accanto (`1,62× il tuo solito`) e' invece un confronto con
+se stessi, ed e' l'unico dei quattro che non dipende da come stanno gli altri
+muscoli.
+
 ### Cardio, e perché il GPS ha un asterisco
 
 **Su iPhone una pagina web non può registrare un percorso con lo schermo
@@ -2224,6 +2239,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non far cancellare dati a un interruttore di modulo: spegnere nasconde, non
   distrugge. E non dare per scontato che `S.settings.moduli` esista — un backup
   scritto prima non ce l'ha, e `modulliDaStato()` lo deduce
+- Non far dire alla mappa una frase generica al posto dei numeri: i tre modi
+  fanno tre domande, e la lettura le risponde tutte e tre
+- Non presentare come assolute le percentuali della mappa: sono rispetto al
+  gruppo che guida quella classifica, e "stanchezza 100%" e' "il piu' stanco
+  di oggi", non "distrutto"
 - Non colorare una mappa a gradini larghi: con quattro livelli il primo tiene
   un quarto della scala, e due valori diversi escono identici. La scala e'
   continua, e parte dal colore della superficie

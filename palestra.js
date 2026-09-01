@@ -749,14 +749,27 @@ function sezGymMappa(v, k, st) {
   }
   cm.append(viste);
 
+  /* La lettura dice tutti e tre i numeri della mappa, non solo quello del
+     modo acceso: sono le tre domande che i tre bottoni qui sopra pongono, e
+     toccando un muscolo si vogliono sapere tutte e tre insieme — quanto lo
+     alleno, quanto e' stanco, quanto sta crescendo. Prima usciva una frase
+     generica ("nella norma") che non si capiva a cosa si riferisse.
+     Quello del modo acceso e' in evidenza, cosi' il numero e il colore che
+     hai davanti restano legati. */
   const read = el('div', 'read', '<span class="ph">Tocca un muscolo</span>');
   const box = el('div', 'bodywrap gymmap');
   box.append(mappaSVG(gymVista, st, gymModo, s => {
+    const voce = (modo, lab, v) => `<span class="${gymModo === modo ? 'ev' : ''}">`
+      + `${lab} <b>${v == null ? '—' : nf(v * 100) + '%'}</b></span>`;
     read.innerHTML = `<span><b>${esc(s.nome)}</b></span>`
-      + `<span>${nf(s.serie, 1)} serie/sett</span>`
-      + (s.relDati ? `<span>fatica <b>${nf(s.rel, 2)}×</b> il tuo solito</span>` : '')
-      + `<span>${s.pronto == null ? 'poca storia'
-        : s.pronto ? 'nella norma' : 'piu\' carico del solito'}</span>`;
+      + `<span>${nf(s.serie, 1)} serie</span>`
+      + voce('volume', 'volume', s.nVolume)
+      + voce('fatica', 'stanchezza', s.nFatica)
+      + voce('forma', 'in crescita', s.nForma)
+      + (s.relDati
+        ? `<span>fatica <b>${nf(s.rel, 2)}×</b> il tuo solito`
+          + ` · ${s.pronto ? 'nella norma' : 'piu\' carico'}</span>`
+        : '<span class="muted">poca storia per il confronto</span>');
   }));
   cm.append(box);
   cm.append(read);
@@ -778,6 +791,10 @@ function sezGymMappa(v, k, st) {
         + 'perche\' una settimana quasi vuota non si dipinga come una piena. '
         + 'Per il confronto con i riferimenti c\'e\' il volume settimanale qui sotto. '
       : 'Il colore e\' relativo: il pieno e\' il gruppo messo peggio, non una soglia. ')
+    + 'Le tre percentuali della lettura seguono la stessa regola — ognuna e\' '
+    + 'rispetto al gruppo che guida quella classifica, non una quota assoluta: '
+    + '"stanchezza 100%" vuol dire "il piu\' stanco di oggi", non "distrutto". '
+    + 'Il moltiplicatore accanto e\' invece un confronto con te stesso. '
     + 'I tracciati sono anatomici: ogni ventre muscolare ha la sua forma, e il colore '
     + 'riempie il muscolo vero. La figura segue il sesso del profilo. Adduttori, '
     + 'tibiale e collo restano grigi: esistono nel disegno ma non fra i tredici '
