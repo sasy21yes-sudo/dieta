@@ -1531,3 +1531,16 @@ button.sp-h{cursor:pointer}
 /* un avviso che si tocca deve sembrare toccabile */
 button.flag.tap{width:100%;text-align:left;font:inherit;cursor:pointer}
 button.flag.tap:active{opacity:.75}
+
+/* ---------------- il verdetto sul singolo giorno del piano ----------------
+   Sta sul giorno e non solo in cima alla pagina: un giorno da 600 kcal nasce
+   mentre lo componi, ed e' li' che va detto. */
+.gg-f{font-size:12.5px;line-height:1.4;margin:6px 0 2px;color:var(--ink-2)}
+.gg-f.bad{color:var(--alert)}
+.gg-f.warn{color:var(--amber)}
+/* un filo di colore sul bordo sinistro: si vede scorrendo, prima di leggere */
+.card.gg-basso{border-left:3px solid var(--alert)}
+.card.gg-sotto,.card.gg-sopra{border-left:3px solid var(--amber)}
+/* la riga di lettura del foglio: l'ultima cella prende il colore dello stato */
+.read span.bad{color:var(--alert)}
+.read span.warn{color:var(--amber)}

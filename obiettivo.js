@@ -523,6 +523,42 @@ function sheetObiettivo(id, k = today()) {
 }
 
 /**
+ * Com'e' messo **questo** giorno, in una riga.
+ *
+ * Sta qui e non dentro la vista perche' lo chiedono in tre: la riga del giorno
+ * nell'editor della settimana, il foglio in cui scegli la ricetta per uno
+ * slot, e la carta di riepilogo. Tre copie della stessa soglia prima o poi
+ * diventano tre soglie.
+ *
+ * `kcal` si passa da fuori perche' il foglio deve poter chiedere "e se
+ * mettessi QUESTA ricetta, come verrebbe?" prima che la ricetta sia assegnata.
+ */
+function statoGiorno(kcal, assegnati, c) {
+  c = c || controlloPiano();
+  if (!c) return null;
+  const tgt = c.tgt, pav = c.pav.pavimento;
+  const scarto = tgt > 0 ? (kcal - tgt) / tgt : null;
+  const manca = tgt > 0 ? tgt - kcal : null;
+  let stato = 'ok', eti = 'in linea', cls = 'ok';
+  if (!assegnati) { stato = 'vuoto'; eti = 'vuoto'; cls = ''; }
+  else if (kcal < pav) { stato = 'basso'; eti = 'sotto il minimo'; cls = 'bad'; }
+  else if (scarto != null && scarto < -PIANO_SCARTO) {
+    stato = 'sotto'; eti = nf(scarto * 100, 0) + '%'; cls = 'warn';
+  } else if (scarto != null && scarto > PIANO_SCARTO) {
+    stato = 'sopra'; eti = '+' + nf(scarto * 100, 0) + '%'; cls = 'warn';
+  }
+  /* La frase dice **quanto manca**, non "sei fuori": chi sta componendo un
+     giorno ha bisogno del numero da coprire, non di un giudizio. */
+  let frase = null;
+  if (stato === 'basso')
+    frase = `${nf(kcal)} kcal: sotto il minimo di ${nf(pav)}, calcolato sul tuo corpo.`
+      + (manca > 0 ? ` Al target ne mancano ${nf(manca)}.` : '');
+  else if (stato === 'sotto') frase = `Mancano ${nf(manca)} kcal al target di ${nf(tgt)}.`;
+  else if (stato === 'sopra') frase = `${nf(-manca)} kcal oltre il target di ${nf(tgt)}.`;
+  return { stato, eti, cls, scarto, manca, kcal, pav, tgt, frase };
+}
+
+/**
  * La carta: il piano regge, giorno per giorno.
  *
  * Sta nel passo della settimana, che e' **dove il problema si crea** — e in
@@ -568,6 +604,11 @@ function cardControlloPiano(k = today(), corta = false) {
       `<span>- - target ${nf(c.tgt)}</span><span>media ${nf(c.media)} kcal</span>`));
   }
 
+  /* Nel passo della settimana ogni giorno ha gia' la sua pastiglia: una carta
+     in cima che dice "va tutto bene" ripeterebbe sette volte la stessa cosa.
+     Nel passo del target invece la conferma serve, perche' li' i giorni non
+     si vedono. */
+  if (tutto && corta) return null;
   if (tutto) {
     box.append(el('div', 'read',
       `<span>${c.pieni} giorni pieni</span><span>nessuno sotto il pavimento</span>`

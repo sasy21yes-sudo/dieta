@@ -1405,9 +1405,9 @@ function sezSettimana(v) {
     av.append(b);
     v.append(av);
   }
-  /* Il controllo sta qui, in cima, perche' qui i giorni si compongono: e'
-     il punto in cui un giorno da 600 kcal viene creato, e quindi il punto in
-     cui va detto. */
+  /* In cima resta il riepilogo — quale giorno, e la direzione contro
+     l'obiettivo, che e' una proprieta' della settimana e non ha una casa su
+     un singolo giorno. Il verdetto del singolo giorno sta sul giorno. */
   if (typeof cardControlloPiano === 'function') {
     const cc = cardControlloPiano(today(), true);
     if (cc) v.append(cc);
@@ -1419,11 +1419,24 @@ function sezSettimana(v) {
      di ricette puo essere diverso da un giorno all altro</strong>. I totali si
      ricalcolano da soli.</div>`));
 
+  /* Il verdetto sta **sul giorno**, non solo in cima alla pagina: un giorno da
+     600 kcal nasce qui, mentre lo componi, ed e' qui che va detto. Una carta
+     di riepilogo in testa la vedi quando risali, cioe' dopo — e "dopo" e' il
+     momento in cui non stai piu' guardando quel giorno. */
+  const cPiano = typeof controlloPiano === 'function' ? controlloPiano() : null;
+
   for (const [gi, g] of sett.entries()) {
     const c = el('div', 'card');
+    const assegnati = (g.pasti || []).filter(x => D.pasti[x.codice]).length;
+    const sg = (typeof statoGiorno === 'function' && cPiano)
+      ? statoGiorno(g.totali.kcal, assegnati, cPiano) : null;
+    if (sg && sg.stato !== 'ok' && sg.stato !== 'vuoto') c.classList.add('gg-' + sg.stato);
     c.append(el('div', 'row between',
-      `<strong style="font-family:var(--serif);font-size:16px">${esc(g.giorno)}</strong>
+      `<strong style="font-family:var(--serif);font-size:16px">${esc(g.giorno)}${
+        sg && sg.stato !== 'vuoto'
+          ? ` <span class="pill ${sg.cls}">${esc(sg.eti)}</span>` : ''}</strong>
        <span class="mono muted" style="font-size:11px">${nf(g.totali.kcal)} kcal · ${macroRiga(g.totali)}</span>`));
+    if (sg?.frase) c.append(el('div', 'gg-f ' + sg.cls, esc(sg.frase)));
     const righe = [];
     for (const [si, s] of (g.pasti || []).entries()) {
       const pa = D.pasti[s.codice];
@@ -1603,6 +1616,31 @@ function cambiaSlot(gi, si) {
   w.append(el('h2', 'sec', 'Scegli la ricetta'));
   w.lastChild.style.marginTop = '0';
 
+  /* **Come viene il giorno.** E' il momento in cui il giorno si compone, e
+     quindi il momento in cui serve saperlo: scegliere una ricetta al buio e
+     scoprire due schermate dopo che quel giorno fa 900 kcal vuol dire tornare
+     indietro a rifare. Il conto si fa **senza** la ricetta che c'e' adesso in
+     questo slot, cosi' ogni riga puo' dire dove porterebbe. */
+  const gd = D.settimana[gi];
+  const cPiano = typeof controlloPiano === 'function' ? controlloPiano() : null;
+  const attuale = D.pasti[gd?.pasti?.[si]?.codice];
+  const senza = (gd?.totali?.kcal || 0) - (attuale?.macro?.kcal || 0);
+  const nAltri = (gd?.pasti || []).filter((x, i) => i !== si && D.pasti[x.codice]).length;
+  const sgOra = cPiano && typeof statoGiorno === 'function'
+    ? statoGiorno(gd.totali.kcal, nAltri + (attuale ? 1 : 0), cPiano) : null;
+  if (sgOra && cPiano.tgt > 0) {
+    const r = el('div', 'read');
+    r.innerHTML = `<span>oggi <b>${nf(gd.totali.kcal)}</b> kcal</span>`
+      + `<span>target ${nf(cPiano.tgt)}</span>`
+      + `<span class="${sgOra.cls === 'ok' ? '' : sgOra.cls}">${esc(sgOra.eti)}</span>`;
+    w.append(r);
+    if (sgOra.frase) w.append(el('div', 'gg-f ' + sgOra.cls, esc(sgOra.frase)));
+    w.append(el('p', 'hint',
+      'Sotto ogni ricetta c\'e\' a quanto arriverebbe <strong>questo giorno</strong> '
+      + 'scegliendola. Non e\' un voto sulla ricetta: una colazione da 300 kcal e\' '
+      + 'una colazione, non un errore.'));
+  }
+
   /* Con il piano vuoto D.pasti e' vuoto, e questo foglio mostrava il titolo,
      un vuoto, e il bottone per togliere lo slot: sembrava rotto, e in pratica
      lo era — non c'era nessuna strada da qui in avanti. Un elenco vuoto va
@@ -1631,8 +1669,22 @@ function cambiaSlot(gi, si) {
   for (const [code, pa] of Object.entries(D.pasti)
       .sort((a, b) => (a[1].nome || '').localeCompare(b[1].nome || ''))) {
     const r = el('button', 'prod');
-    r.innerHTML = `<div class="grow"><div class="nm">${esc(pa.nome || code)}</div>
-      <div class="mt">${nf(pa.macro.p, 0)}P ${nf(pa.macro.c, 0)}C ${nf(pa.macro.g, 0)}G</div></div>
+    /* Dove porterebbe questa ricetta, su questo giorno.
+       La pastiglia compare **solo se cambia lo stato** rispetto a com'e' il
+       giorno adesso. Senza quella regola, su un giorno con un pasto solo
+       uscivano ventidue "sotto il minimo" identici: vero per tutte e quindi
+       inutile per sceglierne una — quel giorno e' corto perche' ha un pasto,
+       non perche' la ricetta sia sbagliata. Ventidue etichette rosse uguali
+       sono il modo migliore per insegnare a ignorare le etichette rosse.
+       Il numero, invece, resta sempre: quello dice davvero dove vai. */
+    const dopo = senza + pa.macro.kcal;
+    const sgD = cPiano && cPiano.tgt > 0 && typeof statoGiorno === 'function'
+      ? statoGiorno(dopo, nAltri + 1, cPiano) : null;
+    const cambia = sgD && sgOra && sgD.stato !== sgOra.stato;
+    r.innerHTML = `<div class="grow"><div class="nm">${esc(pa.nome || code)}${
+        cambia ? ` <span class="pill ${sgD.cls}">${esc(sgD.eti)}</span>` : ''}</div>
+      <div class="mt">${nf(pa.macro.p, 0)}P ${nf(pa.macro.c, 0)}C ${nf(pa.macro.g, 0)}G${
+        sgD ? ` · il giorno farebbe ${nf(dopo)} kcal` : ''}</div></div>
       <div class="kc">${nf(pa.macro.kcal)}${code === s.codice ? '<br><span class="mt">attuale</span>' : ''}</div>`;
     r.onclick = () => {
       s.codice = code; save(); fondiPiano(); closeSheet(); route(); toast('Slot aggiornato');

@@ -1015,6 +1015,30 @@ invece di consegnare una soglia calata dall'alto.
 chi ha scelto "tieni solo l'obiettivo, non i target": l'obiettivo *e'* una
 posizione rispetto a quello che spendi.
 
+**E il verdetto sta sul giorno, non in cima alla pagina.** Era la prima
+versione, ed era il posto sbagliato: un giorno da 600 kcal nasce **mentre lo
+componi**, e una carta di riepilogo in testa la vedi quando risali — cioe'
+dopo, quando non stai piu' guardando quel giorno. Adesso ogni giorno
+dell'editor porta la sua pastiglia (`in linea`, `+28%`, `sotto il minimo`), un
+filo di colore sul bordo sinistro che si vede scorrendo, e una riga che dice
+**quanto manca**: *"Mancano 1847 kcal al target di 2482"*. Chi sta componendo
+un giorno ha bisogno del numero da coprire, non di un giudizio.
+
+In cima resta solo quello che e' **settimanale** — quale giorno, e la direzione
+contro l'obiettivo, che non ha una casa su un singolo giorno — e sparisce del
+tutto quando va tutto bene, perche' le sette pastiglie lo dicono gia'.
+
+**Anche il foglio in cui scegli la ricetta lo dice**, ed e' il momento piu'
+vicino alla decisione: sotto ogni ricetta c'e' a quanto arriverebbe *quel*
+giorno scegliendola. Ma con una regola che e' costata una prova per essere
+trovata: **la pastiglia compare solo se quella scelta cambia lo stato del
+giorno.** Senza, su un giorno con un pasto solo uscivano **ventidue "sotto il
+minimo" identici** — veri per tutte e quindi inutili per sceglierne una, e il
+modo migliore di insegnare a ignorare le etichette rosse. Misurato: su
+mercoledi a 635 kcal le pastiglie passano da 22 a **zero**, e su un lunedi gia'
+in linea restano le **15 su 24** che porterebbero il giorno fuori target. Il
+numero invece resta sempre: quello dice dove vai.
+
 Due dettagli che sarebbero passati inosservati:
 
 - **un giorno vuoto non e' un giorno povero.** E' un giorno a cui non hai
@@ -2826,6 +2850,13 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   cento chili sono fame nera e per una persona di cinquanta sedentaria quasi
   mantenimento. Il pavimento e' `max(BMR x 1,1, dispendio x 0,75)`, e la UI
   scrive tutti e due i numeri
+- Non mettere il verdetto di un giorno solo in cima alla pagina: un giorno da
+  600 kcal nasce mentre lo componi, e un riepilogo in testa lo leggi quando
+  risali, cioe' quando non stai piu' guardando quel giorno
+- Non etichettare ogni opzione di un elenco con lo stato che avrebbe: su un
+  giorno con un pasto solo tutte e ventidue le ricette danno "sotto il
+  minimo", il che e' vero e inutile. L'etichetta compare solo se quella scelta
+  **cambia** lo stato; il numero resta sempre
 - Non trattare un giorno senza ricette assegnate come un giorno povero: e' un
   giorno vuoto, e sette righe rosse al primo avvio fanno chiudere l'app
 - Non proporre di abbassare il target fino alla media del piano quando quella
