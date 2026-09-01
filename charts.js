@@ -663,12 +663,20 @@ function meter(o) {
   const dentro = o.val != null && o.tgt
     && Math.abs(o.val - o.tgt) <= o.tgt * (o.tolleranza ?? 0.1);
   const sotto = o.val != null && o.tgt && o.val < o.tgt;
+  /* Il colore dice **dentro o fuori**, e basta: e' scritto qui sopra da
+     sempre, e il codice invece usava tre colori — verde dentro, ambra sopra
+     e grigio sotto. Ma il grigio in quest'app e' il colore di "non c'e'
+     dato" (`--ink-3` e' anche il testo spento), quindi una media dell'acqua
+     mezzo litro sotto il target si leggeva come una riga disattivata invece
+     che come uno scarto. Sotto e sopra sono tutti e due "fuori"; da che parte
+     lo dice la riga di testo, che c'e' gia'. */
+  const classe = o.val == null ? 'vuoto' : dentro ? 'ok' : 'fuori';
   box.innerHTML = `
     <div class="mt-h"><span class="mt-l">${esc(o.lab)}</span>
       <span class="mt-v mono">${o.val == null ? '—' : nf(o.val, o.dec ?? 0)}
         <em>/ ${nf(o.tgt, o.dec ?? 0)} ${esc(o.unit || '')}</em></span></div>
     <div class="mt-t">
-      <i style="width:${pct(o.val).toFixed(1)}%" class="${dentro ? 'ok' : sotto ? 'lo' : 'hi'}"></i>
+      <i style="width:${pct(o.val).toFixed(1)}%" class="${classe}"></i>
       <b style="left:${pct(o.tgt).toFixed(1)}%"></b>
     </div>
     <div class="mt-n">${o.val == null ? esc(o.vuoto || 'nessun dato')
@@ -1103,17 +1111,28 @@ function viewDati(v) {
   }));
 
   /* --- composizione --- */
+  /* Dove c'e' una bioimpedenza vince lei: il giorno in cui e' stata fatta e'
+     l'unico in cui questo grafico ha una misura invece di una stima, e
+     coprirla con la formula butterebbe via il dato migliore della serie. */
   const comp = giorni.map(d => {
     const w = weightMA(d);
-    const vv = S.log[d]?.misure?.vita, cc = S.log[d]?.misure?.collo;
-    if (w == null || vv == null || cc == null) return null;
-    const bf = bodyFat(vv, cc, D.profilo.altezza_cm, D.profilo.sesso,
-      S.log[d]?.misure?.fianchi);
+    if (w == null) return null;
+    const misurata = S.log[d]?.bia?.bf;
+    let bf = misurata > 0 ? misurata : null;
+    if (bf == null) {
+      const vv = S.log[d]?.misure?.vita, cc = S.log[d]?.misure?.collo;
+      if (vv == null || cc == null) return null;
+      bf = bodyFat(vv, cc, D.profilo.altezza_cm, D.profilo.sesso,
+        S.log[d]?.misure?.fianchi);
+    }
     if (bf == null) return null;
     return { magra: w * (1 - bf / 100), grassa: w * bf / 100 };
   });
+  const quanteBia = giorni.filter(d => S.log[d]?.bia?.bf > 0).length;
   v.append(chartStack({
-    titolo: 'Composizione stimata', sub: 'Serve peso, vita e collo nello stesso giorno. Stima da formula: ±3–4 punti.',
+    titolo: 'Composizione stimata',
+    sub: 'Serve peso, vita e collo nello stesso giorno. Stima da formula: ±3–4 punti.'
+      + (quanteBia ? ` Nei ${quanteBia === 1 ? 'giorno' : quanteBia + ' giorni'} in cui hai fatto una bioimpedenza vale quella, che e' una misura.` : ''),
     days: giorni, unit: 'kg',
     serie: [
       { nome: 'Massa magra', vals: comp.map(c => c ? c.magra : 0) },

@@ -1394,6 +1394,87 @@ si scorrerebbe la stessa settimana all'infinito credendo di vedere altro.
 Il Diario resta invece bloccato a oggi, e la differenza non e' un'incoerenza:
 il Diario **e'** il registro, e per il futuro non ha niente da far vedere.
 
+### La bioimpedenza batte la formula, ma non per sempre
+
+Il grasso corporeo usciva da una sola strada: la formula della Marina su vita,
+collo e altezza, con i suoi tre o quattro punti di errore dichiarati in ogni
+schermata. Ma chi passa in farmacia e sale su un impedenziometro **una misura
+ce l'ha**, e l'app non aveva un posto dove metterla.
+
+Adesso ce l'ha (`S.log[k].bia`), con tre decisioni:
+
+1. **Vale trenta giorni.** Una BIA e' un punto nel tempo: la vita si rimisura
+   ogni settimana e segue il corpo, una bioimpedenza di due mesi fa descrive
+   quello di due mesi fa. Dopo `BIA_GG` torna a valere la formula, e la carta
+   lo scrive invece di continuare a mostrare un numero vecchio come se fosse
+   di oggi.
+2. **Si prende la percentuale, non i chili.** Lo strumento stampa anche massa
+   magra, muscolo e acqua, e la tentazione era di usare la magra dichiarata —
+   e' quello che misura. Ma allora la massa grassa diventa *peso di oggi meno
+   magra della farmacia*, cioe' la differenza fra due bilance diverse in due
+   momenti diversi: misurato sul caso reale, 21,3% dichiarato con 54,2 kg di
+   magra su una pesata di 69,8 dava una grassa di 15,6 kg, che e' il **22,4%**
+   — la stessa tabella avrebbe scritto due percentuali diverse. La divisione
+   si fa sempre `peso di oggi x percentuale`; gli altri numeri restano nel
+   registro, dove servono a confrontare due BIA fra loro.
+3. **Il grafico della composizione la usa** nei giorni in cui c'e': sono gli
+   unici in cui quella serie ha una misura invece di una stima, e coprirli con
+   la formula butterebbe via il dato migliore.
+
+`fonte` vale `'bia'` o `'formula'` e la carta lo dice sempre. Non e' una nota a
+pie' di pagina: fra le due la differenza puo' essere piu' grande del
+cambiamento che stai guardando.
+
+### La composizione e' come si divide il peso
+
+La carta si chiamava "Composizione" e la prima riga era **Peso** — lo stesso
+numero che sta grande in cima alla stessa schermata, due carte sopra. Sotto,
+altre due righe che composizione non sono: vita su altezza e torace su vita
+sono **proporzioni**, e sono scese nella carta delle misure, sotto le
+circonferenze da cui escono.
+
+Quello che resta e' quello che la parola promette: come si divide il peso.
+Tre righe — grasso, magra, grassa — e sopra **due barre sulla stessa scala**,
+ora e target. La cosa che conta di una ricomposizione e' che il totale puo'
+restare fermo mentre le due parti si scambiano, e tre numeri incolonnati non
+lo fanno vedere.
+
+### Un grafico del peso senza asse dice solo "sale"
+
+Il grafico del peso era l'unico dell'app disegnato a mano fuori dal toolkit, e
+si portava dietro la conseguenza: **nessuna griglia e nessun numero sull'asse**.
+Una curva senza scala dice la direzione e nasconde l'ampiezza — e siccome la
+scala si adatta ai dati, mezzo chilo e tre chili disegnano esattamente la
+stessa curva.
+
+Adesso ha la sua spalla a sinistra, quattro righe di griglia e i chili, con la
+stessa `niceTicks()` di tutti gli altri: valori tondi, o l'intervallo diviso in
+parti uguali stampa due volte "69" per due numeri diversi. E sotto, una riga
+dice da dove a dove arriva l'asse, perche' una scala che si adatta va letta
+prima della pendenza.
+
+### I contatori contavano un'altra cosa
+
+Sopra "La settimana in un colpo d'occhio" c'erano due numeri grossi: **cose a
+posto** e **da sistemare**. Contavano i messaggi di `analyse()` — che compaiono
+in fondo alla pagina — mentre la carta che intestavano ne mostra otto altre, le
+medie contro i target. Usciva "1 cose a posto / 2 da sistemare" sopra otto
+barre: tre numeri che non tornavano con niente di visibile, e per giunta
+"1 cose".
+
+Adesso contano **le otto voci di quella carta**, in tre stati: in linea, fuori
+target, senza dato. Il terzo non e' un riempitivo — e' la ragione per cui la
+somma non fa otto, ed e' anche la prima cosa da sistemare, perche' una media
+che non esiste non e' una media buona.
+
+Nello stesso giro i colori delle barre: erano tre — verde dentro, ambra sopra,
+**grigio sotto**. Ma il grigio in quest'app e' il colore di "non c'e' dato"
+(`--ink-3` e' anche il testo spento), quindi una media dell'acqua mezzo litro
+sotto il target si leggeva come una riga disattivata invece che come uno
+scarto. Il commento sopra la funzione diceva gia' la regola giusta — *il colore
+dice soltanto se sei dentro o fuori* — e il codice ne usava tre: adesso sono
+due, e da che parte sei lo dice la riga di testo che c'era gia'.
+
 ### Il peso e' in Corpo, grande
 
 Stava terzo in una griglia di campi di testo. Ora e' la prima carta di Corpo,
@@ -2526,6 +2607,22 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   formula su vita, collo e altezza e sbaglia di ±3–4 punti; le misure di Brad Pitt
   sono dichiarazioni di stampa (`fonte: "stima"`). Servono a dare una direzione,
   non un verdetto, e la UI deve dirlo
+- Non usare la massa magra dichiarata da una bioimpedenza insieme alla pesata
+  di oggi: la grassa diventa la differenza fra due bilance diverse, e la
+  stessa tabella finisce per scrivere due percentuali diverse. Dalla BIA si
+  prende la percentuale
+- Non far valere una bioimpedenza per sempre: e' un punto nel tempo, e dopo
+  un mese descrive il corpo di un mese fa. La formula si rimisura, lei no
+- Non mettere in una carta chiamata "Composizione" il peso, che sta gia'
+  grande in cima alla stessa schermata, ne' i rapporti fra circonferenze, che
+  sono proporzioni e stanno con le circonferenze
+- Non lasciare un grafico senza griglia e senza numeri sull'asse quando la
+  scala si adatta ai dati: mezzo chilo e tre chili disegnano la stessa curva
+- Non far contare a un'intestazione una cosa diversa da quella che sta
+  intestando: due numeri sopra otto barre devono contare quelle otto barre
+- Non usare il grigio per dire "sotto il target": in quest'app il grigio vuol
+  dire "non c'e' dato", e una riga sotto target sembra disattivata. Il colore
+  dice dentro o fuori, la direzione la dice il testo
 - Non far calcolare la composizione con un collo fuori scala (32–48 cm): la formula
   si regge sulla differenza vita−collo, 7 cm di errore lì valgono 5 punti di grasso.
   Meglio rifiutare il calcolo che dare un numero falso

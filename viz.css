@@ -338,6 +338,29 @@
 #btn-profilo svg{width:21px;height:21px;display:block}
 #btn-profilo:active{color:var(--pine)}
 
+/* ---------------- come si divide il peso ----------------
+   Due barre sulla stessa scala: quello che conta e' vedere le due parti
+   scambiarsi mentre il totale resta fermo, e tre numeri incolonnati non lo
+   fanno vedere. */
+.dvp{margin:2px 0 12px}
+.dvp-r{display:grid;grid-template-columns:46px 1fr 46px;gap:8px;align-items:center;
+  margin-bottom:6px}
+.dvp-r .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3)}
+.dvp-r .t{display:flex;height:14px;border-radius:7px;overflow:hidden;
+  background:var(--wash)}
+.dvp-r .t i{display:block;height:100%}
+.dvp-r .t i.m{background:var(--pine)}
+.dvp-r .t i.g{background:var(--amber)}
+.dvp-r .v{font-size:12px;text-align:right}
+/* il target e' un riferimento, non un dato di oggi: stessa forma, meno peso */
+.dvp-r.tgt .t{opacity:.42}
+.dvp-r.tgt .v{color:var(--ink-3)}
+
+/* i due rapporti in fondo alle misure: sono proporzioni, non circonferenze,
+   e una riga di stacco lo dice senza scriverlo */
+.cmp.rapp{margin-top:6px;padding-top:6px;border-top:1px solid var(--rule)}
+
 /* ---------------- barre orizzontali ---------------- */
 .hb{display:grid;grid-template-columns:84px 1fr 38px;gap:9px;align-items:center;
   padding:5px 0;font-size:12.5px}
@@ -682,8 +705,8 @@
   overflow:visible}
 .mt-t i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;display:block;
   background:var(--pine)}
-.mt-t i.lo{background:var(--ink-3)}
-.mt-t i.hi{background:var(--amber)}
+.mt-t i.fuori{background:var(--amber)}
+.mt-t i.vuoto{background:none}
 .mt-t b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);
   border-radius:2px}
 .mt-n{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);margin-top:4px}
@@ -698,6 +721,9 @@
 .an-conta b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;
   color:var(--pine)}
 .an-conta .warn b{color:var(--amber)}
+/* il terzo contatore e' "senza dato", e non e' ne' buono ne' cattivo: prende
+   il grigio, che qui vuol dire esattamente quello */
+.an-conta .vuoto b{color:var(--ink-3)}
 .an-conta span{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
   text-transform:uppercase;color:var(--ink-3)}
 /* tre numeri stanno stretti su 390 px: si dividono la riga in parti uguali e

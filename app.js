@@ -338,19 +338,70 @@ function bodyFat(vita, collo, h, sesso, fianchi) {
   return bf > 2 && bf < 60 ? bf : null;
 }
 
-/** Composizione stimata oggi, già confrontata con il fisico target. */
+/* ------------------------------------------------------ la bioimpedenza
+ *
+ * La formula della Marina e' una **stima** da tre circonferenze, e sbaglia di
+ * tre o quattro punti: e' scritto in ogni schermata che la usa. Una BIA fatta
+ * in farmacia non e' una DEXA, ma e' una **misura** — con i suoi limiti, che
+ * dipendono soprattutto da quanto sei idratato — e dove c'e' una misura una
+ * stima non serve.
+ *
+ * Ma una BIA e' anche un punto nel tempo. La vita si rimisura ogni settimana e
+ * segue il corpo; una bioimpedenza di due mesi fa no, descrive quello di due
+ * mesi fa. Quindi vale come valore di adesso per **trenta giorni** e poi lascia
+ * il posto alla formula — dicendolo, invece di continuare a mostrare un numero
+ * vecchio come se fosse di oggi.
+ */
+const BIA_GG = 30;
+
+/** L'ultima bioimpedenza registrata entro `k`, con quanti giorni sono passati. */
+function ultimaBia(k = today()) {
+  const gg = Object.keys(S.log)
+    .filter(d => d <= k && S.log[d]?.bia?.bf > 0).sort();
+  if (!gg.length) return null;
+  const d = gg[gg.length - 1];
+  const eta = Math.round((new Date(k) - new Date(d)) / 86400000);
+  return { ...S.log[d].bia, k: d, eta, fresca: eta <= BIA_GG };
+}
+
+/** Tutte le bioimpedenze, dalla piu' recente. */
+function tutteBia() {
+  return Object.keys(S.log).filter(d => S.log[d]?.bia?.bf > 0).sort().reverse()
+    .map(d => ({ ...S.log[d].bia, k: d }));
+}
+
+/**
+ * Composizione di oggi, gia' confrontata con il fisico target.
+ * `fonte` dice da dove viene il numero — 'bia' o 'formula' — perche' fra una
+ * misura e una stima la differenza e' piu' grande di quella che stai
+ * guardando, e chi legge deve saperlo.
+ */
 function composition(k = today()) {
   const h = D.profilo.altezza_cm, TF = D.target_fisico;
   const vita = lastMeas('vita'), collo = lastMeas('collo'), torace = lastMeas('torace');
   const peso = trendW(k) ?? lastWeight() ?? D.profilo.peso_iniziale_kg;
   // un collo fuori scala falsa tutto: 7 cm di errore valgono 5 punti di grasso
   const colloSospetto = collo != null && (collo < 32 || collo > 48);
-  const bf = colloSospetto ? null
+  const stima = colloSospetto ? null
     : bodyFat(vita, collo, h, D.profilo.sesso, lastMeas('fianchi'));
+  const bia = ultimaBia(k);
+  const bf = bia?.fresca ? bia.bf : stima;
+  const fonte = bia?.fresca ? 'bia' : 'formula';
+  /* La divisione si fa **sempre** con il peso di oggi.
+     La tentazione era di prendere la massa magra dichiarata dallo strumento —
+     e' quello che misura, dopotutto. Ma la massa grassa diventa allora
+     `peso di oggi − magra della farmacia`, cioe' la differenza fra due
+     bilance diverse pesate in due momenti diversi: con 21,3% dichiarato e
+     54,2 kg di magra su una pesata di 69,8 usciva una grassa di 15,6 kg,
+     che e' il 22,4% — la carta avrebbe scritto due percentuali diverse
+     nella stessa tabella.
+     Quindi dalla BIA si prende **la percentuale**, che e' il numero che
+     descrive il corpo e non la bilancia; la magra dichiarata resta nel
+     registro, dove serve a confrontare due BIA fra loro. */
   const lbm = bf != null ? peso * (1 - bf / 100) : null;
   const fm = bf != null ? peso - lbm : null;
   return {
-    peso, vita, collo, torace, colloSospetto, bf, lbm, fm,
+    peso, vita, collo, torace, colloSospetto, bf, lbm, fm, bia, stima, fonte,
     vitaAltezza: vita ? vita / h : null,
     toraceVita: torace && vita ? torace / vita : null,
     t: { peso: TF.peso_kg, bf: TF.bf_pct, lbm: TF.massa_magra_kg,
@@ -2384,30 +2435,47 @@ function viewCorpo(v) {
        si regge sulla differenza vita−collo: 7 cm di errore lì valgono 5 punti di
        grasso qui, quindi finché non lo rimisuri non calcolo niente.</p></div>`));
   }
-  const cmp = el('div', 'cmp');
-  cmp.append(el('div', 'cmp-h', '<span></span><span>Ora</span><span>Target</span><span>Manca</span>'));
-  const rowC = (lab, now, tgt, dec, unit, inv) => {
-    if (now == null) return;
-    const d = tgt - now, vicino = Math.abs(d) <= Math.abs(tgt) * 0.03;
-    cmp.append(el('div', 'cmp-r',
-      `<span>${lab}</span>
-       <span class="mono">${nf(now, dec)}</span>
-       <span class="mono muted">${nf(tgt, dec)}</span>
-       <span class="mono ${vicino ? 'good' : ''}">${vicino ? '✓'
-         : (d > 0 ? '+' : '') + nf(d, dec) + `<em>${unit}</em>`}</span>`));
-  };
-  rowC('Peso', C.peso, C.t.peso, 1, ' kg');
+  /* La composizione e' **come si divide il peso**, non il peso: quello sta
+     grande in cima alla stessa schermata, e ripeterlo qui era una riga che
+     diceva una cosa gia' detta due carte sopra. E i due rapporti — vita su
+     altezza, torace su vita — non sono composizione ma proporzioni, e sono
+     scesi nella carta delle misure da cui escono. */
   if (C.bf != null) {
+    cc.append(divisionePeso(C));
+    const cmp = el('div', 'cmp');
+    cmp.append(el('div', 'cmp-h',
+      '<span></span><span>Ora</span><span>Target</span><span>Manca</span>'));
+    const rowC = (lab, now, tgt, dec, unit) => {
+      if (now == null) return;
+      const d = tgt - now, vicino = Math.abs(d) <= Math.abs(tgt) * 0.03;
+      cmp.append(el('div', 'cmp-r',
+        `<span>${lab}</span>
+         <span class="mono">${nf(now, dec)}</span>
+         <span class="mono muted">${nf(tgt, dec)}</span>
+         <span class="mono ${vicino ? 'good' : ''}">${vicino ? '✓'
+           : (d > 0 ? '+' : '') + nf(d, dec) + `<em>${unit}</em>`}</span>`));
+    };
     rowC('Grasso', C.bf, C.t.bf, 1, ' %');
     rowC('Massa magra', C.lbm, C.t.lbm, 1, ' kg');
     rowC('Massa grassa', C.fm, C.t.peso * C.t.bf / 100, 1, ' kg');
-  }
-  if (C.vitaAltezza) rowC('Vita / altezza', C.vitaAltezza, C.t.vitaAltezza, 2, '');
-  if (C.toraceVita) rowC('Torace / vita', C.toraceVita, C.t.toraceVita, 2, '');
-  cc.append(cmp);
-  if (C.bf != null)
+    cc.append(cmp);
     cc.append(el('p', 'hint',
-      `Grasso stimato con la formula della Marina USA da vita, collo e altezza: ±3–4 punti di errore reale. Serve a vedere la direzione, non il valore assoluto. Da qui al target ci sono ${nf(Math.abs(C.dFm), 1)} kg di grasso in meno e ${nf(Math.abs(C.dLbm), 1)} kg di muscolo in più — lo stesso numero sulla bilancia, un corpo diverso.`));
+      `Da qui al target ci sono ${nf(Math.abs(C.dFm), 1)} kg di grasso in meno e ${
+        nf(Math.abs(C.dLbm), 1)} kg di muscolo in più: lo stesso numero sulla bilancia, un corpo diverso.`));
+  } else if (!C.colloSospetto) {
+    cc.append(el('p', 'muted',
+      'Servono vita e collo per stimare il grasso, oppure una bioimpedenza. '
+      + 'Senza uno dei due qui non c\'e\' niente da dividere.'));
+  }
+
+  /* Da dove viene il numero. Fra una misura e una stima la differenza puo'
+     essere piu' grande di quella che stai guardando. */
+  cc.append(fonteComposizione(C));
+  const bBia = el('button', 'btn wide');
+  bBia.style.marginTop = '10px';
+  bBia.textContent = C.bia ? 'Registra una nuova bioimpedenza' : 'Ho fatto una bioimpedenza';
+  bBia.onclick = () => sheetBia(k);
+  cc.append(bBia);
   v.append(cc);
 
   /* --- misure --- */
@@ -2443,6 +2511,23 @@ function viewCorpo(v) {
          vicino ? '✓' : (d > 0 ? '+' : '') + nf(d, 1)}</span>`);
     r.onclick = () => sheetMisura(m, k);   // una sola, fuori dal giro
     tb.append(r);
+  }
+  /* I rapporti stanno qui e non in Composizione: sono proporzioni fra due
+     circonferenze, e le circonferenze sono le righe qui sopra. */
+  if (C.vitaAltezza || C.toraceVita) {
+    const rp = el('div', 'cmp rapp');
+    const rowR = (lab, now, tgt) => {
+      if (now == null) return;
+      const d = tgt - now, vicino = Math.abs(d) <= Math.abs(tgt) * 0.03;
+      rp.append(el('div', 'cmp-r',
+        `<span>${lab}</span><span class="mono">${nf(now, 2)}</span>
+         <span class="mono muted">${nf(tgt, 2)}</span>
+         <span class="mono ${vicino ? 'good' : ''}">${vicino ? '✓'
+           : (d > 0 ? '+' : '') + nf(d, 2)}</span>`));
+    };
+    rowR('Vita / altezza', C.vitaAltezza, C.t.vitaAltezza);
+    rowR('Torace / vita', C.toraceVita, C.t.toraceVita);
+    tb.append(rp);
   }
   cm.append(tb);
   const nota = D.misure.find(m => m.nota);
@@ -2563,13 +2648,31 @@ function weightCard(k) {
   const pts = days.map(x => ({ k: x, w: S.log[x].peso }));
   const ma = pts.map(p => ({ k: p.k, w: weightMA(p.k) })).filter(p => p.w);
   const H = 28, f = forecast(H, D.target.kcal, k);
-  const W = 320, HT = 140, PX = 8, PY = 12;
+  /* Il riquadro lascia una spalla a sinistra per i chili: senza numeri
+     sull'asse la linea dice solo "sale" o "scende", e su un grafico del peso
+     la domanda vera e' **di quanto** — mezzo chilo e tre chili disegnano la
+     stessa curva se la scala si adatta ai dati, e questa si adatta. */
+  const W = 320, HT = 148, PL = 30, PR = 8, PY = 12;
   const span = days.length - 1 + (f ? H : 0);
   const all = pts.map(p => p.w).concat(ma.map(p => p.w));
   if (f) all.push(f.peso + f.banda, f.peso - f.banda);
   const lo = Math.min(...all) - 0.3, hi = Math.max(...all) + 0.3;
-  const sx = i => PX + (i / Math.max(span, 1)) * (W - PX * 2);
+  const sx = i => PL + (i / Math.max(span, 1)) * (W - PL - PR);
   const sy = w => PY + (1 - (w - lo) / (hi - lo || 1)) * (HT - PY * 2);
+  /* Valori tondi, non l'intervallo diviso in parti uguali: quello produce
+     due etichette "69" per due numeri diversi. E' la stessa `niceTicks()` di
+     tutti gli altri grafici. */
+  const tick = typeof niceTicks === 'function' ? niceTicks(lo, hi, 4) : [];
+  const passoT = tick.length > 1 ? Math.abs(tick[1] - tick[0]) : 1;
+  const decT = passoT >= 1 ? 0 : 1;
+  const griglia = tick.map(val => {
+    const y = sy(val).toFixed(1);
+    return `<line x1="${PL}" x2="${W - PR}" y1="${y}" y2="${y}"
+              stroke="var(--grid)" stroke-width="1"/>
+            <text x="${PL - 5}" y="${(+y + 3.4).toFixed(1)}" text-anchor="end"
+              fill="var(--ink-3)" font-size="9"
+              font-family="var(--mono)">${nf(val, decT)}</text>`;
+  }).join('');
   const idx = Object.fromEntries(days.map((x, i) => [x, i]));
   const last = days.length - 1;
 
@@ -2588,6 +2691,7 @@ function weightCard(k) {
   // rispetto alla media mobile, che e' una serie diversa
   const grezza = pts.map((p, i) => `${i ? 'L' : 'M'}${sx(i).toFixed(1)},${sy(p.w).toFixed(1)}`).join(' ');
   c.append(el('div', null, `<svg class="chart" viewBox="0 0 ${W} ${HT}">
+    ${griglia}
     ${fc}<path d="${grezza}" fill="none" stroke="var(--ink-3)" stroke-width="1" opacity=".35"/>
     <path d="${line}" fill="none" stroke="var(--pine)" stroke-width="2"
       stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`));
@@ -2595,6 +2699,8 @@ function weightCard(k) {
     '<span><i style="background:var(--ink-3)"></i>pesata del giorno</span>'
     + '<span><i style="background:var(--pine)"></i>media mobile a 7 giorni</span>'
     + (f ? '<span><i style="background:var(--pine);opacity:.35"></i>previsione</span>' : '')));
+  c.lastChild.insertAdjacentHTML('afterend',
+    `<div class="hint" style="margin-top:2px">Asse in kg, da ${nf(lo, 1)} a ${nf(hi, 1)}: la scala si adatta ai dati, quindi guarda i numeri e non la pendenza.</div>`);
 
   const cur = weightMA(days[last]), prev = weightMA(addDays(days[last], -7));
   c.append(el('div', 'row between',
@@ -2605,6 +2711,185 @@ function weightCard(k) {
   if (f) c.append(el('p', 'hint',
     `Il tratteggio è la previsione a 28 giorni seguendo il piano; l'area è la banda di confidenza al 95%, e si allarga perché l'incertezza sul dispendio si accumula giorno dopo giorno.`));
   return c;
+}
+
+/**
+ * Come si divide il peso: magra e grassa, con il target sotto.
+ *
+ * La tabella dice i tre numeri, ma tre numeri incolonnati non fanno vedere la
+ * cosa che conta — che il totale puo' restare fermo mentre le due parti si
+ * scambiano. Due barre allineate sulla stessa scala lo fanno vedere e basta.
+ * La scala e' condivisa fra "ora" e "target", o confrontarle non direbbe niente.
+ */
+function divisionePeso(C) {
+  const tFm = C.t.peso * C.t.bf / 100, tLbm = C.t.lbm;
+  const max = Math.max(C.peso, tFm + tLbm) || 1;
+  const box = el('div', 'dvp');
+  const barra = (lab, magra, grassa, cls) => {
+    const r = el('div', 'dvp-r' + (cls ? ' ' + cls : ''));
+    r.innerHTML = `<span class="l">${lab}</span>
+      <span class="t">
+        <i class="m" style="width:${(magra / max * 100).toFixed(1)}%"></i>
+        <i class="g" style="width:${(grassa / max * 100).toFixed(1)}%"></i>
+      </span>
+      <span class="v mono">${nf(magra + grassa, 1)}</span>`;
+    return r;
+  };
+  box.append(barra('Ora', C.lbm, C.fm));
+  box.append(barra('Target', tLbm, tFm, 'tgt'));
+  box.append(el('div', 'leg',
+    '<span><i style="background:var(--pine)"></i>massa magra</span>'
+    + '<span><i style="background:var(--amber)"></i>massa grassa</span>'));
+  return box;
+}
+
+/**
+ * Da dove viene il numero della composizione.
+ *
+ * Non e' una nota a pie' di pagina: fra una bioimpedenza e la formula della
+ * Marina la differenza puo' essere piu' grande del cambiamento che stai
+ * guardando, e leggere "18,4%" senza sapere quale delle due e' vuol dire non
+ * sapere cosa si sta leggendo.
+ */
+function fonteComposizione(C) {
+  const p = el('p', 'note');
+  if (C.fonte === 'bia') {
+    const q = C.bia.eta === 0 ? 'oggi' : C.bia.eta === 1 ? 'ieri'
+      : `${C.bia.eta} giorni fa`;
+    p.innerHTML = `<strong>Misurata</strong> con una bioimpedenza ${esc(q)}${
+      C.bia.dove ? ' (' + esc(C.bia.dove) + ')' : ''}. Una BIA non e' una DEXA e
+      risente molto di quanto sei idratato — la stessa persona a due ore di
+      distanza puo' uscire con due punti di differenza — ma resta una misura,
+      e finche' e' recente vale piu' di una stima da tre circonferenze.
+      Dopo ${BIA_GG} giorni torna a valere la formula.`;
+    if (C.stima != null) p.innerHTML += ` La formula, sulle tue misure di oggi,
+      direbbe ${nf(C.stima, 1)}%.`;
+  } else {
+    p.innerHTML = `<strong>Stimato</strong> con la formula della Marina USA da
+      vita, collo e altezza: ±3-4 punti di errore reale. Serve a vedere la
+      direzione, non il valore assoluto.`;
+    if (C.bia) p.innerHTML += ` L'ultima bioimpedenza (${esc(C.bia.k)},
+      ${nf(C.bia.bf, 1)}%) ha piu' di ${BIA_GG} giorni: resta nello storico,
+      ma non descrive piu' il corpo di adesso.`;
+  }
+  return p;
+}
+
+/**
+ * Registrare una bioimpedenza.
+ *
+ * Si chiede **il grasso** e basta come obbligatorio: e' il numero che tutti gli
+ * strumenti danno ed e' quello che serve alla composizione. Massa magra,
+ * muscolo e acqua sono facoltativi — se la stampa della farmacia li porta si
+ * scrivono, e la massa magra dichiarata vince sul calcolo, perche' e' quello
+ * che lo strumento misura davvero.
+ *
+ * La data si sceglie: una BIA la si registra spesso la sera tornando a casa, e
+ * segnarla sul giorno sbagliato la fa poi valere trenta giorni dal giorno
+ * sbagliato.
+ */
+function sheetBia(k = today()) {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Composizione misurata'));
+  w.append(el('h2', 'sec', 'Bioimpedenza'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Quella della farmacia, della palestra o di una bilancia impedenziometrica. '
+    + 'Basta la percentuale di grasso: il resto e\' facoltativo.'));
+
+  const gia = day(k).bia || {};
+  const campo = (id, lab, unit, val, ph) => el('div', 'field',
+    `<label>${lab}${unit ? ` <span class="muted">(${unit})</span>` : ''}</label>
+     <input type="text" inputmode="decimal" id="bia-${id}" value="${val ?? ''}"
+       placeholder="${esc(ph || '')}">`);
+
+  const dt = el('div', 'field',
+    `<label>Giorno in cui l'hai fatta</label>
+     <input type="date" id="bia-k" value="${k}" max="${today()}">`);
+  w.append(dt);
+  w.append(campo('bf', 'Grasso corporeo', '%', gia.bf, 'per esempio 18,4'));
+  const g2 = el('div');
+  g2.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px';
+  g2.append(campo('lbm', 'Massa magra', 'kg', gia.lbm),
+            campo('mus', 'Massa muscolare', 'kg', gia.mus),
+            campo('acqua', 'Acqua', '%', gia.acqua),
+            campo('peso', 'Peso segnato', 'kg', gia.peso));
+  w.append(g2);
+  w.append(el('div', 'field',
+    `<label>Dove <span class="muted">(facoltativo)</span></label>
+     <input type="text" id="bia-dove" value="${esc(gia.dove || '')}"
+       placeholder="Farmacia, palestra, bilancia di casa">`));
+  w.append(el('p', 'hint',
+    'Se ne fai piu\' di una, falle sempre nelle stesse condizioni: stessa ora, '
+    + 'stesso stato di idratazione, prima di allenarti. Fra due BIA fatte in '
+    + 'momenti diversi della giornata la differenza e\' quasi tutta acqua, e '
+    + 'confrontarle direbbe una cosa che non e\' successa.'));
+  w.append(el('p', 'note',
+    'Dei numeri qui sopra la composizione usa <strong>solo la percentuale di '
+    + 'grasso</strong>, e la applica al tuo peso di oggi. Massa magra, muscolo, '
+    + 'acqua e il peso dello strumento restano registrati e servono a '
+    + 'confrontare due bioimpedenze fra loro: usarli insieme alla tua pesata '
+    + 'mescolerebbe due bilance diverse in due momenti diversi, e la somma '
+    + 'delle due parti non farebbe piu\' il tuo peso.'));
+
+  const salva = el('button', 'btn wide pri', 'Salva la bioimpedenza');
+  salva.onclick = () => {
+    const bf = parseNum($('#bia-bf').value);
+    if (!(bf > 2 && bf < 70)) { toast('La percentuale di grasso non torna'); return; }
+    const kk = $('#bia-k').value || k;
+    if (kk > today()) { toast('Non puoi segnarla su un giorno che non e\' arrivato'); return; }
+    const b = { bf };
+    for (const [id, campo2] of [['lbm', 'lbm'], ['mus', 'mus'],
+                                ['acqua', 'acqua'], ['peso', 'peso']]) {
+      const n = parseNum($('#bia-' + id).value);
+      if (n > 0) b[campo2] = n;
+    }
+    const dove = $('#bia-dove').value.trim();
+    if (dove) b.dove = dove;
+    day(kk).bia = b;
+    // il peso segnato dallo strumento non sovrascrive la pesata del giorno:
+    // sono due bilance diverse, e la tendenza si regge sull'essere sempre la
+    // stessa. Resta dentro la BIA, dove si puo' confrontare
+    save(); closeSheet(); route();
+    toast('Bioimpedenza registrata');
+  };
+  w.append(salva);
+
+  /* --- quelle di prima --- */
+  const st = tutteBia();
+  if (st.length) {
+    const c = el('div', 'card flat');
+    c.style.marginTop = '14px';
+    c.append(el('div', 'eyebrow', st.length === 1 ? 'Una registrata' : st.length + ' registrate'));
+    for (const b of st) {
+      const r = el('div', 'row between');
+      r.style.cssText = 'padding:7px 0;border-bottom:1px solid var(--rule)';
+      r.innerHTML = `<span><strong>${nf(b.bf, 1)}%</strong>
+        <span class="muted"> ${esc(b.k)}${b.dove ? ' · ' + esc(b.dove) : ''}</span></span>`;
+      const x = el('button', 'ico-b');
+      x.innerHTML = '&times;';
+      x.setAttribute('aria-label', 'Elimina');
+      x.onclick = () => {
+        if (!confirm(`Eliminare la bioimpedenza del ${b.k}?`)) return;
+        delete day(b.k).bia; save(); sheetBia(k); route();
+      };
+      r.append(x);
+      c.append(r);
+    }
+    if (st.length > 1) {
+      const d = st[0].bf - st[st.length - 1].bf;
+      c.append(el('p', 'hint',
+        `Dalla prima all'ultima: ${d > 0 ? '+' : ''}${nf(d, 1)} punti di grasso. `
+        + 'Vale come confronto solo se le condizioni erano le stesse.'));
+    }
+    w.append(c);
+  }
+
+  const ch = el('button', 'btn wide', 'Chiudi');
+  ch.style.marginTop = '10px';
+  ch.onclick = closeSheet;
+  w.append(ch);
+  sheet(w);
 }
 
 /**
@@ -2798,8 +3083,6 @@ function sezSintesi(v) {
 
   /* --- cosa non torna, e quanto --- */
   const trovati = analyse();
-  const problemi = trovati.filter(f => f[0] !== 'ok').length;
-  const buone = trovati.length - problemi;
 
   // la costanza sta qui e in nessun altro posto: prima era un anello in questa
   // schermata e una carta intera in Dati, cioe' lo stesso numero due volte a
@@ -2810,15 +3093,34 @@ function sezSintesi(v) {
   testa.append(el('h3', null, 'La settimana in un colpo d\'occhio'));
   testa.append(el('div', 'sub',
     'Medie degli ultimi sette giorni chiusi, confrontate con i tuoi target. La barra dice quanto, il segno verticale dove doveva arrivare.'));
+  /* I due numeri contano **le otto voci qui sotto**, non i messaggi
+     dell'analisi.
+     Prima erano `analyse().length` e quanti di quelli non erano 'ok': cioe' un
+     conto sui testi che compaiono in fondo alla pagina, messo in cima a una
+     carta che ne mostra otto altre. Usciva "1 cose a posto / 2 da sistemare"
+     sopra otto barre di cui cinque senza dato — tre numeri che non tornavano
+     con niente di visibile, e per giunta "1 cose".
+     Le voci senza dato sono il terzo stato e vanno dette: sono la ragione per
+     cui la somma non fa otto, e sono anche la cosa da sistemare per prima. */
+  const M = typeof metriche === 'function' ? metriche(k, 7) : [];
+  const dentro = m => m.val != null && m.tgt
+    && Math.abs(m.val - m.tgt) <= m.tgt * (m.tolleranza ?? 0.1);
+  const senza = M.filter(m => m.val == null).length;
+  const ok = M.filter(dentro).length;
+  const fuori = M.length - senza - ok;
+  const plur = (n, uno, tanti) => n === 1 ? uno : tanti;
   const r = el('div', 'an-conta solo');
-  r.innerHTML = `<div><b>${buone}</b><span>cose a posto</span></div>
-     <div class="${problemi ? 'warn' : ''}"><b>${problemi}</b><span>da sistemare</span></div>`;
+  r.innerHTML = `<div><b>${ok}</b><span>${plur(ok, 'in linea', 'in linea')}</span></div>
+     <div class="${fuori ? 'warn' : ''}"><b>${fuori}</b><span>${
+       plur(fuori, 'fuori target', 'fuori target')}</span></div>`
+     + (senza ? `<div class="vuoto"><b>${senza}</b><span>${
+       plur(senza, 'senza dato', 'senza dato')}</span></div>` : '');
   testa.append(r);
-  if (typeof metriche === 'function')
-    for (const m of metriche(k, 7)) testa.append(meter(m));
+  for (const m of M) testa.append(meter(m));
   v.append(testa);
 
-  v.append(el('h2', 'sec', problemi ? 'Cosa posso migliorare' : 'Tutto a posto'));
+  const daDire = trovati.filter(f => f[0] !== 'ok').length;
+  v.append(el('h2', 'sec', daDire ? 'Cosa posso migliorare' : 'Tutto a posto'));
   for (const [kind, ico, title, body] of trovati) {
     v.append(el('div', 'flag ' + kind,
       `<div class="ico">${ico}</div>
