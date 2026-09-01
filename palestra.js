@@ -963,41 +963,91 @@ function sezGymCarico(v, k) {
 }
 
 function sezGymStorico(v, k) {
-  /* --- storico --- */
-  // qui c'e' spazio: prima erano dodici perche' stavano in coda a tutto il resto
   /* Aprire la schermata di scelta crea la giornata anche se poi non ci si
      registra niente: una riga "Seduta · 0 serie" nello storico e' il segno di
      un tocco, non di un allenamento. */
   const sedute = Object.keys(P().sessioni)
     .filter(x => (P().sessioni[x]?.serie || []).length)
     .sort().reverse().slice(0, 60);
-  if (sedute.length) {
-    /* In cima il resoconto dell'ultima: aprire lo storico e vedere un elenco
-       di date e' guardare un archivio, non capire com'e' andata. Il resoconto
-       non aggiunge conti nuovi — chiede a quelli che ci sono gia'. */
-    if (typeof resocontoSeduta === 'function') {
-      const r = resocontoSeduta(sedute[0]);
-      if (r) v.append(cardResoconto(r));
-    }
-    const c = el('div', 'card');
-    c.append(el('h2', 'sec', 'Ultime sedute'));
-    c.lastChild.style.marginTop = '0';
-    for (const kk of sedute) {
-      const s = P().sessioni[kk];
-      const r = el('button', 'prod');
-      const ton2 = s.serie.reduce((a, x) => a + tonnellaggioSerie(x), 0);
-      const ns = s.serie.reduce((a, x) => a + serieEquivalenti(x), 0);
-      r.innerHTML = `<div class="grow"><div class="nm">${esc(s.nome || 'Seduta')}</div>
-        <div class="mt">${kk} · ${nf(ns, ns % 1 ? 1 : 0)} serie · ${nf(ton2)} kg</div></div>
-        <div class="kc">apri &rsaquo;</div>`;
-      // dallo storico si apre il resoconto, non il modulo di registrazione:
-      // chi guarda una seduta di tre settimane fa vuole ricordarsela
-      r.onclick = () => typeof sheetResoconto === 'function'
-        ? sheetResoconto(kk) : sheetSeduta(kk);
-      c.append(r);
-    }
-    v.append(c);
+  if (!sedute.length) {
+    v.append(el('div', 'card flat',
+      `<div class="eyebrow">Ancora niente</div>
+       <div class="muted">Le sedute registrate finiscono qui, con il resoconto
+       di ognuna. Comincia da "Registra pesi".</div>`));
+    return;
   }
+
+  /* In cima il resoconto dell'ultima: aprire lo storico e vedere un elenco di
+     date e' guardare un archivio, non capire com'e' andata. Il resoconto non
+     aggiunge conti nuovi — chiede a quelli che ci sono gia'. */
+  if (typeof resocontoSeduta === 'function') {
+    const r = resocontoSeduta(sedute[0]);
+    if (r) v.append(cardResoconto(r));
+  }
+
+  /* --- l'elenco ---
+   * Rifatto con il linguaggio della Sintesi: un blocco con titolo e
+   * sottotitolo, i numeri grossi del periodo, e poi le righe. La barra su
+   * ogni riga e' in scala **fra le sedute mostrate**, non in assoluto: serve
+   * a vedere a colpo d'occhio quali sono state grosse e quali corte, che e'
+   * la domanda che si fa scorrendo uno storico. Sotto c'e' scritto.
+   */
+  const dati = sedute.map(kk => {
+    const s2 = P().sessioni[kk];
+    return {
+      k: kk, nome: s2.nome || 'Seduta',
+      serie: s2.serie.reduce((a, x) => a + serieEquivalenti(x), 0),
+      tonn: s2.serie.reduce((a, x) => a + tonnellaggioSerie(x), 0),
+      ex: new Set(s2.serie.map(x => x.ex)).size
+    };
+  });
+  const maxT = Math.max(1, ...dati.map(x => x.tonn));
+  // il periodo di riferimento dei numeri in testa: le ultime otto settimane
+  const daQuando = addDays(k, -56);
+  const rec = dati.filter(x => x.k >= daQuando);
+  const tot = rec.reduce((a, x) => a + x.tonn, 0);
+  const nSer = rec.reduce((a, x) => a + x.serie, 0);
+
+  const c = el('div', 'cw');
+  c.append(el('h3', null, 'Le tue sedute'));
+  c.append(el('div', 'sub',
+    'Le ultime sessanta, dalla piu\' recente. Tocca una seduta per il suo '
+    + 'resoconto e per correggere le serie.'));
+  const n = el('div', 'an-conta tre');
+  n.innerHTML = `<div><b>${rec.length}</b><span>sedute in 8 settimane</span></div>
+    <div><b>${nf(nSer, nSer % 1 ? 1 : 0)}</b><span>serie</span></div>
+    <div><b>${nf(Math.round(tot / 1000), 1)}</b><span>tonnellate</span></div>`;
+  c.append(n);
+
+  const nomiMesi = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu',
+                    'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  let ultimoMese = null;
+  for (const x of dati) {
+    const d = new Date(x.k);
+    const mese = d.getFullYear() + '-' + d.getMonth();
+    if (mese !== ultimoMese) {
+      ultimoMese = mese;
+      c.append(el('div', 'st-mese',
+        `${nomiMesi[d.getMonth()]} ${d.getFullYear()}`));
+    }
+    const r = el('button', 'st-r');
+    r.innerHTML = `<span class="gg"><b>${String(d.getDate()).padStart(2, '0')}</b>
+        <em>${['do', 'lu', 'ma', 'me', 'gi', 've', 'sa'][d.getDay()]}</em></span>
+      <span class="grow"><span class="n">${esc(x.nome)}</span>
+        <span class="m">${nf(x.serie, x.serie % 1 ? 1 : 0)} serie · ${x.ex} esercizi</span>
+        <span class="bar"><i style="width:${(x.tonn / maxT * 100).toFixed(1)}%"></i></span></span>
+      <span class="t">${nf(Math.round(x.tonn))}<em>kg</em></span>
+      <span class="go">&rsaquo;</span>`;
+    r.onclick = () => typeof sheetResoconto === 'function'
+      ? sheetResoconto(x.k) : sheetSeduta(x.k);
+    c.append(r);
+  }
+  c.append(el('p', 'note',
+    'La barra e\' in scala fra le sedute qui sopra, non in assoluto: dice '
+    + 'quali sono state grosse rispetto alle altre tue, non rispetto a '
+    + 'qualcun altro. Gli scarichi di uno stripping contano mezza serie e '
+    + 'tutti i loro chili, come in ogni altro conto dell\'app.'));
+  v.append(c);
 }
 
 /** Scheda di un singolo esercizio: massimale stimato e proiezione. */
@@ -1337,9 +1387,17 @@ function sheetSeduta(k) {
      e' una decisione: e' un incidente, e passare di nuovo da "come registri?"
      costringe a ritrovare la scheda giusta in un elenco mentre si e' sotto un
      bilanciere. Se c'e' una guida in corso su una scheda che esiste ancora,
-     si torna li' e basta. */
+     si torna li' e basta.
+
+     Ma "a meta'" vuol dire che qualcosa e' stato fatto. Aprendo una scheda e
+     richiudendola subito restava una guida a zero serie, e da li' in poi
+     "registra pesi" portava dentro quella scheda ogni volta, proponendo di
+     riprendere una seduta che non era mai cominciata. Una guida senza
+     nemmeno una serie non e' un lavoro interrotto: e' un tocco, e si
+     cancella invece di trascinarsela dietro. */
   const g = p.sessioni[k].guida;
-  if (g?.scheda && scheda(g.scheda) && typeof sheetGuidata === 'function')
+  if (g && !p.sessioni[k].serie.length) { delete p.sessioni[k].guida; save(); }
+  else if (g?.scheda && scheda(g.scheda) && typeof sheetGuidata === 'function')
     return sheetGuidata(k, g.scheda);
   // sempre la schermata di scelta: prima, se c'erano gia' delle serie, si
   // finiva dritti nella seduta libera e alle schede non si arrivava piu'
@@ -1354,8 +1412,10 @@ function sheetSceltaModo(k) {
   w.lastChild.style.marginTop = '0';
 
   // chi arriva qui con una guida in corso l'ha voluto: sheetSeduta() lo
-  // avrebbe gia' riportato dentro. Il modo di uscirne resta scritto
-  const guida = P().sessioni[k]?.guida;
+  // avrebbe gia' riportato dentro. Il modo di uscirne resta scritto.
+  // Vale la stessa regola: senza nemmeno una serie non c'e' niente da
+  // riprendere, e proporlo sarebbe una domanda su un lavoro mai iniziato
+  const guida = gia ? P().sessioni[k]?.guida : null;
   if (guida?.scheda && scheda(guida.scheda)) {
     const rip = el('button', 'btn wide pri',
       `Riprendi "${scheda(guida.scheda).nome}" da dove eri`);

@@ -702,6 +702,46 @@
 .an-conta .warn b{color:var(--amber)}
 .an-conta span{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
   text-transform:uppercase;color:var(--ink-3)}
+/* tre numeri stanno stretti su 390 px: si dividono la riga in parti uguali e
+   l'etichetta va a capo invece di uscire dal bordo */
+.an-conta.tre{gap:10px;margin:10px 0 12px;padding-bottom:12px;
+  border-bottom:1px solid var(--rule)}
+.an-conta.tre > div{flex:1;min-width:0}
+.an-conta.tre b{font-size:22px}
+.an-conta.tre span{white-space:normal;line-height:1.25;display:block}
+
+/* ---------------- lo storico delle sedute ----------------
+   Stessa lingua della Sintesi: titolo, sottotitolo, i numeri grossi del
+   periodo, poi le righe. Il blocco del giorno a sinistra fa da ancora
+   verticale — scorrendo si legge la data prima del nome — e la barra sotto
+   dice a colpo d'occhio quali sedute sono state grosse. */
+.st-mese{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3);margin:14px 0 2px}
+.st-mese:first-of-type{margin-top:4px}
+.st-r{display:flex;width:100%;align-items:center;gap:11px;padding:9px 0;
+  border:0;border-bottom:1px solid var(--rule);background:none;color:var(--ink);
+  font:inherit;text-align:left;cursor:pointer}
+.st-r:last-of-type{border-bottom:0}
+.st-r:active{background:var(--wash)}
+.st-r .gg{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:38px;height:38px;flex:none;border-radius:11px;background:var(--wash);
+  border:1px solid var(--rule)}
+.st-r .gg b{font-family:var(--mono);font-size:14px;font-weight:600;line-height:1}
+.st-r .gg em{font-style:normal;font-family:var(--mono);font-size:8.5px;
+  color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;margin-top:1px}
+.st-r .grow{min-width:0}
+.st-r .n{display:block;font-size:13.5px;font-weight:600;line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-r .m{display:block;font-family:var(--mono);font-size:10.5px;
+  color:var(--ink-3);margin-top:1px}
+.st-r .bar{display:block;height:3px;border-radius:2px;background:var(--rule);
+  margin-top:5px;overflow:hidden}
+.st-r .bar i{display:block;height:100%;background:var(--pine);border-radius:2px}
+.st-r .t{font-family:var(--mono);font-size:14px;font-weight:600;flex:none;
+  text-align:right;line-height:1.05}
+.st-r .t em{font-style:normal;font-size:9px;color:var(--ink-3);display:block;
+  font-weight:400}
+.st-r .go{color:var(--ink-3);font-size:17px;flex:none}
 .meal-h .grow.tap{cursor:pointer}
 .meal-h .grow.tap .meal-name::after{content:' ›';color:var(--ink-3);font-weight:400}
 

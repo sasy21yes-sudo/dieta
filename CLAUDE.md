@@ -550,6 +550,12 @@ scheda che esiste ancora, ci torna dentro e basta. Il modo di uscirne resta
 scritto — "abbandona la guida e registra a mano" — e non cancella niente: le
 serie fatte restano, si continua dal modulo.
 
+Ma **"a meta'" vuol dire che qualcosa e' stato fatto.** Aprendo una scheda e
+richiudendola subito restava una guida a zero serie, e da li' in poi "registra
+pesi" portava dentro quella scheda ogni volta, proponendo di riprendere una
+seduta che non era mai cominciata. Una guida senza nemmeno una serie non e' un
+lavoro interrotto: e' un tocco, e si cancella invece di trascinarsela dietro.
+
 ### Uno stripping vale uguale ovunque
 
 Uno stripping non e' una serie e non e' due: e' una serie piu' N code fatte a
@@ -1183,6 +1189,26 @@ allenarti", ma "oggi ti conviene questa".
 
 Senza abbastanza storico non compare niente e la nota lo dice, invece di
 inventare un verdetto.
+
+### Lo storico non e' un archivio
+
+Era un elenco di date con accanto due numeri: per sapere com'era andata una
+settimana bisognava aprire le sedute una per una. Ora ha la lingua della
+Sintesi — titolo, sottotitolo, i numeri grossi del periodo, poi le righe — e
+ogni riga porta quello che serve a scorrerlo:
+
+- il **blocco del giorno** a sinistra fa da ancora verticale: scorrendo si
+  legge la data prima del nome. Le sigle sono di due lettere (`ma`, `me`) e
+  non di tre, perche' "mar" sotto un'intestazione "set 2026" qualcuno lo
+  legge come marzo;
+- una **barra sotto il nome** con il tonnellaggio in scala **fra le sedute
+  mostrate**: dice quali sono state grosse rispetto alle altre tue, e la nota
+  lo scrive perche' non e' una scala assoluta;
+- i mesi separano i gruppi, cosi' i vuoti si vedono senza contarli.
+
+In testa tre numeri sulle ultime otto settimane — sedute, serie, tonnellate —
+che sono la risposta alla domanda che si fa aprendo lo storico: *quanto ho
+fatto ultimamente*.
 
 ### Una serie si corregge, non solo si butta
 
@@ -2525,6 +2551,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non elencare nello storico le sedute senza serie: aprire la schermata di
   scelta ne crea una, e quella e' la traccia di un tocco, non di un
   allenamento
+- Non far riprendere una guida che non ha registrato niente: aprire una
+  scheda e richiuderla lascia uno stato a zero serie, e riproporlo ogni volta
+  e' una domanda su un lavoro mai iniziato
+- Non abbreviare i giorni della settimana a tre lettere sotto un'intestazione
+  di mese: "mar" si legge marzo
 - Non lasciare senza uscita una seduta registrata per sbaglio: entra nel
   volume, nella forma-fatica, nel monitoraggio della scheda e nel conteggio
   della revisione. E chi la elimina va avvisato che tocca solo la palestra
