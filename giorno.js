@@ -29,6 +29,91 @@
  * nella giornata — cosi' la spunta, le porzioni e tutto il resto continuano a
  * parlare della stessa riga anche dopo il cambio.
  */
+/* ===================================================== quello che hai mangiato
+ *
+ * **Il piano e' un modello, il diario e' un fatto**, e finora la seconda meta'
+ * non era vera: `consumed(k)` rileggeva ogni volta la ricetta dal piano, e
+ * `d.pasti[code]` era un semplice `true`. Conseguenza: correggere una ricetta
+ * oggi — o riassegnare uno slot della settimana — **riscriveva mesi di
+ * storico**. Una pasta portata da 749 a 900 kcal spostava all'indietro tutte
+ * le giornate in cui era stata spuntata, e con loro il bilancio energetico da
+ * cui il filtro di Kalman stima il dispendio.
+ *
+ * La cura e' congelare **al momento della spunta**, e solo quel pasto: e'
+ * l'istante in cui una riga smette di essere "quello che dovrei mangiare" e
+ * diventa "quello che ho mangiato". Ticchi la colazione e la colazione si
+ * fissa; se piu' tardi correggi la ricetta del pranzo, il pranzo di oggi —
+ * che non hai ancora spuntato — segue la versione nuova, che e' giusto.
+ *
+ * Si congela la **ricetta effettiva** (dopo un eventuale cambio di pasto) con
+ * il suo elenco di ingredienti, piu' slot e ora. Gli strati del giorno —
+ * porzioni, sostituzioni, aggiunti — stanno gia' nel diario e continuano ad
+ * applicarsi sopra: non c'e' niente da duplicare.
+ *
+ * Cosa NON si congela, ed e' una scelta: i valori nutrizionali degli alimenti.
+ * Collegare un prodotto reale a un alimento **deve** correggere i conti
+ * ovunque — e' una funzione dichiarata, non un effetto collaterale — e li' la
+ * stima di prima era il numero sbagliato, non un fatto storico.
+ */
+function congelaPasto(code, k) {
+  const d = day(k);
+  const eff = pastoDelGiorno(code, k);
+  const p = D.pasti[eff];
+  if (!p) return;
+  const slot = (D.settimana[dayIdx(k)]?.pasti || []).find(x => x.codice === code);
+  d.fatti ||= {};
+  d.fatti[code] = {
+    code: eff, nome: p.nome || eff,
+    slot: slot?.slot || '', ora: slot?.ora || '',
+    ingredienti: (p.ingredienti || []).map(i => ({ ...i })),
+    // senza ingredienti (una ricetta scritta a macro) si tiene il totale
+    macro: p.ingredienti?.length ? null : { ...p.macro }
+  };
+}
+function scongelaPasto(code, k) {
+  const d = S.log[k];
+  if (d?.fatti) { delete d.fatti[code]; if (!Object.keys(d.fatti).length) delete d.fatti; }
+}
+/** La ricetta come era quando l'hai spuntata, se c'e'. */
+const pastoFatto = (code, k) => S.log[k]?.fatti?.[code] || null;
+
+/**
+ * La ricetta di quel pasto **in quel giorno**: la copia congelata se c'e',
+ * altrimenti quella del piano.
+ *
+ * Serve ovunque si guardi un pasto dentro una giornata, e non solo per i
+ * conti. Il caso che lo rende evidente: la scheda dice "cosa e' cambiato
+ * rispetto al piano", e su un giorno congelato quel confronto va fatto con la
+ * ricetta di allora — altrimenti basta correggere il piano oggi perche' una
+ * giornata mai toccata si metta a dichiarare "modificato +150 kcal".
+ */
+function ricettaGiorno(code, k) {
+  const f = pastoFatto(code, k);
+  if (f?.ingredienti?.length) return f;
+  return D.pasti[pastoDelGiorno(code, k)] || null;
+}
+
+/**
+ * Gli slot di un giorno: quelli del piano, piu' quelli spuntati che il piano
+ * non ha piu'.
+ *
+ * Riassegnare la cena del mercoledi cambiava `D.settimana`, e la spunta
+ * vecchia — che e' indicizzata sul codice della ricetta — restava orfana:
+ * spariva da `consumed()` e dalla scheda Oggi, cioe' un pasto registrato
+ * scompariva dal registro senza che nessuno lo avesse tolto.
+ */
+function slotsGiorno(k) {
+  const base = (D.settimana[dayIdx(k)]?.pasti || []).map(s => ({ ...s }));
+  const f = S.log[k]?.fatti;
+  if (!f) return base;
+  const visti = new Set(base.map(s => s.codice));
+  for (const [code, x] of Object.entries(f)) {
+    if (visti.has(code)) continue;
+    base.push({ codice: code, slot: x.slot || 'Registrato', ora: x.ora || '', fuoriPiano: true });
+  }
+  return typeof ordinaSlotOrari === 'function' ? ordinaSlotOrari(base) : base;
+}
+
 function pastoDelGiorno(code, k) {
   const alt = S.log[k]?.pastoSwap?.[code];
   return alt && D.pasti[alt] ? alt : code;
@@ -64,11 +149,17 @@ function mettePastoSwap(code, k, nuovo, scala = 1) {
     }
   }
   if (!Object.keys(d.pastoSwap).length) delete d.pastoSwap;
+  // se quel pasto era gia' spuntato, quello che hai mangiato e' la ricetta
+  // NUOVA: la copia congelata va rifatta, o resterebbe quella di prima
+  if (d.pasti?.[code]) congelaPasto(code, k);
   save();
 }
 
 function ingredientiGiorno(code, k) {
-  const p = D.pasti[pastoDelGiorno(code, k)];
+  // la copia congelata vince sul piano: e' il punto unico da cui passano
+  // Oggi, il totale del pasto, il foglio delle porzioni e `consumed()`
+  const fatto = pastoFatto(code, k);
+  const p = fatto?.ingredienti?.length ? fatto : D.pasti[pastoDelGiorno(code, k)];
   if (!p?.ingredienti) return [];
   const sw = S.log[k]?.swap?.[code] || {};
   const por = S.log[k]?.porzioni?.[code] || {};
@@ -164,15 +255,22 @@ function mealMGiorno(code, k) {
   const sw = S.log[k]?.swap?.[code];
   const por = S.log[k]?.porzioni?.[code];
   const agg = S.log[k]?.aggiunti?.[code];
-  const p = D.pasti[eff];
+  const fatto = pastoFatto(code, k);
+  const p = fatto?.ingredienti?.length ? fatto : D.pasti[eff];
   /* Gli aggiunti contano come gli altri tre strati. Mancavano, e la
      conseguenza era la peggiore possibile: aggiungendo qualcosa a un pasto e
      basta, il totale continuava a dire il numero della ricetta. Un pasto che
      mente sulle calorie e' peggio di un pasto che non si puo' modificare. */
-  const cambiato = eff !== code
+  /* Un pasto congelato va SEMPRE ricalcolato dalla sua copia, anche senza
+     nessuno strato addosso: e' tutto il punto. `mealM(eff)` rileggerebbe la
+     ricetta dal piano di adesso, cioe' proprio il numero che non deve piu'
+     cambiare. */
+  const cambiato = !!fatto || eff !== code
     || (por && Object.keys(por).length) || (sw && Object.keys(sw).length)
     || (agg && agg.length);
-  if (!cambiato || !p?.ingredienti) return mealM(eff);
+  if (!cambiato || !p?.ingredienti) {
+    return fatto?.macro ? { ...fatto.macro } : mealM(eff);
+  }
   const m = M0();
   for (const i of ingredientiGiorno(code, k)) addM(m, macroIngrediente(i));
   for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) m[x] = Math.round(m[x] * 10) / 10;
@@ -207,7 +305,7 @@ function slotAbituale(code) {
  */
 function pastiEquivalenti(code, k, n = 8) {
   const eff = pastoDelGiorno(code, k);
-  const src = D.pasti[eff];
+  const src = ricettaGiorno(code, k);
   if (!src?.macro?.kcal) return [];
   const m0 = src.macro;
   const out = [];
@@ -253,8 +351,9 @@ function metteSwap(code, k, slot, nuovo, qta, prod) {
 
 /* ------------------------------------------------- porzioni di un pasto */
 function sheetPorzioni(k, code) {
-  // il pasto di oggi, che puo' non essere quello del piano
-  const p = D.pasti[pastoDelGiorno(code, k)];
+  // il pasto di quel giorno: puo' non essere quello del piano perche' lo hai
+  // cambiato, o perche' e' congelato dalla spunta
+  const p = ricettaGiorno(code, k);
   if (!p) return;
   const d = day(k);
   d.porzioni ||= {};
@@ -488,10 +587,10 @@ function sheetAggiungiAlPasto(k, code) {
      e' gia' quella, e chiederla sarebbe una domanda con una risposta sola. */
   const dest = { code };
   const slots = usaPiano()
-    ? (D.settimana[dayIdx(k)]?.pasti || []).filter(x => D.pasti[x.codice]) : [];
+    ? slotsGiorno(k).filter(x => ricettaGiorno(x.codice, k)) : [];
   if (!code && !slots.length) dest.code = null;      // resta il fuori piano
 
-  const p = code ? D.pasti[pastoDelGiorno(code, k)] : null;
+  const p = code ? ricettaGiorno(code, k) : null;
   const w = el('div');
   w.append(el('div', 'eyebrow', code ? esc(p?.nome || code) : (k === today() ? 'Oggi' : k)));
   w.append(el('h2', 'sec', 'Aggiungi un alimento'));
@@ -613,7 +712,7 @@ function sheetAggiungiAlPasto(k, code) {
  */
 function sheetCambiaPasto(k, code) {
   const eff = pastoDelGiorno(code, k);
-  const src = D.pasti[eff];
+  const src = ricettaGiorno(code, k);
   if (!src) return;
   const w = el('div');
   w.append(el('div', 'eyebrow', 'Tutta la ricetta'));
@@ -684,7 +783,8 @@ function sheetCambiaPasto(k, code) {
 /* ------------------------------------------------ la giornata in dettaglio */
 /** Tutto quello che l'app sa di un giorno, in una scheda sola. */
 function sheetGiorno(k) {
-  const d = S.log[k], plan = D.settimana[dayIdx(k)];
+  const d = S.log[k];
+  const plan = { ...D.settimana[dayIdx(k)], pasti: slotsGiorno(k) };
   const w = el('div');
   const nomi = ['lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato', 'domenica'];
   w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k === addDays(today(), -1) ? 'Ieri' : k));

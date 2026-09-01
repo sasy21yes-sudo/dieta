@@ -1581,6 +1581,72 @@ La riga resta in Diario ma **in lettura**: dice cosa c'e' registrato quel
 giorno e porta in Gym. Toglierla del tutto avrebbe fatto pensare che
 l'allenamento non contasse piu'.
 
+### Il piano e' un modello, il diario e' un fatto
+
+E per molto tempo la seconda meta' non era vera. `consumed(k)` rileggeva la
+ricetta **dal piano di adesso** a ogni conto, e `S.log[k].pasti[code]` era un
+semplice `true`. Conseguenza: correggere una ricetta oggi — o riassegnare uno
+slot della settimana — **riscriveva mesi di storico**. Una pasta portata da
+749 a 900 kcal spostava all'indietro tutte le giornate in cui era stata
+spuntata, e con loro il bilancio energetico da cui il filtro di Kalman stima
+il dispendio: cambiare una ricetta cambiava il *metabolismo misurato*.
+
+Peggio ancora con la settimana: la spunta e' indicizzata sul **codice della
+ricetta**, quindi riassegnando la cena del mercoledi la spunta vecchia restava
+orfana e il pasto **spariva** da `consumed()` e dalla scheda Oggi. Un pasto
+registrato che scompare dal registro senza che nessuno lo abbia tolto.
+
+**Si congela al momento della spunta**, e solo quel pasto: e' l'istante in cui
+una riga smette di essere *"quello che dovrei mangiare"* e diventa *"quello
+che ho mangiato"*. `S.log[k].fatti[code]` tiene nome, slot, ora e l'elenco
+degli ingredienti com'erano. Ticchi la colazione e la colazione si fissa; se
+piu' tardi correggi la ricetta del pranzo, il pranzo di oggi — che non hai
+ancora spuntato — segue la versione nuova, che e' giusto. Togliendo la spunta
+la copia se ne va con lei.
+
+Tre conseguenze che tengono in piedi il resto:
+
+- **`slotsGiorno(k)`** unisce gli slot del piano con quelli spuntati che il
+  piano non ha piu', cosi' un pasto registrato non sparisce mai. Ci passano
+  Oggi, `consumed()`, la scheda della giornata e il resoconto in PDF;
+- **`ricettaGiorno(code, k)`** e' l'accessore unico: copia congelata se c'e',
+  ricetta del piano altrimenti. Non serve solo ai conti — la scheda dice
+  *"cosa e' cambiato rispetto al piano"*, e su un giorno congelato quel
+  confronto va fatto con la ricetta di allora, o basta correggere il piano
+  perche' una giornata mai toccata dichiari "modificato +150 kcal";
+- **gli strati del giorno non si duplicano.** Porzioni, sostituzioni e
+  aggiunti stanno gia' nel diario e continuano ad applicarsi *sopra* la copia
+  congelata. Congelare i macro finali invece degli ingredienti avrebbe voluto
+  dire ricalcolare la copia a ogni modifica di uno strato — e dimenticarne uno
+  e' esattamente l'errore gia' fatto una volta con `mealMGiorno()`.
+
+**Cosa NON si congela, ed e' una scelta:** i valori nutrizionali degli
+alimenti. Collegare un prodotto reale a un alimento *deve* correggere i conti
+ovunque — e' una funzione dichiarata, non un effetto collaterale — e li' la
+stima di prima era il numero sbagliato, non un fatto storico.
+
+**I registri vecchi continuano a valere.** Una spunta `true` senza copia legge
+la ricetta di adesso, cioe' si comporta come si comportava l'app prima: per
+quelle giornate la versione di allora non esiste piu', e inventarla sarebbe
+peggio che leggerne una approssimata.
+
+### Il doppio tocco non deve ingrandire la pagina
+
+Su iOS un doppio tocco su una pagina web zooma. In un'app dove si spuntano
+pasti, si tocca "+100 g" due volte di fila e si segnano serie fra una
+ripetizione e l'altra, quel gesto capita per sbaglio in continuazione.
+
+`touch-action: manipulation` toglie **solo** il doppio-tocco-per-zoomare, e
+come effetto secondario elimina il ritardo di 300 ms che Safari aspettava per
+capire se il secondo tocco stava arrivando: i bottoni rispondono subito.
+
+Quello che **non** si fa e' `user-scalable=no` nel viewport, che sarebbe la
+strada corta: quello toglie anche il pizzico, cioe' l'unico modo che ha chi ci
+vede poco di leggere una riga piccola. iOS peraltro lo ignora dalla 10 in poi,
+proprio per questo. E gli elementi che dichiarano `touch-action:none` per
+conto loro — la maniglia di trascinamento, il cursore del confronto fra due
+foto — restano come sono, perche' quella regola e' piu' specifica.
+
 ### In avanti si guarda, non si scrive
 
 In Oggi la freccia in avanti non aveva un fondo: si poteva arrivare al 2027 e
@@ -3132,6 +3198,26 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   della revisione. E chi la elimina va avvisato che tocca solo la palestra
 - Non far dimenticare a `_ffCache` una seduta cancellata: la forma-fatica e'
   memorizzata per muscolo e continuerebbe a rispondere coi numeri di prima
+- Non far rileggere al diario la ricetta dal piano di adesso: correggere una
+  ricetta riscriverebbe mesi di storico, e con loro il dispendio che il filtro
+  di Kalman ha misurato. Si congela alla spunta, che e' il momento in cui
+  quella riga diventa un fatto
+- Non indicizzare un pasto registrato solo sul piano: la spunta sta sul codice
+  della ricetta, e riassegnare uno slot la lasciava orfana — il pasto spariva
+  dal registro senza che nessuno lo avesse tolto. Gli slot di un giorno
+  passano da `slotsGiorno()`, che unisce piano e registro
+- Non congelare i macro finali invece degli ingredienti: gli strati del giorno
+  si applicano sopra, e una copia dei totali andrebbe rifatta a ogni modifica
+  di uno strato. Dimenticarne uno e' l'errore gia' fatto con `mealMGiorno()`
+- Non congelare anche i valori degli alimenti: collegare un prodotto reale
+  deve correggere i conti ovunque, ed e' una funzione dichiarata. Li' la stima
+  di prima era il numero sbagliato, non un fatto storico
+- Non sostituire l'oggetto del giorno del piano con i soli slot: porta anche
+  il nome, l'attivita' e i totali, e l'intestazione di Oggi si mette a
+  scrivere "undefined"
+- Non usare `user-scalable=no` per fermare lo zoom da doppio tocco: toglie
+  anche il pizzico, che e' l'unico modo di leggere per chi ci vede poco, e iOS
+  lo ignora dalla 10. Si usa `touch-action: manipulation`
 - Non lasciare spuntare un pasto in un giorno che non e' arrivato: quel
   giorno comincerebbe con le caselle gia' segnate. Ma nemmeno bloccare la
   navigazione in avanti: "cosa mangio domani" e' una domanda legittima, e il

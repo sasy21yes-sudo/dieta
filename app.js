@@ -186,8 +186,11 @@ function mealM(code) {
 /** Macro effettivamente consumate: pasti spuntati + extra fuori piano. */
 function consumed(k) {
   const d = day(k), t = M0();
-  const plan = D.settimana[dayIdx(k)];
-  for (const s of plan.pasti) if (d.pasti[s.codice])
+  // gli slot del giorno, non quelli del piano di adesso: una cena
+  // riassegnata dopo non deve far sparire la spunta di tre settimane fa
+  const slots = typeof slotsGiorno === 'function'
+    ? slotsGiorno(k) : D.settimana[dayIdx(k)].pasti;
+  for (const s of slots) if (d.pasti[s.codice])
     addM(t, typeof mealMGiorno === 'function' ? mealMGiorno(s.codice, k) : mealM(s.codice));
   for (const e of d.extra) addM(t, e);
   return t;
@@ -801,7 +804,7 @@ function analyse(k = today()) {
     `Nessuna assunzione negli ultimi 7 giorni. È l'unico integratore non negoziabile di una dieta vegana e la carenza è silenziosa per mesi.`]);
 
   // --- distribuzione proteica di oggi
-  const dd = day(k), plan = D.settimana[dayIdx(k)];
+  const dd = day(k), plan = { ...D.settimana[dayIdx(k)], pasti: slotsGiorno(k) };
   const main = plan.pasti.filter(s => ['Colazione', 'Pranzo', 'Cena'].includes(s.slot));
   // il pasto di oggi, non quello previsto: se lo hai cambiato conta il nuovo
   const low = main.filter(s => {
@@ -1062,7 +1065,11 @@ let viewDate = today();
 const OGGI_AVANTI = 7;
 
 function viewOggi(v) {
-  const k = viewDate, plan = D.settimana[dayIdx(k)], d = day(k);
+  /* Gli slot del GIORNO, non quelli del piano di adesso: una cena
+     riassegnata la settimana dopo non deve far sparire dalla scheda un pasto
+     che avevi spuntato. `slotsGiorno()` li unisce. */
+  const k = viewDate, d = day(k);
+  const plan = { ...D.settimana[dayIdx(k)], pasti: slotsGiorno(k) };
   /* In avanti si puo' andare, ma solo a leggere.
      Guardare cosa si mangia domani e' una domanda legittima — il piano
      esiste anche per quello — mentre spuntare un pasto che non e' ancora
@@ -1213,6 +1220,13 @@ function viewOggi(v) {
       // il rimbalzo conferma il tocco prima che la pagina si ridisegni: senza,
       // su un telefono lento sembra che non sia successo niente
       if (!done && typeof pulsa === 'function') pulsa(tick, { scala: 1.35, dur: 320 });
+      /* Qui la riga smette di essere "quello che dovrei mangiare" e diventa
+         "quello che ho mangiato": la ricetta si congela com'e' adesso, e da
+         quel momento correggerla nel piano non tocca piu' questa giornata.
+         Togliendo la spunta il fatto non c'e' piu', e la copia se ne va con
+         lui — rimettendola si ricongela sulla versione di quel momento. */
+      if (!done) { if (typeof congelaPasto === 'function') congelaPasto(s.codice, k); }
+      else if (typeof scongelaPasto === 'function') scongelaPasto(s.codice, k);
       d.pasti[s.codice] = !done; save();
       setTimeout(route, done ? 0 : 130);
     };

@@ -132,11 +132,16 @@ function statPasti(per) {
   const perSlot = new Map();
   const perPasto = new Map();
   for (const k of gg) {
-    const giorno = D.settimana[dayIdx(k)];
     const log = S.log[k];
-    for (const sl of (giorno?.pasti || [])) {
+    // il denominatore e' quello che quel giorno prevedeva, non quello che il
+    // piano prevede adesso: altrimenti riassegnando una cena cambierebbero
+    // all'indietro tutte le percentuali del resoconto
+    const slots = typeof slotsGiorno === 'function'
+      ? slotsGiorno(k) : (D.settimana[dayIdx(k)]?.pasti || []);
+    for (const sl of slots) {
       if (!sl.codice) continue;
-      const nome = D.pasti[sl.codice]?.nome || sl.codice;
+      const nome = log?.fatti?.[sl.codice]?.nome
+        || D.pasti[sl.codice]?.nome || sl.codice;
       const preso = !!log?.pasti?.[sl.codice];
       for (const [mappa, chiave, etichetta] of
            [[perSlot, sl.slot, sl.slot], [perPasto, sl.codice, nome]]) {

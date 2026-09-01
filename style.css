@@ -29,6 +29,33 @@ html,body{margin:0;padding:0;background:var(--paper);color:var(--ink)}
 body{font-family:var(--sans);font-size:15px;line-height:1.45;
      overscroll-behavior-y:none;padding-bottom:calc(64px + var(--safe-b))}
 
+/* ---------------- il doppio tocco non deve zoomare ----------------
+ *
+ * Su iOS un doppio tocco su una pagina web ingrandisce. In un'app dove si
+ * spuntano pasti, si tocca "+100 g" due volte di fila e si segnano serie fra
+ * una ripetizione e l'altra, quel gesto capita per sbaglio in continuazione:
+ * la pagina si ingrandisce a caso e bisogna ripizzicare per tornare.
+ *
+ * `touch-action: manipulation` toglie **solo** il doppio-tocco-per-zoomare, e
+ * come effetto secondario elimina anche il ritardo di 300 ms che Safari
+ * aspettava per capire se il secondo tocco stava arrivando: i bottoni
+ * rispondono subito.
+ *
+ * Quello che NON si fa e' `user-scalable=no` nel viewport, che sarebbe la
+ * strada corta: quello toglie **anche il pizzico**, cioe' l'unico modo che ha
+ * chi ci vede poco di leggere una riga piccola. Togliere l'ingrandimento a
+ * un'intera app per riparare un gesto involontario e' un cattivo affare, e
+ * iOS peraltro lo ignora dalla 10 in poi proprio per questo.
+ *
+ * Gli elementi che dichiarano `touch-action:none` per conto loro — la
+ * maniglia di trascinamento delle righe, il cursore del confronto fra due
+ * foto — restano come sono: quella regola e' piu' specifica. */
+html{touch-action:manipulation}
+/* Safari applica touch-action solo se l'elemento e' il bersaglio del tocco:
+   metterlo anche sui contenitori che si toccano davvero copre i casi in cui
+   il gesto parte da un figlio */
+body,#view,#sheet,#sheet-card,#topbar,#tabbar{touch-action:manipulation}
+
 /* ---------------- chrome ---------------- */
 #topbar{position:sticky;top:0;z-index:20;display:grid;align-items:center;
   grid-template-columns:42px 1fr 42px;gap:6px;
