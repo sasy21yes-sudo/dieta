@@ -116,12 +116,38 @@
 .meal-apri .go{color:var(--pine);white-space:nowrap}
 .meal-apri:active{background:var(--rule)}
 
-/* --------- la scorciatoia su Oggi ---------
-   Sta subito sotto "restano N kcal", cioe' nel punto in cui uno pensa "ho
-   mangiato una cosa": prima bisognava scorrere fino in fondo alla pagina o
-   aprire il pasto giusto. */
-.card.veloce .chips{margin-top:6px}
-.card.veloce .agg-b{display:flex;align-items:center;justify-content:center;gap:8px}
+/* --------- il fuori piano, in fondo a Oggi ---------
+   Due carte che chiedono la stessa cosa erano un doppione, e un bottone
+   verde pieno largo quanto lo schermo si prendeva un'attenzione che non
+   merita: Oggi serve a leggere come sta andando. Ora e' una carta sola con
+   la forma delle altre liste dell'app — icona a sinistra, chevron a
+   destra — e la gerarchia giusta: prima cosa hai registrato, poi come
+   aggiungerne dell'altro. */
+.ex-r{display:flex;align-items:center;gap:10px;padding:9px 0;
+  border-top:1px solid var(--rule)}
+.ex-r .n{display:block;font-size:13.5px;line-height:1.25}
+.ex-r .mm{display:block;font-family:var(--mono);font-size:10.5px;
+  color:var(--ink-3);margin-top:2px}
+.ex-r .kc{font-family:var(--mono);font-size:14px;font-weight:600;
+  white-space:nowrap;text-align:right}
+.ex-r .kc em{font-style:normal;font-size:9.5px;color:var(--ink-3);
+  display:block;font-weight:400;margin-top:-2px}
+
+.ex-az{margin-top:12px;border-top:1px solid var(--rule)}
+.ex-b{display:flex;width:100%;align-items:center;gap:11px;padding:11px 0;
+  border:0;border-bottom:1px solid var(--rule);background:none;color:var(--ink);
+  font:inherit;text-align:left;cursor:pointer}
+.ex-b:last-child{border-bottom:0}
+.ex-b:active{background:var(--wash)}
+.ex-b .ic{display:inline-flex;align-items:center;justify-content:center;
+  width:34px;height:34px;flex:none;border-radius:10px;
+  background:var(--pine-soft);color:var(--pine)}
+.ex-b .n{display:block;font-size:13.5px;font-weight:600;line-height:1.25}
+.ex-b .d{display:block;font-size:11.5px;color:var(--ink-3);
+  line-height:1.3;margin-top:1px}
+.ex-b .go{color:var(--ink-3);font-size:17px;flex:none}
+.ex-e{margin-top:12px}
+.ex-chips{margin-bottom:0}
 
 /* --------- dentro il pasto --------- */
 .porz-az{display:flex;gap:6px;grid-column:6;justify-self:end;flex:none}

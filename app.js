@@ -1063,14 +1063,6 @@ function viewOggi(v) {
   box.lastChild.style.marginTop = '10px';
   v.append(box);
 
-  /* La scorciatoia, e sta qui per un motivo: e' subito sotto "restano 2456
-     kcal", cioe' nel punto esatto in cui uno pensa "ho mangiato una cosa".
-     Prima per registrare qualcosa bisognava scorrere fino in fondo alla
-     pagina — dove sta il fuori piano — oppure aprire il pasto giusto e
-     cercare dentro. Due strade lunghe per l'azione piu' frequente dell'app.
-     Le pastiglie sono quello che registri di solito: un tocco solo. */
-  if (!futuro) v.append(cardAggiungiVeloce(k, d));
-
   // pasti — solo se il piano e' acceso
   if (!usaPiano()) {
     v.append(cardGiornoLibero(k, d));
@@ -1170,22 +1162,78 @@ function viewOggi(v) {
 }
 
 /**
- * La scorciatoia per registrare un alimento, in cima a Oggi.
+ * Il blocco per registrare qualcosa, in fondo a Oggi.
  *
- * Due livelli, dal piu' corto al piu' lungo: le cose che registri sempre —
- * un tocco, niente domande — e il bottone che apre la scelta completa, dove
- * si decide anche se finisce dentro un pasto o nel fuori piano.
+ * Era una carta a se' in cima, ed era due errori insieme. Il primo: due
+ * carte che chiedono la stessa cosa — "aggiungi in fretta" sopra e "fuori
+ * piano" sotto — sono un doppione, e in questo file c'e' scritto da tempo
+ * che due elenchi che si somigliano sono peggio di uno lungo. Il secondo:
+ * un bottone verde pieno largo quanto lo schermo, in mezzo alla pagina, si
+ * prende un'attenzione che non merita — la scheda Oggi serve a leggere come
+ * sta andando, non a gridare "aggiungi".
  *
- * `extraFrequenti()` esisteva gia' e lo usava solo il foglio del fuori piano,
- * cioe' l'ultimo posto in cui si arriva. Qui e' il primo.
+ * Adesso e' uno solo, in coda, e ha la forma delle altre liste dell'app:
+ * righe con l'icona a sinistra e il chevron a destra, come i prodotti e le
+ * schede. La gerarchia e' quella vera — prima quello che hai gia'
+ * registrato, poi le due strade per aggiungerne dell'altro.
  */
-function cardAggiungiVeloce(k, d) {
-  const c = el('div', 'card veloce');
-  c.append(el('div', 'eyebrow', 'Aggiungi in fretta'));
+function cardExtraEAggiungi(k, d, conPiano) {
+  const c = el('div', 'card');
+  c.append(el('h2', 'sec', conPiano ? 'Fuori piano' : 'Cosa hai mangiato'));
+  c.lastChild.style.marginTop = conPiano ? '' : '0';
+  c.append(el('p', 'muted', conPiano
+    ? 'Registralo e basta. Non serve compensare: il bilancio è settimanale.'
+    : 'Aggiungi quello che mangi durante la giornata: cercando un alimento i macro li calcola lui, tutti e cinque.'));
 
+  /* --- quello che c'e' gia' --- */
+  for (const [i, e] of d.extra.entries()) {
+    const row = el('div', 'ex-r');
+    row.innerHTML = `<span class="grow"><span class="n">${esc(e.nome)}</span>`
+      + `<span class="mm">${macroRiga(e)}</span></span>`
+      + `<span class="kc">${nf(e.kcal)}<em>kcal</em></span>`;
+    const del = el('button', 'ico-b');
+    del.title = 'Togli';
+    del.setAttribute('aria-label', 'Togli ' + e.nome);
+    if (typeof icona === 'function') del.append(icona('trash', { size: 16 }));
+    else del.textContent = '×';
+    del.onclick = () => { d.extra.splice(i, 1); save(); route(); };
+    row.append(del);
+    c.append(row);
+  }
+  if (!d.extra.length) c.append(el('p', 'hint', conPiano
+    ? 'Niente fuori piano oggi.' : 'Ancora niente registrato oggi.'));
+
+  /* --- le due strade per aggiungere --- */
+  const az = el('div', 'ex-az');
+
+  const b1 = el('button', 'ex-b');
+  b1.innerHTML = '<span class="ic"></span>'
+    + '<span class="grow"><span class="n">Aggiungi un alimento</span>'
+    + '<span class="d">cerchi, scegli quanto e dove finisce</span></span>'
+    + '<span class="go">&rsaquo;</span>';
+  if (typeof icona === 'function')
+    b1.querySelector('.ic').append(icona('plus', { size: 18 }));
+  b1.onclick = () => sheetAggiungiAlPasto(k, null);
+  az.append(b1);
+
+  const b2 = el('button', 'ex-b');
+  b2.innerHTML = '<span class="ic"></span>'
+    + '<span class="grow"><span class="n">Scrivi i valori a mano</span>'
+    + '<span class="d">quando l\'alimento non c\'e\': calorie e macro li metti tu</span></span>'
+    + '<span class="go">&rsaquo;</span>';
+  if (typeof icona === 'function')
+    b2.querySelector('.ic').append(icona('utensils', { size: 18 }));
+  b2.onclick = () => sheetExtra(k);
+  az.append(b2);
+  c.append(az);
+
+  /* --- e in fondo quello che registri sempre: un tocco e basta ---
+     `extraFrequenti()` c'era gia' e lo usava solo il foglio del fuori piano,
+     cioe' l'ultimo posto in cui si arriva. Qui e' a un tocco. */
   const freq = typeof extraFrequenti === 'function' ? extraFrequenti(k, 5) : [];
   if (freq.length) {
-    const chips = el('div', 'chips');
+    c.append(el('div', 'eyebrow ex-e', 'Di solito registri'));
+    const chips = el('div', 'chips ex-chips');
     for (const f of freq) {
       const b = el('button', 'chip');
       b.innerHTML = `<span class="n">${esc(f.nome)}</span>`
@@ -1199,19 +1247,6 @@ function cardAggiungiVeloce(k, d) {
     }
     c.append(chips);
   }
-
-  /* Niente codice a barre qui, ed e' una rinuncia meditata: `leggiCodice()`
-     puo' tornare col solo codice — quando l'utente sceglie di inserire i
-     valori a mano — e i suoi macro sono per 100 g. Registrare "un prodotto,
-     forse 100 g, forse 0 kcal" sarebbe inventare due numeri per risparmiare
-     un tocco. Il codice a barre resta dove c'e' un modulo che lo accoglie:
-     in "aggiungi un alimento" dentro il piano. */
-  const b1 = el('button', 'btn wide pri agg-b');
-  b1.style.marginTop = freq.length ? '10px' : '4px';
-  if (typeof icona === 'function') b1.append(icona('plus', { size: 17 }));
-  b1.append(el('span', null, 'Aggiungi un alimento'));
-  b1.onclick = () => sheetAggiungiAlPasto(k, null);
-  c.append(b1);
   return c;
 }
 
@@ -1222,30 +1257,7 @@ function cardAggiungiVeloce(k, d) {
  * da cui essere fuori.
  */
 function listaExtra(k, d, conPiano) {
-  const ex = el('div', 'card');
-  ex.append(el('h2', 'sec', conPiano ? 'Fuori piano' : 'Cosa hai mangiato'));
-  ex.lastChild.style.marginTop = conPiano ? '' : '0';
-  ex.append(el('p', 'muted', conPiano
-    ? 'Registralo e basta. Non serve compensare: il bilancio è settimanale.'
-    : 'Aggiungi quello che mangi durante la giornata. Cercando un alimento i macro li calcola lui — tutti e cinque; altrimenti scrivi tu calorie e proteine.'));
-  for (const [i, e] of d.extra.entries()) {
-    const row = el('div', 'row between');
-    row.style.cssText = 'padding:8px 0;border-top:1px solid var(--rule)';
-    row.append(el('div', 'grow',
-      `${esc(e.nome)}<span class="mm">${macroRiga(e)}</span>`),
-      el('span', 'pill', `${nf(e.kcal)} kcal`));
-    const del = el('button', 'btn sm', '×');
-    del.onclick = () => { d.extra.splice(i, 1); save(); route(); };
-    row.append(del); ex.append(row);
-  }
-  if (!d.extra.length) ex.append(el('p', 'hint', conPiano
-    ? 'Niente fuori piano oggi.' : 'Ancora niente registrato oggi.'));
-  const add = el('button', 'btn wide' + (conPiano ? '' : ' pri'),
-    conPiano ? '+ Aggiungi pasto fuori piano' : '+ Aggiungi quello che hai mangiato');
-  add.style.marginTop = '10px';
-  add.onclick = () => sheetExtra(k);
-  ex.append(add);
-  return ex;
+  return cardExtraEAggiungi(k, d, conPiano);
 }
 
 /** La scheda Oggi quando il piano e' spento: solo il registro del giorno. */

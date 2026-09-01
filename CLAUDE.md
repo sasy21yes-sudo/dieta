@@ -1945,23 +1945,33 @@ E **i dati non si toccano**: `D.pasti`, `d.pasti`, `pastoDelGiorno`,
 com'erano. Rinominare le chiavi vorrebbe dire rompere ogni backup gia'
 esportato per un cambio di etichetta.
 
-### La scorciatoia per registrare
+### Registrare qualcosa, in fondo a Oggi
 
 L'azione piu' frequente dell'app — "ho mangiato una cosa, la scrivo" — aveva
 due strade, tutte e due lunghe: scorrere fino in fondo a Oggi, dove sta il
 fuori piano, oppure aprire la ricetta giusta e cercare dentro.
 
-Ora c'e' una carta **subito sotto "restano 2456 kcal"**, che e' il punto
-esatto in cui uno pensa di doverlo fare. Due livelli, dal piu' corto al piu'
-lungo:
+Il primo tentativo e' stato una carta "aggiungi in fretta" **in cima**, ed
+erano due errori insieme. Il primo: due carte che chiedono la stessa cosa —
+quella sopra e il fuori piano sotto — sono un doppione, e in questo file c'e'
+scritto da tempo che due elenchi che si somigliano sono peggio di uno lungo.
+Il secondo: un bottone verde pieno largo quanto lo schermo, in mezzo alla
+pagina, si prende un'attenzione che non merita — Oggi serve a **leggere** come
+sta andando, non a gridare "aggiungi".
 
-1. **le pastiglie di quello che registri sempre** — un tocco, niente domande.
-   `extraFrequenti()` esisteva gia' e lo usava soltanto il foglio del fuori
-   piano, cioe' l'ultimo posto in cui si arriva. Qui e' il primo;
-2. **"Aggiungi un alimento"**, che chiede cosa, quanto e **dove**: dentro una
+Adesso e' una carta sola, in coda, con la forma delle altre liste dell'app:
+icona a sinistra, testo, chevron a destra, come i prodotti e le schede. La
+gerarchia e' quella vera — prima quello che hai gia' registrato, poi le due
+strade per aggiungerne dell'altro, e in fondo le pastiglie:
+
+1. **"Aggiungi un alimento"**: cosa, quanto e **dove**, cioe' dentro una
    ricetta del giorno oppure nel fuori piano. La destinazione parte gia'
    scelta sulla ricetta piu' vicina all'ora di adesso, perche' chi registra
-   qualcosa quasi sempre lo sta mangiando.
+   qualcosa quasi sempre lo sta mangiando;
+2. **"Scrivi i valori a mano"**, per quando l'alimento non c'e';
+3. **le pastiglie di quello che registri sempre** — un tocco, niente domande.
+   `extraFrequenti()` esisteva gia' e lo usava soltanto il foglio del fuori
+   piano, cioe' l'ultimo posto in cui si arriva. Qui basta un tocco.
 
 Il codice a barre **non** e' in questa carta, ed e' una rinuncia meditata:
 `leggiCodice()` puo' tornare col solo codice — quando l'utente sceglie di
@@ -2453,8 +2463,12 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   non toccare le chiavi dei dati per un cambio di etichetta: `D.pasti`,
   `pastoDelGiorno`, `pastoSwap` e il prefisso `pasto-` reggono i backup gia'
   esportati
-- Non lasciare la registrazione di un alimento in fondo alla pagina: e'
-  l'azione piu' frequente dell'app, e va dove si guarda quanto manca
+- Non mettere due carte che chiedono la stessa cosa in due punti della stessa
+  schermata: la registrazione di un alimento e il fuori piano sono la stessa
+  intenzione, e stanno in una carta sola
+- Non usare un bottone pieno a tutta larghezza per un'azione che non e' la
+  ragione per cui si e' aperta la pagina: Oggi si apre per leggere come sta
+  andando
 - Non srotolare gli ingredienti di ogni pasto su Oggi: cinque righe per cinque
   pasti fanno un elenco della spesa lungo due schermate, e quasi mai si sta
   cercando qualcosa li' dentro. Si aprono dove si modificano
