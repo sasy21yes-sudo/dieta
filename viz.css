@@ -1037,8 +1037,6 @@
 .sel-c{position:relative}
 .sel-i{width:100%;padding:10px 11px;border:1px solid var(--rule);border-radius:9px;
   background:var(--paper);color:var(--ink);font:inherit}
-/* il 44vh e' solo il tetto: l'altezza vera la mette selettoreCercabile() sullo
-   spazio che resta sotto il campo, che con la tastiera aperta e' molto meno */
 .sel-l{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;max-height:44vh;
   overflow-y:auto;background:var(--paper);border:1px solid var(--rule);border-radius:10px;
   box-shadow:0 8px 26px rgba(0,0,0,.16)}

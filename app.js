@@ -1454,45 +1454,16 @@ function cardGiornoLibero(k, d) {
 }
 
 /* ------------------------------------------------------ sheet: swap */
-/**
- * Il foglio si ferma sopra la tastiera.
- *
- * Su iOS aprire la tastiera **non ridimensiona la pagina**: restringe solo il
- * "visual viewport" e ci disegna sopra la tastiera. Un foglio ancorato in
- * basso (`#sheet` e' `position:fixed; inset:0`, il pannello sta a `bottom:0`)
- * resta quindi appoggiato al fondo dello **schermo**, cioe' sotto la
- * tastiera — e con lui il campo che stai scrivendo e i risultati che
- * compaiono sotto: si cerca alla cieca.
- *
- * `visualViewport` dice quanto e' alta davvero la parte visibile e da dove
- * comincia: si alza il fondo del contenitore di quella differenza, e il
- * pannello torna a poggiare sul bordo alto della tastiera.
- *
- * Dove `visualViewport` non c'e' non succede niente: resta il comportamento
- * di prima, scomodo ma non rotto.
- */
-function seguiTastiera() {
-  const vv = window.visualViewport, sh = $('#sheet');
-  if (!vv || !sh || sh.hidden) return;
-  const coperto = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-  sh.style.bottom = Math.round(coperto) + 'px';
-}
-if (window.visualViewport) {
-  visualViewport.addEventListener('resize', seguiTastiera);
-  visualViewport.addEventListener('scroll', seguiTastiera);
-}
-
+/* Il foglio NON si sposta quando si apre la tastiera, ed e' una scelta dopo
+   una prova andata male: spostarlo con `visualViewport` faceva ballare lo
+   scroll invece di sistemarlo. Su iOS resta quindi il comportamento di
+   sempre — la tastiera copre il fondo del foglio — che e' scomodo ma
+   prevedibile. */
 function sheet(html) {
   $('#sheet-body').innerHTML = ''; $('#sheet-body').append(html);
   $('#sheet').hidden = false;
-  seguiTastiera();
 }
-function closeSheet() {
-  const sh = $('#sheet');
-  sh.hidden = true;
-  // o il foglio dopo nascerebbe gia' spostato in su
-  sh.style.bottom = '';
-}
+function closeSheet() { $('#sheet').hidden = true; }
 
 /**
  * Le sostituzioni, e il bottone che le applica davvero.

@@ -73,34 +73,16 @@ function selettoreCercabile(opzioni, valore, onScegli, ph = 'Cerca…') {
       lista.append(el('div', 'sel-vuoto', `…e altre ${trovate.length - 40}. Scrivi qualche lettera in piu'.`));
   };
 
-  /* **La lista deve stare dove si vede.**
-     Si apre sotto il campo, e su un telefono con la tastiera aperta lo spazio
-     sotto il campo puo' essere zero: si scriveva e i risultati comparivano
-     dietro la tastiera. Due mosse, e servono tutte e due.
-     La prima: il campo si porta **in cima** al foglio, cosi' lo spazio sotto
-     e' tutto quello che resta invece di quel poco che avanzava.
-     La seconda: la lista si limita a quello spazio. Aveva `max-height: 44vh`,
-     e `vh` su iOS e' calcolato sulla finestra intera — con la tastiera aperta
-     una lista "alta il 44% dello schermo" e' piu' alta dello schermo utile. */
-  const spazioSotto = () => {
-    const vv = window.visualViewport;
-    const fondo = vv ? vv.offsetTop + vv.height : window.innerHeight;
-    return Math.max(140, Math.round(fondo - inp.getBoundingClientRect().bottom - 14));
-  };
-  const adatta = () => { lista.style.maxHeight = spazioSotto() + 'px'; };
-  const apri = () => {
-    lista.hidden = false;
-    disegna();
-    adatta();
-    // la tastiera ci mette un momento a salire: la misura buona e' dopo
-    try { inp.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) {}
-    setTimeout(adatta, 300);
-  };
-
+  /* Qui c'e' stato un tentativo di far salire il foglio sopra la tastiera e
+     di portare il campo in cima a ogni tocco. **Tolto**: lo scroll diventava
+     imprevedibile, e in particolare `scrollIntoView` girava a ogni tasto
+     battuto, quindi la pagina si muoveva sotto le dita mentre si scriveva.
+     Un rimedio peggiore del male che curava. Se si riprova, la regola e' che
+     lo scroll non si tocca durante la digitazione. */
   // al tocco si svuota il campo: altrimenti la voce gia' scelta filtrerebbe
   // la lista fino a se stessa, e sembrerebbe rotto
-  inp.onfocus = () => { inp.dataset.q = ''; inp.select(); apri(); };
-  inp.oninput = () => { inp.dataset.q = inp.value; apri(); };
+  inp.onfocus = () => { inp.dataset.q = ''; inp.select(); lista.hidden = false; disegna(); };
+  inp.oninput = () => { inp.dataset.q = inp.value; lista.hidden = false; disegna(); };
   inp.onblur = () => setTimeout(() => {
     lista.hidden = true;
     const o = opzioni.find(x => x.v === scelto);

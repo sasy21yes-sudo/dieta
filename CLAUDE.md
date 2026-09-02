@@ -2746,27 +2746,30 @@ dichiarato — riscalarla per pareggiare le calorie del pasto previsto. Fuori da
 quei limiti il secondo bottone non compare, invece di offrire un ×5,3 che non
 sarebbe piu' quella ricetta.
 
-### La tastiera copriva i risultati
+### La tastiera che copre i risultati: provato e tolto
 
-Su iOS aprire la tastiera **non ridimensiona la pagina**: restringe il *visual
-viewport* e ci disegna sopra la tastiera. Un foglio ancorato in basso resta
-percio' appoggiato al fondo dello **schermo**, cioe' sotto la tastiera — e con
-lui il campo che stai scrivendo e i risultati che compaiono sotto. Si cercava
-alla cieca.
+Il problema e' vero. Su iOS aprire la tastiera **non ridimensiona la pagina**:
+restringe il *visual viewport* e ci disegna sopra la tastiera. Un foglio
+ancorato in basso resta percio' appoggiato al fondo dello **schermo**, cioe'
+sotto la tastiera — e con lui il campo che stai scrivendo e i risultati che
+compaiono sotto.
 
-Servono tre cose insieme, e ognuna da sola non basta:
+Il rimedio provato faceva tre cose: alzava il fondo del foglio misurando
+`visualViewport`, portava il campo in cima con `scrollIntoView`, e limitava la
+lista allo spazio rimasto. **Alla prova sul telefono lo scroll e' peggiorato**,
+ed e' stato tolto: il codice e' tornato identico a prima.
 
-1. **il foglio si ferma sopra la tastiera.** `visualViewport` dice quanto e'
-   alta davvero la parte visibile e da dove comincia; si alza il fondo del
-   contenitore di quella differenza;
-2. **il campo va in cima al foglio** quando lo tocchi, cosi' lo spazio sotto e'
-   tutto quello che resta invece di quel poco che avanzava;
-3. **la lista si limita a quello spazio.** Aveva `max-height: 44vh`, e `vh` su
-   iOS si calcola sulla finestra intera: con la tastiera aperta una lista
-   "alta il 44% dello schermo" e' piu' alta dello schermo utile.
+Il difetto piu' grosso e' anche il piu' facile da vedere a posteriori:
+`scrollIntoView` stava dentro `oninput`, quindi girava **a ogni tasto
+battuto** — la pagina si muoveva sotto le dita mentre si scriveva. Spostare
+poi il foglio con `visualViewport` mentre iOS sta gia' scorrendo per conto suo
+aggiungeva un secondo movimento sopra il primo.
 
-Dove `visualViewport` non c'e' non succede niente: resta il comportamento di
-prima, scomodo ma non rotto.
+Resta scritto qui perche' la tentazione di riprovarci e' forte, e perche' la
+regola che ne esce vale in generale: **lo scroll non si tocca mentre l'utente
+scrive.** Un rimedio che rende imprevedibile il movimento della pagina e'
+peggio del fastidio che cura — la tastiera che copre il fondo e' scomoda, ma
+prevedibile.
 
 ### I pasti del giorno vanno in ordine di orario
 
@@ -3275,12 +3278,13 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non offrire solo le ricette a parita' di macro quando si sostituisce un
   pasto: il motore ordina per somiglianza, ma "somigliante" non e' "voluto".
   La scelta libera c'e' gia' sugli ingredienti, e va anche qui
-- Non lasciare un foglio ancorato al fondo dello schermo quando si apre la
-  tastiera: su iOS il layout non si ridimensiona, e il campo con i suoi
-  risultati finisce dietro la tastiera. Si passa da `visualViewport`
-- Non dimensionare in `vh` una lista che si apre sotto un campo di ricerca:
-  con la tastiera aperta il 44% della finestra e' piu' alto dello schermo
-  utile. L'altezza si misura sullo spazio che resta sotto il campo
+- Non toccare lo scroll mentre l'utente scrive: `scrollIntoView` dentro
+  `oninput` gira a ogni tasto e fa muovere la pagina sotto le dita. E' stato
+  provato per tenere i risultati sopra la tastiera, ed e' finito peggio del
+  problema — la tastiera che copre il fondo di un foglio e' scomoda ma
+  prevedibile
+- Non spostare un foglio con `visualViewport` mentre iOS sta gia' scorrendo
+  per conto suo: i due movimenti si sommano
 - Non riscalare un pasto oltre ×0,6–×1,6 per far combaciare i macro: mezza
   porzione di un pasto non e' piu' quel pasto
 - Non tenere porzioni e sostituzioni di ingrediente quando si cambia il pasto
