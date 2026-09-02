@@ -41,7 +41,8 @@ function statRegistro(per) {
     registrati: gg.filter(k => typeof dayScore === 'function' ? dayScore(k) > 0 : con(k)).length,
     pesate: gg.filter(k => S.log[k]?.peso != null).length,
     conPasti: gg.filter(k => S.log[k]
-      && (Object.keys(S.log[k].pasti || {}).length || (S.log[k].extra || []).length)).length,
+      && (Object.values(S.log[k].pasti || {}).some(Boolean)
+        || (S.log[k].extra || []).length)).length,
     completezza: statMedia(gg.map(k => typeof dayScore === 'function' ? dayScore(k) : null)),
     inPausa: typeof inPausa === 'function' ? gg.filter(inPausa).length : 0
   };

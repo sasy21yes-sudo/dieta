@@ -84,7 +84,8 @@ function costanze(k = today(), n = 28) {
 
   const nutr = giorni.filter(g => {
     const d = S.log[g];
-    return d && (Object.keys(d.pasti || {}).length || (d.extra || []).length);
+    // i valori, non le chiavi: vedi dayScore()
+    return d && (Object.values(d.pasti || {}).some(Boolean) || (d.extra || []).length);
   }).length;
 
   const allenati = giorni.filter(g =>

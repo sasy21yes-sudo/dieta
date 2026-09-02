@@ -33,7 +33,8 @@ function dayScore(k) {
   // come "ho mangiato una pizza da 900 kcal" e' una giornata registrata, e
   // `consumed()` la conta eccome. E' lo stesso criterio del punteggio di
   // nutrizione in costanze()
-  if (Object.keys(d.pasti || {}).length || (d.extra || []).length) n++;
+  // i valori veri, non le chiavi: una spunta tolta lasciava `false` dietro
+  if (Object.values(d.pasti || {}).some(Boolean) || (d.extra || []).length) n++;
   if (d.acqua != null) n++;
   if (d.passi != null) n++;
   if (d.sonno != null) n++;

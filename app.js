@@ -128,6 +128,9 @@ function normalize() {
        di residuo da cui nasce un "modificato" su un pasto che nessuno ha
        toccato. Adesso si chiudono dove nascono; questi sono quelli gia' in
        giro, e si buttano una volta all'avvio. */
+    // le spunte tolte lasciavano `false` invece di sparire, e da li' una
+    // giornata svuotata continuava a contare come registrata
+    for (const [ch, v] of Object.entries(d.pasti)) if (!v) delete d.pasti[ch];
     for (const nome of ['porzioni', 'swap', 'aggiunti', 'pastoSwap', 'fatti']) {
       const o = d[nome]; if (!o || typeof o !== 'object') continue;
       for (const [ch, v] of Object.entries(o))
@@ -1323,7 +1326,17 @@ function viewOggi(v) {
          lui — rimettendola si ricongela sulla versione di quel momento. */
       if (!done) { if (typeof congelaPasto === 'function') congelaPasto(chiaveP(s), k); }
       else if (typeof scongelaPasto === 'function') scongelaPasto(chiaveP(s), k);
-      d.pasti[chiaveP(s)] = !done; save();
+      /* Togliendo la spunta la chiave si **cancella**, non si mette a `false`.
+         Sembra la stessa cosa e non lo e': mezza app conta i pasti di una
+         giornata con `Object.keys(d.pasti).length`, e una chiave a `false` la
+         fa risultare come un pasto registrato. Misurato: spuntando un pasto e
+         togliendolo la giornata restava "registrata", entrava nel punteggio di
+         nutrizione della costanza e nel conteggio del resoconto — mentre
+         `consumed()` diceva giustamente zero. Un giorno che risulta pieno e
+         vuoto nello stesso momento. */
+      if (done) delete d.pasti[chiaveP(s)];
+      else d.pasti[chiaveP(s)] = true;
+      save();
       setTimeout(route, done ? 0 : 130);
     };
     // toccare il nome del pasto apre le porzioni DI QUEL GIORNO: il piano dice

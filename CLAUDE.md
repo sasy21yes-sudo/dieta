@@ -1778,6 +1778,41 @@ ignorava il fuori piano: una giornata registrata solo come "ho mangiato una
 pizza" usciva bianca. Adesso conta i pasti spuntati **oppure** gli extra, lo
 stesso criterio del punteggio di nutrizione.
 
+### Una spunta tolta deve sparire, non diventare `false`
+
+Togliendo la spunta a un pasto il codice faceva `d.pasti[chiave] = false`
+invece di cancellare la chiave. Sembra la stessa cosa e non lo e': mezza app
+conta i pasti di una giornata con `Object.keys(d.pasti).length`, e una chiave
+a `false` la fa risultare come un pasto registrato.
+
+Il risultato e' una giornata che risultava **piena e vuota nello stesso
+momento**: `consumed()` diceva giustamente zero, ma la giornata entrava fra i
+"giorni registrati", nel punteggio di nutrizione della costanza, nel
+calendario e nel conteggio del resoconto. Misurato su sette giornate in cui
+non era stato registrato niente ma le caselle erano state toccate e rimesse a
+posto: **"giorni registrati" passava da 36 a 40**.
+
+Tre mosse, e servono tutte e tre:
+
+1. **alla radice**: togliendo la spunta la chiave si cancella;
+2. **in lettura**: chi conta i pasti guarda i *valori* veri
+   (`Object.values(...).some(Boolean)`), non le chiavi — `dayScore()`,
+   `costanze()`, `statRegistro()`. Cosi' i resoconti sono giusti gia' prima
+   del prossimo avvio, sui dati sporchi che ci sono adesso;
+3. **all'avvio**: `normalize()` butta le chiavi a `false` gia' scritte.
+
+`giornoPieno()` non e' stato toccato ed e' voluto: e' generico apposta —
+qualunque campo con un contenuto conta — e irrigidirlo per un caso
+particolare vorrebbe dire ricominciare l'elenco a mano che quel controllo
+esiste per evitare. Li' la cura e' la pulizia all'avvio.
+
+**Cosa invece funzionava.** Il resoconto e il PDF sono stati ripercorsi voce
+per voce sulla stessa settimana — registro, ripartizione, distribuzione
+settimanale, pasti uno per uno, fuori piano, peso, allenamento — e leggono i
+dati giusti: con tre pasti su cinque spuntati per sette giorni il PDF esce di
+quattro pagine con "Cena 0/7" dove la cena non era stata spuntata, e nessun
+`NaN` o `undefined` fra le 248 stringhe di testo del file.
+
 ### La chiave del diario e' il pasto, non la ricetta
 
 Tutti gli strati del giorno — spunta, sostituzioni, porzioni, alimenti
@@ -3628,6 +3663,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   della revisione. E chi la elimina va avvisato che tocca solo la palestra
 - Non far dimenticare a `_ffCache` una seduta cancellata: la forma-fatica e'
   memorizzata per muscolo e continuerebbe a rispondere coi numeri di prima
+- Non scrivere `false` per togliere una spunta: mezza app conta i pasti di una
+  giornata con `Object.keys(d.pasti).length`, e una chiave a `false` fa
+  risultare registrata una giornata vuota. La chiave si cancella
+- Non contare i pasti spuntati con `Object.keys(d.pasti).length`: sono i
+  **valori** che dicono se un pasto e' stato spuntato
 - Non contare i giorni registrati con `Object.keys(S.log).length`: `day(k)`
   crea la giornata anche in lettura, quindi scorrere il diario gonfia il
   numero. Si passa da `loggedDays()` / `giornoPieno()`
