@@ -1490,6 +1490,19 @@ function sezSettimana(v) {
         sg && sg.stato !== 'vuoto'
           ? ` <span class="pill ${sg.cls}">${esc(sg.eti)}</span>` : ''}</strong>
        <span class="mono muted" style="font-size:11px">${nf(g.totali.kcal)} kcal · ${macroRiga(g.totali)}</span>`));
+    /* **Come sono divise le calorie di questo giorno.** I grammi da soli non
+       si confrontano fra giorni di dimensione diversa: 77 g di grassi su 2400
+       kcal e 77 su 3200 sono due giornate con una struttura diversa, e la
+       percentuale e' l'unica forma in cui quel confronto si legge. La barra
+       usa le stesse tre tinte di "Da dove vengono le calorie". */
+    const qm = typeof quoteMacro === 'function' ? quoteMacro(g.totali) : null;
+    if (qm) {
+      const mb = el('div', 'gg-m');
+      mb.innerHTML = `<span class="b">${['p', 'c', 'g'].map((x, j) =>
+          `<u class="m${j + 1}" style="width:${qm[x].toFixed(1)}%"></u>`).join('')}</span>
+        <span class="q mono">${nf(qm.p, 0)}% P · ${nf(qm.c, 0)}% C · ${nf(qm.g, 0)}% G</span>`;
+      c.append(mb);
+    }
     if (sg?.frase) c.append(el('div', 'gg-f ' + sg.cls, esc(sg.frase)));
     const righe = [];
     for (const [si, s] of (g.pasti || []).entries()) {

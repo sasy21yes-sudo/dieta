@@ -198,6 +198,28 @@ function pavimentoCalorico(k = today()) {
  */
 const PIANO_SCARTO = 0.10;   // per giorno, la stessa soglia che usa analyse()
 
+/**
+ * Da quanto viene ogni macro, in percentuale delle calorie.
+ *
+ * Le calorie dicono **quanto**, le quote dicono **com'e' fatto**: sono due
+ * domande diverse, e un giorno in linea sulle calorie puo' avere una divisione
+ * completamente storta — 77 g di grassi e 301 di carboidrati fanno lo stesso
+ * totale di 100 e 250, ma non sono la stessa giornata.
+ *
+ * Si calcolano sulle **calorie ricostruite dai macro** (4/4/9) e non sul totale
+ * dichiarato: fra i due c'e' quasi sempre uno scarto di qualche decina di kcal
+ * — gli alimenti reali si discostano dai valori di tabella — e usando il
+ * totale le tre quote non sommerebbero mai a cento.
+ */
+function quoteMacro(t) {
+  if (!t) return null;
+  const p = (t.p || 0) * 4, c = (t.c || 0) * 4, g = (t.g || 0) * 9;
+  const tot = p + c + g;
+  if (!(tot > 0)) return null;
+  return { p: p / tot * 100, c: c / tot * 100, g: g / tot * 100,
+           kcalMacro: tot, gp: t.p || 0, gc: t.c || 0, gg: t.g || 0 };
+}
+
 /* I giorni nel file di dominio sono in maiuscolo, che va bene per
    un'intestazione e non dentro una frase: "MERCOLEDI' sta sotto le 1874"
    grida una cosa che non e' un grido. */
@@ -215,16 +237,26 @@ function controlloPiano(k = today()) {
     const assegnati = (g.pasti || []).filter(x => D.pasti[x.codice]).length;
     const vuoto = assegnati === 0;
     const scarto = tgt > 0 ? (kcal - tgt) / tgt : null;
+    const mac = quoteMacro(g.totali);
     let stato = 'ok';
     if (vuoto) stato = 'vuoto';
     else if (kcal < pav.pavimento) stato = 'basso';
     else if (scarto != null && scarto < -PIANO_SCARTO) stato = 'sotto';
     else if (scarto != null && scarto > PIANO_SCARTO) stato = 'sopra';
-    return { giorno: g.giorno, kcal, assegnati, vuoto, scarto, stato };
+    return { giorno: g.giorno, kcal, assegnati, vuoto, scarto, stato,
+             tot: g.totali || {}, mac };
   });
 
   const pieni = giorni.filter(x => !x.vuoto);
   const media = pieni.length ? pieni.reduce((a, x) => a + x.kcal, 0) / pieni.length : 0;
+  /* La media dei macro si fa **sui giorni pieni**, come quella delle calorie:
+     includere i giorni senza niente assegnato abbasserebbe tutto in
+     proporzione a quanti ne hai ancora da comporre, che non e' una cosa che
+     riguarda come mangi. */
+  const medMac = quoteMacro(['p', 'c', 'g', 'fibre', 'kcal'].reduce((o, x) => {
+    o[x] = pieni.length ? pieni.reduce((a, d2) => a + (d2.tot[x] || 0), 0) / pieni.length : 0;
+    return o;
+  }, {}));
 
   /* La direzione: un obiettivo si definisce rispetto al DISPENDIO, non al
      target — che potrebbe essere vecchio o messo a mano. Cosi' il controllo
@@ -238,7 +270,8 @@ function controlloPiano(k = today()) {
   }
 
   return {
-    giorni, pieni: pieni.length, media, tgt, pav, ob: att, direzione,
+    giorni, pieni: pieni.length, media, medMac, macTarget: quoteMacro(D.target),
+    tgt, pav, ob: att, direzione,
     sottoPavimento: giorni.filter(x => x.stato === 'basso'),
     fuoriTarget: giorni.filter(x => x.stato === 'sotto' || x.stato === 'sopra'),
     vuoti: giorni.filter(x => x.vuoto).length,
@@ -585,13 +618,22 @@ function cardControlloPiano(k = today(), corta = false) {
   /* Le barre dicono **quale** giorno e' storto; il numero sotto dice **di
      quanto**. Senza il numero bisogna toccare ogni barra per saperlo, e su una
      schermata che si legge scorrendo quel tocco non lo fa nessuno. */
+  /* **L'altezza dice quanto, il riempimento dice com'e' fatto.**
+     Una barra sola risponde percio' alle due domande insieme, e un giorno con
+     le stesse calorie ma i grassi al doppio si vede senza aprire niente. Il
+     verdetto sul giorno resta sul numero sotto e sul bordo della barra: se lo
+     portasse il colore del riempimento non ci sarebbe piu' posto per i macro. */
   const max = Math.max(c.tgt || 0, ...c.giorni.map(g => g.kcal)) || 1;
   const gr = el('div', 'pl-g');
   for (const g of c.giorni) {
     const col = el('div', 'pl-d ' + g.stato);
-    col.title = `${g.giorno}: ${g.vuoto ? 'niente assegnato' : nf(g.kcal) + ' kcal'}`;
+    col.title = `${g.giorno}: ${g.vuoto ? 'niente assegnato'
+      : nf(g.kcal) + ' kcal' + (g.mac ? ` · ${nf(g.mac.p, 0)}% P, ${
+        nf(g.mac.c, 0)}% C, ${nf(g.mac.g, 0)}% G` : '')}`;
     const b = el('i');
     b.style.height = g.vuoto ? '3px' : Math.max(4, g.kcal / max * 52).toFixed(0) + 'px';
+    if (g.mac) b.innerHTML = ['p', 'c', 'g'].map((x, j) =>
+      `<u class="m${j + 1}" style="height:${g.mac[x].toFixed(1)}%"></u>`).join('');
     col.append(b);
     col.append(el('span', 'k', g.vuoto ? '—' : nf(g.kcal)));
     col.append(el('span', 'n', g.giorno.slice(0, 2).toLowerCase()));
@@ -615,6 +657,31 @@ function cardControlloPiano(k = today(), corta = false) {
       + `<span class="${cls}">media ${nf(c.media)} kcal${
           c.scartoMedia != null && Math.abs(c.scartoMedia) >= 0.01
             ? ` (${c.scartoMedia > 0 ? '+' : ''}${nf(c.scartoMedia * 100, 0)}%)` : ''}</span>`));
+  }
+
+  /* --- come sono divise, in media e contro il target --- */
+  if (c.medMac) {
+    const M = [['p', 'Proteine', 'P'], ['c', 'Carboidrati', 'C'], ['g', 'Grassi', 'G']];
+    box.append(el('div', 'eyebrow', 'Come sono divise, in media'));
+    const t = el('div', 'pl-m');
+    for (const [x, nome, sig] of M) {
+      const q = c.medMac[x], qt = c.macTarget ? c.macTarget[x] : null;
+      const dq = qt != null ? q - qt : null;
+      const r = el('div', 'pl-mr');
+      r.innerHTML = `<span class="l"><i class="m${M.findIndex(y => y[0] === x) + 1}"></i>${esc(nome)}</span>
+        <span class="b"><u style="width:${Math.min(100, q).toFixed(1)}%"
+          class="m${M.findIndex(y => y[0] === x) + 1}"></u>${
+          qt != null ? `<b style="left:${Math.min(100, qt).toFixed(1)}%"></b>` : ''}</span>
+        <span class="v mono">${nf(q, 0)}%</span>
+        <span class="g mono">${nf(c.medMac['g' + sig.toLowerCase()], 0)} g</span>`;
+      t.append(r);
+    }
+    box.append(t);
+    box.append(el('div', 'pl-leg',
+      c.macTarget
+        ? `<span>| il segno e' il target: ${M.map(([x, , sig]) =>
+            sig + ' ' + nf(c.macTarget[x], 0) + '%').join(' \u00b7 ')}</span>`
+        : '<span>nessun target con cui confrontarle</span>'));
   }
 
   /* Nel passo della settimana ogni giorno ha gia' la sua pastiglia: una carta

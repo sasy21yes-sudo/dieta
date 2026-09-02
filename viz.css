@@ -1587,3 +1587,35 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .pl-leg .bad{color:var(--alert);font-weight:600}
 .pl-leg .warn{color:var(--amber)}
 .pl-leg .ok{color:var(--pine)}
+
+/* ---------------- i macro dentro le barre del piano ----------------
+   L'altezza della barra dice quante calorie, il riempimento come sono
+   divise: due domande, una figura. Le tinte sono le stesse di "Da dove
+   vengono le calorie", o le stesse tre cose avrebbero due codici colore
+   a due schermate di distanza. */
+.pl-d i{display:flex;flex-direction:column;overflow:hidden;background:var(--wash)}
+.pl-d i u{display:block;width:100%;text-decoration:none}
+.m1{background:var(--c1)} .m2{background:var(--c2)} .m3{background:var(--c3)}
+/* il verdetto sul giorno non e' piu' nel riempimento: sta nel bordo, nel
+   numero sotto e nella sigla, che restano colorati */
+.pl-d.basso i{box-shadow:inset 0 0 0 2px var(--alert)}
+.pl-d.sotto i,.pl-d.sopra i{box-shadow:inset 0 0 0 2px var(--amber)}
+
+/* la media della settimana: tre righe con la quota e il segno del target */
+.pl-m{margin:6px 0 2px}
+.pl-mr{display:grid;grid-template-columns:96px 1fr 34px 42px;gap:8px;
+  align-items:center;padding:3px 0;font-size:12px}
+.pl-mr .l{display:flex;align-items:center;gap:6px;color:var(--ink-2)}
+.pl-mr .l i{width:9px;height:9px;border-radius:2px;flex:none}
+.pl-mr .b{position:relative;height:9px;border-radius:5px;background:var(--wash)}
+.pl-mr .b u{display:block;height:100%;border-radius:5px;text-decoration:none}
+.pl-mr .b b{position:absolute;top:-3px;bottom:-3px;width:2px;
+  background:var(--ink);border-radius:2px}
+.pl-mr .v{text-align:right;font-size:12.5px;font-weight:600}
+.pl-mr .g{text-align:right;font-size:11px;color:var(--ink-3)}
+/* la divisione dei macro sulla riga di un giorno del piano */
+.gg-m{display:flex;align-items:center;gap:9px;margin:6px 0 2px}
+.gg-m .b{flex:1;display:flex;height:7px;border-radius:4px;overflow:hidden;
+  background:var(--wash);min-width:0}
+.gg-m .b u{display:block;height:100%;text-decoration:none}
+.gg-m .q{font-size:10.5px;color:var(--ink-3);white-space:nowrap;flex:none}

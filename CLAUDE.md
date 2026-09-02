@@ -1136,6 +1136,31 @@ nascondere proprio la conclusione. E la carta sta **in cima al piano**, non
 solo dentro il passo della settimana: chi apre il piano vuole sapere prima di
 tutto se quello che ha costruito regge.
 
+**E le calorie non bastano: conta anche come sono divise.** Un giorno in
+linea sul totale puo' avere una struttura completamente storta — 77 g di
+grassi e 301 di carboidrati fanno lo stesso numero di 100 e 250, ma non sono
+la stessa giornata. E i grammi da soli non si confrontano fra giorni di
+dimensione diversa: 77 g di grassi su 2400 kcal e 77 su 3200 sono due cose
+diverse, e la **percentuale** e' l'unica forma in cui quel confronto si legge.
+
+Quindi le barre della striscia sono **impilate per macro**: l'altezza dice
+quante calorie, il riempimento come sono divise, e una figura sola risponde
+alle due domande insieme. Il verdetto sul giorno si e' spostato sul bordo
+della barra, sul numero sotto e sulla sigla — se lo portasse il riempimento
+non ci sarebbe piu' posto per i macro. Sotto, la **media della settimana** con
+le tre quote, i grammi e il segno del target su ciascuna. E ogni giorno
+dell'editor porta la sua barra con `22% P · 49% C · 28% G`.
+
+Le tinte sono **le stesse** di "Da dove vengono le calorie": le stesse tre
+cose con due codici colore a due schermate di distanza sarebbero due cose
+diverse.
+
+Un dettaglio del calcolo: le quote si fanno sulle **calorie ricostruite dai
+macro** (4/4/9) e non sul totale dichiarato. Fra i due c'e' quasi sempre uno
+scarto di qualche decina di kcal — gli alimenti reali si discostano dai valori
+di tabella, ed e' scritto anche nel passo del target — e usando il totale le
+tre quote non sommerebbero mai a cento.
+
 **E il verdetto sta sul giorno, non in cima alla pagina.** Era la prima
 versione, ed era il posto sbagliato: un giorno da 600 kcal nasce **mentre lo
 componi**, e una carta di riepilogo in testa la vedi quando risali — cioe'
@@ -3498,6 +3523,15 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non lasciare in giro strati svuotati (`porzioni: { c1: {} }`): non cambiano
   i conti, ma sono lo stato da cui nasce un "modificato" su un pasto che
   nessuno ha toccato
+- Non mostrare i macro di un piano solo in grammi: fra giorni di dimensione
+  diversa non si confrontano, e la struttura della giornata e' quello che i
+  grammi nascondono
+- Non calcolare le quote dei macro sul totale dichiarato delle calorie: fra
+  quello e la somma di 4/4/9 c'e' sempre uno scarto, e le tre quote non
+  sommerebbero a cento
+- Non dare alle stesse tre cose due codici colore a due schermate di distanza:
+  proteine, carboidrati e grassi hanno le tinte di "Da dove vengono le
+  calorie" ovunque
 - Non mediare una serie su tutto il periodo e il suo totale sui soli giorni
   pieni: le serie riportano zero nei giorni vuoti, e le quote sommano 70%
   invece di 100
