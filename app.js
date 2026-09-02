@@ -116,6 +116,11 @@ function normalize() {
   S.piano.target ||= {}; S.piano.profilo ||= {};
   for (const k of Object.keys(S.log)) {
     const d = S.log[k]; if (!d || typeof d !== 'object') { delete S.log[k]; continue; }
+    // le scatole vuote lasciate dal solo aver guardato una data: si buttano
+    // all'avvio, dove nessuno ci sta scrivendo dentro. Non contengono niente,
+    // per definizione: `giornoPieno` guarda prima che le chiavi di struttura
+    // vengano create qui sotto, o sembrerebbero tutte piene
+    if (!giornoPieno(d)) { delete S.log[k]; continue; }
     d.pasti ||= {}; d.extra ||= []; d.misure ||= {}; d.integratori ||= {};
     d.porzioni ||= {};
   }
@@ -140,11 +145,45 @@ function save() {
   try { localStorage.setItem(chiaveStato(), JSON.stringify(S)); }
   catch { toast('Memoria piena: esporta un backup'); }
 }
+/**
+ * La giornata, creandola se non c'e'.
+ *
+ * **Attenzione: questa funzione crea.** E' chiamata anche in lettura da mezza
+ * app — aprire Oggi su una data, scorrere il diario, guardare la scheda di un
+ * giorno — quindi `S.log` si riempie di **scatole vuote** solo navigando. Non
+ * e' un problema di spazio: e' che quelle scatole venivano contate come
+ * "giorni registrati". Chi si e' guardato indietro cinque giorni si ritrovava
+ * cinque giorni registrati che non aveva registrato.
+ * Per questo il conteggio non passa mai da `Object.keys(S.log).length` ma da
+ * `giornoPieno()` / `loggedDays()`, e le scatole rimaste si buttano all'avvio.
+ */
 function day(k = today()) {
   S.log[k] ||= { pasti: {}, extra: [], misure: {}, integratori: {} };
   const d = S.log[k];
   d.pasti ||= {}; d.extra ||= []; d.misure ||= {}; d.integratori ||= {};
   return d;
+}
+
+/**
+ * C'e' davvero qualcosa dentro questa giornata?
+ *
+ * Il criterio e' **generico di proposito**: qualunque campo con un contenuto
+ * conta. La versione di prima elencava a mano peso, pasti e misure, e da li'
+ * nascevano due errori opposti allo stesso tempo — una giornata con solo
+ * acqua, passi e sonno non veniva contata (registrata eccome), e una scatola
+ * vuota creata scorrendo veniva contata (registrata per niente). Cosi' invece
+ * un campo nuovo aggiunto in futuro conta da solo, senza che nessuno debba
+ * ricordarsi di aggiungerlo a un elenco.
+ */
+function giornoPieno(d) {
+  if (!d || typeof d !== 'object') return false;
+  for (const v of Object.values(d)) {
+    if (v == null || v === false || v === '') continue;
+    if (Array.isArray(v)) { if (v.length) return true; continue; }
+    if (typeof v === 'object') { if (Object.keys(v).length) return true; continue; }
+    return true;                       // un numero, una stringa, `true`
+  }
+  return false;
 }
 
 /* ------------------------------------------------------------ nutrizione */
@@ -682,7 +721,10 @@ function pavimentoGrassi(k = today()) {
 function analyse(k = today()) {
   const F = [], T = D.target;
   const d7 = windowDays(k, 7), d14 = windowDays(k, 14);
-  const logged = d7.filter(x => S.log[x]).length;
+  // i giorni con qualcosa dentro, non le scatole create scorrendo: con quelle
+  // l'analisi poteva superare la soglia dei tre giorni senza un solo dato e
+  // mettersi a giudicare il nulla
+  const logged = d7.filter(x => giornoPieno(S.log[x])).length;
 
   if (logged < 3) {
     F.push(['warn', '!', 'Servono più dati',
@@ -838,11 +880,7 @@ async function persist() {
 
 /** Giorni con qualcosa dentro davvero, non solo la struttura vuota. */
 function loggedDays() {
-  return Object.keys(S.log).filter(k => {
-    const d = S.log[k]; if (!d) return false;
-    return d.peso != null || Object.keys(d.pasti || {}).length
-        || Object.keys(d.misure || {}).length;
-  }).sort();
+  return Object.keys(S.log).filter(k => giornoPieno(S.log[k])).sort();
 }
 
 /** Giorni registrati dall'ultimo backup; 0 se non e' ancora il caso di insistere. */
@@ -3338,7 +3376,7 @@ function sheetImport(grezzo) {
   }
 
   /* --- cosa c'e' adesso, per il confronto --- */
-  const ora = Object.keys(S.log).length;
+  const ora = loggedDays().length;
   w.append(el('div', 'hint', ora
     ? `Adesso in memoria hai <strong>${ora} giorni</strong> nel profilo aperto. `
       + 'Importare li sostituisce, e non si torna indietro.'
@@ -3458,7 +3496,7 @@ function sheetProfilo() {
   if (D.profilo?.altezza_cm) d.push(nf(D.profilo.altezza_cm) + ' cm');
   const pw = typeof lastWeight === 'function' ? lastWeight() : null;
   if (pw) d.push(nf(pw, 1) + ' kg');
-  const gg = Object.keys(S.log || {}).length;
+  const gg = loggedDays().length;
   d.push(gg + (gg === 1 ? ' giorno registrato' : ' giorni registrati'));
   w.append(el('p', 'muted', d.join(' · ')));
 
@@ -3598,7 +3636,7 @@ function sheetMenu() {
      + 'e resta indietro senza dirlo.',
      () => sheetVersione());
 
-  const days = Object.keys(S.log).length;
+  const days = loggedDays().length;
   const stato = el('div', 'card flat',
     `<div class="eyebrow">Stato</div>
      <div class="muted">${days} giorni registrati · target ${nf(D.target.kcal)} kcal,

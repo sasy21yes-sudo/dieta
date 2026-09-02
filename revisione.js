@@ -152,7 +152,12 @@ function revMetriche(per) {
       tgt: T.passi, unit: '', dec: 0, verso: 'su' },
     { id: 'sedute', lab: 'Allenamenti', ora: sed(questa), pre: sed(prima),
       tgt: seduteObiettivo, unit: '', dec: 0, verso: 'su' },
-    { id: 'registro', lab: 'Giorni registrati', ora: contaSu2(questa, x => S.log[x]?.peso != null),
+    /* Si chiamava "Giorni registrati" e contava le **pesate**: chi registrava
+       tutto tranne il peso si vedeva dare zero su sette e il primo posto fra
+       gli errori. Il criterio e' giusto — la pesata e' quella che alimenta il
+       filtro di Kalman, ed e' il motivo per cui questa riga pesa 100 — quindi
+       si corregge l'etichetta, che era l'unica cosa a mentire. */
+    { id: 'registro', lab: 'Giorni con la pesata', ora: contaSu2(questa, x => S.log[x]?.peso != null),
       pre: contaSu2(prima, x => S.log[x]?.peso != null), tgt: per.n, unit: '', dec: 0, verso: 'su' }
   ];
 }

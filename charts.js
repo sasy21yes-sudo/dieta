@@ -29,7 +29,11 @@ function dayScore(k) {
   if (!d) return 0;
   let n = 0;
   if (d.peso != null) n++;
-  if (Object.keys(d.pasti || {}).length) n++;
+  // i pasti spuntati OPPURE il fuori piano: una giornata registrata solo
+  // come "ho mangiato una pizza da 900 kcal" e' una giornata registrata, e
+  // `consumed()` la conta eccome. E' lo stesso criterio del punteggio di
+  // nutrizione in costanze()
+  if (Object.keys(d.pasti || {}).length || (d.extra || []).length) n++;
   if (d.acqua != null) n++;
   if (d.passi != null) n++;
   if (d.sonno != null) n++;

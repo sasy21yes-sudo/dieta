@@ -1581,6 +1581,50 @@ La riga resta in Diario ma **in lettura**: dice cosa c'e' registrato quel
 giorno e porta in Gym. Toglierla del tutto avrebbe fatto pensare che
 l'allenamento non contasse piu'.
 
+### "Giorni registrati" ne contava di piu' e di meno insieme
+
+Tre errori, e i primi due tiravano in direzioni opposte.
+
+**Guardare una data la creava.** `day(k)` crea la giornata se non c'e', ed e'
+chiamata anche in lettura da mezza app: aprire Oggi su una data, scorrere il
+diario, guardare la scheda di un giorno. `S.log` si riempiva quindi di
+**scatole vuote** solo navigando, e ogni contatore faceva
+`Object.keys(S.log).length`. Misurato: scorrendo cinque giorni di un anno fa,
+"giorni registrati" passava da 41 a 46. Chi si guarda indietro si vedeva
+accreditare giornate che non ha registrato.
+
+**E `loggedDays()` ne perdeva di vere.** Esisteva gia' — commentata *"giorni
+con qualcosa dentro davvero"* — ma elencava a mano peso, pasti e misure, e
+soprattutto **non la usava nessuno** tranne la striscia dei giorni di fila.
+Cosi' una giornata con acqua, passi, sonno, fame ed energia non contava, e
+nemmeno una in cui avevi registrato una pizza da 900 kcal fuori piano — che
+`consumed()` conta eccome.
+
+Adesso il criterio e' uno solo, `giornoPieno()`, ed e' **generico di
+proposito**: qualunque campo con un contenuto conta. Un campo nuovo aggiunto
+in futuro conta da solo, senza che nessuno debba ricordarsi di metterlo in un
+elenco — che e' precisamente il modo in cui questo bug era nato. Ci passano il
+profilo, il menu, l'anteprima dell'import e la soglia dei tre giorni
+dell'analisi.
+
+Le scatole vuote **si buttano all'avvio**, in `normalize()`, dove nessuno ci
+sta scrivendo dentro. Durante la sessione continuano a nascere — evitarlo
+vorrebbe dire separare lettura e scrittura in duecento punti — ma non vengono
+piu' contate da nessuna parte.
+
+**Il terzo errore era una parola.** La revisione aveva una riga *"Giorni
+registrati"* che contava le **pesate**: chi registrava tutto tranne il peso si
+vedeva dare zero su sette e il primo posto fra gli errori della settimana. Il
+criterio pero' e' giusto — la pesata e' quella che alimenta il filtro di
+Kalman, ed e' il motivo per cui quella riga pesa 100 nella diagnosi — e infatti
+il testo diceva gia' "Troppi giorni senza pesata". A mentire era solo
+l'etichetta, ed e' quella che e' cambiata.
+
+Nello stesso giro `dayScore()`, che disegna il calendario della costanza,
+ignorava il fuori piano: una giornata registrata solo come "ho mangiato una
+pizza" usciva bianca. Adesso conta i pasti spuntati **oppure** gli extra, lo
+stesso criterio del punteggio di nutrizione.
+
 ### Il piano e' un modello, il diario e' un fatto
 
 E per molto tempo la seconda meta' non era vera. `consumed(k)` rileggeva la
@@ -3198,6 +3242,16 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   della revisione. E chi la elimina va avvisato che tocca solo la palestra
 - Non far dimenticare a `_ffCache` una seduta cancellata: la forma-fatica e'
   memorizzata per muscolo e continuerebbe a rispondere coi numeri di prima
+- Non contare i giorni registrati con `Object.keys(S.log).length`: `day(k)`
+  crea la giornata anche in lettura, quindi scorrere il diario gonfia il
+  numero. Si passa da `loggedDays()` / `giornoPieno()`
+- Non elencare a mano i campi che rendono "piena" una giornata: la lista
+  invecchia e si perdono le giornate registrate solo con acqua, passi o un
+  pasto fuori piano. Il criterio e' generico — qualunque campo con un
+  contenuto — cosi' un campo nuovo conta da solo
+- Non chiamare "Giorni registrati" una riga che conta le pesate: il criterio
+  e' giusto (la pesata alimenta il filtro di Kalman), l'etichetta no, e chi
+  registra tutto tranne il peso si vede dare zero
 - Non far rileggere al diario la ricetta dal piano di adesso: correggere una
   ricetta riscriverebbe mesi di storico, e con loro il dispendio che il filtro
   di Kalman ha misurato. Si congela alla spunta, che e' il momento in cui
