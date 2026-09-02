@@ -369,7 +369,10 @@ function sheetPorzioni(k, code) {
   // la via d'uscita per chi quel pasto non lo mangia proprio
   const cambia = el('button', 'btn wide');
   cambia.style.marginBottom = '12px';
-  cambia.textContent = 'Cambia la ricetta \u203a';
+  /* "Cambia la ricetta" suonava come "modificala", che e' quello che fa il
+     resto di questa scheda. Qui invece si butta via tutta la ricetta prevista
+     e se ne mette un'altra, per oggi. */
+  cambia.textContent = 'Sostituisci l\'intero pasto \u203a';
   cambia.onclick = () => sheetCambiaPasto(k, code);
   w.append(cambia);
 
@@ -715,7 +718,7 @@ function sheetCambiaPasto(k, code) {
   const src = ricettaGiorno(code, k);
   if (!src) return;
   const w = el('div');
-  w.append(el('div', 'eyebrow', 'Tutta la ricetta'));
+  w.append(el('div', 'eyebrow', 'Sostituisci l\'intero pasto'));
   w.append(el('h2', 'sec', esc(src.nome)));
   w.lastChild.style.marginTop = '0';
   w.append(el('p', 'muted', `${nf(src.macro.kcal)} kcal · ${macroRiga(src.macro)}`));
@@ -772,6 +775,66 @@ function sheetCambiaPasto(k, code) {
     + 'calorie, e si ferma fra ×0,6 e ×1,6: oltre quei limiti mezza porzione '
     + 'di una ricetta non e’ piu’ quella ricetta. Le quantita’ restano modificabili '
     + 'una per una qui accanto.'));
+
+  /* **Oppure una qualunque.**
+     La stessa regola gia' imparata sulle sostituzioni di ingrediente: il
+     motore ordina per somiglianza, ma "somigliante" non e' "voluto". Stasera
+     puoi avere voglia di una cosa che con i macro di stamattina non c'entra
+     niente, e l'app deve saperla scrivere invece di costringerti a spuntare
+     niente e riscrivere la giornata come fuori piano. */
+  w.append(el('h2', 'sec', 'Oppure scegline una qualunque'));
+  w.append(el('p', 'muted',
+    'Tutte le ricette che hai, anche quelle lontanissime da questa. '
+    + 'Scegliendola vedi subito cosa cambia.'));
+
+  const opz = Object.entries(D.pasti)
+    .filter(([id]) => id !== eff)
+    .map(([id, pa]) => ({ v: id, lab: pa.nome || id,
+      sub: `${nf(pa.macro.kcal)} kcal \u00b7 ${nf(pa.macro.p, 0)}P ${
+        nf(pa.macro.c, 0)}C ${nf(pa.macro.g, 0)}G` }))
+    .sort((a, b) => a.lab.localeCompare(b.lab));
+
+  const esito = el('div');
+  if (!opz.length) {
+    w.append(el('p', 'muted', 'Non ne hai altre.'));
+  } else {
+    w.append(selettoreCercabile(opz, null, (id) => {
+      esito.innerHTML = '';
+      const pa = D.pasti[id];
+      if (!pa) return;
+      const dd = ([mid, l]) => {
+        const q = (pa.macro[mid] || 0) - (src.macro[mid] || 0);
+        return `${q >= 0 ? '+' : '\u2212'}${nf(Math.abs(q), 1)} ${l}`;
+      };
+      const dk = pa.macro.kcal - src.macro.kcal;
+      const r = el('div', 'read');
+      r.innerHTML = `<span>${nf(pa.macro.kcal)} kcal</span>`
+        + `<span>${dk >= 0 ? '+' : '\u2212'}${nf(Math.abs(dk))} kcal</span>`
+        + `<span>${[['p', 'P'], ['c', 'C'], ['g', 'G']].map(dd).join(' \u00b7 ')}</span>`;
+      esito.append(r);
+
+      const metti = (scala, testo) => {
+        const b = el('button', 'btn wide' + (scala === 1 ? ' pri' : ''));
+        b.style.marginTop = '8px';
+        b.textContent = testo;
+        b.onclick = () => {
+          mettePastoSwap(code, k, id, scala);
+          closeSheet(); route();
+          toast(pa.nome + ' al posto di ' + src.nome + ', solo per oggi');
+        };
+        esito.append(b);
+      };
+      metti(1, 'Metti "' + (pa.nome || id) + '" intera');
+      /* Il pareggio delle calorie si offre solo se sta dentro i limiti gia'
+         dichiarati: oltre quelli mezza porzione non e' piu' quella ricetta,
+         ed e' la stessa soglia che usa l'elenco a parita' di macro. */
+      const sc = pa.macro.kcal > 0 ? src.macro.kcal / pa.macro.kcal : 0;
+      if (sc >= 0.6 && sc <= 1.6 && Math.abs(sc - 1) > 0.05)
+        metti(+sc.toFixed(2),
+          `\u2026oppure \u00d7${nf(sc, 2)}, per pareggiare le ${nf(src.macro.kcal)} kcal`);
+    }, 'Cerca fra le tue ricette\u2026'));
+    w.append(esito);
+  }
 
   const ch = el('button', 'btn wide pri', 'Chiudi');
   ch.style.marginTop = '12px';

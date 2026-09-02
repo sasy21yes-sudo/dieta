@@ -2724,6 +2724,50 @@ cambiare qualcos'altro il campo sarebbe apparso vuoto — salvando, l'ora
 spariva. `oraValida()` normalizza in ingresso: "9:15" e "9.5" diventano
 "09:15" e "09:05", "24:00" resta vuoto perche' non e' un'ora.
 
+### Sostituire l'intero pasto, anche con qualcosa che non c'entra
+
+Il bottone diceva **"Cambia la ricetta"**, che suona come *modificala* — ed e'
+quello che fa tutto il resto di quella scheda. Qui invece si butta via la
+ricetta prevista e se ne mette un'altra, per oggi: **"Sostituisci l'intero
+pasto"**.
+
+Dentro c'erano solo le ricette **a parita' di macro**, ordinate dal motore. E'
+la risposta giusta alla domanda "cosa ci sta al posto di questa", ma non a
+quella che uno si fa davvero la sera: *stasera voglio quello*. La stessa
+lezione gia' imparata sulle sostituzioni di ingrediente — *il motore ordina
+per somiglianza, ma "somigliante" non e' "voluto"* — che qui non era stata
+applicata.
+
+Adesso sotto c'e' **"Oppure scegline una qualunque"**: tutte le tue ricette in
+un campo cercabile, comprese quelle lontanissime. Scegliendone una compare
+subito **cosa cambia** (`+90 kcal · +7,8 P · +29,3 C · −9,4 G`) e due strade:
+metterla **intera**, oppure — solo se la scala sta dentro il ×0,6–×1,6 gia'
+dichiarato — riscalarla per pareggiare le calorie del pasto previsto. Fuori da
+quei limiti il secondo bottone non compare, invece di offrire un ×5,3 che non
+sarebbe piu' quella ricetta.
+
+### La tastiera copriva i risultati
+
+Su iOS aprire la tastiera **non ridimensiona la pagina**: restringe il *visual
+viewport* e ci disegna sopra la tastiera. Un foglio ancorato in basso resta
+percio' appoggiato al fondo dello **schermo**, cioe' sotto la tastiera — e con
+lui il campo che stai scrivendo e i risultati che compaiono sotto. Si cercava
+alla cieca.
+
+Servono tre cose insieme, e ognuna da sola non basta:
+
+1. **il foglio si ferma sopra la tastiera.** `visualViewport` dice quanto e'
+   alta davvero la parte visibile e da dove comincia; si alza il fondo del
+   contenitore di quella differenza;
+2. **il campo va in cima al foglio** quando lo tocchi, cosi' lo spazio sotto e'
+   tutto quello che resta invece di quel poco che avanzava;
+3. **la lista si limita a quello spazio.** Aveva `max-height: 44vh`, e `vh` su
+   iOS si calcola sulla finestra intera: con la tastiera aperta una lista
+   "alta il 44% dello schermo" e' piu' alta dello schermo utile.
+
+Dove `visualViewport` non c'e' non succede niente: resta il comportamento di
+prima, scomodo ma non rotto.
+
 ### I pasti del giorno vanno in ordine di orario
 
 Un giorno si legge dall'alto in basso come lo si vive. Aggiungere uno spuntino
@@ -3228,6 +3272,15 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   sostituzione che si cerca più spesso. Il nome è un criterio, non un dettaglio
 - Non far entrare tutto fuori categoria per far salire le varianti: senza il
   recinto l'elenco diventa un catalogo. Metà delle parole in comune è la soglia
+- Non offrire solo le ricette a parita' di macro quando si sostituisce un
+  pasto: il motore ordina per somiglianza, ma "somigliante" non e' "voluto".
+  La scelta libera c'e' gia' sugli ingredienti, e va anche qui
+- Non lasciare un foglio ancorato al fondo dello schermo quando si apre la
+  tastiera: su iOS il layout non si ridimensiona, e il campo con i suoi
+  risultati finisce dietro la tastiera. Si passa da `visualViewport`
+- Non dimensionare in `vh` una lista che si apre sotto un campo di ricerca:
+  con la tastiera aperta il 44% della finestra e' piu' alto dello schermo
+  utile. L'altezza si misura sullo spazio che resta sotto il campo
 - Non riscalare un pasto oltre ×0,6–×1,6 per far combaciare i macro: mezza
   porzione di un pasto non e' piu' quel pasto
 - Non tenere porzioni e sostituzioni di ingrediente quando si cambia il pasto
