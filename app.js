@@ -225,8 +225,46 @@ function foodM(nome, qta) {
   const a = alimento(nome); if (!a) return M0();   // rispetta i prodotti reali
   const m = M0(); return addM(m, a, qta / 100);
 }
+/* ============================ un pasto puo' essere anche un alimento solo
+ *
+ * Uno slot della settimana poteva contenere **solo una ricetta**, e per
+ * mettere uno yogurt di soia allo spuntino bisognava comporre una ricetta con
+ * dentro un ingrediente: un giro assurdo, e un elenco di ricette che si
+ * riempie di voci che ricette non sono.
+ *
+ * La strada scelta non tocca il modello: il codice del pasto puo' essere un
+ * **codice sintetico** `ali:<qta>:<nome>`, e `pasto()` lo risolve in un
+ * oggetto della stessa forma di una ricetta — nome, ingredienti, macro. Da li'
+ * in poi tutto il resto dell'app non si accorge di niente: i macro si
+ * calcolano, la lista della spesa lo somma, la spunta lo congela, le porzioni
+ * lo modificano, il resoconto lo conta.
+ *
+ * La quantita' sta **dentro il codice** e non a fianco, e va bene perche' gli
+ * strati del giorno sono indicizzati sull'id del pasto e non sul codice della
+ * ricetta: cambiare la quantita' non lascia orfano niente.
+ */
+const PRE_ALI = 'ali:';
+const codiceAlimento = (nome, qta) => PRE_ALI + (+qta || 0) + ':' + nome;
+
+/** La ricetta di un codice: quella composta, o l'alimento singolo. */
+function pasto(code) {
+  if (!code) return null;
+  if (typeof code !== 'string' || !code.startsWith(PRE_ALI)) return D.pasti[code] || null;
+  const i = code.indexOf(':', PRE_ALI.length);
+  const qta = +code.slice(PRE_ALI.length, i);
+  const nome = code.slice(i + 1);
+  if (!alimento(nome)) return null;              // l'alimento non c'e' piu'
+  const u = alimento(nome)?.unita || 'g';
+  return {
+    nome: nome.charAt(0).toUpperCase() + nome.slice(1) + ' \u00b7 ' + nf(qta) + ' ' + u,
+    soloAlimento: nome, qta,
+    ingredienti: [{ alimento: nome, qta }],
+    macro: foodM(nome, qta)
+  };
+}
+
 function mealM(code) {
-  const p = D.pasti[code]; if (!p) return M0();
+  const p = pasto(code); if (!p) return M0();
   // I macro del piano sono precalcolati e verificati a monte: si usano cosi'
   // come sono. L'unica eccezione e' un ingrediente per cui l'utente ha
   // registrato il prodotto vero letto in etichetta — li' la stima va superata.
@@ -913,7 +951,7 @@ function analyse(k = today()) {
   const low = main.filter(s => {
     if (!dd.pasti[chiaveP(s)]) return false;
     const m = typeof mealMGiorno === 'function' ? mealMGiorno(chiaveP(s), k)
-      : D.pasti[s.codice]?.macro;
+      : pasto(s.codice)?.macro;
     return m && m.p < T.min_p_per_pasto;
   });
   if (low.length) F.push(['warn', 'L', 'Dose proteica bassa in un pasto',
@@ -1280,7 +1318,7 @@ function viewOggi(v) {
     v.append(cardGiornoLibero(k, d));
     return;
   }
-  if (!plan.pasti.some(s => D.pasti[s.codice])) {
+  if (!plan.pasti.some(s => pasto(s.codice))) {
     const av = el('div', 'card flat');
     av.append(el('div', 'eyebrow', 'Giornata da comporre'));
     av.append(el('div', 'muted',
@@ -1296,7 +1334,7 @@ function viewOggi(v) {
     // il pasto che c'e' oggi: se lo hai cambiato, si vede quello
     const eff = typeof pastoDelGiorno === 'function'
       ? pastoDelGiorno(chiaveP(s), k) : s.codice;
-    const p = D.pasti[eff], done = !!d.pasti[chiaveP(s)];
+    const p = pasto(eff), done = !!d.pasti[chiaveP(s)];
     // slot senza pasto: con il piano vuoto e' la norma, non un errore
     if (!p) {
       const vuoto = el('button', 'meal vuoto');
@@ -1347,14 +1385,14 @@ function viewOggi(v) {
        quasi sempre non si stava cercando niente li' dentro. Si aprono
        toccando il pasto, che e' anche il posto in cui si modificano. */
     const mgOggi = typeof mealMGiorno === 'function' ? mealMGiorno(chiaveP(s), k) : p.macro;
-    const mgPiano = D.pasti[s.codice]?.macro || p.macro || null;
+    const mgPiano = pasto(s.codice)?.macro || p.macro || null;
     const dk = mgPiano ? Math.round((mgOggi.kcal || 0) - (mgPiano.kcal || 0)) : 0;
     const toccato = eff !== s.codice
       || (typeof porzioniCambiate === 'function' && porzioniCambiate(chiaveP(s), k))
       || !!(d.swap?.[chiaveP(s)] && Object.keys(d.swap[chiaveP(s)]).length)
       || !!(d.aggiunti?.[chiaveP(s)] || []).length;
     const tag = eff !== s.codice
-      ? 'al posto di ' + (D.pasti[s.codice]?.nome || s.codice)
+      ? 'al posto di ' + (pasto(s.codice)?.nome || s.codice)
       : toccato ? 'modificato' : '';
     const testa = el('div', 'grow tap',
       `<div class="meal-slot">${esc(s.slot)}${s.ora ? ' · ' + esc(s.ora) : ''}</div>
@@ -3345,7 +3383,7 @@ function shoppingList() {
   const need = {};
   for (const g of D.settimana)
     for (const s of g.pasti) {
-      const p = D.pasti[s.codice];          // con il piano vuoto lo slot e' libero
+      const p = pasto(s.codice);            // con il piano vuoto lo slot e' libero
       if (!p || !p.ingredienti) continue;
       for (const i of p.ingredienti)
         need[i.alimento] = (need[i.alimento] || 0) + i.qta;

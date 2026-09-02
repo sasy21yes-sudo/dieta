@@ -2755,6 +2755,38 @@ riscala apposta, e quello che si sposta sono le proteine o i grassi. Dire solo
 "+12 kcal" nasconderebbe esattamente la parte che cambia. Su Oggi la stessa
 cosa in forma corta: `modificato +242 kcal` accanto al nome.
 
+### Un pasto puo' essere anche un alimento solo
+
+Per mettere uno yogurt di soia allo spuntino bisognava **comporre una ricetta
+con dentro un ingrediente**. Un giro assurdo, e un elenco di ricette che si
+riempie di voci che ricette non sono: "Yogurt di soia", "Mela", "Frullato
+pronto" non sono piatti composti, sono cose che si mangiano e basta.
+
+La strada scelta **non tocca il modello**, ed e' quello che la rende
+economica: il codice di un pasto puo' essere un **codice sintetico**
+`ali:<qta>:<nome>`, e `pasto(code)` lo risolve in un oggetto della stessa
+forma di una ricetta — nome, ingredienti, macro. Da li' in poi il resto
+dell'app non si accorge di niente. Verificato una voce alla volta: i macro si
+calcolano (`ali:150:yogurt di soia` = 75 kcal su 50 kcal/100 g), la scheda
+Oggi lo elenca, la spunta lo congela, le porzioni lo modificano (300 g = 150
+kcal), **la lista della spesa lo somma insieme agli stessi alimenti usati
+dalle ricette**, e il resoconto lo conta come riga a se'.
+
+Due dettagli:
+
+- **`pasto()` e' l'unico accessore.** I ventidue punti che leggevano
+  `D.pasti[code]` per uno slot passano da li'; restano diretti solo l'editor
+  delle ricette e il file di scambio, che lavorano sul registro delle ricette
+  e non su un pasto della settimana.
+- **La quantita' sta dentro il codice**, e va bene perche' gli strati del
+  giorno sono indicizzati sull'**id del pasto** e non sul codice della
+  ricetta: cambiare la quantita' non lascia orfano niente. Prima di quella
+  correzione questa scelta sarebbe stata un disastro.
+
+Nel foglio dello slot la sezione si chiama **"Oppure un alimento solo"**, e
+c'e' anche quando di ricette non ne hai nessuna: chi comincia da zero non deve
+comporre un piatto per segnare una mela.
+
 ### Si chiamano ricette
 
 Per tutta la vita dell'app il piatto composto — quello che si costruisce
@@ -3533,6 +3565,12 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   tre sedute: una giornata storta sposterebbe il verdetto da sola
 - Non presentare le otto settimane come una soglia misurata: e' pratica comune,
   come le costanti di Banister
+- Non costringere a comporre una ricetta per mettere un alimento solo in un
+  pasto: un codice `ali:<qta>:<nome>` risolto da `pasto()` si comporta come
+  una ricetta ovunque, senza sporcare l'elenco delle ricette
+- Non leggere `D.pasti[code]` per il pasto di uno slot: passa da `pasto()`, o
+  gli alimenti singoli spariscono da quel conto. Restano diretti solo
+  l'editor delle ricette e il file di scambio
 - Non chiamare "ricetta" quello che si aggiunge a un giorno: quello e' un
   **pasto**, cioe' un nome e un'ora, e la ricetta ci va dentro dopo. E non
   usare "slot" nei testi: e' una parola del codice

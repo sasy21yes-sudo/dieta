@@ -89,7 +89,7 @@ function codiceBase(sid, k) {
 function congelaPasto(sid, k) {
   const d = day(k);
   const eff = pastoDelGiorno(sid, k);
-  const p = D.pasti[eff];
+  const p = pasto(eff);
   if (!p) return;
   const slot = pastoSlot(sid, k);
   d.fatti ||= {};
@@ -121,7 +121,7 @@ const pastoFatto = (sid, k) => S.log[k]?.fatti?.[sid] || null;
 function ricettaGiorno(sid, k) {
   const f = pastoFatto(sid, k);
   if (f?.ingredienti?.length) return f;
-  return D.pasti[pastoDelGiorno(sid, k)] || null;
+  return pasto(pastoDelGiorno(sid, k));
 }
 
 /**
@@ -154,7 +154,7 @@ function pastoDelGiorno(sid, k) {
      riassegnato proprio a quella ricetta, la sostituzione non sostituisce
      piu' niente — ma la scritta "al posto di" resterebbe li' a dichiarare un
      cambio che non c'e' piu'. */
-  return (alt && alt !== base && D.pasti[alt]) ? alt : base;
+  return (alt && alt !== base && pasto(alt)) ? alt : base;
 }
 
 /**
@@ -178,7 +178,7 @@ function mettePastoSwap(sid, k, nuovo, scala = 1) {
     // la scala si scrive come porzioni del pasto nuovo: e' lo stesso strato
     // che usa gia' il moltiplicatore, non serve inventarne un altro
     if (scala && Math.abs(scala - 1) > 0.02) {
-      const ing = D.pasti[nuovo]?.ingredienti || [];
+      const ing = pasto(nuovo)?.ingredienti || [];
       if (ing.length) {
         d.porzioni ||= {};
         d.porzioni[code] = Object.fromEntries(ing.map(i =>
@@ -198,7 +198,7 @@ function ingredientiGiorno(sid, k) {
   // la copia congelata vince sul piano: e' il punto unico da cui passano
   // Oggi, il totale del pasto, il foglio delle porzioni e `consumed()`
   const fatto = pastoFatto(code, k);
-  const p = fatto?.ingredienti?.length ? fatto : D.pasti[pastoDelGiorno(code, k)];
+  const p = fatto?.ingredienti?.length ? fatto : pasto(pastoDelGiorno(code, k));
   if (!p?.ingredienti) return [];
   const sw = S.log[k]?.swap?.[code] || {};
   const por = S.log[k]?.porzioni?.[code] || {};
@@ -315,7 +315,7 @@ function mealMGiorno(sid, k) {
   const por = S.log[k]?.porzioni?.[code];
   const agg = S.log[k]?.aggiunti?.[code];
   const fatto = pastoFatto(code, k);
-  const p = fatto?.ingredienti?.length ? fatto : D.pasti[eff];
+  const p = fatto?.ingredienti?.length ? fatto : pasto(eff);
   /* Gli aggiunti contano come gli altri tre strati. Mancavano, e la
      conseguenza era la peggiore possibile: aggiungendo qualcosa a un pasto e
      basta, il totale continuava a dire il numero della ricetta. Un pasto che
@@ -464,7 +464,7 @@ function sheetPorzioni(k, code) {
      slot, non il pasto che c'e' oggi: se hai gia' cambiato l'intero pasto,
      confrontarlo con se stesso direbbe sempre zero. */
   const pianoM = () => {
-    const orig = D.pasti[code];
+    const orig = pasto(code);
     if (orig?.macro) return orig.macro;
     return p.macro || M0();
   };
@@ -747,7 +747,7 @@ function sheetAggiungiAlPasto(k, code) {
     if (dest.code) {
       aggiungiAlPasto(dest.code, k, nome, q, prod);
       if (code) { sheetPorzioni(k, code); toast('Aggiunto per oggi'); }
-      else { closeSheet(); route(); toast(nome + ' in ' + (D.pasti[pastoDelGiorno(dest.code, k)]?.nome || 'quel pasto')); }
+      else { closeSheet(); route(); toast(nome + ' in ' + (pasto(pastoDelGiorno(dest.code, k))?.nome || 'quel pasto')); }
     } else {
       // fuori piano: i macro si calcolano, non si chiedono
       const m = typeof macroMangiabile === 'function' ? macroMangiabile(v, q) : null;
@@ -793,7 +793,7 @@ function sheetCambiaPasto(k, code) {
     const base = codiceBase(code, k);
     const box = el('div', 'card flat');
     box.append(el('div', 'eyebrow', 'Il piano qui prevedeva'));
-    box.append(el('div', 'muted', `<strong>${esc(D.pasti[base]?.nome || base)}</strong>`));
+    box.append(el('div', 'muted', `<strong>${esc(pasto(base)?.nome || base)}</strong>`));
     const via = el('button', 'btn wide');
     via.style.marginTop = '9px';
     via.textContent = 'Rimetti la ricetta del piano';
@@ -862,7 +862,7 @@ function sheetCambiaPasto(k, code) {
   } else {
     w.append(selettoreCercabile(opz, null, (id) => {
       esito.innerHTML = '';
-      const pa = D.pasti[id];
+      const pa = pasto(id);
       if (!pa) return;
       const dd = ([mid, l]) => {
         const q = (pa.macro[mid] || 0) - (src.macro[mid] || 0);

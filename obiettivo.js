@@ -234,7 +234,7 @@ function controlloPiano(k = today()) {
 
   const giorni = (D.settimana || []).map(g => {
     const kcal = g.totali?.kcal || 0;
-    const assegnati = (g.pasti || []).filter(x => D.pasti[x.codice]).length;
+    const assegnati = (g.pasti || []).filter(x => pasto(x.codice)).length;
     const vuoto = assegnati === 0;
     const scarto = tgt > 0 ? (kcal - tgt) / tgt : null;
     const mac = quoteMacro(g.totali);

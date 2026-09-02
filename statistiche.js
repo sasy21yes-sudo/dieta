@@ -142,7 +142,7 @@ function statPasti(per) {
     for (const sl of slots) {
       if (!sl.codice) continue;
       const nome = log?.fatti?.[chiaveP(sl)]?.nome
-        || D.pasti[sl.codice]?.nome || sl.codice;
+        || pasto(sl.codice)?.nome || sl.codice;
       // la spunta e' indicizzata sul PASTO: due pasti con la stessa ricetta
       // sono due righe distinte anche qui
       const preso = !!log?.pasti?.[chiaveP(sl)];

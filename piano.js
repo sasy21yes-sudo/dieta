@@ -416,7 +416,7 @@ function sheetIntegratore(nome) {
 function totaliGiorno(g) {
   const t = M0();
   for (const s of g.pasti || []) {
-    const pa = D.pasti[s.codice];
+    const pa = pasto(s.codice);
     if (pa && pa.macro) addM(t, pa.macro);
   }
   for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) t[x] = Math.round(t[x] * 10) / 10;
@@ -1481,7 +1481,7 @@ function sezSettimana(v) {
 
   for (const [gi, g] of sett.entries()) {
     const c = el('div', 'card');
-    const assegnati = (g.pasti || []).filter(x => D.pasti[x.codice]).length;
+    const assegnati = (g.pasti || []).filter(x => pasto(x.codice)).length;
     const sg = (typeof statoGiorno === 'function' && cPiano)
       ? statoGiorno(g.totali.kcal, assegnati, cPiano) : null;
     if (sg && sg.stato !== 'ok' && sg.stato !== 'vuoto') c.classList.add('gg-' + sg.stato);
@@ -1506,7 +1506,7 @@ function sezSettimana(v) {
     if (sg?.frase) c.append(el('div', 'gg-f ' + sg.cls, esc(sg.frase)));
     const righe = [];
     for (const [si, s] of (g.pasti || []).entries()) {
-      const pa = D.pasti[s.codice];
+      const pa = pasto(s.codice);
       const senzOra = oraMinuti(s.ora) == null;
       // s.codice e' null finche' non assegni, ed esc(null) stampava "null":
       // con il piano vuoto erano sette giorni di righe che dicevano "null"
@@ -1713,9 +1713,9 @@ function cambiaSlot(gi, si) {
      questo slot, cosi' ogni riga puo' dire dove porterebbe. */
   const gd = D.settimana[gi];
   const cPiano = typeof controlloPiano === 'function' ? controlloPiano() : null;
-  const attuale = D.pasti[gd?.pasti?.[si]?.codice];
+  const attuale = pasto(gd?.pasti?.[si]?.codice);
   const senza = (gd?.totali?.kcal || 0) - (attuale?.macro?.kcal || 0);
-  const nAltri = (gd?.pasti || []).filter((x, i) => i !== si && D.pasti[x.codice]).length;
+  const nAltri = (gd?.pasti || []).filter((x, i) => i !== si && pasto(x.codice)).length;
   const sgOra = cPiano && typeof statoGiorno === 'function'
     ? statoGiorno(gd.totali.kcal, nAltri + (attuale ? 1 : 0), cPiano) : null;
   if (sgOra && cPiano.tgt > 0) {
@@ -1731,6 +1731,63 @@ function cambiaSlot(gi, si) {
       + 'una colazione, non un errore.'));
   }
 
+  /**
+   * **Un pasto puo' essere un alimento solo.**
+   *
+   * Per mettere uno yogurt di soia allo spuntino bisognava comporre una
+   * ricetta con dentro un ingrediente: un giro assurdo, e un elenco di ricette
+   * che si riempie di voci che ricette non sono. Qui si sceglie l'alimento e
+   * la quantita', e il pasto e' fatto — il codice diventa `ali:<qta>:<nome>`
+   * e da li' in poi si comporta come qualunque altra ricetta: macro
+   * calcolati, lista della spesa, spunta, porzioni, resoconto.
+   */
+  const sezAlimento = () => {
+    const box = el('div');
+    box.append(el('h2', 'sec', 'Oppure un alimento solo'));
+    box.append(el('p', 'muted',
+      'Uno yogurt, una mela, un frullato gia\' pronto: non serve farne una '
+      + 'ricetta. Scegli cosa e quanto, e il pasto e\' fatto.'));
+    const opz = Object.keys(D.alimenti).sort((a, b) => a.localeCompare(b))
+      .map(nome => {
+        const al = alimento(nome) || {};
+        return { v: nome, lab: nome.charAt(0).toUpperCase() + nome.slice(1),
+          sub: `${nf(al.kcal || 0)} kcal / 100 ${al.unita || 'g'}` };
+      });
+    let scelto = null;
+    const eco = el('div');
+    const qta = el('div', 'field',
+      `<label>Quanto</label>
+       <input type="text" inputmode="decimal" id="cs-aq" value="150">`);
+    const disegna = () => {
+      eco.innerHTML = '';
+      if (!scelto) return;
+      const q = parseNum($('#cs-aq')?.value) ?? 0;
+      const m = foodM(scelto, q);
+      const r = el('div', 'read');
+      r.innerHTML = `<span><b>${nf(m.kcal)}</b> kcal</span>`
+        + `<span>${nf(m.p, 0)}P ${nf(m.c, 0)}C ${nf(m.g, 0)}G</span>`
+        + (cPiano && cPiano.tgt > 0
+          ? `<span>il giorno farebbe ${nf(senza + m.kcal)}</span>` : '');
+      eco.append(r);
+      const ok = el('button', 'btn wide pri');
+      ok.style.marginTop = '8px';
+      ok.textContent = 'Metti ' + scelto + ' in questo pasto';
+      ok.onclick = () => {
+        const q2 = parseNum($('#cs-aq').value);
+        if (!(q2 > 0)) { toast('Serve una quantita\''); return; }
+        s.codice = codiceAlimento(scelto, q2);
+        save(); fondiPiano(); closeSheet(); route(); toast('Pasto aggiornato');
+      };
+      eco.append(ok);
+    };
+    box.append(selettoreCercabile(opz, null, v => { scelto = v; disegna(); },
+      'Cerca un alimento\u2026'));
+    box.append(qta);
+    qta.querySelector('input').oninput = disegna;
+    box.append(eco);
+    return box;
+  };
+
   /* Con il piano vuoto D.pasti e' vuoto, e questo foglio mostrava il titolo,
      un vuoto, e il bottone per togliere lo slot: sembrava rotto, e in pratica
      lo era — non c'era nessuna strada da qui in avanti. Un elenco vuoto va
@@ -1745,6 +1802,8 @@ function cambiaSlot(gi, si) {
     const vai = el('button', 'btn wide pri', 'Vai a comporre una ricetta');
     vai.onclick = () => { pianoTab = 'pasti'; closeSheet(); route(); };
     w.append(vai);
+    // senza ricette la strada c'e' lo stesso: un alimento non ne ha bisogno
+    w.append(sezAlimento());
     const ind = el('button', 'btn wide', 'Torna alla settimana');
     ind.style.marginTop = '8px';
     ind.onclick = closeSheet;
@@ -1781,6 +1840,8 @@ function cambiaSlot(gi, si) {
     };
     w.append(r);
   }
+  w.append(sezAlimento());
+
   /* L'ora si imposta qui, e cambiandola il pasto si rimette al posto giusto
      nella giornata: un orario che non riordina niente e' solo un'etichetta. */
   const fo = el('div', 'field',
