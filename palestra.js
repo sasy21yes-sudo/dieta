@@ -361,6 +361,27 @@ function previsioneForza(id, orizzonte = 28) {
  * tetto del range con poco in serbatoio; finche' no, si aggiungono ripetizioni.
  * Alzare il peso prima significa solo fare meno lavoro con un numero piu' bello.
  */
+/* ============================================ gli esercizi che si fanno per lato
+ *
+ * Un curl alternato, un affondo, una row a un braccio: la serie la fai due
+ * volte — una per parte — e il carico e' quello di **un** lato. Scritto
+ * "3 x 8-10, 20 kg" dice meta' della verita': le serie vere sono sei e i chili
+ * in mano sono venti per parte.
+ *
+ * E' una **dichiarazione, non un indovinello**: il nome non basta. "Affondi"
+ * si fanno per lato e non lo dice, "Alzate laterali" ha "laterali" nel nome e
+ * si fanno insieme. Quindi c'e' un interruttore nell'editor dell'esercizio, e
+ * il catalogo di base parte con quelli in cui la cosa e' fuori discussione.
+ *
+ * **E' un'etichetta, non un conto.** Il tonnellaggio, il volume per muscolo e
+ * la forma-fatica non cambiano: ricalcolarli vorrebbe dire raddoppiare
+ * all'indietro tutte le sedute gia' registrate, cioe' riscrivere lo storico
+ * per una questione di scrittura. La nota lo dice.
+ */
+const perLato = ex => !!(ex && ex.lato);
+/** "x2" da appendere dove si scrivono le serie o i chili, se serve. */
+const x2 = ex => perLato(ex) ? '<span class="x2">\u00d72</span>' : '';
+
 function prossimoPasso(id) {
   const ex = esercizio(id); if (!ex) return null;
   const tutte = serieEsercizio(id);
@@ -1620,7 +1641,7 @@ function sheetDaScheda(k, schedaId) {
     box.style.marginBottom = '10px';
     const cap = el('div', 'row between');
     cap.innerHTML = `<strong><span class="sk-g">${et[ei].testo}</span> ${esc(ex.nome)}</strong>
-       <span class="mono muted" style="font-size:11px">${nSerie} × ${
+       <span class="mono muted" style="font-size:11px">${nSerie}${x2(ex)} × ${
          riga.piram?.length ? esc(listaTesto(riga.piram)) : rangeTesto(riga)}</span>`;
     box.append(cap);
     // in una superserie il recupero sta DOPO la coppia, non in mezzo:
@@ -1648,7 +1669,7 @@ function sheetDaScheda(k, schedaId) {
       `L'ultima volta (${prec.k}): ${prec.serie.map(x => `${nf(x.kg, 1)}×${x.reps}`).join(', ')}.`));
 
     box.append(el('div', 'setrow sethead',
-      '<span class="n"></span><span>kg</span><span>rip</span><span>RIR</span>'));
+      `<span class="n"></span><span>kg${x2(ex)}</span><span>rip</span><span>RIR</span>`));
     for (let si = 0; si < nSerie; si++) {
       // prima quello di oggi, poi l'ultima volta, poi il peso della scheda
       const d = daOggi(riga.ex, si, nSerie) || prec?.serie[si] || {};
@@ -2184,9 +2205,9 @@ function sheetScheda(id, statoPre) {
           ${riga.tecnica && riga.tecnica !== 'normale'
             ? `<em>${esc(t.nome.toLowerCase() + dett + rec)}</em>`
             : rec ? `<em>${esc(rec.replace(' · ', ''))}</em>` : ''}</span>
-        <span class="v">${serieDiRiga(riga)}</span>
+        <span class="v">${serieDiRiga(riga)}${x2(ex)}</span>
         <span class="v">${rangeTesto(riga)}</span>
-        <span class="v">${riga.kg ? nf(riga.kg, 1) : '—'}</span>
+        <span class="v">${riga.kg ? nf(riga.kg, 1) + x2(ex) : '—'}</span>
         <span class="go">›</span>`;
       r.onclick = () => {
         stato.nome = $('#sk-nome').value;      // non perdere quello che ha scritto
@@ -3130,6 +3151,7 @@ function sheetSchedaEsercizio(id) {
   const r = el('div', 'read');
   r.innerHTML = `<span>${esc(e.attrezzo)}</span>`
     + `<span>${e.tipo === 'isolamento' ? 'isolamento' : 'multiarticolare'}</span>`
+    + (perLato(e) ? '<span>un lato per volta</span>' : '')
     + (e.range ? `<span>${e.range[0]}–${e.range[1]} ripetizioni</span>` : '')
     + (e.incremento ? `<span>+${nf(e.incremento, e.incremento % 1 ? 1 : 0)} kg per volta</span>` : '');
   w.append(r);
@@ -3160,7 +3182,8 @@ function sheetSchedaEsercizio(id) {
 function sheetEsercizio(id, pre) {
   const miei = P().esercizi;
   const cur = id ? miei.find(x => x.id === id) : (pre || null);
-  const stato = { primari: [...(cur?.primari || [])], secondari: [...(cur?.secondari || [])],
+  const stato = { lato: !!cur?.lato,
+                  primari: [...(cur?.primari || [])], secondari: [...(cur?.secondari || [])],
                   tipo: cur?.tipo === 'isolamento' ? 'isolamento' : 'multi' };
   const w = el('div');
   w.append(el('div', 'eyebrow', id ? 'Modifica' : pre ? 'Dal catalogo' : 'Nuovo esercizio'));
@@ -3249,6 +3272,26 @@ function sheetEsercizio(id, pre) {
     'Serve al recupero consigliato dal timer: un multiarticolare pesante chiede tre '
     + 'minuti, un isolamento poco piu' + '\u2019 di uno.'));
 
+  /* Il nome non basta a dedurlo: "Affondi" si fanno per lato e non lo dicono,
+     "Alzate laterali" hanno "laterali" nel nome e si fanno insieme. */
+  const sw = el('button', 'sw-r' + (stato.lato ? ' on' : ''));
+  sw.style.marginTop = '10px';
+  const dis = () => {
+    sw.innerHTML = `<span class="body"><span class="t">Si fa un lato per volta</span>
+      <span class="d">Curl alternati, affondi, row a un braccio. Le serie e i chili
+      vengono scritti con un <b>\u00d72</b> accanto: la serie la fai due volte e il
+      peso e\' quello di una parte sola.</span></span>
+      <span class="box">${stato.lato ? '&check;' : ''}</span>`;
+    sw.classList.toggle('on', !!stato.lato);
+  };
+  dis();
+  sw.onclick = () => { stato.lato = !stato.lato; dis(); };
+  w.append(sw);
+  w.append(el('div', 'hint',
+    'E\' solo il modo in cui il numero viene scritto: tonnellaggio, volume per '
+    + 'muscolo e forma-fatica restano quelli che sono. Raddoppiarli adesso vorrebbe '
+    + 'dire riscrivere all\'indietro tutte le sedute gia\' registrate.'));
+
   const salva = el('button', 'btn wide pri', 'Salva');
   salva.onclick = () => {
     const nome = $('#ex-nome').value.trim();
@@ -3257,6 +3300,7 @@ function sheetEsercizio(id, pre) {
     const rec = {
       id: cur?.id || ('mio-' + uid()), nome,
       attrezzo: $('#ex-att').value.trim() || 'altro', tipo: stato.tipo,
+      ...(stato.lato ? { lato: true } : {}),
       primari: stato.primari, secondari: stato.secondari,
       range: [parseNum($('#ex-lo').value) ?? 8, parseNum($('#ex-hi').value) ?? 12],
       incremento: parseNum($('#ex-inc').value) ?? 2.5

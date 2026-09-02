@@ -481,7 +481,8 @@
     8,
     12
    ],
-   "incremento": 2
+   "incremento": 2,
+   "lato": true
   },
   {
    "id": "leg-extension",
@@ -858,7 +859,8 @@
     10,
     12
    ],
-   "incremento": 2
+   "incremento": 2,
+   "lato": true
   },
   {
    "id": "leg-press-plie",
@@ -943,7 +945,8 @@
     10,
     12
    ],
-   "incremento": 2
+   "incremento": 2,
+   "lato": true
   },
   {
    "id": "reverse-curl",

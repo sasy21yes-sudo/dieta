@@ -1544,3 +1544,32 @@ button.flag.tap:active{opacity:.75}
 /* la riga di lettura del foglio: l'ultima cella prende il colore dello stato */
 .read span.bad{color:var(--alert)}
 .read span.warn{color:var(--amber)}
+
+/* ---------------- "sali o resti?" nella seduta guidata ----------------
+   La doppia progressione c'era gia' e usciva come una riga grigia in mezzo
+   alle altre: sotto un bilanciere un periodo intero non lo legge nessuno.
+   Qui e' una decisione, tre parole e un numero. */
+.gd-prog-c{border:1px solid var(--rule);border-left:3px solid var(--ink-3);
+  border-radius:11px;padding:9px 12px;margin:10px 0 2px;background:var(--paper)}
+.gd-prog-c .r{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.gd-prog-c .t{font-weight:600;font-size:15px}
+.gd-prog-c .d{font-family:var(--mono);font-size:15px;font-weight:600}
+.gd-prog-c .p{color:var(--ink-2);font-size:12.5px;line-height:1.35;margin-top:2px}
+.gd-prog-c .u{color:var(--ink-3);font-size:11px;margin-top:5px}
+/* salire e' l'unica delle tre che chiede di cambiare qualcosa */
+.gd-prog-c.su{border-left-color:var(--pine);background:var(--pine-soft)}
+.gd-prog-c.su .t,.gd-prog-c.su .d{color:var(--pine)}
+.gd-prog-c.su .p{color:var(--ink-2)}
+
+/* il ×2 degli esercizi che si fanno un lato per volta: piccolo e in tinta,
+   non una pastiglia — e' un'annotazione sul numero, non un'etichetta */
+.x2{font-family:var(--mono);font-size:.78em;color:var(--pine);
+  margin-left:1px;vertical-align:.08em;letter-spacing:0}
+/* la carta "sali" e' un bottone: mette il carico nel campo con un tocco, cosi'
+   il campo continua a dire quello che avevi sul bilanciere invece di un
+   consiglio travestito da dato */
+button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
+  display:block}
+.gd-prog-c .go{color:var(--pine);font-size:10.5px;margin-top:6px;
+  letter-spacing:.04em}
+.gd-prog-c.fatto{opacity:.72}

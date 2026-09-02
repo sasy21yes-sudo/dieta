@@ -220,6 +220,68 @@ function chiudiRecupero(k, s) {
   save();
 }
 
+/**
+ * Sali o resti?
+ *
+ * `prossimoPasso()` la risposta ce l'aveva gia' — e' la doppia progressione,
+ * il motore che dice di caricare solo quando **tutte** le serie toccano il
+ * tetto del range con RIR <= 2. Ma nella guida usciva come una riga grigia in
+ * mezzo alle altre, e per giunta un periodo intero da leggere sotto un
+ * bilanciere.
+ *
+ * Qui diventa quello che e': **una decisione, tre parole e un numero**. Sopra
+ * il verdetto, sotto il perche' — cioe' cosa hai fatto l'ultima volta, che e'
+ * l'unica cosa che permette di non fidarsi ciecamente.
+ *
+ * Sta **solo sulla prima serie** dell'esercizio, ed e' voluto: la decisione
+ * sul carico si prende li'. Dalla seconda in poi il campo arriva gia' pieno
+ * con quello che hai appena sollevato, e ripetere "sali a 62,5" mentre sei a
+ * 60 e a meta' esercizio sarebbe un consiglio fuori tempo.
+ */
+function cartaCarico(riga, k) {
+  const pp = prossimoPasso(riga.ex);
+  if (!pp) return null;                  // mai fatto: non c'e' niente da dire
+  const ex = esercizio(riga.ex);
+  const prec = ultimoUso(riga.ex, k);
+
+  const stile = { carico: 'su', attesa: 'tieni', ripetizioni: 'tieni' }[pp.tipo];
+  const cap = pp.tipo === 'carico'
+    ? `Sali a ${nf(pp.kg, 1)} kg`
+    : `Resta a ${nf(pp.kg, 1)} kg`;
+  const perche = pp.tipo === 'carico'
+    ? `hai chiuso tutte le serie in cima al range`
+    : pp.tipo === 'attesa'
+      ? 'sei in cima al range ma con RIR alto: stessi chili, piu\' vicino al cedimento'
+      : `porta la serie piu\' bassa a ${pp.reps} ripetizioni`;
+
+  /* Quando la carta dice "sali a 62,5" e il campo sotto e' precompilato con
+     60 ci sono due centimetri di contraddizione, e ha ragione il campo: quel
+     numero e' il peso che avevi sul bilanciere, non un consiglio. Invece di
+     far vincere uno dei due, la carta diventa **toccabile**: un tocco e il
+     nuovo carico e' nel campo. Cosi' il campo continua a non mentire da solo
+     e il consiglio si applica senza scrivere a mano. */
+  const sale = pp.tipo === 'carico';
+  const c = el(sale ? 'button' : 'div', 'gd-prog-c ' + stile);
+  const delta = sale && pp.da != null
+    ? `<span class="d">+${nf(pp.kg - pp.da, 1)}</span>` : '';
+  c.innerHTML = `<div class="r"><span class="t">${esc(cap)}</span>${delta}</div>
+    <div class="p">${esc(perche)}</div>`
+    + (prec ? `<div class="u mono">l'ultima volta ${nf(
+        Math.max(...prec.serie.map(x => +x.kg || 0)), 1)} kg${
+        typeof x2 === 'function' ? x2(ex) : ''} · ${
+        prec.serie.map(x => x.reps).join(', ')} rip</div>` : '')
+    + (sale ? '<div class="go mono">tocca per metterlo nel campo</div>' : '');
+  if (sale) c.onclick = () => {
+    const campo = $('#gd-kg');
+    if (!campo) return;                     // la carta puo' sopravvivere al foglio
+    campo.value = nf(pp.kg, 1).replace('.', ',');
+    c.classList.add('fatto');
+    c.querySelector('.go').textContent = 'messo';
+    if (typeof pulsa === 'function') pulsa(campo, { scala: 1.06, dur: 260 });
+  };
+  return c;
+}
+
 /* ------------------------------------------------------------- la schermata */
 function sheetGuidata(k, schedaId) {
   const p = P(), sc = scheda(schedaId);
@@ -289,7 +351,6 @@ function sheetGuidata(k, schedaId) {
   const rp = usaRestPause(sc, riga);
   const bers = bersaglioTesto(riga, passo.si);
   const kgProp = caricoProposto(riga, k, passo.si);
-  const pp = prossimoPasso(riga.ex);
 
   /* --- dove sei --- */
   w.append(el('div', 'eyebrow', `${esc(sc.nome)} · passo ${idx + 1} di ${passi.length}`));
@@ -302,7 +363,8 @@ function sheetGuidata(k, schedaId) {
   w.lastChild.style.marginTop = '6px';
 
   const sotto = [`<span class="sk-g">${esc(passo.et.testo)}</span>`,
-    `serie <b>${passo.si + 1}</b> di ${serieDiRiga(riga)}`,
+    `serie <b>${passo.si + 1}</b> di ${serieDiRiga(riga)}${
+      typeof x2 === 'function' ? x2(ex) : ''}`,
     `bersaglio <b>${esc(bers)}</b> ${+bers === 1 ? 'ripetizione' : 'ripetizioni'}`];
   if (kgProp != null) {
     const fc = fonteCarico(riga, k);
@@ -339,7 +401,10 @@ function sheetGuidata(k, schedaId) {
     w.append(el('div', 'gd-tec ss',
       `<strong>Superserie</strong> — appena finita questa vai subito su `
       + `<b>${esc(esercizio(passo.prossimo.ex)?.nome || '')}</b>, senza recupero.`));
-  if (pp && passo.si === 0) w.append(el('div', 'hint', esc(pp.testo)));
+  if (passo.si === 0) {
+    const cc = cartaCarico(riga, k);
+    if (cc) w.append(cc);
+  }
 
   /* --- i tre numeri ---
      Il kg arriva gia' scritto perche' e' quello che hai messo sul bilanciere e
@@ -348,7 +413,8 @@ function sheetGuidata(k, schedaId) {
      segnaposto proprio perche' non venga scambiato per una risposta. Un
      campo prevompilato col bersaglio registrerebbe quello che DOVEVI fare. */
   const g = el('div', 'gd-in');
-  g.innerHTML = `<div class="field"><label>kg</label>
+  g.innerHTML = `<div class="field"><label>kg${
+      typeof x2 === 'function' ? x2(ex) : ''}</label>
       <input type="text" inputmode="decimal" id="gd-kg" value="${kgProp ?? ''}"></div>
     <div class="field"><label>rip fatte</label>
       <input type="text" inputmode="numeric" id="gd-rp" placeholder="${esc(bers)}"></div>

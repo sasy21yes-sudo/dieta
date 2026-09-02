@@ -548,6 +548,52 @@ dice in testa. Tre dettagli che sarebbero passati inosservati:
   giornata che conteneva gia' del lavoro quella e' una cancellazione, non un
   salvataggio.
 
+### Gli esercizi che si fanno un lato per volta
+
+Un curl alternato, un affondo, una row a un braccio: la serie la fai **due
+volte**, una per parte, e il carico e' quello di **un** lato. Scritto
+`3 × 8–10, 20 kg` dice meta' della verita'.
+
+Ora c'e' `lato` sull'esercizio, e dove si scrivono le serie o i chili compare
+un `×2` piccolo e in tinta — un'annotazione sul numero, non una pastiglia.
+Nella scheda, nel modulo, nell'elenco degli esercizi e nella carta della guida.
+
+Due decisioni:
+
+- **e' una dichiarazione, non un indovinello.** Il nome non basta: "Affondi" si
+  fanno per lato e non lo dicono, "Alzate laterali" hanno "laterali" nel nome e
+  si fanno insieme. C'e' un interruttore nell'editor dell'esercizio, e il
+  catalogo di base parte con i tre in cui la cosa e' fuori discussione;
+- **e' un'etichetta, non un conto.** Tonnellaggio, volume per muscolo e
+  forma-fatica non cambiano, e la nota lo dice. Raddoppiarli adesso vorrebbe
+  dire riscrivere all'indietro tutte le sedute gia' registrate — per una
+  questione di scrittura.
+
+### Sali o resti? La guida lo dice prima della prima serie
+
+`prossimoPasso()` la risposta ce l'aveva **gia'**: e' la doppia progressione,
+il motore che dice di caricare solo quando tutte le serie toccano il tetto del
+range con RIR ≤ 2. Ma nella guida usciva come una riga grigia in mezzo alle
+altre, e per giunta un periodo intero da leggere sotto un bilanciere.
+
+Adesso e' quello che e' — **una decisione, tre parole e un numero**: sopra il
+verdetto (`Sali a 62,5 kg` in verde, con `+2,5` a destra), sotto il perche',
+e in fondo cosa hai fatto l'ultima volta, che e' l'unica cosa che permette di
+non fidarsi ciecamente. Tre righe.
+
+Sta **solo sulla prima serie** dell'esercizio, ed e' voluto: la decisione sul
+carico si prende li'. Dalla seconda in poi il campo arriva gia' pieno con
+quello che hai appena sollevato, e ripetere "sali a 62,5" mentre sei a 60 e a
+meta' esercizio sarebbe un consiglio fuori tempo. E quando quell'esercizio non
+l'hai mai fatto la carta non c'e': non c'e' niente da dire.
+
+**La carta e' toccabile, e questo risolve una contraddizione.** Diceva "sali a
+62,5" mentre il campo due centimetri sotto era precompilato con 60 — e ha
+ragione il campo: quel numero e' il peso che avevi sul bilanciere, non un
+consiglio. Invece di far vincere uno dei due, un tocco sulla carta mette il
+nuovo carico nel campo. Il campo continua a non mentire da solo, e il
+consiglio si applica senza scriverlo a mano.
+
 ### Il recupero e' la schermata, non una barra sopra
 
 Prima il recupero era una barra che compariva sopra il foglio **mentre la
@@ -3286,6 +3332,20 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   non sanno che esiste un piramidale
 - Non scrivere "8–8": un range con gli estremi uguali non e' un range, e letto
   su una scheda sembra un errore di compilazione
+- Non dedurre dal nome se un esercizio si fa un lato per volta: "Affondi" non
+  lo dice e "Alzate laterali" lo direbbe a torto. Si dichiara
+- Non raddoppiare tonnellaggio e volume per gli esercizi per lato: il `×2` e'
+  come il numero viene scritto, e ricalcolarlo riscriverebbe all'indietro
+  tutte le sedute gia' registrate
+- Non lasciare la doppia progressione in una riga grigia: e' la decisione piu'
+  importante della serie, e sotto un bilanciere un periodo intero non lo
+  legge nessuno
+- Non mostrare il consiglio sul carico oltre la prima serie di un esercizio:
+  dalla seconda in poi il campo ha gia' quello che hai appena sollevato, e
+  "sali a 62,5" mentre sei a 60 a meta' esercizio e' fuori tempo
+- Non far precompilare al campo kg il carico *consigliato*: quel campo dice
+  cosa avevi sul bilanciere. Se il consiglio e' un altro, si tocca la carta e
+  ce lo mette lei
 - Non far riscrivere il carico a ogni serie: se hai appena fatto 60 kg, la
   serie dopo parte da 60. E dire da dove viene il numero, invece di lasciarlo
   indovinare
