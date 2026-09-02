@@ -594,6 +594,71 @@ consiglio. Invece di far vincere uno dei due, un tocco sulla carta mette il
 nuovo carico nel campo. Il campo continua a non mentire da solo, e il
 consiglio si applica senza scriverlo a mano.
 
+### Oggi quell'esercizio non si puo' fare
+
+Il rack occupato, la macchina rotta, una spalla che oggi non ne vuole sapere:
+succede di continuo, e l'unica strada era **abbandonare la guida** e registrare
+a mano sotto un nome sbagliato. Adesso l'esercizio si sostituisce, e nei due
+posti in cui serve — la guida passo per passo e il modulo da scheda.
+
+Tre regole:
+
+1. **La scheda non si tocca.** Vale anche domani com'e' scritta: la
+   sostituzione dura quanto la seduta. Nella guida sta in `s.guida.sost` e
+   sparisce con lei; nel modulo vive quanto il foglio. Quello che resta e' la
+   **serie registrata**, che porta gia' l'esercizio nuovo — ed e' il dato vero,
+   quello che finisce nello storico dei carichi e nella mappa muscolare.
+2. **Primi quelli che allenano la stessa cosa.** Con un attrezzo occupato la
+   domanda non e' "cosa mi somiglia di nome" ma "cosa mi allena la stessa
+   cosa": l'elenco pesa i muscoli primari in comune il doppio dei secondari, e
+   in cima ne mette quattro. Sulla panca piana propone panca con manubri,
+   panca inclinata, croci ai cavi e piegamenti.
+3. **Il carico e la progressione seguono l'esercizio di oggi.** `caricoProposto`,
+   `fonteCarico`, `cartaCarico` e l'avviso sugli acciacchi guardano tutti
+   `exDiRiga()`: proporre i chili della panca a chi ha appena messo le
+   parallele sarebbe il numero di un altro esercizio, e il "sali a 62,5" della
+   panca non c'entra niente con quello che stai per fare.
+
+L'elenco e' **lo stesso** nei due posti (`sheetScegliRicambio`), e non e' un
+caso: e' la stessa domanda fatta in due momenti della stessa seduta, e due
+elenchi ordinati diversamente darebbero due consigli diversi sullo stesso
+attrezzo occupato.
+
+### Quanti scarichi li decidi mentre li fai
+
+Le caselle di uno stripping erano esattamente quante ne dichiarava la scheda,
+e uno stripping non funziona cosi': quante volte scarichi dipende da come ti
+senti quel giorno e da quanto ti resta. Chi ne faceva tre su una riga che ne
+prevedeva due **non aveva dove scrivere il terzo**, e quel lavoro spariva dal
+volume.
+
+La scheda resta il bersaglio — i segnaposto dicono ancora quello che chiedeva
+— ma sotto le caselle c'e' "+ un altro scarico".
+
+### Un esercizio del catalogo si corregge
+
+`catalogo()` era `base.concat(tuoi)` ed `esercizio(id)` restituisce il primo
+che trova: una voce tua con lo stesso id di una di base restava **invisibile
+per sempre**. Conseguenza pratica: i 59 del catalogo non si potevano toccare.
+Se per te la panca inclinata lavora piu' le spalle che il petto — dipende da
+come la fai — non c'era modo di dirlo, e la mappa muscolare continuava a
+colorare quello che diceva il file.
+
+Adesso i tuoi **vincono sull'id**, e questa e' la parte che conta: sovrascrivere
+per id invece di creare un doppione e' l'unica strada che non spezza niente,
+perche' lo storico dei carichi, il volume settimanale e la forma-fatica sono
+indicizzati sull'id — un id nuovo li dividerebbe in due. "Rimetti quello del
+catalogo" toglie la tua versione e fa riemergere quella di base, che non e'
+mai stata cancellata.
+
+Nello stesso giro, **"Come si esegue" compariva solo se l'esercizio era gia'
+collegato** ai fotogrammi del catalogo pubblico — e da Gym > Esercizi non ci si
+arrivava mai, perche' il collegamento si fa proprio da li'. Adesso il bottone
+c'e' sempre e dice quale dei due casi e'. E la riga dell'elenco apre sempre la
+scheda dell'esercizio, che da li' porta a correggerlo e a vederne l'esecuzione:
+prima si andava in due posti diversi a seconda che l'esercizio fosse tuo o del
+catalogo, cioe' una cosa che chi tocca la riga non ha modo di sapere.
+
 ### Il recupero e' la schermata, non una barra sopra
 
 Prima il recupero era una barra che compariva sopra il foglio **mentre la
@@ -3587,6 +3652,24 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non marcare `verificato` un alimento arrivato da un codice a barre passando
   per Open Food Facts: quei valori li inseriscono le persone. Da un prodotto
   gia' nel proprio registro si', perche' li ha scritti l'utente dall'etichetta
+- Non far cambiare la scheda a una sostituzione fatta durante la seduta: il
+  rack occupato di oggi non e' un cambio di programma. Dura quanto la seduta,
+  e quello che resta e' la serie registrata
+- Non lasciare che carico proposto, progressione e avviso sugli acciacchi
+  guardino l'esercizio scritto in scheda quando quello che stai facendo e' un
+  altro: sono i numeri di un esercizio diverso
+- Non ordinare alfabeticamente i ricambi di un esercizio: con un attrezzo
+  occupato la domanda e' "cosa mi allena la stessa cosa", e i muscoli primari
+  in comune pesano il doppio dei secondari
+- Non fissare il numero di scarichi di uno stripping su quello della scheda:
+  quante volte scarichi lo decidi mentre lo fai, e quello che non ha una
+  casella sparisce dal volume
+- Non concatenare i tuoi esercizi in fondo al catalogo di base: `esercizio(id)`
+  restituisce il primo che trova, quindi una tua correzione con lo stesso id
+  resterebbe invisibile. I tuoi vincono sull'id — e l'id non cambia, o lo
+  storico dei carichi si spezza in due
+- Non nascondere "Come si esegue" quando il collegamento manca: e' proprio da
+  li' che il collegamento si fa
 - Non dare un id nuovo a un esercizio che esiste gia' con un altro nome: lo
   storico dei carichi e il volume settimanale si spezzano in due
 - Non scrivere una sola delle due date del cruscotto: `datiIntervallo()` le

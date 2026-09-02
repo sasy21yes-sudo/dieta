@@ -13,7 +13,27 @@ function P() {
   return S.palestra;
 }
 /** Catalogo = esercizi del file + quelli aggiunti dall'utente. */
-function catalogo() { return (PD?.esercizi || []).concat(P().esercizi); }
+/**
+ * Il catalogo: i 59 di base piu' i tuoi, **e i tuoi vincono sull'id**.
+ *
+ * Prima era una semplice concatenazione, e `esercizio(id)` restituisce il
+ * primo che trova: una voce tua con lo stesso id di una di base restava quindi
+ * invisibile per sempre. Conseguenza pratica: gli esercizi del catalogo non si
+ * potevano correggere. Se per te la panca inclinata lavora piu' le spalle che
+ * il petto — dipende da come la fai — non c'era modo di dirlo, e la mappa
+ * muscolare continuava a colorare quello che diceva il file.
+ *
+ * Sovrascrivere per id invece di creare un doppione e' anche l'unica strada
+ * che non spezza niente: lo storico dei carichi, il volume settimanale e la
+ * forma-fatica sono indicizzati sull'id, e un id nuovo li dividerebbe in due.
+ */
+function catalogo() {
+  const miei = P().esercizi;
+  const suoi = new Set(miei.map(e => e.id));
+  return (PD?.esercizi || []).filter(e => !suoi.has(e.id)).concat(miei);
+}
+/** Esiste nel file di base con quell'id? Serve a distinguere una correzione. */
+const diBase = id => (PD?.esercizi || []).some(e => e.id === id);
 function esercizio(id) { return catalogo().find(e => e.id === id) || null; }
 function muscoli() { return PD?.muscoli || []; }
 function muscolo(id) { return muscoli().find(m => m.id === id) || null; }
@@ -1576,8 +1596,59 @@ function parseScarichi(txt) {
 }
 const scarichiTesto = d => (d || []).map(x => `${nf(x.kg, 1)}x${x.reps}`).join(', ');
 
+/**
+ * Con cosa lo sostituisco.
+ *
+ * Primi quelli che allenano **gli stessi muscoli**: quando un attrezzo e'
+ * occupato la domanda non e' "cosa mi somiglia di nome" ma "cosa mi allena la
+ * stessa cosa", e un elenco alfabetico a quella domanda non risponde.
+ */
+function sheetScegliRicambio(exOrig, onScelto, torna) {
+  const orig = esercizio(exOrig);
+  const prim = new Set(orig?.primari || []);
+  const punti = e => e.id === exOrig ? -1
+    : (e.primari || []).filter(x => prim.has(x)).length * 2
+      + (e.secondari || []).filter(x => prim.has(x)).length;
+
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Solo per questa seduta'));
+  w.append(el('h2', 'sec', 'Al posto di ' + esc(orig?.nome || exOrig)));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'La scheda non cambia: vale domani com\'e\' scritta. Le serie che registri '
+    + 'portano l\'esercizio nuovo, ed e\' quello che finisce nello storico dei '
+    + 'carichi e nella mappa muscolare.'));
+
+  const simili = catalogo().filter(e => punti(e) >= 2)
+    .sort((a, b) => punti(b) - punti(a)).slice(0, 4);
+  if (simili.length) {
+    w.append(el('div', 'eyebrow', 'Allenano la stessa cosa'));
+    for (const e of simili) {
+      const b = el('button', 'prod');
+      b.innerHTML = `<div class="grow"><div class="nm">${esc(e.nome)}</div>
+        <div class="mt">${esc(e.attrezzo)}</div></div><div class="kc">usa &rsaquo;</div>`;
+      b.onclick = () => onScelto(e.id);
+      w.append(b);
+    }
+  }
+  w.append(el('div', 'eyebrow', 'Oppure un altro'));
+  w.append(selettoreCercabile(
+    catalogo().filter(e => e.id !== exOrig)
+      .sort((a, b) => punti(b) - punti(a) || a.nome.localeCompare(b.nome))
+      .map(e => ({ v: e.id, lab: e.nome,
+        sub: e.attrezzo + (punti(e) > 0 ? ' \u00b7 stessi muscoli' : '') })),
+    null, id => onScelto(id), 'Cerca un esercizio\u2026'));
+
+  const ind = el('button', 'btn wide');
+  ind.style.marginTop = '12px';
+  ind.textContent = 'Lascia com\'e\'';
+  ind.onclick = () => (torna ? torna() : closeSheet());
+  w.append(ind);
+  sheet(w);
+}
+
 /** Seduta da scheda: si toccano solo carico, ripetizioni e RIR. */
-function sheetDaScheda(k, schedaId) {
+function sheetDaScheda(k, schedaId, sostPre) {
   const p = P(), sc = scheda(schedaId);
   if (!sc) return sheetSceltaModo(k);
   const et = etichetteScheda(sc.esercizi);
@@ -1627,10 +1698,19 @@ function sheetDaScheda(k, schedaId) {
       + 'dopo, o per scrivere tutto in una volta a fine seduta.'));
   }
 
+  /* **L'esercizio si puo' cambiare anche qui.**
+     La guida ce l'ha; questo modulo no, e chi registra a fine seduta si
+     trovava a dover scrivere sotto il nome sbagliato. La sostituzione vale
+     per **questo modulo**: la scheda non si tocca — vale anche domani — e le
+     serie che salvi portano gia' l'esercizio nuovo, che e' il dato che finisce
+     nello storico dei carichi e nella mappa muscolare. */
+  const sost = { ...(sostPre || {}) };
+  const exRiga = riga => sost[riga.ex] || riga.ex;
+
   for (const [ei, riga] of sc.esercizi.entries()) {
-    const ex = esercizio(riga.ex);
+    const ex = esercizio(exRiga(riga));
     if (!ex) continue;
-    const prec = ultimoUso(riga.ex, k);
+    const prec = ultimoUso(exRiga(riga), k);
     const lo = riga.reps, hi = riga.repsMax || riga.reps;
     const t = tecnica(riga.tecnica);
     const nSerie = serieDiRiga(riga);
@@ -1648,9 +1728,12 @@ function sheetDaScheda(k, schedaId) {
     // se la riga dopo e' attaccata a questa, qui il timer non ci va
     if (!sc.esercizi[ei + 1]?.superserie)
       cap.querySelector('span:last-child').before(bottoneRecupero(ex, riga, sc));
-    cap.querySelector('span:last-child').before(bottoneEsecuzione(riga.ex));
-    const av = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(riga.ex, k) : null;
+    cap.querySelector('span:last-child').before(bottoneEsecuzione(exRiga(riga)));
+    const av = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(exRiga(riga), k) : null;
     if (av) box.append(av);
+    if (exRiga(riga) !== riga.ex) box.append(el('div', 'hint',
+      `Al posto di <strong>${esc(esercizio(riga.ex)?.nome || riga.ex)}</strong>, `
+      + 'solo per questa seduta.'));
     if (riga.tecnica && riga.tecnica !== 'normale')
       box.append(el('div', 'hint', `<strong>${esc(t.nome)}${
         riga.tecnica === 'stripping' && riga.strip?.length
@@ -1663,7 +1746,28 @@ function sheetDaScheda(k, schedaId) {
       box.append(el('div', 'hint',
         `Subito dopo ${esc(esercizio(sc.esercizi[ei - 1].ex)?.nome || '')}, senza recupero.`));
 
-    const pp = prossimoPasso(riga.ex);
+    /* Cambiare l'esercizio ridisegna il modulo, e quello che era scritto nelle
+       caselle si perde: e' il motivo per cui il bottone e' piccolo e sta in
+       fondo alla scheda dell'esercizio, non in cima. */
+    const cambia = el('button', 'btn wide');
+    cambia.style.marginTop = '8px';
+    cambia.textContent = exRiga(riga) !== riga.ex
+      ? 'Rimetti ' + (esercizio(riga.ex)?.nome || 'quello della scheda')
+      : 'Non posso farlo \u00b7 cambia esercizio';
+    cambia.onclick = () => {
+      if (exRiga(riga) !== riga.ex) {
+        delete sost[riga.ex];
+        sheetDaScheda(k, schedaId, sost);
+        return;
+      }
+      sheetScegliRicambio(riga.ex, nuovo => {
+        sost[riga.ex] = nuovo;
+        sheetDaScheda(k, schedaId, sost);
+      }, () => sheetDaScheda(k, schedaId, sost));
+    };
+    box.append(cambia);
+
+    const pp = prossimoPasso(exRiga(riga));
     if (pp) box.append(el('div', 'hint', esc(pp.testo)));
     else if (prec) box.append(el('div', 'hint',
       `L'ultima volta (${prec.k}): ${prec.serie.map(x => `${nf(x.kg, 1)}×${x.reps}`).join(', ')}.`));
@@ -1704,6 +1808,7 @@ function sheetDaScheda(k, schedaId) {
     for (const [ei, riga] of sc.esercizi.entries()) {
       if (!esercizio(riga.ex)) continue;
       const nS = serieDiRiga(riga);
+      const exSalva = exRiga(riga);
       for (let si = 0; si < nS; si++) {
         // il recupero vero non sta nel modulo, ma e' un dato registrato dalla
         // guida: da li' escono la durata della seduta e il recupero medio del
@@ -1711,7 +1816,7 @@ function sheetDaScheda(k, schedaId) {
         const orig = daOggi(riga.ex, si, nS);
         const reps = parseNum(($('#sc-' + ei + '-' + si + '-rp') || {}).value);
         if (!(reps > 0)) continue;                 // serie non fatta: si salta
-        const rec = { ex: riga.ex,
+        const rec = { ex: exSalva,
           kg: parseNum(($('#sc-' + ei + '-' + si + '-kg') || {}).value) ?? 0,
           reps, rir: parseNum(($('#sc-' + ei + '-' + si + '-rr') || {}).value) ?? 2 };
         if (orig?.rec_s > 0) rec.rec_s = orig.rec_s;
@@ -3090,7 +3195,9 @@ function sezGymEsercizi(v) {
           || 'nessun gruppo'}</div></div>
         ${ruolo === 'secondario' ? '<span class="pill">secondario</span>' : ''}
         ${mio.has(e.id) ? '<span class="pill ok">tuo</span>' : ''}`;
-      r.onclick = () => mio.has(e.id) ? sheetEsercizio(e.id) : sheetSchedaEsercizio(e.id);
+      // sempre la scheda: da li' si corregge e si guarda l'esecuzione, e non
+      // serve piu' sapere in anticipo se quell'esercizio e' tuo o del catalogo
+      r.onclick = () => sheetSchedaEsercizio(e.id);
       lista.append(r);
     }
     lista.append(el('p', 'hint', `${trovati.length} su ${tutti.length}`
@@ -3162,11 +3269,32 @@ function sheetSchedaEsercizio(id) {
     'Range e incremento sono valori di partenza del catalogo, non calibrati su di te: '
     + 'nella scheda li cambi come vuoi.'));
 
-  if (typeof sheetEsecuzione === 'function' && esecMappa()[id]) {
-    const b = el('button', 'btn wide', 'Come si esegue');
+  /* "Come si esegue" c'era, ma **solo se l'esercizio era gia' collegato** ai
+     fotogrammi del catalogo pubblico: da Gym > Esercizi non ci si arrivava
+     mai, perche' il collegamento si fa proprio da li'. Adesso il bottone c'e'
+     sempre, e dice se il collegamento manca invece di nascondersi. */
+  if (typeof sheetEsecuzione === 'function') {
+    const gia = !!esecMappa()[id];
+    const b = el('button', 'btn wide',
+      gia ? 'Come si esegue' : 'Collega l\'esecuzione');
     b.onclick = () => sheetEsecuzione(id);
     w.append(b);
+    if (!gia) w.append(el('p', 'hint',
+      'Due fotogrammi dal catalogo pubblico, partenza e arrivo. Il collegamento '
+      + 'si fa una volta: i nomi italiani non si possono indovinare, e mostrare '
+      + 'l\'esecuzione sbagliata e\' peggio che non mostrarne nessuna.'));
   }
+
+  const mod = el('button', 'btn wide', diBase(id) && !P().esercizi.some(x => x.id === id)
+    ? 'Correggilo' : 'Modifica');
+  mod.style.marginTop = '8px';
+  mod.onclick = () => sheetEsercizio(id);
+  w.append(mod);
+  w.append(el('p', 'hint',
+    'Muscoli, tipo, range e incremento: le tue correzioni valgono ovunque — '
+    + 'mappa muscolare, volume, recupero consigliato — e lo storico dei carichi '
+    + 'non si spezza, perche' + '\u2019 l\'esercizio resta lo stesso.'));
+
   const ch = el('button', 'btn wide pri', 'Chiudi');
   ch.style.marginTop = '8px';
   ch.onclick = closeSheet;
@@ -3181,12 +3309,17 @@ function sheetSchedaEsercizio(id) {
  */
 function sheetEsercizio(id, pre) {
   const miei = P().esercizi;
-  const cur = id ? miei.find(x => x.id === id) : (pre || null);
+  // anche uno del catalogo di base: salvandolo nasce una tua versione con lo
+  // stesso id, che da quel momento vince ovunque
+  const cur = id ? esercizio(id) : (pre || null);
+  const eraTuo = !!(id && miei.some(x => x.id === id));
   const stato = { lato: !!cur?.lato,
                   primari: [...(cur?.primari || [])], secondari: [...(cur?.secondari || [])],
                   tipo: cur?.tipo === 'isolamento' ? 'isolamento' : 'multi' };
   const w = el('div');
-  w.append(el('div', 'eyebrow', id ? 'Modifica' : pre ? 'Dal catalogo' : 'Nuovo esercizio'));
+  w.append(el('div', 'eyebrow', id
+    ? (eraTuo ? 'Modifica' : 'Correggi quello del catalogo')
+    : pre ? 'Dal catalogo' : 'Nuovo esercizio'));
   w.append(el('h2', 'sec', esc(cur?.nome || 'Esercizio')));
   w.lastChild.style.marginTop = '0';
 
@@ -3306,19 +3439,29 @@ function sheetEsercizio(id, pre) {
       incremento: parseNum($('#ex-inc').value) ?? 2.5
     };
     if (pre?.origine) rec.origine = pre.origine;
-    if (pre?.exdbId) rec.exdbId = pre.exdbId;
+    if (pre?.exdbId || cur?.exdbId) rec.exdbId = pre?.exdbId || cur.exdbId;
+    // correggendo uno di base l'id resta lo stesso: e' quello che tiene
+    // insieme lo storico dei carichi e il volume gia' registrato
+    if (id) rec.id = id;
     const i = miei.findIndex(x => x.id === rec.id);
     if (i >= 0) miei[i] = rec; else miei.push(rec);
     save(); closeSheet(); route(); toast('Esercizio salvato');
   };
   w.append(salva);
-  if (cur) {
-    const del = el('button', 'btn wide', 'Elimina');
+  // su un esercizio del catalogo mai corretto non c'e' niente da rimettere e
+  // niente da eliminare: un bottone disabilitato e' una domanda senza risposta
+  if (id && (eraTuo || !diBase(id))) {
+    const base = diBase(id);
+    const del = el('button', 'btn wide',
+      base ? 'Rimetti quello del catalogo' : 'Elimina');
     del.style.marginTop = '8px';
     del.onclick = () => {
-      if (!confirm('Eliminare questo esercizio?')) return;
-      P().esercizi = miei.filter(x => x.id !== cur.id);
-      save(); closeSheet(); route(); toast('Eliminato');
+      if (!confirm(base
+        ? 'Butto via le tue correzioni e rimetto l\'esercizio come sta nel catalogo?'
+        : 'Eliminare questo esercizio?')) return;
+      P().esercizi = miei.filter(x => x.id !== id);
+      save(); closeSheet(); route();
+      toast(base ? 'Rimesso come nel catalogo' : 'Eliminato');
     };
     w.append(del);
   }

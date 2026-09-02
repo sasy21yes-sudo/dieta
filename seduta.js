@@ -83,16 +83,22 @@ function passoCorrente(k, sc) {
  *   4. il peso di partenza scritto nella scheda
  */
 function caricoProposto(riga, k, si) {
-  const oggi = (P().sessioni[k]?.serie || []).filter(x => x.ex === riga.ex);
+  /* L'esercizio di OGGI, che puo' essere quello messo al posto di quello
+     della scheda: proporre i chili della panca a chi ha appena sostituito la
+     panca con le parallele sarebbe il numero di un altro esercizio. */
+  const ex = typeof exDiRiga === 'function' ? exDiRiga(riga, k) : riga.ex;
+  const oggi = (P().sessioni[k]?.serie || []).filter(x => x.ex === ex);
   if (oggi.length) return oggi[oggi.length - 1].kg ?? riga.kg ?? null;
-  const prec = ultimoUso(riga.ex, k);
+  const prec = ultimoUso(ex, k);
   const d = prec?.serie?.[si] ?? prec?.serie?.[prec.serie.length - 1];
-  return d?.kg ?? riga.kg ?? null;
+  // il peso della scheda vale solo se l'esercizio e' ancora quello
+  return d?.kg ?? (ex === riga.ex ? riga.kg : null) ?? null;
 }
 /** Da dove viene, per poterlo scrivere invece di farlo indovinare. */
 function fonteCarico(riga, k) {
-  if ((P().sessioni[k]?.serie || []).some(x => x.ex === riga.ex)) return 'oggi';
-  return ultimoUso(riga.ex, k) ? 'ultima' : riga.kg ? 'scheda' : null;
+  const ex = typeof exDiRiga === 'function' ? exDiRiga(riga, k) : riga.ex;
+  if ((P().sessioni[k]?.serie || []).some(x => x.ex === ex)) return 'oggi';
+  return ultimoUso(ex, k) ? 'ultima' : (ex === riga.ex && riga.kg) ? 'scheda' : null;
 }
 
 /* =========================================================== il recupero
@@ -239,10 +245,13 @@ function chiudiRecupero(k, s) {
  * 60 e a meta' esercizio sarebbe un consiglio fuori tempo.
  */
 function cartaCarico(riga, k) {
-  const pp = prossimoPasso(riga.ex);
+  // la progressione e' quella dell'esercizio che fai OGGI: se hai sostituito
+  // la panca con le parallele, il "sali a 62,5" della panca non c'entra
+  const exId = typeof exDiRiga === 'function' ? exDiRiga(riga, k) : riga.ex;
+  const pp = prossimoPasso(exId);
   if (!pp) return null;                  // mai fatto: non c'e' niente da dire
-  const ex = esercizio(riga.ex);
-  const prec = ultimoUso(riga.ex, k);
+  const ex = esercizio(exId);
+  const prec = ultimoUso(exId, k);
 
   const stile = { carico: 'su', attesa: 'tieni', ripetizioni: 'tieni' }[pp.tipo];
   const cap = pp.tipo === 'carico'
@@ -280,6 +289,42 @@ function cartaCarico(riga, k) {
     if (typeof pulsa === 'function') pulsa(campo, { scala: 1.06, dur: 260 });
   };
   return c;
+}
+
+/**
+ * L'esercizio di oggi, che puo' non essere quello della scheda.
+ *
+ * Il rack occupato, la macchina rotta, una spalla che oggi non ne vuole
+ * sapere: succede di continuo, e l'unica strada era abbandonare la guida e
+ * registrare a mano. La scheda pero' **non si tocca** — vale anche domani — e
+ * questa sostituzione dura quanto la seduta: sta in `s.guida.sost`, sparisce
+ * con lei, e le serie che scrivi portano gia' l'esercizio nuovo, che e' il
+ * dato vero.
+ */
+function exDiRiga(riga, k) {
+  const alt = P().sessioni[k]?.guida?.sost?.[riga.ex];
+  return alt && esercizio(alt) ? alt : riga.ex;
+}
+
+/**
+ * Il foglio: con cosa lo sostituisci, per oggi.
+ *
+ * L'elenco e' lo stesso del modulo da scheda (`sheetScegliRicambio`), e non e'
+ * un caso: e' la stessa domanda fatta in due momenti diversi della stessa
+ * seduta, e due elenchi ordinati con criteri diversi darebbero due consigli
+ * diversi sullo stesso attrezzo occupato. Qui cambia solo dove finisce la
+ * risposta — in `s.guida.sost`, che vive quanto la guida.
+ */
+function sheetCambiaEsercizio(k, schedaId, exOrig, torna) {
+  sheetScegliRicambio(exOrig, nuovo => {
+    const s2 = P().sessioni[k];
+    if (!s2?.guida) { toast('La guida non e\' attiva'); return; }
+    s2.guida.sost ||= {};
+    s2.guida.sost[exOrig] = nuovo;
+    save();
+    toast(esercizio(nuovo)?.nome + ' al posto di ' + (esercizio(exOrig)?.nome || ''));
+    if (torna) torna(); else { closeSheet(); route(); }
+  }, torna);
 }
 
 /* ------------------------------------------------------------- la schermata */
@@ -346,7 +391,10 @@ function sheetGuidata(k, schedaId) {
 
   const passo = passi[idx];
   const riga = passo.riga;
-  const ex = esercizio(riga.ex);
+  // l'esercizio di oggi, che puo' essere quello sostituito al volo
+  const exId = exDiRiga(riga, k);
+  const ex = esercizio(exId);
+  const sostituito = exId !== riga.ex;
   const scar = scarichiDiRiga(riga);
   const rp = usaRestPause(sc, riga);
   const bers = bersaglioTesto(riga, passo.si);
@@ -361,6 +409,9 @@ function sheetGuidata(k, schedaId) {
 
   w.append(el('h2', 'sec', esc(ex.nome)));
   w.lastChild.style.marginTop = '6px';
+  if (sostituito) w.append(el('div', 'hint',
+    `Al posto di <strong>${esc(esercizio(riga.ex)?.nome || riga.ex)}</strong>, `
+    + 'solo per oggi. La scheda non e\' cambiata.'));
 
   const sotto = [`<span class="sk-g">${esc(passo.et.testo)}</span>`,
     `serie <b>${passo.si + 1}</b> di ${serieDiRiga(riga)}${
@@ -377,7 +428,7 @@ function sheetGuidata(k, schedaId) {
     sotto.push(`recupero <b>${recTesto(recupeoConsigliato(ex, riga, sc))}</b>`);
   w.append(el('div', 'read', sotto.map(x => `<span>${x}</span>`).join('')));
 
-  const av = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(riga.ex, k) : null;
+  const av = typeof avvisoAcciacco === 'function' ? avvisoAcciacco(exId, k) : null;
   if (av) w.append(av);
 
   /* --- cosa chiede questa serie --- */
@@ -445,23 +496,42 @@ function sheetGuidata(k, schedaId) {
     'Quante ne hai fatte davvero, non quante ne chiedeva la scheda: e\' da '
     + 'quel numero che escono il massimale stimato e la progressione.'));
 
+  /* **Quanti scarichi li decidi mentre li fai.**
+     Le caselle erano esattamente quante ne dichiarava la scheda, e uno
+     stripping non funziona cosi': quante volte scarichi dipende da come ti
+     senti quel giorno e da quanto ti resta nel serbatoio. Chi ne faceva tre su
+     una riga che ne prevedeva due non aveva dove scrivere il terzo, e quel
+     lavoro spariva dal volume.
+     La scheda resta il bersaglio — i segnaposto dicono ancora quello che
+     chiedeva — ma le caselle si aggiungono. */
   const drops = [];
   if (scar.length) {
     const cd = el('div', 'gd-drop');
     cd.append(el('div', 'lab', 'Scarichi'));
-    scar.forEach((r2, i2) => {
+    const campi = el('div');
+    cd.append(campi);
+    let n = 0;
+    const aggiungi = (bersaglio) => {
+      const i2 = n++;
       const f = el('div', 'gd-in due');
       f.innerHTML = `<div class="field"><label>kg</label>
           <input type="text" inputmode="decimal" id="gd-dk-${i2}"></div>
         <div class="field"><label>rip</label>
           <input type="text" inputmode="numeric" id="gd-dr-${i2}"
-            placeholder="${r2 ?? ''}"></div>`;
-      cd.append(f);
+            placeholder="${bersaglio ?? ''}"></div>`;
+      campi.append(f);
       drops.push(i2);
-    });
+      return f;
+    };
+    scar.forEach(r2 => aggiungi(r2));
+    const piu = el('button', 'btn wide', '+ un altro scarico');
+    piu.style.marginTop = '4px';
+    piu.onclick = () => { const f = aggiungi(null); f.querySelector('input').focus(); };
+    cd.append(piu);
     cd.append(el('div', 'hint',
-      'Lascia vuoto quello che non hai fatto. Ogni scarico conta mezza serie '
-      + 'nel volume: e\' lavoro vero, ma piu\' corto.'));
+      'Lascia vuoto quello che non hai fatto, e aggiungine se ne fai piu\' di '
+      + 'quanti ne chiedeva la scheda. Ogni scarico conta mezza serie nel '
+      + 'volume: e\' lavoro vero, ma piu\' corto.'));
     w.append(cd);
   }
 
@@ -487,7 +557,7 @@ function sheetGuidata(k, schedaId) {
       $('#gd-rp').focus();
       return;
     }
-    const rec = { ex: riga.ex,
+    const rec = { ex: exId,
       kg: parseNum($('#gd-kg').value) ?? 0,
       reps,
       rir: parseNum($('#gd-rr').value) ?? 2 };
@@ -519,6 +589,27 @@ function sheetGuidata(k, schedaId) {
     sheetGuidata(k, sc.id);
   };
   w.append(fatto);
+
+  /* Il rack occupato, la macchina rotta, una spalla che oggi non ne vuole
+     sapere: l'unica strada era abbandonare la guida. Sta sotto i bottoni
+     principali perche' e' un'eccezione, non un passaggio della seduta. */
+  const camb = el('button', 'btn wide',
+    sostituito ? 'Cambia di nuovo esercizio' : 'Non posso farlo \u00b7 cambia esercizio');
+  camb.style.marginTop = '8px';
+  camb.onclick = () => sheetCambiaEsercizio(k, sc.id, riga.ex,
+    () => sheetGuidata(k, sc.id));
+  if (sostituito) {
+    const rim = el('button', 'btn wide');
+    rim.style.marginTop = '8px';
+    rim.textContent = 'Rimetti ' + (esercizio(riga.ex)?.nome || 'quello della scheda');
+    rim.onclick = () => {
+      const g2 = P().sessioni[k]?.guida;
+      if (g2?.sost) { delete g2.sost[riga.ex]; save(); }
+      sheetGuidata(k, sc.id);
+    };
+    w.append(rim);
+  }
+  w.append(camb);
 
   const salta = el('button', 'btn wide', 'Salta questa serie');
   salta.style.marginTop = '8px';
