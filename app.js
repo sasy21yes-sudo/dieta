@@ -3528,7 +3528,7 @@ function sheetProfilo() {
     + 'di vedere un cambiamento che sulla bilancia non si vede.',
     porta('#/foto'));
   if (usaPiano()) {
-    vai('Piano settimanale', 'Quale ricetta in quale slot, nei sette giorni. Da qui '
+    vai('Piano settimanale', 'Quale ricetta in quale pasto, nei sette giorni. Da qui '
       + 'escono le barre della scheda Oggi e la lista della spesa.',
       porta('#/piano', 'settimana'));
     vai('Ricette', 'I piatti composti pesando gli ingredienti, con i macro calcolati '

@@ -722,7 +722,7 @@ function sheetCambiaPasto(k, code) {
   w.append(el('p', 'hint',
     'Vale <strong>solo per oggi</strong>, come le porzioni: il piano resta com\'e\' '
     + 'e domani torna il pasto previsto. Le quantita\' e le sostituzioni di '
-    + 'ingrediente gia\' fatte su questo slot vengono azzerate — erano di un\'altra '
+    + 'ingrediente gia\' fatte su questo pasto vengono azzerate — erano di un\'altra '
     + 'ricetta.'));
 
   if (eff !== code) {

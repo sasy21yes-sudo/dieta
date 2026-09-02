@@ -535,7 +535,7 @@ function pianoPassi() {
       mio: nPas > 0,
       stato: nPas ? `${nPas} tuoi, oltre ai ${basePas} di base` : `${basePas} di base, nessuno tuo` },
     { id: 'settimana', t: 'Quando li mangi',
-      d: 'Assegna le ricette agli slot dei sette giorni.',
+      d: 'Assegna le ricette ai pasti dei sette giorni.',
       perche: 'E’ quello che vedi nella scheda Oggi: da qui escono le barre dei macro, il totale residuo e la lista della spesa.',
       mio: !!p.settimana,
       stato: p.settimana ? 'riorganizzata da te' : 'quella del piano di partenza' }
@@ -1414,10 +1414,11 @@ function sezSettimana(v) {
   }
   v.append(el('div', 'card flat',
     `<div class="eyebrow">Come funziona</div>
-     <div class="muted">Ogni giorno ha i suoi slot. Tocca uno slot per cambiare
-     la ricetta assegnata o per toglierla, oppure aggiungine uno: <strong>il numero
-     di ricette puo essere diverso da un giorno all altro</strong>. I totali si
-     ricalcolano da soli.</div>`));
+     <div class="muted">Un giorno e' fatto di <strong>pasti</strong> — colazione,
+     pranzo, uno spuntino — e dentro ogni pasto ci va una <strong>ricetta</strong>.
+     Tocca un pasto per cambiare la ricetta o per toglierla, oppure aggiungi un
+     pasto: <strong>il numero di pasti puo essere diverso da un giorno
+     all'altro</strong>. I totali si ricalcolano da soli.</div>`));
 
   /* Il verdetto sta **sul giorno**, non solo in cima alla pagina: un giorno da
      600 kcal nasce qui, mentre lo componi, ed e' qui che va detto. Una carta
@@ -1466,7 +1467,7 @@ function sezSettimana(v) {
     });
     const add = el('button', 'btn wide');
     add.style.marginTop = '10px';
-    add.textContent = '+ Aggiungi una ricetta a ' + g.giorno.toLowerCase();
+    add.textContent = '+ Aggiungi un pasto a ' + g.giorno.toLowerCase();
     add.onclick = () => nuovoSlot(gi);
     c.append(add);
     v.append(c);
@@ -1573,6 +1574,20 @@ function trascinaRighe(righe, puoMuovere, onSposta) {
 }
 
 /** Aggiunge un pasto a un giorno: il numero di pasti non e' fisso. */
+/**
+ * L'ora nel formato che `<input type="time">` accetta: **HH:MM** con lo zero
+ * davanti. Un orario scritto a mano nelle versioni di prima poteva essere
+ * "9:15", e il campo nativo con quel valore si presenta **vuoto** — senza
+ * dire niente, e salvando cancellerebbe l'ora che c'era.
+ */
+function oraValida(o) {
+  const m = String(o || '').match(/^(\d{1,2})[:.](\d{1,2})$/);
+  if (!m) return '';
+  const h = +m[1], mi = +m[2];
+  if (!(h >= 0 && h < 24 && mi >= 0 && mi < 60)) return '';
+  return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+}
+
 function nuovoSlot(gi) {
   const p = piano();
   p.settimana ||= JSON.parse(JSON.stringify(
@@ -1580,14 +1595,20 @@ function nuovoSlot(gi) {
   const g = p.settimana[gi];
   const w = el('div');
   w.append(el('div', 'eyebrow', esc(g.giorno)));
-  w.append(el('h2', 'sec', 'Nuova ricetta'));
+  /* Qui si aggiunge un **pasto**, cioe' un momento della giornata con un nome
+     e un'ora: la ricetta e' quello che ci si mette dentro dopo. Si chiamava
+     "Nuova ricetta" e prometteva un'altra cosa — un piatto da comporre — che
+     sta nel passo "Le tue ricette". */
+  w.append(el('h2', 'sec', 'Nuovo pasto'));
   w.lastChild.style.marginTop = '0';
   w.append(el('div', 'field',
     `<label>Come si chiama</label>
-     <input type="text" id="ns-slot" placeholder="Spuntino del pomeriggio">`));
+     <input type="text" id="ns-slot" placeholder="Spuntino del pomeriggio">
+     <div class="hint">E' il momento della giornata, non il piatto: "Colazione",
+     "Pre-nanna". La ricetta la scegli dopo.</div>`));
   w.append(el('div', 'field',
     `<label>A che ora <span class="muted">(facoltativo)</span></label>
-     <input type="text" inputmode="numeric" id="ns-ora" placeholder="16:30">
+     <input type="time" id="ns-ora">
      <div class="hint">Con l'ora il pasto si mette da solo al posto giusto nella
      giornata. Senza, resta dove lo aggiungi e lo sposti trascinandolo.</div>`));
   const b = el('button', 'btn wide pri', 'Aggiungi');
@@ -1599,7 +1620,8 @@ function nuovoSlot(gi) {
     g.pasti.push({ slot: nome, ora, codice: null });
     ordinaSlotOrari(g.pasti);
     save(); fondiPiano(); closeSheet(); route();
-    toast(ora ? 'Aggiunto alle ' + ora : 'Aggiunto in fondo: trascinalo dove vuoi');
+    toast(ora ? 'Pasto aggiunto alle ' + ora
+      : 'Pasto aggiunto in fondo: trascinalo dove vuoi');
   };
   w.append(b);
   sheet(w);
@@ -1649,7 +1671,7 @@ function cambiaSlot(gi, si) {
   if (!quanti) {
     w.append(el('p', 'muted',
       'Non hai ancora composto nessuna ricetta, quindi non c\'e\' niente da assegnare a '
-      + 'questo slot. Le ricette si costruiscono nel passo <strong>"Le tue ricette"</strong>: '
+      + 'questo pasto. Le ricette si costruiscono nel passo <strong>"Le tue ricette"</strong>: '
       + 'scegli gli alimenti e le quantita\', i macro si calcolano da soli, e da li\' in '
       + 'poi quella ricetta la metti in qualunque giorno.'));
     const vai = el('button', 'btn wide pri', 'Vai a comporre una ricetta');
@@ -1660,7 +1682,7 @@ function cambiaSlot(gi, si) {
     ind.onclick = closeSheet;
     w.append(ind);
     w.append(el('p', 'note',
-      'Lo slot resta dov\'e\': un giorno con gli orari gia\' impostati e le ricette ancora '
+      'Il pasto resta dov\'e\': un giorno con gli orari gia\' impostati e le ricette ancora '
       + 'da scegliere e\' un piano a meta\', non un piano rotto.'));
     sheet(w);
     return;
@@ -1695,8 +1717,7 @@ function cambiaSlot(gi, si) {
      nella giornata: un orario che non riordina niente e' solo un'etichetta. */
   const fo = el('div', 'field',
     `<label>A che ora <span class="muted">(facoltativo)</span></label>
-     <input type="text" inputmode="numeric" id="cs-ora" value="${esc(s.ora || '')}"
-            placeholder="16:30">`);
+     <input type="time" id="cs-ora" value="${esc(oraValida(s.ora))}">`);
   const bo = el('button', 'btn wide');
   bo.style.marginTop = '4px';
   bo.textContent = 'Salva l\'ora';
@@ -1717,21 +1738,23 @@ function cambiaSlot(gi, si) {
   if (s.codice) {
     const sv = el('button', 'btn wide');
     sv.style.marginTop = '12px';
-    sv.textContent = 'Lascia lo slot vuoto';
+    sv.textContent = 'Togli solo la ricetta, lascia il pasto';
     sv.onclick = () => {
       s.codice = null; save(); fondiPiano(); closeSheet(); route();
-      toast('Slot svuotato: l\'orario resta');
+      toast('Ricetta tolta: il pasto e l\'ora restano');
     };
     w.append(sv);
   }
 
   const via = el('button', 'btn wide');
   via.style.marginTop = '8px';
-  via.textContent = 'Togli questa ricetta dal giorno';
+  // questo toglie il PASTO, cioe' lo slot intero con la sua ora: e' un'altra
+  // cosa dal togliere la ricetta che ci sta dentro, ed e' il bottone sopra
+  via.textContent = 'Togli questo pasto dal giorno';
   via.onclick = () => {
-    if (!confirm(`Tolgo "${s.slot}" da ${g.giorno}?`)) return;
+    if (!confirm(`Tolgo "${s.slot}" da ${g.giorno}? Sparisce il pasto, con la sua ora.`)) return;
     g.pasti.splice(si, 1);
-    save(); fondiPiano(); closeSheet(); route(); toast('Ricetta tolta');
+    save(); fondiPiano(); closeSheet(); route(); toast('Pasto tolto');
   };
   w.append(via);
   sheet(w);

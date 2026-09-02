@@ -2573,6 +2573,22 @@ linea passa esattamente li':
 | "Cambia la ricetta", "Scala tutta la ricetta" | "pasti spuntati", "giorni senza pasti" |
 | il passo del piano, che ora si chiama **"Le tue ricette"** | i promemoria del calendario |
 
+**Il pasto e' il contenitore, la ricetta il contenuto**, e in un punto la
+distinzione era saltata: nell'editor della settimana il bottone diceva
+*"Aggiungi una ricetta a lunedi"* e apriva un foglio intitolato *"Nuova
+ricetta"* — ma quel foglio chiede **un nome e un'ora**, cioe' costruisce un
+pasto. La ricetta la scegli dopo, toccandolo. Adesso: *"Aggiungi un pasto"*,
+*"Nuovo pasto"*, e sotto il campo del nome la riga che chiude il cerchio —
+*"e' il momento della giornata, non il piatto"*.
+
+Nello stesso giro i due bottoni in fondo alla scheda di un pasto, che facevano
+due cose diverse chiamandole quasi uguale: **"Togli solo la ricetta, lascia il
+pasto"** (l'ora resta) e **"Togli questo pasto dal giorno"** (sparisce lo slot).
+
+E la parola **"slot"** e' sparita dai testi: e' una parola del codice — dentro
+i dati resta `pasti[].slot`, che i backup gia' esportati non devono vedersi
+cambiare sotto — ma nell'interfaccia quel posto si chiama pasto.
+
 **Nessun sed alla cieca**, e per due ragioni concrete trovate strada facendo:
 "pastigl**ia**" contiene "pasti", e "pasto fuori piano" sarebbe diventato
 "ricetta fuori piano", che e' sbagliato. Cinquantotto stringhe riviste una a
@@ -2689,6 +2705,24 @@ sostituzioni di ingrediente di quello slot: erano grammi e alimenti di un'altra
 ricetta, e tenerli vorrebbe dire applicare a un pasto le correzioni fatte su un
 altro. La scala si scrive come porzioni del pasto nuovo, che e' lo stesso strato
 gia' usato dal moltiplicatore: non serviva inventarne un altro.
+
+### Un'ora non si scrive col tastierino
+
+Il campo dell'ora era `type="text"` con `inputmode="numeric"`, e su iOS quel
+tastierino **non ha i due punti**: si poteva digitare "1630" e nient'altro, e
+il controllo rifiutava. Un campo che chiede un formato che la tastiera che
+apre non sa produrre.
+
+Adesso e' `type="time"`, cioe' il selettore a rotella di sistema: l'ora si
+sceglie e il valore torna sempre in `HH:MM`, che e' esattamente quello che
+`oraMinuti()` si aspetta.
+
+Una trappola che sarebbe passata inosservata: **il campo nativo, con un valore
+che non e' `HH:MM`, si presenta vuoto e non dice niente**. Gli orari scritti a
+mano nelle versioni precedenti potevano essere "9:15", e aprendo il pasto per
+cambiare qualcos'altro il campo sarebbe apparso vuoto — salvando, l'ora
+spariva. `oraValida()` normalizza in ingresso: "9:15" e "9.5" diventano
+"09:15" e "09:05", "24:00" resta vuoto perche' non e' un'ora.
 
 ### I pasti del giorno vanno in ordine di orario
 
@@ -3202,6 +3236,15 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   tre sedute: una giornata storta sposterebbe il verdetto da sola
 - Non presentare le otto settimane come una soglia misurata: e' pratica comune,
   come le costanti di Banister
+- Non chiamare "ricetta" quello che si aggiunge a un giorno: quello e' un
+  **pasto**, cioe' un nome e un'ora, e la ricetta ci va dentro dopo. E non
+  usare "slot" nei testi: e' una parola del codice
+- Non usare `inputmode="numeric"` per un'ora: quel tastierino su iOS non ha i
+  due punti, quindi il campo chiede un formato che la tastiera che apre non sa
+  produrre. `type="time"` apre il selettore e restituisce sempre `HH:MM`
+- Non passare a `<input type="time">` un valore che non sia `HH:MM`: il campo
+  si presenta **vuoto senza dire niente**, e salvando cancella l'ora che
+  c'era. Gli orari vecchi passano da `oraValida()`
 - Non rinominare "pasto" in "ricetta" con una sostituzione globale:
   "pastiglia" contiene "pasti", e "pasto fuori piano" non e' una ricetta. E
   non toccare le chiavi dei dati per un cambio di etichetta: `D.pasti`,
