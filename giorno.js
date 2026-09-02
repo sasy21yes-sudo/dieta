@@ -147,8 +147,14 @@ function slotsGiorno(k) {
 }
 
 function pastoDelGiorno(sid, k) {
+  const base = codiceBase(sid, k);
   const alt = S.log[k]?.pastoSwap?.[sid];
-  return alt && D.pasti[alt] ? alt : codiceBase(sid, k);
+  /* Il confronto `alt !== base` va fatto **anche in lettura**, non solo
+     quando la sostituzione si scrive: se dopo averla messa il piano viene
+     riassegnato proprio a quella ricetta, la sostituzione non sostituisce
+     piu' niente — ma la scritta "al posto di" resterebbe li' a dichiarare un
+     cambio che non c'e' piu'. */
+  return (alt && alt !== base && D.pasti[alt]) ? alt : base;
 }
 
 /**
@@ -180,7 +186,7 @@ function mettePastoSwap(sid, k, nuovo, scala = 1) {
       }
     }
   }
-  if (!Object.keys(d.pastoSwap).length) delete d.pastoSwap;
+  pulisciStrati(d, sid);
   // se quel pasto era gia' spuntato, quello che hai mangiato e' la ricetta
   // NUOVA: la copia congelata va rifatta, o resterebbe quella di prima
   if (d.pasti?.[code]) congelaPasto(code, k);
@@ -244,6 +250,25 @@ function aggiungiAlPasto(code, k, alimento, qta, prod) {
 }
 
 /** Toglie una riga aggiunta, e con lei le sue quantita' e sostituzioni. */
+/**
+ * Toglie gli strati rimasti vuoti.
+ *
+ * `d.porzioni[sid] = {}` o `d.swap[sid] = {}` non cambiano nessun conto — chi
+ * li legge guarda sempre `Object.keys(...).length` — ma sono uno stato che non
+ * dovrebbe esistere, e basta un punto che li legga come "c'e' qualcosa" per
+ * far comparire un "modificato" su un pasto che nessuno ha toccato. Si
+ * chiudono dove nascono, invece di sperare che nessuno li guardi male.
+ */
+function pulisciStrati(d, sid) {
+  for (const nome of ['porzioni', 'swap', 'aggiunti']) {
+    const o = d[nome]; if (!o) continue;
+    const v = o[sid];
+    if (v && (Array.isArray(v) ? !v.length : !Object.keys(v).length)) delete o[sid];
+    if (!Object.keys(o).length) delete d[nome];
+  }
+  if (d.pastoSwap && !Object.keys(d.pastoSwap).length) delete d.pastoSwap;
+}
+
 function togliDalPasto(code, k, slot) {
   const d = day(k);
   const id = String(slot).replace(/^agg:/, '');
@@ -254,6 +279,7 @@ function togliDalPasto(code, k, slot) {
   }
   if (d.porzioni?.[code]) delete d.porzioni[code][slot];
   if (d.swap?.[code]) delete d.swap[code][slot];
+  pulisciStrati(d, code);
   save();
 }
 
@@ -378,7 +404,7 @@ function metteSwap(code, k, slot, nuovo, qta, prod) {
     if (d.porzioni?.[code]) delete d.porzioni[code][slot];
   }
   if (!Object.keys(d.swap[code]).length) delete d.swap[code];
-  if (d.porzioni?.[code] && !Object.keys(d.porzioni[code]).length) delete d.porzioni[code];
+  pulisciStrati(d, code);
   save();
 }
 
@@ -476,6 +502,7 @@ function sheetPorzioni(k, code) {
   const tieni = () => {
     if (Object.keys(stato).length) d.porzioni[code] = stato;
     else delete d.porzioni[code];
+    pulisciStrati(d, code);
     save();
   };
 
@@ -595,6 +622,7 @@ function sheetPorzioni(k, code) {
   salva.onclick = () => {
     if (Object.keys(stato).length) d.porzioni[code] = stato;
     else delete d.porzioni[code];
+    pulisciStrati(d, code);
     save(); closeSheet(); route(); toast('Porzioni aggiornate');
   };
   w.append(salva);

@@ -502,11 +502,27 @@ function chartStack(o) {
   /* In un'area impilata l'occhio legge le proporzioni, non i valori: la media
      di ogni fascia e' il numero che poi si va comunque a cercare. */
   {
-    const pezzi = o.serie.map(se => {
-      const vv = se.vals.filter(x => x != null && !isNaN(x));
-      return vv.length
-        ? '<span>' + esc(se.nome) + ' <b>' + nf(avg(vv), o.dec ?? 0) + '</b></span>' : '';
-    }).filter(Boolean);
+    /* Su un grafico disegnato in percentuale la media in valore assoluto da
+       sola non basta — e viceversa: la quota dice **com'e' fatta** la giornata,
+       il numero dice **quanto e' grande**. Due giornate con la stessa torta
+       possono essere una a 180 g di carboidrati e l'altra a 320, ed e' proprio
+       la cosa che questa carta non faceva vedere. */
+    /* Le medie si fanno **sugli stessi giorni**, e sono quelli in cui c'e'
+       qualcosa: le serie riportano `0` per i giorni vuoti, quindi mediarle su
+       tutto il periodo mentre il totale si media solo sui giorni pieni dava
+       tre quote che sommate facevano 70% invece di 100 — e tre medie in kcal
+       piu' basse del vero di tutto il rapporto fra i due denominatori. */
+    const tot = o.days.map((_, i) => o.serie.reduce((a, se) => a + (se.vals[i] || 0), 0));
+    const pieni = tot.map((x, i) => x > 0 ? i : -1).filter(i => i >= 0);
+    const media = vals => pieni.length
+      ? pieni.reduce((a, i) => a + (vals[i] || 0), 0) / pieni.length : 0;
+    const totMedia = media(tot);
+    const pezzi = pieni.length ? o.serie.map(se => {
+      const m = media(se.vals);
+      const q = (o.pct && totMedia > 0) ? ` <em>${nf(m / totMedia * 100, 0)}%</em>` : '';
+      return '<span>' + esc(se.nome) + ' <b>' + nf(m, o.dec ?? 0)
+        + (o.pct ? ' kcal' : '') + '</b>' + q + '</span>';
+    }) : [];
     if (pezzi.length) {
       const r = el('div', 'riep');
       r.innerHTML = '<span class="fino">media del periodo</span>' + pezzi.join('');

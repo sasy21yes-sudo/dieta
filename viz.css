@@ -1573,3 +1573,17 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .gd-prog-c .go{color:var(--pine);font-size:10.5px;margin-top:6px;
   letter-spacing:.04em}
 .gd-prog-c.fatto{opacity:.72}
+/* la quota accanto alla media: dice com'e' fatta la giornata, mentre il
+   numero dice quanto e' grande. Piu' piccola perche' e' la seconda lettura */
+.riep em{font-style:normal;font-size:11px;color:var(--ink-3);margin-left:1px}
+/* il numero sotto la barra: le barre dicono quale giorno, il numero di quanto */
+.pl-d .k{font-family:var(--mono);font-size:9.5px;color:var(--ink-2);
+  line-height:1;letter-spacing:-.02em}
+.pl-d.basso .k{color:var(--alert);font-weight:600}
+.pl-d.sotto .k,.pl-d.sopra .k{color:var(--amber)}
+.pl-d.vuoto .k{color:var(--ink-3)}
+.pl-g{height:84px}
+/* la media porta il colore del suo verdetto */
+.pl-leg .bad{color:var(--alert);font-weight:600}
+.pl-leg .warn{color:var(--amber)}
+.pl-leg .ok{color:var(--pine)}

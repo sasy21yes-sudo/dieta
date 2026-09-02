@@ -123,6 +123,18 @@ function normalize() {
     if (!giornoPieno(d)) { delete S.log[k]; continue; }
     d.pasti ||= {}; d.extra ||= []; d.misure ||= {}; d.integratori ||= {};
     d.porzioni ||= {};
+    /* Gli strati svuotati e non cancellati: `porzioni: { c1: {} }` non cambia
+       nessun conto ma e' uno stato che non dovrebbe esistere, ed e' il tipo
+       di residuo da cui nasce un "modificato" su un pasto che nessuno ha
+       toccato. Adesso si chiudono dove nascono; questi sono quelli gia' in
+       giro, e si buttano una volta all'avvio. */
+    for (const nome of ['porzioni', 'swap', 'aggiunti', 'pastoSwap', 'fatti']) {
+      const o = d[nome]; if (!o || typeof o !== 'object') continue;
+      for (const [ch, v] of Object.entries(o))
+        if (v == null || (Array.isArray(v) ? !v.length
+          : typeof v === 'object' && !Object.keys(v).length)) delete o[ch];
+      if (!Object.keys(o).length && nome !== 'porzioni') delete d[nome];
+    }
   }
 }
 

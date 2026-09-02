@@ -626,6 +626,14 @@ function viewPiano(v) {
   }
   v.append(cp);
 
+  /* Le calorie giorno per giorno stanno **in cima al piano**, non solo dentro
+     il passo della settimana: chi apre il piano vuole sapere prima di tutto se
+     quello che ha costruito regge, e per saperlo non deve entrare in un passo. */
+  if (usaPiano() && typeof cardControlloPiano === 'function') {
+    const cc = cardControlloPiano(today(), true);
+    if (cc) v.append(cc);
+  }
+
   /* --- che cos'e' un piano --- */
   const passi = pianoPassi();
   const miei = passi.filter(x => x.mio).length;

@@ -582,6 +582,9 @@ function cardControlloPiano(k = today(), corta = false) {
   box.append(el('div', 'eyebrow', 'Il piano regge?'));
 
   /* --- la riga dei sette giorni: la si legge prima di leggere --- */
+  /* Le barre dicono **quale** giorno e' storto; il numero sotto dice **di
+     quanto**. Senza il numero bisogna toccare ogni barra per saperlo, e su una
+     schermata che si legge scorrendo quel tocco non lo fa nessuno. */
   const max = Math.max(c.tgt || 0, ...c.giorni.map(g => g.kcal)) || 1;
   const gr = el('div', 'pl-g');
   for (const g of c.giorni) {
@@ -590,6 +593,7 @@ function cardControlloPiano(k = today(), corta = false) {
     const b = el('i');
     b.style.height = g.vuoto ? '3px' : Math.max(4, g.kcal / max * 52).toFixed(0) + 'px';
     col.append(b);
+    col.append(el('span', 'k', g.vuoto ? '—' : nf(g.kcal)));
     col.append(el('span', 'n', g.giorno.slice(0, 2).toLowerCase()));
     gr.append(col);
   }
@@ -600,8 +604,17 @@ function cardControlloPiano(k = today(), corta = false) {
     rif.style.bottom = (c.tgt / max * 52 + 16).toFixed(0) + 'px';
     gr.style.position = 'relative';
     gr.append(rif);
+    /* La media porta il colore del suo stato: e' il numero che riassume la
+       settimana, e lasciarlo grigio accanto a sette barre colorate vorrebbe
+       dire nascondere proprio il verdetto. */
+    const fuoriMedia = Math.abs(c.scartoMedia ?? 0) > 0.08;
+    const bassaMedia = c.media < c.pav.pavimento;
+    const cls = bassaMedia ? 'bad' : fuoriMedia ? 'warn' : 'ok';
     box.append(el('div', 'pl-leg',
-      `<span>- - target ${nf(c.tgt)}</span><span>media ${nf(c.media)} kcal</span>`));
+      `<span>- - target ${nf(c.tgt)}</span>`
+      + `<span class="${cls}">media ${nf(c.media)} kcal${
+          c.scartoMedia != null && Math.abs(c.scartoMedia) >= 0.01
+            ? ` (${c.scartoMedia > 0 ? '+' : ''}${nf(c.scartoMedia * 100, 0)}%)` : ''}</span>`));
   }
 
   /* Nel passo della settimana ogni giorno ha gia' la sua pastiglia: una carta

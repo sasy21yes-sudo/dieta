@@ -1126,6 +1126,16 @@ invece di consegnare una soglia calata dall'alto.
 chi ha scelto "tieni solo l'obiettivo, non i target": l'obiettivo *e'* una
 posizione rispetto a quello che spendi.
 
+**Le calorie di ogni giorno si leggono, non si toccano.** Le barre dicono
+*quale* giorno e' storto; il numero sotto dice *di quanto*, e senza quello
+bisognava toccare ogni barra per saperlo — su una schermata che si legge
+scorrendo, quel tocco non lo fa nessuno. La media porta il colore del suo
+verdetto e lo scarto percentuale, perche' e' il numero che riassume la
+settimana e lasciarlo grigio accanto a sette barre colorate vorrebbe dire
+nascondere proprio la conclusione. E la carta sta **in cima al piano**, non
+solo dentro il passo della settimana: chi apre il piano vuole sapere prima di
+tutto se quello che ha costruito regge.
+
 **E il verdetto sta sul giorno, non in cima alla pagina.** Era la prima
 versione, ed era il posto sbagliato: un giorno da 600 kcal nasce **mentre lo
 componi**, e una carta di riepilogo in testa la vedi quando risali — cioe'
@@ -2282,6 +2292,25 @@ Dettaglio di lingua, non di codice: le preposizioni articolate stanno nel
 periodo (`confronto`, `su`, `primaNome`). "Rispetto a la settimana prima" e'
 il genere di sbavatura che fa sembrare l'app tradotta da un'altra.
 
+### Una quota non dice quanto, un numero non dice come
+
+"Da dove vengono le calorie" e' disegnato **in percentuale** — e' il suo
+mestiere, dice com'e' fatta la giornata — ma la riga della media sotto
+riportava i valori grezzi in kcal. Due letture diverse nella stessa carta, e
+nessuna delle due completa: la quota non dice quanto e' grande la giornata, il
+numero non dice com'e' divisa. Due giornate con la stessa torta possono essere
+una a 180 g di carboidrati e l'altra a 320.
+
+Adesso la riga porta tutti e due: `Carboidrati 1120 kcal 48%`.
+
+Nel farlo e' saltato fuori un errore di denominatore che c'era da sempre: le
+serie riportano **zero** nei giorni senza dati, e la media di ogni fascia si
+faceva su tutto il periodo mentre il totale si mediava solo sui giorni pieni.
+Su venti giorni registrati in novanta le tre quote sommavano **70%** invece di
+100, e le medie in kcal erano piu' basse del vero di tutto il rapporto fra i
+due denominatori — 364 kcal di proteine invece di 520. Adesso numeratore e
+denominatore guardano gli stessi giorni.
+
 ### Tutti i macro, non solo due
 
 Per molto tempo l'app contava bene le calorie e le proteine, teneva d'occhio le
@@ -2774,6 +2803,35 @@ diversa. La soglia del sole pieno sale a mezzogiorno, e il nome
 ("Pre-nanna" e' pre-nanna anche alle 21), l'ora e' un ripiego ragionevole per
 gli slot chiamati "Post workout". Se non dicono niente ne' l'uno ne' l'altra
 resta il piatto — meglio un'icona neutra di una sbagliata.
+
+### Le sostituzioni fantasma
+
+Segnalato che "ogni tanto escono scritte di sostituzione dove in realta' non e'
+avvenuta o e' stata annullata". La causa piu' probabile e' **quella gia'
+chiusa**: fino alla versione precedente il diario era indicizzato sul codice
+della ricetta, quindi sostituire il pasto delle 11 metteva l'etichetta anche a
+quello delle 16:30 — che e' esattamente lo screenshot arrivato con la
+segnalazione. La migrazione **conserva** quel doppione, perche' e' quello che i
+totali di quei giorni hanno registrato, ma da adesso i due si annullano
+separatamente.
+
+I percorsi di annullamento sono stati ripercorsi uno per uno — sostituzione
+del pasto e ritorno al piano, sostituzione con scala, sostituzione di un
+ingrediente, cestino e "rimettilo", alimento aggiunto e tolto — e l'etichetta
+sparisce sempre. Quello che si e' trovato sono due stati che *potrebbero*
+produrla, e sono stati chiusi:
+
+- **il confronto si fa anche in lettura.** `pastoDelGiorno()` scartava una
+  sostituzione uguale alla ricetta del piano solo quando la si scriveva: se il
+  piano veniva riassegnato *dopo* proprio a quella ricetta, la sostituzione non
+  sostituiva piu' niente e la scritta restava li' a dichiarare un cambio che
+  non c'era;
+- **gli strati svuotati non restano in giro.** `porzioni: { c1: {} }` non
+  cambia nessun conto — chi li legge guarda sempre `Object.keys().length` — ma
+  e' uno stato che non dovrebbe esistere, e basta un punto che lo legga come
+  "c'e' qualcosa" perche' compaia un "modificato" su un pasto mai toccato.
+  Adesso si chiudono dove nascono (`pulisciStrati()`), e quelli gia' in giro si
+  buttano all'avvio.
 
 ### La sostituzione si applica
 
@@ -3434,6 +3492,15 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non aggiungere un alimento a un pasto dentro `extra`: quello e' il fuori
   piano e si conta a parte, e il totale del pasto continuerebbe a dire il
   numero della ricetta
+- Non decidere se una sostituzione e' attiva solo quando la si scrive: il
+  piano puo' cambiare dopo, e "al posto di X" resta a dichiarare un cambio che
+  non c'e' piu'. Il confronto va fatto anche in lettura
+- Non lasciare in giro strati svuotati (`porzioni: { c1: {} }`): non cambiano
+  i conti, ma sono lo stato da cui nasce un "modificato" su un pasto che
+  nessuno ha toccato
+- Non mediare una serie su tutto il periodo e il suo totale sui soli giorni
+  pieni: le serie riportano zero nei giorni vuoti, e le quote sommano 70%
+  invece di 100
 - Non indicizzare il diario sul codice della ricetta: due pasti con la stessa
   ricetta nello stesso giorno — le mandorle alle 11 e alle 16:30 — si
   ritrovavano a condividere spunta, sostituzioni e porzioni. La chiave e' il
