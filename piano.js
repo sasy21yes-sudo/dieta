@@ -1260,14 +1260,40 @@ function sezPasti(v) {
   b.onclick = () => sheetPasto(null);
   v.append(b);
 
+  /* **La ricerca.** Con una ventina di ricette l'elenco e' gia' piu' lungo
+     dello schermo, e trovare "pasta e ceci" voleva dire scorrere. Cerca nel
+     nome e negli **ingredienti**, che e' la domanda vera quando si compone un
+     giorno: non "come si chiama" ma "cosa ho con dentro il tofu".
+     Il filtro non passa da `route()`: ridisegnare la vista a ogni lettera fa
+     perdere il fuoco al campo e su un telefono chiude la tastiera. */
+  const cer = el('div', 'field');
+  cer.style.margin = '12px 0 4px';
+  cer.innerHTML = '<input type="text" id="pt-cerca" placeholder="Cerca una ricetta '
+    + 'o un ingrediente\u2026" autocomplete="off">';
+  v.append(cer);
+  const conte = el('div');
+  v.append(conte);
+  const inp = cer.querySelector('input');
+
+  const cerca = (pa, q) => {
+    if (!q) return true;
+    const testo = [pa.nome || '', ...(pa.ingredienti || []).map(i => i.alimento)]
+      .join(' ').toLowerCase();
+    return q.split(/\s+/).every(t => testo.includes(t));
+  };
+
   const miei = Object.keys(p.pasti);
-  const lista = (titolo, ids, sub) => {
-    if (!ids.length) return;
+  const lista = (titolo, ids, sub, q) => {
+    const trovati = ids.filter(id => {
+      const pa = D.pasti[id] || DBASE.pasti[id];
+      return pa && cerca(pa, q);
+    });
+    if (!trovati.length) return 0;
     const c = el('div', 'card');
-    c.append(el('h2', 'sec', titolo));
+    c.append(el('h2', 'sec', titolo + ' (' + trovati.length + ')'));
     c.lastChild.style.marginTop = '0';
     if (sub) c.append(el('p', 'muted', sub));
-    for (const id of ids.sort()) {
+    for (const id of trovati.sort()) {
       /* Con il piano vuoto D.pasti contiene SOLO i pasti tuoi: i ventiquattro
          di base non sono fusi dentro. Cercarli li' dava undefined e il passo
          "Come li combini" andava in crash all'apertura — cioe' esattamente
@@ -1281,11 +1307,22 @@ function sezPasti(v) {
       r.onclick = () => sheetPasto(id);
       c.append(r);
     }
-    v.append(c);
+    conte.append(c);
+    return trovati.length;
   };
-  lista(`Composti da te (${miei.length})`, miei);
-  lista(`Nel piano di base (${Object.keys(DBASE.pasti).length})`,
-        Object.keys(DBASE.pasti), 'Toccane uno per usarlo come punto di partenza.');
+
+  const disegna = () => {
+    const q = inp.value.trim().toLowerCase();
+    conte.innerHTML = '';
+    const n = lista('Composte da te', miei, null, q)
+      + lista('Nel piano di base', Object.keys(DBASE.pasti),
+              'Toccane una per usarla come punto di partenza.', q);
+    if (!n) conte.append(el('p', 'hint', q
+      ? 'Nessuna ricetta con "' + esc(q) + '" nel nome o fra gli ingredienti.'
+      : 'Non hai ancora nessuna ricetta. Con il bottone qui sopra ne componi una.'));
+  };
+  inp.oninput = disegna;
+  disegna();
 }
 
 function sheetPasto(id) {
@@ -1815,8 +1852,28 @@ function cambiaSlot(gi, si) {
     return;
   }
 
+  /* Anche qui la ricerca, ed e' l'elenco piu' lungo dell'app: ventiquattro
+     ricette, e ci si arriva sapendo gia' cosa si vuole mettere. Cerca nel
+     nome e negli ingredienti, come il passo delle ricette. */
+  const cerca = el('div', 'field');
+  cerca.innerHTML = '<input type="text" id="cs-cerca" autocomplete="off" '
+    + 'placeholder="Cerca una ricetta o un ingrediente…">';
+  w.append(cerca);
+  const elenco = el('div');
+  w.append(elenco);
+  const testoRic = pa => [pa.nome || '',
+    ...(pa.ingredienti || []).map(i => i.alimento)].join(' ').toLowerCase();
+
+  const disegnaRic = () => {
+  const q = (cerca.querySelector('input').value || '').trim().toLowerCase();
+  const par = q ? q.split(/\s+/) : [];
+  elenco.innerHTML = '';
+  let n = 0;
   for (const [code, pa] of Object.entries(D.pasti)
       .sort((a, b) => (a[1].nome || '').localeCompare(b[1].nome || ''))) {
+    const t = testoRic(pa);
+    if (!par.every(x => t.includes(x))) continue;
+    n++;
     const r = el('button', 'prod');
     /* Dove porterebbe questa ricetta, su questo giorno.
        La pastiglia compare **solo se cambia lo stato** rispetto a com'e' il
@@ -1836,10 +1893,17 @@ function cambiaSlot(gi, si) {
         sgD ? ` · il giorno farebbe ${nf(dopo)} kcal` : ''}</div></div>
       <div class="kc">${nf(pa.macro.kcal)}${code === s.codice ? '<br><span class="mt">attuale</span>' : ''}</div>`;
     r.onclick = () => {
-      s.codice = code; save(); fondiPiano(); closeSheet(); route(); toast('Slot aggiornato');
+      s.codice = code; save(); fondiPiano(); closeSheet(); route(); toast('Pasto aggiornato');
     };
-    w.append(r);
+    elenco.append(r);
   }
+  if (!n) elenco.append(el('p', 'hint',
+    'Nessuna ricetta con quelle parole nel nome o fra gli ingredienti. '
+    + "Se e' un alimento solo, qui sotto lo metti senza farne una ricetta."));
+  };
+  cerca.querySelector('input').oninput = disegnaRic;
+  disegnaRic();
+
   w.append(sezAlimento());
 
   /* L'ora si imposta qui, e cambiandola il pasto si rimette al posto giusto

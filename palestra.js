@@ -3194,7 +3194,9 @@ function sezGymEsercizi(v) {
         <div class="mt">${esc(e.attrezzo)} · ${(e.primari || []).map(nomeM).join(', ')
           || 'nessun gruppo'}</div></div>
         ${ruolo === 'secondario' ? '<span class="pill">secondario</span>' : ''}
-        ${mio.has(e.id) ? '<span class="pill ok">tuo</span>' : ''}`;
+        ${mio.has(e.id) ? '<span class="pill ok">tuo</span>' : ''}
+        ${esecDi(e.id) ? '<span class="pill esec" title="Ci sono i fotogrammi'
+          + ' dell\'esecuzione">&#9654;</span>' : ''}`;
       // sempre la scheda: da li' si corregge e si guarda l'esecuzione, e non
       // serve piu' sapere in anticipo se quell'esercizio e' tuo o del catalogo
       r.onclick = () => sheetSchedaEsercizio(e.id);

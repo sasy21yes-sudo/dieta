@@ -3072,6 +3072,40 @@ si pone piu': `ordinaSlotOrari()` e' idempotente e non tocca le voci senza ora,
 quindi rifonderlo mille volte da' sempre la stessa giornata, con i trascinamenti
 a mano ancora dove li avevi lasciati.
 
+### Un elenco lungo vuole un campo di ricerca
+
+Ventiquattro ricette e cinquantanove esercizi non si scorrono: si cercano. Il
+campo c'era gia' in **Gym > Esercizi** e mancava nei due posti in cui l'elenco
+delle ricette e' piu' lungo — il passo **Le tue ricette** e il foglio in cui si
+sceglie la ricetta di un pasto.
+
+Due decisioni:
+
+- **si cerca anche negli ingredienti.** La domanda che porta li' non e' "come
+  si chiama" ma "cosa ho con dentro il tofu", e un nome come "Bowl completa"
+  non risponde. Le parole si contano tutte: "ceci forno" trova la ricetta che
+  ha tutti e due, in qualunque ordine.
+- **il filtro non passa da `route()`.** Ridisegnare la vista a ogni lettera fa
+  perdere il fuoco al campo, e su un telefono questo chiude la tastiera. E'
+  la stessa regola gia' scritta per l'elenco degli esercizi, e vale ovunque
+  ci sia un campo che filtra mentre scrivi.
+
+Quando non trova niente lo dice, e nel foglio del pasto aggiunge la strada
+che resta: **"se e' un alimento solo, qui sotto lo metti senza farne una
+ricetta"** — cioe' proprio la sezione che sta due dita piu' giu'.
+
+### L'elenco degli esercizi dice quali hanno l'esecuzione
+
+"Come si esegue" c'e' solo per gli esercizi collegati ai fotogrammi del
+catalogo pubblico, e l'unico modo di sapere quali erano era **aprirli uno per
+uno**. Ora la riga porta una pastiglia `▶` quando `esecDi()` risponde, cosi'
+si vede scorrendo.
+
+E' un `<span>`, non un bottone: la riga **e' gia'** un `<button>`, e un bottone
+dentro un bottone non e' HTML valido — il tocco finirebbe a volte su uno e a
+volte sull'altro. La pastiglia dice che c'e' qualcosa da vedere; a vederlo ci
+si va dalla scheda, come prima.
+
 ### Esercizi: una pagina, non un foglio
 
 "Esercizi" apriva un foglio con dentro solo i propri, e i 59 del catalogo non
@@ -3533,6 +3567,14 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   tieni fermo, e le tre risposte vanno mostrate tutte e tre
 - Non inventare un equivalente dove il vincolo non esiste (proteine di un olio):
   `null` e una riga che lo dice valgono piu' di un numero enorme
+- Non far filtrare un elenco passando da `route()`: ridisegnare la vista a
+  ogni lettera fa perdere il fuoco al campo, e sul telefono chiude la
+  tastiera. Il filtro ridisegna solo il suo contenitore
+- Non cercare solo nel nome di una ricetta: la domanda e' "cosa ho con dentro
+  il tofu", e "Bowl completa" non risponde. Si cerca anche negli ingredienti
+- Non mettere un `<button>` dentro una riga che e' gia' un `<button>`: non e'
+  HTML valido e il tocco finisce a volte su uno e a volte sull'altro. Per
+  segnare qualcosa su una riga toccabile serve uno `<span>`
 - Non aprire una seconda schermata per gli alimenti: "Cosa mangi" e la voce di
   menu sono la stessa `elencoAlimenti()`. Due elenchi che si somigliano sono
   peggio di uno lungo
