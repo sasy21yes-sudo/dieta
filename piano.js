@@ -94,6 +94,48 @@ function targetNeutro() {
  * sceglie il piano resta vuoto e i suoi valori si calcolano dal suo profilo.
  * Chi sceglie l'esempio se lo prende tutto, ed e' suo da modificare.
  */
+/* ==================================================== l'identita' di un pasto
+ *
+ * **Il diario era indicizzato sul codice della RICETTA, non sul pasto.** Due
+ * pasti diversi che usano la stessa ricetta — le mandorle allo spuntino delle
+ * 11 e a quello delle 16:30, che e' una cosa normalissima — condividevano
+ * quindi tutto: la spunta, le sostituzioni, le porzioni, gli alimenti
+ * aggiunti. Spuntando quello della mattina si spuntava anche quello del
+ * pomeriggio; sostituendo la ricetta in uno la si sostituiva in tutti e due.
+ * Segnalato con uno screenshot che lo mostra su due righe della stessa
+ * giornata.
+ *
+ * La chiave giusta e' il **pasto**, che e' il posto nella giornata, e ogni
+ * pasto ha bisogno di un'identita' che non dipenda ne' dalla ricetta che ci
+ * sta dentro ne' dalla sua posizione — perche' i pasti si riordinano, si
+ * rinominano e cambiano ricetta di continuo.
+ *
+ * `idPasto()` la assegna a chi non ce l'ha. La forma `g<giorno>-<posizione>`
+ * vale solo come punto di partenza per il piano di base, che e' un file
+ * statico e quindi ha posizioni stabili: appena l'utente tocca la settimana lo
+ * strato in `S.piano` viene scritto con gli id dentro, e da quel momento sono
+ * suoi e non si muovono piu'.
+ */
+function idPasto(gi, si) { return 'g' + gi + '-' + si; }
+
+/**
+ * Mette un id a ogni pasto che non ce l'ha, e lo **salva** se il piano e'
+ * gia' dell'utente. L'ordine per orario si applica dopo: altrimenti la
+ * posizione da cui nasce l'id cambierebbe a ogni fusione.
+ */
+function assegnaIdPasti() {
+  const p = piano();
+  let scritto = false;
+  for (const [gi, g] of (D.settimana || []).entries()) {
+    for (const [si, sl] of (g.pasti || []).entries()) {
+      if (!sl.id) sl.id = idPasto(gi, si);
+      const mio = p.settimana?.[gi]?.pasti?.[si];
+      if (mio && !mio.id) { mio.id = sl.id; scritto = true; }
+    }
+  }
+  if (scritto) save();
+}
+
 function fondiPiano() {
   const p = piano();
   const esempio = S.settings?.pianoBase === 'esempio';
@@ -137,9 +179,12 @@ function fondiPiano() {
      voci senza ora, che restano dove le hai messe trascinandole. */
   D.settimana = D.settimana.map(g => ({
     ...g,
-    pasti: ordinaSlotOrari((g.pasti || []).map(x => ({ ...x }))),
+    pasti: (g.pasti || []).map(x => ({ ...x })),
     totali: totaliGiorno(g)
   }));
+  // prima l'id, che nasce dalla posizione, e solo dopo l'ordine per orario
+  assegnaIdPasti();
+  for (const g of D.settimana) g.pasti = ordinaSlotOrari(g.pasti);
 }
 
 /**
@@ -1617,7 +1662,9 @@ function nuovoSlot(gi) {
     if (!nome) { toast('Serve un nome'); return; }
     const ora = $('#ns-ora').value.trim();
     if (ora && oraMinuti(ora) == null) { toast('L\'ora si scrive cosi\': 16:30'); return; }
-    g.pasti.push({ slot: nome, ora, codice: null });
+    // un id vero e non derivato dalla posizione: questo pasto puo' essere
+    // spostato, e la sua identita' non deve seguirlo
+    g.pasti.push({ id: 'p' + uid(), slot: nome, ora, codice: null });
     ordinaSlotOrari(g.pasti);
     save(); fondiPiano(); closeSheet(); route();
     toast(ora ? 'Pasto aggiunto alle ' + ora

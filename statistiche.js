@@ -140,9 +140,11 @@ function statPasti(per) {
       ? slotsGiorno(k) : (D.settimana[dayIdx(k)]?.pasti || []);
     for (const sl of slots) {
       if (!sl.codice) continue;
-      const nome = log?.fatti?.[sl.codice]?.nome
+      const nome = log?.fatti?.[chiaveP(sl)]?.nome
         || D.pasti[sl.codice]?.nome || sl.codice;
-      const preso = !!log?.pasti?.[sl.codice];
+      // la spunta e' indicizzata sul PASTO: due pasti con la stessa ricetta
+      // sono due righe distinte anche qui
+      const preso = !!log?.pasti?.[chiaveP(sl)];
       for (const [mappa, chiave, etichetta] of
            [[perSlot, sl.slot, sl.slot], [perPasto, sl.codice, nome]]) {
         const r = mappa.get(chiave) || { chiave, nome: etichetta, previsti: 0, spuntati: 0 };

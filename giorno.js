@@ -55,14 +55,45 @@
  * ovunque — e' una funzione dichiarata, non un effetto collaterale — e li' la
  * stima di prima era il numero sbagliato, non un fatto storico.
  */
-function congelaPasto(code, k) {
+/* ================================================= la chiave e' il PASTO
+ *
+ * Tutti gli strati del giorno — spunta, sostituzioni, porzioni, alimenti
+ * aggiunti, ricetta congelata — sono indicizzati qui sotto con una chiave
+ * sola, e per molto tempo quella chiave e' stata **il codice della ricetta**.
+ * Funzionava finche' una ricetta compariva una volta sola nella giornata, e
+ * si rompeva nel caso piu' banale che esista: le stesse mandorle allo
+ * spuntino delle 11 e a quello delle 16:30. I due pasti condividevano tutto —
+ * spuntarne uno spuntava l'altro, sostituire in uno sostituiva in tutti e due.
+ *
+ * La chiave giusta e' l'**id del pasto**: il posto nella giornata, che non
+ * cambia ne' quando cambi la ricetta ne' quando lo sposti.
+ */
+const chiaveP = s => (s && (s.id || s.codice)) || null;
+
+/** Il pasto di quel giorno con quella chiave. */
+function pastoSlot(sid, k) {
+  return slotsGiorno(k).find(x => chiaveP(x) === sid) || null;
+}
+
+/**
+ * La ricetta che il **piano** prevede per quel pasto, prima di ogni
+ * sostituzione del giorno.
+ * Il ripiego serve ai registri scritti prima che i pasti avessero un id: li'
+ * la chiave *era* il codice della ricetta, e resta leggibile.
+ */
+function codiceBase(sid, k) {
+  const s = pastoSlot(sid, k);
+  return s ? s.codice : sid;
+}
+
+function congelaPasto(sid, k) {
   const d = day(k);
-  const eff = pastoDelGiorno(code, k);
+  const eff = pastoDelGiorno(sid, k);
   const p = D.pasti[eff];
   if (!p) return;
-  const slot = (D.settimana[dayIdx(k)]?.pasti || []).find(x => x.codice === code);
+  const slot = pastoSlot(sid, k);
   d.fatti ||= {};
-  d.fatti[code] = {
+  d.fatti[sid] = {
     code: eff, nome: p.nome || eff,
     slot: slot?.slot || '', ora: slot?.ora || '',
     ingredienti: (p.ingredienti || []).map(i => ({ ...i })),
@@ -70,12 +101,12 @@ function congelaPasto(code, k) {
     macro: p.ingredienti?.length ? null : { ...p.macro }
   };
 }
-function scongelaPasto(code, k) {
+function scongelaPasto(sid, k) {
   const d = S.log[k];
-  if (d?.fatti) { delete d.fatti[code]; if (!Object.keys(d.fatti).length) delete d.fatti; }
+  if (d?.fatti) { delete d.fatti[sid]; if (!Object.keys(d.fatti).length) delete d.fatti; }
 }
 /** La ricetta come era quando l'hai spuntata, se c'e'. */
-const pastoFatto = (code, k) => S.log[k]?.fatti?.[code] || null;
+const pastoFatto = (sid, k) => S.log[k]?.fatti?.[sid] || null;
 
 /**
  * La ricetta di quel pasto **in quel giorno**: la copia congelata se c'e',
@@ -87,10 +118,10 @@ const pastoFatto = (code, k) => S.log[k]?.fatti?.[code] || null;
  * ricetta di allora — altrimenti basta correggere il piano oggi perche' una
  * giornata mai toccata si metta a dichiarare "modificato +150 kcal".
  */
-function ricettaGiorno(code, k) {
-  const f = pastoFatto(code, k);
+function ricettaGiorno(sid, k) {
+  const f = pastoFatto(sid, k);
   if (f?.ingredienti?.length) return f;
-  return D.pasti[pastoDelGiorno(code, k)] || null;
+  return D.pasti[pastoDelGiorno(sid, k)] || null;
 }
 
 /**
@@ -106,17 +137,18 @@ function slotsGiorno(k) {
   const base = (D.settimana[dayIdx(k)]?.pasti || []).map(s => ({ ...s }));
   const f = S.log[k]?.fatti;
   if (!f) return base;
-  const visti = new Set(base.map(s => s.codice));
-  for (const [code, x] of Object.entries(f)) {
-    if (visti.has(code)) continue;
-    base.push({ codice: code, slot: x.slot || 'Registrato', ora: x.ora || '', fuoriPiano: true });
+  const visti = new Set(base.map(s => chiaveP(s)));
+  for (const [sid, x] of Object.entries(f)) {
+    if (visti.has(sid)) continue;
+    base.push({ id: sid, codice: x.code || sid, slot: x.slot || 'Registrato',
+      ora: x.ora || '', fuoriPiano: true });
   }
   return typeof ordinaSlotOrari === 'function' ? ordinaSlotOrari(base) : base;
 }
 
-function pastoDelGiorno(code, k) {
-  const alt = S.log[k]?.pastoSwap?.[code];
-  return alt && D.pasti[alt] ? alt : code;
+function pastoDelGiorno(sid, k) {
+  const alt = S.log[k]?.pastoSwap?.[sid];
+  return alt && D.pasti[alt] ? alt : codiceBase(sid, k);
 }
 
 /**
@@ -127,14 +159,14 @@ function pastoDelGiorno(code, k) {
  * di un'altra ricetta. Tenerli vorrebbe dire applicare a un pasto le
  * correzioni fatte su un altro.
  */
-function mettePastoSwap(code, k, nuovo, scala = 1) {
-  const d = day(k);
+function mettePastoSwap(sid, k, nuovo, scala = 1) {
+  const d = day(k), code = sid;
   d.pastoSwap ||= {};
   if (d.swap?.[code]) delete d.swap[code];
   if (d.porzioni?.[code]) delete d.porzioni[code];
   // e gli alimenti aggiunti a mano: erano stati messi dentro QUELLA ricetta
   if (d.aggiunti?.[code]) delete d.aggiunti[code];
-  if (!nuovo || nuovo === code) delete d.pastoSwap[code];
+  if (!nuovo || nuovo === codiceBase(sid, k)) delete d.pastoSwap[code];
   else {
     d.pastoSwap[code] = nuovo;
     // la scala si scrive come porzioni del pasto nuovo: e' lo stesso strato
@@ -155,7 +187,8 @@ function mettePastoSwap(code, k, nuovo, scala = 1) {
   save();
 }
 
-function ingredientiGiorno(code, k) {
+function ingredientiGiorno(sid, k) {
+  const code = sid;
   // la copia congelata vince sul piano: e' il punto unico da cui passano
   // Oggi, il totale del pasto, il foglio delle porzioni e `consumed()`
   const fatto = pastoFatto(code, k);
@@ -250,8 +283,8 @@ function unitaIngrediente(i) {
   return D.alimenti[i.alimento]?.unita || 'g';
 }
 
-function mealMGiorno(code, k) {
-  const eff = pastoDelGiorno(code, k);
+function mealMGiorno(sid, k) {
+  const code = sid, eff = pastoDelGiorno(sid, k);
   const sw = S.log[k]?.swap?.[code];
   const por = S.log[k]?.porzioni?.[code];
   const agg = S.log[k]?.aggiunti?.[code];
@@ -590,7 +623,7 @@ function sheetAggiungiAlPasto(k, code) {
      e' gia' quella, e chiederla sarebbe una domanda con una risposta sola. */
   const dest = { code };
   const slots = usaPiano()
-    ? slotsGiorno(k).filter(x => ricettaGiorno(x.codice, k)) : [];
+    ? slotsGiorno(k).filter(x => ricettaGiorno(chiaveP(x), k)) : [];
   if (!code && !slots.length) dest.code = null;      // resta il fuori piano
 
   const p = code ? ricettaGiorno(code, k) : null;
@@ -729,9 +762,10 @@ function sheetCambiaPasto(k, code) {
     + 'ricetta.'));
 
   if (eff !== code) {
+    const base = codiceBase(code, k);
     const box = el('div', 'card flat');
     box.append(el('div', 'eyebrow', 'Il piano qui prevedeva'));
-    box.append(el('div', 'muted', `<strong>${esc(D.pasti[code]?.nome || code)}</strong>`));
+    box.append(el('div', 'muted', `<strong>${esc(D.pasti[base]?.nome || base)}</strong>`));
     const via = el('button', 'btn wide');
     via.style.marginTop = '9px';
     via.textContent = 'Rimetti la ricetta del piano';
@@ -875,14 +909,14 @@ function sheetGiorno(k) {
   w.append(g);
 
   /* pasti */
-  const fatti = (plan.pasti || []).filter(s => d.pasti?.[s.codice]);
+  const fatti = (plan.pasti || []).filter(s => d.pasti?.[chiaveP(s)]);
   if (fatti.length || (d.extra || []).length) {
     w.append(el('div', 'eyebrow', 'Cosa hai mangiato'));
     w.lastChild.style.marginTop = '14px';
     for (const s of fatti) {
-      const p = D.pasti[s.codice]; if (!p) continue;
-      const m = mealMGiorno(s.codice, k);
-      const nMod = porzioniCambiate(s.codice, k);
+      const p = ricettaGiorno(chiaveP(s), k); if (!p) continue;
+      const m = mealMGiorno(chiaveP(s), k);
+      const nMod = porzioniCambiate(chiaveP(s), k);
       w.append(el('div', 'cmp-r',
         `<span>${esc(p.nome || s.codice)}${nMod ? ` <em class="mod-tag">${nMod} porzion${nMod === 1 ? 'e' : 'i'} cambiat${nMod === 1 ? 'a' : 'e'}</em>` : ''}</span>
          <span class="mono">${nf(m.kcal)}</span><span class="mono muted">${nf(m.p, 0)}P</span><span></span>`));

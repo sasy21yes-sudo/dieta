@@ -83,9 +83,14 @@ function icona(nome, { size = 20, col = 'currentColor', cls = '' } = {}) {
  * piatto per l'ignoto — stanno sul verde della casa, che e' il modo di dire
  * "questo e' un pasto" senza inventare un'ora che non si conosce.
  */
+/* Cinque momenti, cinque tinte che non si confondono: ambra all'alba, giallo
+   a mezzogiorno, arancio al tramonto, blu-viola di notte, indaco a letto. La
+   tazza dello spuntino di mattina prende un caramello caldo — vicino
+   all'ambra dell'alba, perche' e' la stessa parte della giornata, ma piu'
+   scuro e con una forma completamente diversa. */
 const SLOT_TINTE = {
   sunrise: '#E0913A', sun: '#E8B62C', sunset: '#DD6E37',
-  moon: '#6A6DD4', bed: '#4C57A0', coffee: '#9C6B3C', utensils: 'var(--pine)'
+  moon: '#6A6DD4', bed: '#4C57A0', coffee: '#B06A34', utensils: 'var(--pine)'
 };
 
 function slotIcona(slot, ora) {
@@ -99,7 +104,16 @@ function slotIcona(slot, ora) {
   else if (/colazione|breakfast/.test(n)) id = 'sunrise';
   else if (/pranzo|lunch/.test(n)) id = 'sun';
   else if (/spuntino|merenda|snack/.test(n))
-    id = h == null ? 'coffee' : h >= 15 ? 'sunset' : h >= 11 ? 'sun' : 'coffee';
+    /* Lo spuntino della mattina aveva **la stessa icona del pranzo** — il sole
+       pieno, perche' la soglia stava alle 11 — e in un elenco di cinque righe
+       due quadrati identici sono due righe che si assomigliano nel punto in
+       cui dovrebbero distinguersi. Adesso e' la tazza, che e' anche quello che
+       uno ha davvero in mano a meta' mattina, e in un caramello caldo che non
+       somiglia a nessuno degli altri quattro.
+       La soglia del sole pieno sale a mezzogiorno: prima delle dodici uno
+       spuntino e' di mattina, e il nome lo dice anche quando l'ora manca. */
+    id = /mattin|mattut|brunch/.test(n) ? 'coffee'
+      : h == null ? 'coffee' : h >= 15 ? 'sunset' : h >= 12 ? 'sun' : 'coffee';
   else if (h != null)
     id = h < 10 ? 'sunrise' : h < 15 ? 'sun' : h < 18 ? 'sunset' : h < 22 ? 'moon' : 'bed';
 

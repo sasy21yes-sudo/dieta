@@ -1671,6 +1671,46 @@ ignorava il fuori piano: una giornata registrata solo come "ho mangiato una
 pizza" usciva bianca. Adesso conta i pasti spuntati **oppure** gli extra, lo
 stesso criterio del punteggio di nutrizione.
 
+### La chiave del diario e' il pasto, non la ricetta
+
+Tutti gli strati del giorno — spunta, sostituzioni, porzioni, alimenti
+aggiunti, ricetta congelata — sono indicizzati con una chiave sola, e per
+tutta la vita dell'app quella chiave e' stata **il codice della ricetta**.
+Funziona finche' una ricetta compare una volta sola nella giornata, e si
+rompe nel caso piu' banale che esista: **le stesse mandorle allo spuntino
+delle 11 e a quello delle 16:30.**
+
+I due pasti condividevano tutto. Spuntandone uno si spuntava anche l'altro;
+sostituendo la ricetta in uno la si sostituiva in tutti e due; le porzioni
+cambiate a colazione ricomparivano al pomeriggio. Segnalato con uno
+screenshot che lo mostra su due righe della stessa giornata, ed e' il tipo di
+difetto che si vede solo usando l'app: leggendo il codice, `d.pasti[s.codice]`
+sembra ragionevole.
+
+La chiave giusta e' il **pasto**: il posto nella giornata, che non cambia ne'
+quando cambi la ricetta ne' quando lo sposti. Ogni voce della settimana ha
+quindi un `id`, e `chiaveP()` e' l'unico modo di ricavarlo.
+
+Tre decisioni dentro:
+
+- **da dove nasce l'id.** `g<giorno>-<posizione>` per il piano di base, che e'
+  un file statico e quindi ha posizioni stabili; appena l'utente tocca la
+  settimana lo strato in `S.piano` viene riscritto **con gli id dentro**, e da
+  quel momento sono suoi e non si muovono piu'. Un pasto aggiunto a mano nasce
+  con un id vero (`p<uid>`), perche' quello puo' essere spostato subito.
+- **l'ordine per orario si applica dopo.** L'id nasce dalla posizione nel
+  file, quindi assegnarlo dopo `ordinaSlotOrari()` lo farebbe dipendere da un
+  ordinamento che cambia quando cambi un'ora.
+- **i registri vecchi si riportano, e senza spostare i numeri.** Una ricetta
+  che compariva in due pasti aveva **una chiave sola condivisa** — ma quello
+  che si vedeva, e che i totali di quel giorno hanno registrato, e' che
+  **erano spuntati tutti e due**. La migrazione copia percio' il valore su
+  ogni pasto che usava quella ricetta: verificato, `consumed()` di quel giorno
+  fa lo stesso identico numero di prima. E i valori composti si duplicano
+  **per copia**, non per riferimento: altrimenti correggere le porzioni di uno
+  cambierebbe anche l'altro, cioe' il bug rientrerebbe dalla porta della
+  migrazione.
+
 ### Il piano e' un modello, il diario e' un fatto
 
 E per molto tempo la seconda meta' non era vera. `consumed(k)` rileggeva la
@@ -2655,6 +2695,16 @@ dentro `icone.js` invece di essere caricati da un CDN: e' la stessa scelta di
 prende. Sono otto disegni, non una dipendenza, e la nota di licenza sta nel
 file.
 
+**Lo spuntino della mattina aveva l'icona del pranzo.** La soglia del sole
+pieno stava alle 11, quindi uno spuntino delle 11:00 usciva con lo stesso
+quadrato giallo di mezzogiorno — e in un elenco di cinque righe due icone
+identiche sono due righe che si assomigliano proprio dove dovrebbero
+distinguersi. Adesso e' la **tazza**, che e' anche quello che uno ha davvero
+in mano a meta' mattina, in un caramello caldo (`#B06A34`) vicino all'ambra
+dell'alba — stessa parte della giornata — ma con una forma completamente
+diversa. La soglia del sole pieno sale a mezzogiorno, e il nome
+("mattina", "mattutino") vince comunque sull'ora.
+
 `slotIcona()` guarda **prima il nome e poi l'ora**: il nome dice l'intenzione
 ("Pre-nanna" e' pre-nanna anche alle 21), l'ora e' un ripiego ragionevole per
 gli slot chiamati "Post workout". Se non dicono niente ne' l'uno ne' l'altra
@@ -3319,6 +3369,19 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non aggiungere un alimento a un pasto dentro `extra`: quello e' il fuori
   piano e si conta a parte, e il totale del pasto continuerebbe a dire il
   numero della ricetta
+- Non indicizzare il diario sul codice della ricetta: due pasti con la stessa
+  ricetta nello stesso giorno — le mandorle alle 11 e alle 16:30 — si
+  ritrovavano a condividere spunta, sostituzioni e porzioni. La chiave e' il
+  **pasto**, e si ricava con `chiaveP()`
+- Non assegnare l'id di un pasto dopo `ordinaSlotOrari()`: nasce dalla
+  posizione nel file, e quell'ordinamento cambia appena si tocca un'ora
+- Non far scegliere alla migrazione uno solo dei pasti che condividevano una
+  chiave: erano spuntati tutti e due, ed e' quello che i totali di quel giorno
+  hanno registrato. Si copia su tutti, e **per copia**, o il bug rientra
+  dalla porta della migrazione
+- Non dare allo spuntino della mattina la stessa icona del pranzo: due
+  quadrati identici in un elenco di cinque righe si assomigliano nel punto in
+  cui dovrebbero distinguersi
 - Non indicizzare gli alimenti aggiunti sull'indice dell'array: togliendo il
   primo si spostano le quantita' di tutti gli altri. Serve un id stabile
 - Non decidere se ricalcolare un pasto guardando solo tre dei quattro strati:

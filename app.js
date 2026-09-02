@@ -229,8 +229,10 @@ function consumed(k) {
   // riassegnata dopo non deve far sparire la spunta di tre settimane fa
   const slots = typeof slotsGiorno === 'function'
     ? slotsGiorno(k) : D.settimana[dayIdx(k)].pasti;
-  for (const s of slots) if (d.pasti[s.codice])
-    addM(t, typeof mealMGiorno === 'function' ? mealMGiorno(s.codice, k) : mealM(s.codice));
+  // la chiave e' il PASTO, non la ricetta: due pasti con la stessa ricetta
+  // sono due pasti, e prima ne contavano uno solo due volte
+  for (const s of slots) if (d.pasti[chiaveP(s)])
+    addM(t, typeof mealMGiorno === 'function' ? mealMGiorno(chiaveP(s), k) : mealM(s.codice));
   for (const e of d.extra) addM(t, e);
   return t;
 }
@@ -718,6 +720,50 @@ function pavimentoGrassi(k = today()) {
   return peso > 0 ? Math.round(peso * 0.6) : null;
 }
 
+/**
+ * I registri scritti quando la chiave era la ricetta.
+ *
+ * Fino a ieri tutti gli strati del giorno erano indicizzati sul **codice
+ * della ricetta**, e da oggi sull'**id del pasto**. Le giornate gia' scritte
+ * vanno riportate, o dal giorno dell'aggiornamento tutto lo storico
+ * risulterebbe con niente spuntato.
+ *
+ * La regola sui doppioni e' la parte che conta. Una ricetta che compariva in
+ * due pasti dello stesso giorno aveva **una chiave sola condivisa**, ed e'
+ * esattamente il difetto che si sta togliendo: ma quello che l'utente vedeva
+ * — e che i totali di quel giorno hanno registrato — era che **erano spuntati
+ * tutti e due**. Copiare il valore su ogni pasto che usava quella ricetta e'
+ * quindi l'unica scelta che non cambia il passato: cosi' `consumed()` di ieri
+ * fa lo stesso numero di ieri.
+ *
+ * I valori composti si duplicano **per copia** e non per riferimento:
+ * altrimenti correggere le porzioni di uno dei due cambierebbe anche l'altro,
+ * cioe' il bug tornerebbe dentro dalla porta della migrazione.
+ */
+function migraPastiPerSlot() {
+  if (S.settings.slotId || !D?.settimana?.length) return;
+  const strati = ['pasti', 'swap', 'porzioni', 'aggiunti', 'pastoSwap', 'fatti'];
+  const copia = v => (v && typeof v === 'object') ? JSON.parse(JSON.stringify(v)) : v;
+  for (const [k, d] of Object.entries(S.log)) {
+    const slots = D.settimana[dayIdx(k)]?.pasti || [];
+    const ids = new Set(slots.map(x => x.id));
+    for (const nome of strati) {
+      const vecchio = d[nome];
+      if (!vecchio || typeof vecchio !== 'object' || Array.isArray(vecchio)) continue;
+      const nuovo = {};
+      for (const [ch, val] of Object.entries(vecchio)) {
+        if (ids.has(ch)) { nuovo[ch] = val; continue; }         // gia' un id
+        const dove = slots.filter(x => x.codice === ch);
+        if (!dove.length) { nuovo[ch] = val; continue; }        // non nel piano
+        for (const x of dove) nuovo[x.id] = dove.length > 1 ? copia(val) : val;
+      }
+      d[nome] = nuovo;
+    }
+  }
+  S.settings.slotId = 1;
+  save();
+}
+
 function analyse(k = today()) {
   const F = [], T = D.target;
   const d7 = windowDays(k, 7), d14 = windowDays(k, 14);
@@ -850,8 +896,8 @@ function analyse(k = today()) {
   const main = plan.pasti.filter(s => ['Colazione', 'Pranzo', 'Cena'].includes(s.slot));
   // il pasto di oggi, non quello previsto: se lo hai cambiato conta il nuovo
   const low = main.filter(s => {
-    if (!dd.pasti[s.codice]) return false;
-    const m = typeof mealMGiorno === 'function' ? mealMGiorno(s.codice, k)
+    if (!dd.pasti[chiaveP(s)]) return false;
+    const m = typeof mealMGiorno === 'function' ? mealMGiorno(chiaveP(s), k)
       : D.pasti[s.codice]?.macro;
     return m && m.p < T.min_p_per_pasto;
   });
@@ -1234,8 +1280,8 @@ function viewOggi(v) {
   for (const s of plan.pasti) {
     // il pasto che c'e' oggi: se lo hai cambiato, si vede quello
     const eff = typeof pastoDelGiorno === 'function'
-      ? pastoDelGiorno(s.codice, k) : s.codice;
-    const p = D.pasti[eff], done = !!d.pasti[s.codice];
+      ? pastoDelGiorno(chiaveP(s), k) : s.codice;
+    const p = D.pasti[eff], done = !!d.pasti[chiaveP(s)];
     // slot senza pasto: con il piano vuoto e' la norma, non un errore
     if (!p) {
       const vuoto = el('button', 'meal vuoto');
@@ -1263,9 +1309,9 @@ function viewOggi(v) {
          quel momento correggerla nel piano non tocca piu' questa giornata.
          Togliendo la spunta il fatto non c'e' piu', e la copia se ne va con
          lui — rimettendola si ricongela sulla versione di quel momento. */
-      if (!done) { if (typeof congelaPasto === 'function') congelaPasto(s.codice, k); }
-      else if (typeof scongelaPasto === 'function') scongelaPasto(s.codice, k);
-      d.pasti[s.codice] = !done; save();
+      if (!done) { if (typeof congelaPasto === 'function') congelaPasto(chiaveP(s), k); }
+      else if (typeof scongelaPasto === 'function') scongelaPasto(chiaveP(s), k);
+      d.pasti[chiaveP(s)] = !done; save();
       setTimeout(route, done ? 0 : 130);
     };
     // toccare il nome del pasto apre le porzioni DI QUEL GIORNO: il piano dice
@@ -1275,13 +1321,13 @@ function viewOggi(v) {
        pasto facevano di Oggi un elenco della spesa lungo due schermate, e
        quasi sempre non si stava cercando niente li' dentro. Si aprono
        toccando il pasto, che e' anche il posto in cui si modificano. */
-    const mgOggi = typeof mealMGiorno === 'function' ? mealMGiorno(s.codice, k) : p.macro;
+    const mgOggi = typeof mealMGiorno === 'function' ? mealMGiorno(chiaveP(s), k) : p.macro;
     const mgPiano = D.pasti[s.codice]?.macro || p.macro || null;
     const dk = mgPiano ? Math.round((mgOggi.kcal || 0) - (mgPiano.kcal || 0)) : 0;
     const toccato = eff !== s.codice
-      || (typeof porzioniCambiate === 'function' && porzioniCambiate(s.codice, k))
-      || !!(d.swap?.[s.codice] && Object.keys(d.swap[s.codice]).length)
-      || !!(d.aggiunti?.[s.codice] || []).length;
+      || (typeof porzioniCambiate === 'function' && porzioniCambiate(chiaveP(s), k))
+      || !!(d.swap?.[chiaveP(s)] && Object.keys(d.swap[chiaveP(s)]).length)
+      || !!(d.aggiunti?.[chiaveP(s)] || []).length;
     const tag = eff !== s.codice
       ? 'al posto di ' + (D.pasti[s.codice]?.nome || s.codice)
       : toccato ? 'modificato' : '';
@@ -1292,23 +1338,23 @@ function viewOggi(v) {
              toccato && Math.abs(dk) >= 1 ? ` ${dk > 0 ? '+' : '−'}${nf(Math.abs(dk))} kcal` : ''}</em>`
          : ''}</div>`);
     if (!futuro && typeof sheetPorzioni === 'function' && p.ingredienti)
-      testa.onclick = () => sheetPorzioni(k, s.codice);
+      testa.onclick = () => sheetPorzioni(k, chiaveP(s));
     h.append(tick, testa,
       el('div', 'meal-kcal', (() => {
         // prima c'erano solo calorie e proteine, e per sapere quanti
         // carboidrati aveva un pasto bisognava aprirlo e sommare a mano
-        const mg = typeof mealMGiorno === 'function' ? mealMGiorno(s.codice, k) : p.macro;
+        const mg = typeof mealMGiorno === 'function' ? mealMGiorno(chiaveP(s), k) : p.macro;
         return `<b>${nf(mg.kcal)}</b> kcal<span class="mm">${macroRiga(mg)}</span>`;
       })()));
     m.append(h);
     // una riga sola sotto il nome: quanti ingredienti ci sono e come aprirli
     const n = (typeof ingredientiGiorno === 'function'
-      ? ingredientiGiorno(s.codice, k) : (p.ingredienti || [])).length;
+      ? ingredientiGiorno(chiaveP(s), k) : (p.ingredienti || [])).length;
     if (n && !futuro) {
       const apri = el('button', 'meal-apri');
       apri.innerHTML = `<span>${n} ${n === 1 ? 'ingrediente' : 'ingredienti'}</span>`
         + '<span class="go">apri e modifica &rsaquo;</span>';
-      apri.onclick = () => sheetPorzioni(k, s.codice);
+      apri.onclick = () => sheetPorzioni(k, chiaveP(s));
       m.append(apri);
     }
     v.append(m);
@@ -3411,7 +3457,8 @@ function sheetImport(grezzo) {
       setTimeout(() => location.reload(), 400);
       return;
     }
-    S = o; normalize(); fondiPiano(); save(); closeSheet(); route();
+    S = o; normalize(); fondiPiano(); migraPastiPerSlot();
+    save(); closeSheet(); route();
     toast('Backup importato');
   };
   w.append(ok);
@@ -3665,6 +3712,8 @@ async function init() {
   try {
     DBASE = await (await fetch('data/dieta.json', { cache: 'no-cache' })).json();
     fondiPiano();       // D = piano di base + modifiche di questo profilo
+    // i registri scritti quando la chiave era la ricetta: una volta sola
+    migraPastiPerSlot();
     // il catalogo palestra non e' vitale: se manca, il resto dell'app vive
     try { PD = await (await fetch('data/palestra.json', { cache: 'no-cache' })).json(); }
     catch { PD = null; }
