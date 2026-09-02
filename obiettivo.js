@@ -684,18 +684,24 @@ function cardControlloPiano(k = today(), corta = false) {
         : '<span>nessun target con cui confrontarle</span>'));
   }
 
-  /* Nel passo della settimana ogni giorno ha gia' la sua pastiglia: una carta
-     in cima che dice "va tutto bene" ripeterebbe sette volte la stessa cosa.
-     Nel passo del target invece la conferma serve, perche' li' i giorni non
-     si vedono. */
-  if (tutto && corta) return null;
+  /* **La striscia e le quote si vedono sempre**, anche quando va tutto bene.
+     Prima la carta spariva del tutto se non c'era niente da segnalare, e
+     aveva un senso finche' era solo un allarme: ora porta le calorie di ogni
+     giorno e come sono divise, cioe' la cosa che si viene a guardare qui — e
+     nasconderla proprio quando il piano e' a posto vuol dire non poterlo mai
+     vedere fatto bene. Quello che resta condizionato sono gli **avvisi**, che
+     sono eccezioni e spariscono da sole. */
+  if (c.vuoti) box.append(el('p', 'hint',
+    `${c.vuoti} ${c.vuoti === 1 ? 'giorno non ha' : 'giorni non hanno'} ancora nessuna `
+    + 'ricetta assegnata: quelli restano fuori dai conti e dalla media.'));
   if (tutto) {
     box.append(el('div', 'read',
       `<span>${c.pieni} giorni pieni</span><span>nessuno sotto il pavimento</span>`
       + `<span>media ${nf(c.media)} kcal</span>`));
-    if (c.vuoti) box.append(el('p', 'hint',
-      `${c.vuoti} ${c.vuoti === 1 ? 'giorno non ha' : 'giorni non hanno'} ancora nessuna `
-      + 'ricetta assegnata: quelli non entrano nei conti.'));
+    box.append(el('p', 'note',
+      'Le sette barre dicono quante calorie ha ogni giorno e come sono divise; '
+      + 'la media sotto le riassume. Le soglie sono di pratica comune, non '
+      + 'misure su di te.'));
     return box;
   }
 

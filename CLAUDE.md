@@ -1170,6 +1170,13 @@ filo di colore sul bordo sinistro che si vede scorrendo, e una riga che dice
 **quanto manca**: *"Mancano 1847 kcal al target di 2482"*. Chi sta componendo
 un giorno ha bisogno del numero da coprire, non di un giudizio.
 
+**La striscia si vede sempre**, anche a piano perfetto. Prima la carta
+spariva del tutto quando non c'era niente da segnalare, e finche' era solo un
+allarme aveva senso; da quando porta le calorie di ogni giorno e come sono
+divise no, perche' quella e' la cosa che si viene a guardare — e nasconderla
+proprio quando il piano e' a posto vuol dire non poterlo mai vedere fatto
+bene. Restano condizionati gli **avvisi**, che sono eccezioni.
+
 In cima resta solo quello che e' **settimanale** — quale giorno, e la direzione
 contro l'obiettivo, che non ha una casa su un singolo giorno — e sparisce del
 tutto quando va tutto bene, perche' le sette pastiglie lo dicono gia'.
@@ -3523,6 +3530,10 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non lasciare in giro strati svuotati (`porzioni: { c1: {} }`): non cambiano
   i conti, ma sono lo stato da cui nasce un "modificato" su un pasto che
   nessuno ha toccato
+- Non far sparire una carta che porta un dato solo perche' non ha allarmi da
+  dare: la striscia delle calorie e delle quote e' la cosa che si viene a
+  guardare, e nasconderla quando va tutto bene vuol dire non poterla mai
+  vedere quando va bene
 - Non mostrare i macro di un piano solo in grammi: fra giorni di dimensione
   diversa non si confrontano, e la struttura della giornata e' quello che i
   grammi nascondono
