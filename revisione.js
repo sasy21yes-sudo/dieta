@@ -1006,6 +1006,9 @@ function pdfResoconto(per) {
   const nn = (v, d = 0, u = '') => v == null ? '—' : nf(v, d) + (u ? ' ' + u : '');
   const pct = v => v == null ? '—' : nf(v, 0) + '%';
 
+  /* --- di chi sono questi numeri --- */
+  pdfProfilo(doc, titolo, tabella, per.a);
+
   /* --- quanto vale quello che segue --- */
   const reg = statRegistro(per);
   titolo('Il registro');
@@ -1233,4 +1236,444 @@ function revisionePronta(k = today()) {
   const letta = S.settings?.revisioneLetta;
   if (!letta) return true;
   return Math.abs(Math.round((new Date(k) - new Date(letta)) / 864e5)) >= 5;
+}
+
+/* ===================================================== il profilo, sul PDF
+ *
+ * Il resoconto racconta **un periodo**: cosa e' andato storto, i numeri, come
+ * si sistema. Chi lo riceve — un nutrizionista, un medico, un allenatore —
+ * quei numeri non li ha mai visti, e prima ancora di leggerli ha bisogno di
+ * sapere **di chi sono** e **dove sta andando** quella persona. Le medie
+ * settimanali di qualcuno che non si sa quanto e' alto, quanto pesa e cosa
+ * sta cercando di fare sono numeri senza soggetto.
+ *
+ * Quindi una sezione che apre la meta' dati del documento con quattro cose:
+ * chi, la sagoma disegnata sulle circonferenze vere, i target, e tre piani
+ * cartesiani che dicono **dove sei rispetto a dove vuoi arrivare**.
+ *
+ * Tre piani e non uno, perche' sono tre domande diverse e la risposta a una
+ * non contiene le altre:
+ *
+ * | Piano | La domanda |
+ * |---|---|
+ * | vita/altezza x grasso | quanto sei lontano dalle fasce di riferimento |
+ * | massa grassa x massa magra | in che direzione ti stai muovendo |
+ * | FFMI x grasso | quanto muscolo chiede il fisico che hai scelto |
+ *
+ * Le fasce disegnate sono **riferimenti di popolazione, non un giudizio su di
+ * te**, ed e' scritto sotto ogni piano — la stessa regola delle costanti di
+ * Banister e delle soglie di HYROX. Sono:
+ *
+ * - **vita/altezza 0,5 e 0,6** — NICE NG246 chiama la prima fascia "adiposita'
+ *   centrale aumentata" e la seconda "alta". E' anche la soglia con la frase
+ *   piu' facile da ricordare che esista in tutta questa materia: la vita meno
+ *   della meta' dell'altezza. La letteratura le contesta di penalizzare le
+ *   persone basse, perche' la vita non scala con l'altezza — e per questo la
+ *   nota lo scrive invece di consegnare una riga sola.
+ * - **le fasce di grasso corporeo** — American Council on Exercise: essenziale
+ *   2-5% (uomini) e 10-13% (donne), atleti 6-13 / 14-20, in forma 14-17 /
+ *   21-24, accettabile 18-24 / 25-31.
+ * - **il tetto dell'FFMI** — 25 negli uomini e 22 nelle donne, da Kouri 1995
+ *   su atleti prima e dopo l'era degli steroidi. Gia' usato dalla scheda del
+ *   fisico di riferimento: usarne uno diverso qui direbbe due cose diverse
+ *   sulla stessa persona nello stesso documento.
+ *
+ * E la regola di sempre, che qui vale doppio perche' il foglio finisce in
+ * mano a qualcun altro: **niente date di arrivo**. I piani dicono dove sei e
+ * dove punti, la distanza fra i due punti si vede; quanto ci vuole non e'
+ * scritto da nessuna parte.
+ */
+
+/** Le fasce di grasso corporeo, ACE. Estremi in percentuale. */
+const PROF_BF = {
+  m: [['essenziale', 2, 5], ['atleti', 6, 13], ['in forma', 14, 17],
+      ['accettabile', 18, 24], ['sopra', 25, 42]],
+  f: [['essenziale', 10, 13], ['atleti', 14, 20], ['in forma', 21, 24],
+      ['accettabile', 25, 31], ['sopra', 32, 48]]
+};
+
+/**
+ * Dove sei stato, non solo dove sei.
+ *
+ * Un punto solo su un piano dice una posizione; due punti dicono una
+ * direzione, ed e' la direzione la cosa che si guarda. La serie si costruisce
+ * sulle date in cui la **vita** e' stata misurata — sono le uniche in cui la
+ * composizione ha davvero un dato nuovo dalla parte del metro — e per collo e
+ * fianchi si prende l'ultima misura **fino a quel giorno**, non l'ultima in
+ * assoluto: `lastMeas()` risponde sempre con l'ultima, che va benissimo per
+ * "adesso" e falserebbe il passato.
+ */
+function serieComposizione(k = today(), n = 12) {
+  const h = D.profilo?.altezza_cm, sesso = D.profilo?.sesso;
+  if (!(h > 0)) return [];
+  const fino = (id, d) => {
+    const gg = Object.keys(S.log)
+      .filter(x => x <= d && S.log[x]?.misure?.[id] != null).sort();
+    return gg.length ? S.log[gg[gg.length - 1]].misure[id]
+      : (D.misure.find(m => m.id === id)?.base ?? null);
+  };
+  const out = [];
+  for (const d of Object.keys(S.log)
+      .filter(x => x <= k && S.log[x]?.misure?.vita > 0).sort()) {
+    const vita = S.log[d].misure.vita;
+    const bf = bodyFat(vita, fino('collo', d), h, sesso, fino('fianchi', d));
+    const peso = trendW(d) ?? null;
+    if (bf == null || !(peso > 0)) continue;
+    const lbm = peso * (1 - bf / 100);
+    out.push({ k: d, vita, bf, peso, lbm, fm: peso - lbm,
+               wh: vita / h, ffmi: ffmi(lbm, h)?.norm ?? null });
+  }
+  return out.slice(-n);
+}
+
+/**
+ * Un piano cartesiano sul PDF.
+ *
+ * `o.punti` sono `{x, y, lab, tipo}` con tipo `ora` (pieno), `target`
+ * (anello) o `scia` (piccolo). `o.fasceX` e `o.fasceY` sono le bande di
+ * riferimento — `[da, a, etichetta]` — e `o.diag` traccia le diagonali a
+ * somma costante, che e' il modo in cui un piano grassa/magra dice "stesso
+ * peso" senza scriverlo.
+ */
+function pdfPianoXY(doc, o) {
+  const { x, y, w, h } = o;
+  const PX = v => x + (v - o.x0) / (o.x1 - o.x0) * w;
+  const PY = v => y + h - (v - o.y0) / (o.y1 - o.y0) * h;
+  const dentro = p => p && isFinite(p.x) && isFinite(p.y);
+
+  // le bande prima di tutto: sono il fondo, e sopra ci va il resto
+  for (const [da, a, lab] of (o.fasceX || [])) {
+    const xa = PX(Math.max(o.x0, da)), xb = PX(Math.min(o.x1, a));
+    if (xb <= xa) continue;
+    doc.rett(xa, y, xb - xa, h, { fill: RES_C.wash });
+    doc.linea(xa, y, xa, y + h, { col: RES_C.rule, w: .5 });
+    if (lab) doc.testo(lab, (xa + xb) / 2, y + 9,
+      { size: 6, col: RES_C.ink3, align: 'center' });
+  }
+  for (const [da, a, lab] of (o.fasceY || [])) {
+    const ya = PY(Math.min(o.y1, a)), yb = PY(Math.max(o.y0, da));
+    if (yb <= ya) continue;
+    doc.rett(x, ya, w, yb - ya, { fill: RES_C.wash });
+    doc.linea(x, ya, x + w, ya, { col: RES_C.rule, w: .5 });
+    if (lab && yb - ya > 9) doc.testo(lab, x + w - 3, (ya + yb) / 2 + 2,
+      { size: 6, col: RES_C.ink3, align: 'right' });
+  }
+
+  /* Le diagonali a somma costante. Su un piano grassa/magra "peso fermo" e'
+     una retta a 45 gradi, e senza disegnarla una ricomposizione — che e'
+     esattamente il movimento lungo la perpendicolare — non si vede. */
+  for (const s of (o.diag || [])) {
+    /* La retta si **taglia** sul riquadro, non si scarta quando un estremo
+       cade fuori: con `x + y = s` fissato quasi nessuna diagonale ha tutti e
+       due gli estremi dentro, e filtrandoli non ne compariva nemmeno una. */
+    const xa = Math.max(o.x0, s - o.y1), xb = Math.min(o.x1, s - o.y0);
+    if (!(xb > xa)) continue;
+    doc.linea(PX(xa), PY(s - xa), PX(xb), PY(s - xb),
+      { col: RES_C.rule, w: .5, tratto: '1 3' });
+    // l'etichetta all'estremo in alto a sinistra, dove la retta esce dal box
+    doc.testo(nf(s, 0) + ' kg', PX(xa) + 2, PY(s - xa) + 6,
+      { size: 5.5, col: RES_C.ink3 });
+  }
+
+  // la cornice e i due assi
+  doc.rett(x, y, w, h, { stroke: RES_C.rule, w: .7 });
+  for (const t of (o.tickX || [])) {
+    const px = PX(t.v);
+    if (px < x - .5 || px > x + w + .5) continue;
+    doc.linea(px, y + h, px, y + h + 3, { col: RES_C.rule });
+    doc.testo(t.l, px, y + h + 11, { size: 6.5, col: RES_C.ink3, align: 'center' });
+  }
+  for (const t of (o.tickY || [])) {
+    const py = PY(t.v);
+    if (py < y - .5 || py > y + h + .5) continue;
+    doc.linea(x - 3, py, x, py, { col: RES_C.rule });
+    doc.testo(t.l, x - 5, py + 2.2, { size: 6.5, col: RES_C.ink3, align: 'right' });
+  }
+  doc.testo(o.labX, x + w / 2, y + h + 21, { size: 7, col: RES_C.ink2, align: 'center' });
+  doc.testo(o.labY, x - 3, y - 6, { size: 7, col: RES_C.ink2 });
+
+  // la scia, poi la freccia, poi i due punti: l'ordine e' l'importanza
+  const scia = (o.punti || []).filter(p => p.tipo === 'scia' && dentro(p));
+  for (let i = 1; i < scia.length; i++)
+    doc.linea(PX(scia[i - 1].x), PY(scia[i - 1].y), PX(scia[i].x), PY(scia[i].y),
+      { col: RES_C.ink3, w: .8 });
+  for (const p of scia) doc.cerchio(PX(p.x), PY(p.y), 1.5, { fill: RES_C.ink3 });
+
+  const ora = (o.punti || []).find(p => p.tipo === 'ora' && dentro(p));
+  const tgt = (o.punti || []).find(p => p.tipo === 'target' && dentro(p));
+  if (ora && tgt)
+    doc.linea(PX(ora.x), PY(ora.y), PX(tgt.x), PY(tgt.y),
+      { col: RES_C.pine, w: .8, tratto: '2 2' });
+  /* Le due etichette vanno da parti opposte, e quale sia "opposta" lo decide
+     la posizione dei due punti. Fisse — target sopra, adesso sotto — si
+     sovrapponevano ogni volta che l'anello finiva sotto il pallino, che e' il
+     caso normale di chi sta scendendo di grasso: sul primo piano uscivano
+     "target" e "adesso" stampate sulla stessa riga. */
+  const sopra = ora && tgt ? (PY(tgt.y) > PY(ora.y) ? 1 : -1) : -1;
+  if (tgt) {
+    doc.cerchio(PX(tgt.x), PY(tgt.y), 4, { stroke: RES_C.pine, w: 1.3 });
+    doc.testo('target', PX(tgt.x), PY(tgt.y) + (sopra > 0 ? 12 : -7),
+      { size: 6, col: RES_C.pine, align: 'center' });
+  }
+  if (ora) {
+    doc.cerchio(PX(ora.x), PY(ora.y), 3.4, { fill: RES_C.ink });
+    doc.testo(ora.lab || 'adesso', PX(ora.x), PY(ora.y) + (sopra > 0 ? -7 : 12),
+      { size: 6, bold: true, col: RES_C.ink, align: 'center' });
+  }
+  return { PX, PY, ora, tgt };
+}
+
+/**
+ * La sagoma, disegnata sulle circonferenze registrate.
+ *
+ * E' la stessa figura di Corpo — `figure()` produce percorsi fatti solo di
+ * `M` e `C`, quindi passano nel PDF senza conversione. La sagoma di
+ * riferimento resta **tratteggiata sopra**, come a schermo: dietro
+ * sparirebbe dove il target e' piu' stretto, cioe' proprio dove serve.
+ */
+function pdfSagoma(doc, x, y, w, cur, tgt) {
+  const sc = w / FIG.W, h = FIG.H * sc;
+  const a = figure(cur), b = tgt ? figure(tgt) : null;
+  const O = { sx: sc, sy: sc, ox: x, oy: y };
+  for (const d of a.braccia)
+    doc.percorso(d, { ...O, fill: RES_C.wash, stroke: RES_C.pine, w: 1.1 });
+  doc.percorso(a.corpo, { ...O, fill: RES_C.wash, stroke: RES_C.pine, w: 1.1 });
+  doc.ellisse(x + a.testa.cx * sc, y + a.testa.cy * sc,
+    a.testa.rx * sc, a.testa.ry * sc,
+    { fill: RES_C.wash, stroke: RES_C.pine, w: 1.1 });
+  /* Sullo schermo il riferimento e' verde tratteggiato e si distingue perche'
+     la figura e' grande. Su A4 la sagoma sta in quattro centimetri, e li' due
+     verdi a un millimetro di distanza sono la stessa linea: il riferimento
+     prende quindi un colore suo, oltre al tratteggio. */
+  if (b) for (const d of b.profili)
+    doc.percorso(d, { ...O, stroke: RES_C.ink2, w: 1, tratto: '3 2' });
+  return h;
+}
+
+/**
+ * La sezione. Apre la meta' dati del resoconto: prima di sapere quanto ha
+ * mangiato, chi legge deve sapere di chi si parla.
+ */
+function pdfProfilo(doc, titolo, tabella, k = today()) {
+  const X = doc.M, W = doc.larghezza;
+  const P = D.profilo || {};
+  const h = P.altezza_cm;
+  const C = typeof composition === 'function' ? composition(k) : null;
+  const TF = D.target_fisico || null;
+  const sesso = P.sesso === 'f' ? 'f' : 'm';
+  const nn = (v, d = 0, u = '') => v == null ? '—' : nf(v, d) + (u ? ' ' + u : '');
+
+  titolo('Profilo');
+
+  /* --- chi, in una riga --- */
+  doc.y += 12;
+  const chi = [P.nome, P.eta ? P.eta + ' anni' : null,
+    sesso === 'f' ? 'donna' : 'uomo', h ? nf(h) + ' cm' : null,
+    C?.peso ? nf(C.peso, 1) + ' kg' : null].filter(Boolean).join(' · ');
+  doc.paragrafo(chi || 'Profilo non compilato.',
+    { size: 10, bold: true, col: RES_C.ink });
+
+  const ob = typeof obiettivoAttivo === 'function' ? obiettivoAttivo() : null;
+  const E = typeof energyModel === 'function' ? energyModel(k) : null;
+  const bmr = (typeof bmrDi === 'function' && h && P.eta)
+    ? bmrDi(C?.peso ?? P.peso_iniziale_kg, h, P.eta, sesso) : null;
+  doc.y += 2;
+  doc.paragrafo([
+    ob ? 'Obiettivo dichiarato: ' + (ob.n || ob.id).toLowerCase()
+       + (ob.pct ? ' (' + (ob.pct > 0 ? '+' : '') + nf(ob.pct * 100, 2)
+          + '% del peso a settimana)' : '') : 'Nessun obiettivo dichiarato',
+    bmr ? 'metabolismo a riposo stimato ' + nf(bmr) + ' kcal' : null,
+    E?.tdee > 0 ? 'dispendio ' + (E.n >= 2 ? 'misurato' : 'stimato') + ' '
+      + nf(E.tdee) + ' kcal' : null,
+    D.target?.kcal ? 'target ' + nf(D.target.kcal) + ' kcal' : null
+  ].filter(Boolean).join(' · ') + '.',
+    { size: 8.5, col: RES_C.ink3, interlinea: 11.5 });
+
+  /* --- la sagoma, e accanto la composizione --- */
+  const mis = {};
+  for (const m of D.misure) mis[m.id] = lastMeas(m.id);
+  const misT = {};
+  for (const m of D.misure) if (m.target != null) misT[m.id] = m.target;
+
+  const LW = 118;                                  // larghezza della figura
+  const hFig = FIG.H * (LW / FIG.W);
+  doc.serve(hFig + 30);
+  doc.y += 14;
+  const yFig = doc.y;
+  let disegnata = false;
+  try {
+    if (h > 0) { pdfSagoma(doc, X + 6, yFig, LW, mis,
+      Object.keys(misT).length ? misT : null); disegnata = true; }
+  } catch { disegnata = false; }
+  if (!disegnata)
+    doc.testo('(figura non disponibile)', X + 6, yFig + 20,
+      { size: 8, col: RES_C.ink3 });
+
+  /* La tabella accanto alla figura si disegna a mano invece di passare da
+     `tabella()`: quella occupa tutta la larghezza, e qui la meta' sinistra e'
+     gia' presa. */
+  const TX = X + LW + 26, TW = W - LW - 26;
+  const col = [TX, TX + TW * 0.52, TX + TW * 0.76, TX + TW];
+  let ty = yFig + 6;
+  const riga = (lab, ora, tg, manca, forte) => {
+    doc.testo(lab, col[0], ty, { size: 8.5, col: RES_C.ink2, bold: !!forte });
+    doc.testo(ora, col[1], ty, { size: 8.5, bold: true, col: RES_C.ink, align: 'right' });
+    doc.testo(tg, col[2], ty, { size: 8.5, col: RES_C.ink3, align: 'right' });
+    doc.testo(manca, col[3], ty, { size: 8.5, col: RES_C.ink2, align: 'right' });
+    ty += 4;
+    doc.linea(TX, ty, TX + TW, ty, { col: RES_C.rule, w: .35 });
+    ty += 11;
+  };
+  doc.testo('COMPOSIZIONE E MISURE', col[0], ty, { size: 7, bold: true, col: RES_C.ink3 });
+  ['Ora', 'Target', 'Manca'].forEach((t, i) => doc.testo(t, col[i + 1], ty,
+    { size: 7, bold: true, col: RES_C.ink3, align: 'right' }));
+  ty += 4;
+  doc.linea(TX, ty, TX + TW, ty, { col: RES_C.rule });
+  ty += 11;
+
+  const dl = (a, b, d = 1, u = '') => (a == null || b == null) ? '—'
+    : (b - a > 0 ? '+' : '−') + nf(Math.abs(b - a), d) + (u ? ' ' + u : '');
+  riga('Peso', nn(C?.peso, 1, 'kg'), nn(TF?.peso_kg, 1), dl(C?.peso, TF?.peso_kg), true);
+  riga('Grasso corporeo', nn(C?.bf, 1, '%'), nn(TF?.bf_pct, 1), dl(C?.bf, TF?.bf_pct));
+  riga('Massa magra', nn(C?.lbm, 1, 'kg'), nn(TF?.massa_magra_kg, 1),
+    dl(C?.lbm, TF?.massa_magra_kg));
+  riga('Massa grassa', nn(C?.fm, 1, 'kg'),
+    nn(TF ? TF.peso_kg * TF.bf_pct / 100 : null, 1),
+    dl(C?.fm, TF ? TF.peso_kg * TF.bf_pct / 100 : null));
+  const fO = C?.lbm != null ? ffmi(C.lbm, h) : null;
+  const fT = TF?.massa_magra_kg ? ffmi(TF.massa_magra_kg, h) : null;
+  riga('FFMI (normalizzato)', nn(fO?.norm, 1), nn(fT?.norm, 1), dl(fO?.norm, fT?.norm));
+  for (const m of D.misure)
+    riga(m.label, nn(mis[m.id], 1, 'cm'), nn(m.target, 1),
+      dl(mis[m.id], m.target));
+  riga('Vita / altezza', nn(C?.vitaAltezza, 2), nn(C?.t?.vitaAltezza, 2),
+    dl(C?.vitaAltezza, C?.t?.vitaAltezza, 2));
+
+  doc.y = Math.max(yFig + hFig, ty) + 6;
+  doc.paragrafo('Il grasso corporeo '
+    + (C?.fonte === 'bia'
+      ? 'viene da una bioimpedenza registrata' + (C.bia?.k ? ' il ' + C.bia.k : '') + '.'
+      : 'e’ stimato con la formula su vita, collo e altezza, che sbaglia di 3-4 punti.')
+    + ' La massa magra e la massa grassa ne discendono, quindi portano lo stesso errore. '
+    + 'La sagoma piena e’ disegnata sulle circonferenze registrate — cambia quando '
+    + 'cambiano i numeri — ed e’ schematica: serve a leggere le proporzioni, non a fare '
+    + 'una scansione. Il profilo tratteggiato, dove c’e’, e’ il riferimento scelto. '
+    + (TF ? 'Il riferimento e’ ' + (TF.nome || 'il fisico scelto')
+        + (TF.scalato ? ', riportato sulla tua altezza' : '')
+        + ': sono misure dichiarate, non rilevate.'
+      : 'Non e’ stato scelto nessun fisico di riferimento, quindi la colonna del target '
+        + 'resta vuota dove non l’hai impostata a mano.'),
+    { size: 8, col: RES_C.ink3, interlinea: 11 });
+
+  /* --- i tre piani --- */
+  const serie = typeof serieComposizione === 'function' ? serieComposizione(k) : [];
+  const PW = 232, PH = 150, GAP = 22, CW = W - PW - GAP;
+  const piano = (opts, testo) => {
+    doc.serve(PH + 52);
+    doc.y += 18;
+    const y0 = doc.y;
+    pdfPianoXY(doc, { ...opts, x: X + 26, y: y0, w: PW - 26, h: PH });
+    const yT = doc.y;
+    doc.y = y0 - 2;
+    doc.testo(opts.tit, X + PW + GAP, doc.y + 8, { size: 9.5, bold: true, col: RES_C.ink });
+    doc.y += 14;
+    doc.paragrafo(testo, { x: X + PW + GAP, w: CW, size: 8,
+      col: RES_C.ink3, interlinea: 11 });
+    doc.y = Math.max(doc.y, yT + PH + 26);
+  };
+
+  const nfWh = v => nf(v, 2);
+  const bfMax = sesso === 'f' ? 46 : 40;
+  const scia = serie.slice(0, -1);
+
+  /* 1. vita/altezza x grasso */
+  piano({
+    tit: 'Dove sei, sulle fasce di riferimento',
+    x0: 0.38, x1: 0.68, y0: 0, y1: bfMax,
+    labX: 'vita / altezza', labY: 'grasso %',
+    tickX: [0.40, 0.45, 0.50, 0.55, 0.60, 0.65].map(v => ({ v, l: nfWh(v) })),
+    tickY: [0, 10, 20, 30, 40].filter(v => v <= bfMax).map(v => ({ v, l: String(v) })),
+    fasceX: [[0.5, 0.6, '0,5'], [0.6, 0.68, '0,6']],
+    fasceY: PROF_BF[sesso].filter(b => b[0] === 'atleti' || b[0] === 'accettabile')
+      .map(b => [b[1], b[2], b[0]]),
+    punti: [
+      ...scia.map(s => ({ x: s.wh, y: s.bf, tipo: 'scia' })),
+      C?.vitaAltezza && C?.bf != null
+        ? { x: C.vitaAltezza, y: C.bf, tipo: 'ora' } : null,
+      C?.t?.vitaAltezza && C?.t?.bf != null
+        ? { x: C.t.vitaAltezza, y: C.t.bf, tipo: 'target' } : null
+    ].filter(Boolean)
+  }, 'Le due righe verticali sono le soglie di adiposita’ centrale di NICE '
+    + '(NG246): sotto 0,5 la vita sta sotto meta’ dell’altezza, fra 0,5 e 0,6 '
+    + 'l’adiposita’ centrale e’ definita aumentata, oltre 0,6 alta. Le due fasce '
+    + 'orizzontali sono gli intervalli di grasso corporeo dell’American Council '
+    + 'on Exercise per il sesso dichiarato. Sono riferimenti di popolazione e non '
+    + 'un giudizio su questa persona: la letteratura contesta alla soglia 0,5 di '
+    + 'penalizzare gli adulti bassi, perche’ la vita non cresce in proporzione '
+    + 'all’altezza. I pallini grigi sono le rilevazioni precedenti, in ordine di '
+    + 'tempo: quello che conta e’ la direzione, non il punto.');
+
+  /* 2. grassa x magra */
+  const fm0 = [C?.fm, TF ? TF.peso_kg * TF.bf_pct / 100 : null, ...serie.map(s => s.fm)]
+    .filter(v => v > 0);
+  const lb0 = [C?.lbm, TF?.massa_magra_kg, ...serie.map(s => s.lbm)].filter(v => v > 0);
+  if (fm0.length && lb0.length) {
+    const fA = Math.max(0, Math.min(...fm0) - 4), fB = Math.max(...fm0) + 4;
+    const lA = Math.min(...lb0) - 4, lB = Math.max(...lb0) + 4;
+    const pesi = [];
+    for (let s = Math.ceil((fA + lA) / 5) * 5; s <= fB + lB; s += 5) pesi.push(s);
+    piano({
+      tit: 'In che direzione ti stai muovendo',
+      x0: fA, x1: fB, y0: lA, y1: lB,
+      labX: 'massa grassa (kg)', labY: 'massa magra (kg)',
+      tickX: niceTicks(fA, fB, 4).map(v => ({ v, l: nf(v, 0) })),
+      tickY: niceTicks(lA, lB, 4).map(v => ({ v, l: nf(v, 0) })),
+      diag: pesi,
+      punti: [
+        ...scia.map(s => ({ x: s.fm, y: s.lbm, tipo: 'scia' })),
+        C?.fm != null && C?.lbm != null ? { x: C.fm, y: C.lbm, tipo: 'ora' } : null,
+        TF ? { x: TF.peso_kg * TF.bf_pct / 100, y: TF.massa_magra_kg, tipo: 'target' } : null
+      ].filter(Boolean)
+    }, 'Le diagonali tratteggiate sono il peso totale: lungo una di quelle il '
+      + 'numero sulla bilancia non si muove. E’ il motivo per cui questo piano '
+      + 'esiste — una ricomposizione e’ un movimento verso sinistra e verso '
+      + 'l’alto che attraversa le diagonali senza cambiare il peso, e quattro '
+      + 'numeri incolonnati non lo fanno vedere. Andare a sinistra e’ perdere '
+      + 'grasso, salire e’ guadagnare massa magra: le due cose insieme sono '
+      + 'lente, e proprio per questo la scia dice piu’ del punto.');
+  }
+
+  /* 3. FFMI x grasso */
+  if (fO?.norm || fT?.norm) {
+    const tetto = sesso === 'f' ? 22 : 25;
+    const fx = [fO?.norm, fT?.norm, ...serie.map(s => s.ffmi)].filter(v => v > 0);
+    const xA = Math.min(15, Math.floor(Math.min(...fx) - 1));
+    const xB = Math.max(tetto + 2, Math.ceil(Math.max(...fx) + 1));
+    piano({
+      tit: 'Quanto muscolo chiede il fisico che hai scelto',
+      x0: xA, x1: xB, y0: 0, y1: bfMax,
+      labX: 'FFMI normalizzato a 1,80 m', labY: 'grasso %',
+      tickX: niceTicks(xA, xB, 4).map(v => ({ v, l: nf(v, 0) })),
+      tickY: [0, 10, 20, 30, 40].filter(v => v <= bfMax).map(v => ({ v, l: String(v) })),
+      fasceX: [[tetto, xB, 'oltre il limite naturale']],
+      punti: [
+        ...scia.map(s => ({ x: s.ffmi, y: s.bf, tipo: 'scia' })),
+        fO?.norm && C?.bf != null ? { x: fO.norm, y: C.bf, tipo: 'ora' } : null,
+        fT?.norm && TF?.bf_pct != null ? { x: fT.norm, y: TF.bf_pct, tipo: 'target' } : null
+      ].filter(Boolean)
+    }, 'L’FFMI e’ la massa magra divisa il quadrato dell’altezza, normalizzata a '
+      + '1,80 m: dice quanto muscolo porta un corpo indipendentemente da quanto e’ '
+      + 'alto. La banda a destra comincia a ' + tetto + ', che e’ il valore oltre il '
+      + 'quale si esce da quello che si raggiunge senza aiuti — il riferimento viene '
+      + 'dallo studio di Kouri del 1995 su atleti prima e dopo l’era degli steroidi, '
+      + 'ed e’ pratica comune, non una legge. Serve a distinguere un obiettivo '
+      + 'impegnativo da uno che non succede: quanto ci vuole ad arrivarci non e’ '
+      + 'scritto qui, e dipende da quanti anni ci si allena.');
+  }
+
+  doc.y += 4;
+  doc.paragrafo('Nessuno dei tre piani porta una data di arrivo, ed e’ voluto: la '
+    + 'distanza fra il punto pieno e l’anello si legge sugli assi, il tempo per '
+    + 'coprirla dipende dal ritmo di adesso e cambia insieme a quello.',
+    { size: 8, col: RES_C.ink3, interlinea: 11 });
 }

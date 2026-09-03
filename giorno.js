@@ -300,6 +300,30 @@ function macroIngrediente(i, qta) {
   return foodM(i.alimento, q);
 }
 
+/**
+ * I macro di una ricetta, **anche quando e' una copia congelata**.
+ *
+ * `congelaPasto()` scrive `macro: null` sulle ricette che hanno degli
+ * ingredienti, ed e' voluto: i macro si ricalcolano da quelli, cosi'
+ * collegare un prodotto reale corregge anche i pasti gia' registrati. Ma chi
+ * leggeva `p.macro` senza saperlo si trovava `null` in mano, e da li'
+ * nascevano **tre difetti dello stesso ceppo**, tutti su un pasto spuntato:
+ * il confronto col piano dichiarava l'intero pasto come differenza
+ * (`+533 kcal` su un pasto che nessuno aveva toccato), "Sostituisci l'intero
+ * pasto" non trovava nessuna ricetta equivalente, e la sua intestazione
+ * moriva su `null.kcal`.
+ *
+ * Un posto solo da cui leggere i macro di una ricetta, quindi, come `pasto()`
+ * e' l'unico da cui leggerla.
+ */
+function macroRicetta(p) {
+  if (p?.macro?.kcal != null) return p.macro;
+  const m = M0();
+  for (const i of (p?.ingredienti || [])) addM(m, macroIngrediente(i, i.qta));
+  for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) m[x] = Math.round(m[x] * 10) / 10;
+  return m;
+}
+
 /** L'unita' di misura di una riga di ingrediente. */
 function unitaIngrediente(i) {
   if (i.prod && typeof prodotti === 'function') {
@@ -365,8 +389,8 @@ function slotAbituale(code) {
 function pastiEquivalenti(code, k, n = 8) {
   const eff = pastoDelGiorno(code, k);
   const src = ricettaGiorno(code, k);
-  if (!src?.macro?.kcal) return [];
-  const m0 = src.macro;
+  const m0 = macroRicetta(src);
+  if (!m0.kcal) return [];
   const out = [];
   for (const [id, p] of Object.entries(D.pasti)) {
     if (id === eff || !p?.macro?.kcal || !p.ingredienti?.length) continue;
@@ -463,10 +487,19 @@ function sheetPorzioni(k, code) {
   /* Il metro del confronto e' il pasto come lo prevede il PIANO per questo
      slot, non il pasto che c'e' oggi: se hai gia' cambiato l'intero pasto,
      confrontarlo con se stesso direbbe sempre zero. */
+  /* Il metro e' `codiceBase()`, cioe' la ricetta che il **piano** mette in
+     quello slot — non `pasto(code)`, che con una chiave di pasto (`g0-2`) non
+     trovava niente, e nemmeno la ricetta di oggi, che confrontata con se
+     stessa da' sempre zero. Misurato prima della correzione: un pasto
+     sostituito e non ancora spuntato diceva "nessuna differenza" invece di
+     +102 kcal. Se il piano quello slot non ce l'ha piu' — un pasto registrato
+     e poi tolto dalla settimana — non c'e' niente con cui confrontarsi, e il
+     metro torna a essere la ricetta stessa: la riga sparisce, invece di
+     dichiarare "modificato" un pasto di cui il piano ha perso l'originale. */
   const pianoM = () => {
-    const orig = pasto(code);
-    if (orig?.macro) return orig.macro;
-    return p.macro || M0();
+    const b = codiceBase(code, k);
+    const orig = b ? pasto(b) : null;
+    return orig ? macroRicetta(orig) : macroRicetta(p);
   };
   // gli ingredienti di oggi, non quelli del piano: se uno e' stato sostituito
   // le quantita' si contano sull'alimento che c'e' davvero
@@ -782,7 +815,8 @@ function sheetCambiaPasto(k, code) {
   w.append(el('div', 'eyebrow', 'Sostituisci l\'intero pasto'));
   w.append(el('h2', 'sec', esc(src.nome)));
   w.lastChild.style.marginTop = '0';
-  w.append(el('p', 'muted', `${nf(src.macro.kcal)} kcal · ${macroRiga(src.macro)}`));
+  const srcM = macroRicetta(src);
+  w.append(el('p', 'muted', `${nf(srcM.kcal)} kcal · ${macroRiga(srcM)}`));
   w.append(el('p', 'hint',
     'Vale <strong>solo per oggi</strong>, come le porzioni: il piano resta com\'e\' '
     + 'e domani torna il pasto previsto. Le quantita\' e le sostituzioni di '
@@ -813,9 +847,9 @@ function sheetCambiaPasto(k, code) {
       + 'Piano, passo "Le tue ricette".'));
   }
   for (const x of list) {
-    const dk = x.macro.kcal - src.macro.kcal;
+    const dk = x.macro.kcal - srcM.kcal;
     const dd = ([id, l]) => {
-      const q = (x.macro[id] || 0) - (src.macro[id] || 0);
+      const q = (x.macro[id] || 0) - (srcM[id] || 0);
       return `${q >= 0 ? '+' : '−'}${nf(Math.abs(q), 1)} ${l}`;
     };
     const r = el('button', 'swapopt');
@@ -865,10 +899,10 @@ function sheetCambiaPasto(k, code) {
       const pa = pasto(id);
       if (!pa) return;
       const dd = ([mid, l]) => {
-        const q = (pa.macro[mid] || 0) - (src.macro[mid] || 0);
+        const q = (pa.macro[mid] || 0) - (srcM[mid] || 0);
         return `${q >= 0 ? '+' : '\u2212'}${nf(Math.abs(q), 1)} ${l}`;
       };
-      const dk = pa.macro.kcal - src.macro.kcal;
+      const dk = pa.macro.kcal - srcM.kcal;
       const r = el('div', 'read');
       r.innerHTML = `<span>${nf(pa.macro.kcal)} kcal</span>`
         + `<span>${dk >= 0 ? '+' : '\u2212'}${nf(Math.abs(dk))} kcal</span>`
@@ -890,10 +924,10 @@ function sheetCambiaPasto(k, code) {
       /* Il pareggio delle calorie si offre solo se sta dentro i limiti gia'
          dichiarati: oltre quelli mezza porzione non e' piu' quella ricetta,
          ed e' la stessa soglia che usa l'elenco a parita' di macro. */
-      const sc = pa.macro.kcal > 0 ? src.macro.kcal / pa.macro.kcal : 0;
+      const sc = pa.macro.kcal > 0 ? srcM.kcal / pa.macro.kcal : 0;
       if (sc >= 0.6 && sc <= 1.6 && Math.abs(sc - 1) > 0.05)
         metti(+sc.toFixed(2),
-          `\u2026oppure \u00d7${nf(sc, 2)}, per pareggiare le ${nf(src.macro.kcal)} kcal`);
+          `\u2026oppure \u00d7${nf(sc, 2)}, per pareggiare le ${nf(srcM.kcal)} kcal`);
     }, 'Cerca fra le tue ricette\u2026'));
     w.append(esito);
   }

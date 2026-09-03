@@ -170,18 +170,55 @@ function pdfNuovo(o = {}) {
     return doc;
   };
 
-  /* Un cerchio in PDF sono quattro curve di Bezier: 0,5523 e' il rapporto che
+  /* Un'ellisse in PDF sono quattro curve di Bezier: 0,5523 e' il rapporto che
      le fa passare per i quattro punti cardinali senza scarto visibile. */
-  doc.cerchio = (cx, cy, r, opt = {}) => {
-    const y = H - cy, k = r * 0.5523;
+  doc.ellisse = (cx, cy, rx, ry, opt = {}) => {
+    const y = H - cy, kx = rx * 0.5523, ky = ry * 0.5523;
     const dis = opt.fill && opt.stroke ? 'B' : opt.stroke ? 'S' : 'f';
     op(`${opt.fill ? pdfCol(opt.fill) + ' rg ' : ''}${
       opt.stroke ? pdfCol(opt.stroke) + ' RG ' + pdfN(opt.w ?? .8) + ' w ' : ''
-    }[] 0 d ${pdfN(cx - r)} ${pdfN(y)} m `
-      + `${pdfN(cx - r)} ${pdfN(y + k)} ${pdfN(cx - k)} ${pdfN(y + r)} ${pdfN(cx)} ${pdfN(y + r)} c `
-      + `${pdfN(cx + k)} ${pdfN(y + r)} ${pdfN(cx + r)} ${pdfN(y + k)} ${pdfN(cx + r)} ${pdfN(y)} c `
-      + `${pdfN(cx + r)} ${pdfN(y - k)} ${pdfN(cx + k)} ${pdfN(y - r)} ${pdfN(cx)} ${pdfN(y - r)} c `
-      + `${pdfN(cx - k)} ${pdfN(y - r)} ${pdfN(cx - r)} ${pdfN(y - k)} ${pdfN(cx - r)} ${pdfN(y)} c ${dis}`);
+    }[] 0 d ${pdfN(cx - rx)} ${pdfN(y)} m `
+      + `${pdfN(cx - rx)} ${pdfN(y + ky)} ${pdfN(cx - kx)} ${pdfN(y + ry)} ${pdfN(cx)} ${pdfN(y + ry)} c `
+      + `${pdfN(cx + kx)} ${pdfN(y + ry)} ${pdfN(cx + rx)} ${pdfN(y + ky)} ${pdfN(cx + rx)} ${pdfN(y)} c `
+      + `${pdfN(cx + rx)} ${pdfN(y - ky)} ${pdfN(cx + kx)} ${pdfN(y - ry)} ${pdfN(cx)} ${pdfN(y - ry)} c `
+      + `${pdfN(cx - kx)} ${pdfN(y - ry)} ${pdfN(cx - rx)} ${pdfN(y - ky)} ${pdfN(cx - rx)} ${pdfN(y)} c ${dis}`);
+    return doc;
+  };
+  /* Un cerchio e' un'ellisse coi due raggi uguali: due copie della stessa
+     costruzione, prima o poi, diventano due costruzioni diverse. */
+  doc.cerchio = (cx, cy, r, opt = {}) => doc.ellisse(cx, cy, r, r, opt);
+
+  /**
+   * Un percorso preso da un `d` di SVG, ma **solo `M`, `C` e `Z`**.
+   *
+   * Non e' un parser di SVG e non prova a esserlo. `smooth()` — la funzione
+   * che disegna la sagoma del corpo — emette esattamente quei tre comandi,
+   * perche' una Catmull-Rom diventa cubiche e basta, e le cubiche il PDF le
+   * ha native. Un `A` o un `Q` ignorati in silenzio darebbero una figura con
+   * un pezzo mancante, che e' il tipo di difetto che non si vede finche' non
+   * lo si cerca: quindi quello che non e' M/C/Z fa lanciare.
+   *
+   * `sx`, `sy`, `ox`, `oy` portano le unita' del disegno dentro il riquadro
+   * sulla pagina; la `y` si ribalta qui, come in tutto il resto del file.
+   */
+  doc.percorso = (d, opt = {}) => {
+    const sx = opt.sx ?? 1, sy = opt.sy ?? sx, ox = opt.ox ?? 0, oy = opt.oy ?? 0;
+    const PX = v => pdfN(ox + v * sx), PY = v => pdfN(H - (oy + v * sy));
+    const t = String(d || '').trim().split(/[\s,]+/).filter(Boolean);
+    let path = '';
+    for (let i = 0; i < t.length;) {
+      const c = t[i++];
+      if (c === 'M') path += `${PX(+t[i++])} ${PY(+t[i++])} m `;
+      else if (c === 'C') path += `${PX(+t[i++])} ${PY(+t[i++])} `
+        + `${PX(+t[i++])} ${PY(+t[i++])} ${PX(+t[i++])} ${PY(+t[i++])} c `;
+      else if (c === 'Z' || c === 'z') path += 'h ';
+      else throw new Error('pdf.percorso: comando "' + c + '" non gestito');
+    }
+    if (!path) return doc;
+    const dis = opt.fill && opt.stroke ? 'B' : opt.stroke ? 'S' : 'f';
+    op(`${opt.fill ? pdfCol(opt.fill) + ' rg ' : ''}${
+      opt.stroke ? pdfCol(opt.stroke) + ' RG ' + pdfN(opt.w ?? .8) + ' w 1 j 1 J ' : ''
+    }${opt.tratto ? `[${opt.tratto}] 0 d ` : '[] 0 d '}${path}${dis}`);
     return doc;
   };
 

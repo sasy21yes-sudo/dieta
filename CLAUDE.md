@@ -2932,6 +2932,37 @@ produrla, e sono stati chiusi:
   Adesso si chiudono dove nascono (`pulisciStrati()`), e quelli gia' in giro si
   buttano all'avvio.
 
+### `macro: null` non vuol dire zero
+
+`congelaPasto()` scrive `macro: null` sulle ricette che hanno degli
+ingredienti, ed e' voluto: i macro si ricalcolano da quelli, cosi' collegare
+un prodotto reale corregge anche i pasti gia' registrati. Ma chi leggeva
+`p.macro` senza saperlo si trovava `null` in mano, e da li' nascevano **tre
+difetti dello stesso ceppo**, tutti su un pasto spuntato:
+
+1. il confronto col piano dichiarava **l'intero pasto** come differenza —
+   `+533 kcal` su un pasto che nessuno aveva toccato, `+635` su uno
+   sostituito, dove la risposta giusta era +102;
+2. "Sostituisci l'intero pasto" non trovava **nessuna** ricetta equivalente,
+   perche' la guardia era `if (!src?.macro?.kcal) return []`;
+3. e la sua intestazione moriva su `null.kcal`.
+
+Segnalato come "dopo che sostituisco l'intero pasto mi esce +x calorie dove x
+sono le calorie dell'intero pasto". Provandolo si e' visto che il caso
+sostituito era solo il piu' evidente: bastava **spuntare** un pasto.
+
+Ora `macroRicetta(p)` e' il posto solo da cui si leggono i macro di una
+ricetta — se ci sono li' restituisce, altrimenti li ricalcola dagli
+ingredienti — come `pasto()` e' il posto solo da cui si legge una ricetta.
+
+Nello stesso giro il **metro del confronto** era sbagliato di suo. `pianoM()`
+faceva `pasto(code)` dove `code` e' ormai la chiave del **pasto** (`g0-2`),
+che non e' il codice di nessuna ricetta: non trovava niente e ripiegava sulla
+ricetta di oggi, cioe' si confrontava con se stessa. Misurato: un pasto
+sostituito e non ancora spuntato diceva "nessuna differenza" invece di +102
+kcal. Il metro giusto e' `codiceBase()`, la ricetta che il **piano** mette in
+quello slot — che e' quello che il commento sopra la funzione diceva gia'.
+
 ### La sostituzione si applica
 
 Per molto tempo il foglio delle sostituzioni era una tabella: diceva "al posto
@@ -3234,6 +3265,84 @@ di comandi su un canvas e si guarda, e in piu' si controlla a calcolo che
 nessuna riga superi il margine destro — `x + pdfLarghezza(testo)`, con le
 stesse metriche del ritorno a capo. Controllare solo la `x` di partenza non
 serve: una riga che sfora comincia dentro il margine.
+
+### Il PDF si apre con chi e', non con quanto ha mangiato
+
+Il resoconto raccontava **un periodo** e cominciava dai numeri. Ma chi lo
+riceve — un nutrizionista, un medico, un allenatore — quei numeri non li ha
+mai visti, e prima di leggerli ha bisogno di sapere **di chi sono** e **dove
+sta andando** quella persona: le medie settimanali di qualcuno di cui non si
+sa quanto e' alto, quanto pesa e cosa sta cercando di fare sono numeri senza
+soggetto.
+
+La sezione **Profilo** apre percio' la meta' dati del documento, con quattro
+cose: chi, la sagoma disegnata sulle circonferenze vere, la tabella
+ora/target/manca, e tre piani cartesiani.
+
+**Tre piani e non uno**, perche' sono tre domande diverse e la risposta a una
+non contiene le altre:
+
+| Piano | La domanda |
+|---|---|
+| vita/altezza x grasso | quanto sei lontano dalle fasce di riferimento |
+| massa grassa x massa magra | in che direzione ti stai muovendo |
+| FFMI x grasso | quanto muscolo chiede il fisico che hai scelto |
+
+Il secondo e' quello che nessuna tabella sa dire: le **diagonali tratteggiate
+sono il peso totale**, quindi lungo una di quelle la bilancia non si muove, e
+una ricomposizione e' esattamente il movimento che le attraversa — a sinistra
+si perde grasso, in alto si guadagna massa magra. Quattro numeri incolonnati
+non lo fanno vedere.
+
+Su tutti e tre c'e' la **scia** delle rilevazioni precedenti: un punto solo
+dice una posizione, due punti dicono una direzione, ed e' la direzione la cosa
+che si guarda. Si costruisce sulle date in cui la **vita** e' stata misurata —
+le uniche in cui la composizione ha un dato nuovo dalla parte del metro — e
+per collo e fianchi prende l'ultima misura **fino a quel giorno**:
+`lastMeas()` risponde sempre con l'ultima in assoluto, che va benissimo per
+"adesso" e falserebbe il passato.
+
+Le fasce disegnate sono **riferimenti di popolazione, non un giudizio**, ed e'
+scritto sotto ogni piano — la stessa regola delle costanti di Banister:
+
+- **vita/altezza 0,5 e 0,6** — NICE NG246 chiama la prima fascia "adiposita'
+  centrale aumentata" e la seconda "alta". La nota riporta anche l'obiezione
+  della letteratura, che quelle soglie penalizzano gli adulti bassi perche' la
+  vita non cresce in proporzione all'altezza: una soglia con una critica nota
+  si consegna con la critica;
+- **le fasce di grasso corporeo** — American Council on Exercise, distinte per
+  sesso: atleti 6-13 (uomini) e 14-20 (donne), accettabile 18-24 e 25-31;
+- **il tetto dell'FFMI** — 25 e 22, da Kouri 1995. E' lo stesso numero che usa
+  gia' la scheda del fisico di riferimento: usarne uno diverso qui direbbe due
+  cose diverse sulla stessa persona nello stesso documento.
+
+E la regola di sempre, che qui vale doppio perche' il foglio finisce in mano a
+qualcun altro: **niente date di arrivo.** I piani dicono dove sei e dove
+punti, la distanza si legge sugli assi; quanto ci vuole non e' scritto da
+nessuna parte.
+
+Due dettagli del disegno, tutti e due trovati guardando la pagina e non il
+codice:
+
+- **le due etichette vanno da parti opposte**, e quale sia "opposta" lo decide
+  la posizione dei punti. Fisse — target sopra, adesso sotto — si
+  sovrapponevano ogni volta che l'anello finiva sotto il pallino, cioe' nel
+  caso normale di chi sta scendendo di grasso;
+- **una diagonale si taglia sul riquadro, non si scarta**: con `x + y = s`
+  fissato quasi nessuna retta ha tutti e due gli estremi dentro il grafico, e
+  filtrando gli estremi non ne compariva **nessuna**.
+
+Il PDF ha percio' un primitivo in piu': `doc.percorso()` porta dentro la
+pagina un `d` di SVG fatto **solo di `M`, `C` e `Z`**. Non e' un parser e non
+prova a esserlo — `smooth()`, la funzione che disegna la sagoma, emette
+esattamente quei tre comandi perche' una Catmull-Rom diventa cubiche e basta —
+e quello che non e' M/C/Z **fa lanciare**: un `A` ignorato in silenzio darebbe
+una figura con un pezzo mancante, che e' il tipo di difetto che non si vede
+finche' non lo si cerca.
+
+E la sagoma di riferimento, che sullo schermo e' verde tratteggiata, su A4
+prende **un colore suo**: li' la figura sta in quattro centimetri, e due verdi
+a un millimetro di distanza sono la stessa linea.
 
 ### Passare un pezzo di piano
 
@@ -3923,6 +4032,37 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non agganciare l'impegno o `revisioneLetta` a un periodo scelto a mano: sono
   due cose settimanali, e chiudere "dal 3 al 19" non deve zittire la revisione
   di domenica
+- Non leggere `p.macro` da una ricetta che puo' essere congelata: la copia
+  della spunta ha `macro: null` **apposta**, e chi lo prende per zero dichiara
+  l'intero pasto come differenza rispetto al piano. Si passa da
+  `macroRicetta()`
+- Non confrontare un pasto del giorno con la ricetta che ha oggi: si
+  confronta con se stesso e dice sempre zero. Il metro e' `codiceBase()`, la
+  ricetta che il piano mette in quello slot
+- Non aprire il resoconto con i numeri: chi lo riceve non sa di chi sono. La
+  sezione Profilo apre la meta' dati, e la sagoma con la tabella ora/target
+  vengono prima delle medie
+- Non mettere un piano cartesiano solo: "dove sono sulle fasce", "in che
+  direzione vado" e "quanto muscolo chiede il target" sono tre domande, e la
+  risposta a una non contiene le altre
+- Non disegnare un piano grassa/magra senza le diagonali del peso: senza
+  quelle una ricomposizione — il movimento che le attraversa a bilancia
+  ferma — non si vede
+- Non scartare una diagonale quando un estremo cade fuori dal grafico: con
+  `x + y` fissato quasi nessuna ha tutti e due gli estremi dentro, e non ne
+  compare nessuna. Si taglia sul riquadro
+- Non fissare da che parte va l'etichetta di un punto: "target" sopra e
+  "adesso" sotto si sovrappongono ogni volta che l'anello finisce sotto il
+  pallino, cioe' nel caso normale di chi sta scendendo di grasso
+- Non presentare le fasce di NICE e ACE come un giudizio: sono riferimenti di
+  popolazione, e alla soglia 0,5 la letteratura contesta di penalizzare gli
+  adulti bassi. Una soglia con una critica nota si consegna con la critica
+- Non far ignorare in silenzio a `doc.percorso()` un comando SVG che non
+  conosce: una figura con un pezzo mancante non si vede finche' non la si
+  cerca. Fa lanciare, e chi la disegna degrada
+- Non lasciare al riferimento tratteggiato lo stesso colore della sagoma
+  piena: sullo schermo la figura e' grande e due verdi si distinguono, su A4
+  sta in quattro centimetri e sono la stessa linea
 - Non usare `window.print()` per fare un PDF su iOS: dentro una PWA aggiunta
   alla Home la finestra di stampa a volte non si apre, e i margini li decide il
   browser. Il file si genera, e cosi' si sa cosa contiene
