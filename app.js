@@ -1412,7 +1412,13 @@ function viewOggi(v) {
     // il pasto che c'e' oggi: se lo hai cambiato, si vede quello
     const eff = typeof pastoDelGiorno === 'function'
       ? pastoDelGiorno(chiaveP(s), k) : s.codice;
-    const p = pasto(eff), done = !!d.pasti[chiaveP(s)];
+    /* Il nome viene dalla copia congelata quando c'e': riassegnando lo slot,
+       una giornata gia' spuntata si vedeva cambiare il nome del pasto sotto —
+       e con lo slot svuotato scriveva perfino "Da assegnare" su un pasto che
+       era stato mangiato. */
+    const p = (typeof ricettaGiorno === 'function' ? ricettaGiorno(chiaveP(s), k) : null)
+      || pasto(eff);
+    const done = !!d.pasti[chiaveP(s)];
     // slot senza pasto: con il piano vuoto e' la norma, non un errore
     if (!p) {
       const vuoto = el('button', 'meal vuoto');
@@ -1463,7 +1469,11 @@ function viewOggi(v) {
        quasi sempre non si stava cercando niente li' dentro. Si aprono
        toccando il pasto, che e' anche il posto in cui si modificano. */
     const mgOggi = typeof mealMGiorno === 'function' ? mealMGiorno(chiaveP(s), k) : p.macro;
-    const mgPiano = pasto(s.codice)?.macro || p.macro || null;
+    /* Il metro: con una sostituzione il piano, altrimenti la ricetta di
+       allora. Vedi `ricettaMetro()`. */
+    const metro = eff !== s.codice ? pasto(s.codice)
+      : (typeof ricettaMetro === 'function' ? ricettaMetro(chiaveP(s), k) : pasto(s.codice));
+    const mgPiano = metro ? macroRicetta(metro) : null;
     const dk = mgPiano ? Math.round((mgOggi.kcal || 0) - (mgPiano.kcal || 0)) : 0;
     const toccato = eff !== s.codice
       || (typeof porzioniCambiate === 'function' && porzioniCambiate(chiaveP(s), k))

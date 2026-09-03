@@ -2794,6 +2794,46 @@ Nel foglio dello slot la sezione si chiama **"Oppure un alimento solo"**, e
 c'e' anche quando di ricette non ne hai nessuna: chi comincia da zero non deve
 comporre un piatto per segnare una mela.
 
+### I numeri erano al sicuro, il giudizio no
+
+Il congelamento alla spunta protegge i **numeri** di una giornata registrata:
+misurato subito dopo aver messo i pesi per pasto, cambiando i pesi nel piano,
+cambiando la ricetta e perfino riassegnando lo slot a un'altra ricetta, le
+calorie di quel giorno non si sono mosse di una — 635 in tutti e quattro i
+casi, ingredienti congelati compresi, resoconto compreso.
+
+Ma il **giudizio** su quella giornata continuava a nascere dal piano di
+adesso, e li' cambiava tutto:
+
+| Cosa cambiavo nel piano | Cosa diceva la giornata di tre giorni fa |
+|---|---|
+| i pesi di quel pasto | *"rispetto al piano \u2212225 kcal"* |
+| la ricetta | *"rispetto al piano \u2212375 kcal"* |
+| lo slot riassegnato | cambiava **nome**: dichiarava un piatto mai mangiato |
+
+Una giornata che nessuno ha toccato non ha nessuno scarto da dichiarare, e il
+nome del pasto e' quello che hai mangiato — non quello che il piano prevede
+oggi in quel posto. E' l'errore che questo file segnalava gia' da tempo
+(*"basta correggere il piano perche' una giornata mai toccata dichiari
+modificato +150 kcal"*) e che il codice faceva lo stesso: il congelamento era
+finito nei conti e non nel confronto.
+
+`ricettaMetro(sid, k)` e' il metro: **la copia congelata se c'e'**, la ricetta
+del piano altrimenti. Con **una** eccezione, che e' anche la ragione per cui
+non e' `ricettaGiorno()`: se quel giorno il pasto era stato **sostituito**, il
+confronto interessante e' proprio con la ricetta che il piano prevedeva — *"al
+posto di X, +102 kcal"* — e li' il metro torna a essere il piano.
+
+Provati uno per uno, gli scarti **veri** restano tutti: porzione cambiata
+(+190), alimento aggiunto (+371), ingrediente sostituito (+69), pasto intero
+sostituito (+102, spuntato e non spuntato). E i pesi che lo slot ha nel piano
+**non** sono uno scarto: quelli sono il piano, non una modifica del giorno.
+
+Nello stesso giro, due cose che si vedevano solo su una giornata gia'
+spuntata: il **nome** sulla riga di Oggi ora viene dalla copia congelata, e
+con lo slot svuotato nel piano quella riga scriveva *"Da assegnare"* sopra un
+pasto che era stato mangiato.
+
 ### La stessa ricetta, con pesi diversi
 
 Pasta con tonno e' una ricetta sola. Ma il lunedi' puo' essere 50 di pasta e
@@ -3854,6 +3894,18 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non costringere a comporre una ricetta per mettere un alimento solo in un
   pasto: un codice `ali:<qta>:<nome>` risolto da `pasto()` si comporta come
   una ricetta ovunque, senza sporcare l'elenco delle ricette
+- Non far nascere dal piano di adesso il giudizio su una giornata gia'
+  spuntata: i numeri sono congelati ma il confronto no, e correggere il piano
+  faceva dichiarare uno scarto a una giornata che nessuno aveva toccato. Il
+  metro e' `ricettaMetro()`
+- Non prendere il nome di un pasto spuntato dal piano di adesso: riassegnando
+  lo slot la giornata cambia nome, e svuotandolo scrive "Da assegnare" sopra
+  un pasto che e' stato mangiato
+- Non usare la copia congelata come metro quando quel giorno il pasto era
+  stato **sostituito**: li' il confronto con la ricetta del piano e' proprio
+  il senso di "al posto di X, +102 kcal"
+- Non trattare i pesi che uno slot ha nel piano come una modifica del giorno:
+  quelli sono il piano
 - Non far comporre due ricette quasi identiche per due pesature dello stesso
   piatto: l'elenco delle ricette si riempie di "Pasta con tonno 2" e smette di
   essere leggibile. Il codice del pasto porta i pesi (`ric:`), la ricetta resta

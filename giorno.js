@@ -118,6 +118,33 @@ const pastoFatto = (sid, k) => S.log[k]?.fatti?.[sid] || null;
  * ricetta di allora — altrimenti basta correggere il piano oggi perche' una
  * giornata mai toccata si metta a dichiarare "modificato +150 kcal".
  */
+/**
+ * **Il metro del confronto per quel giorno.**
+ *
+ * I numeri di una giornata spuntata erano gia' al sicuro — la copia congelata
+ * li tiene, e correggere il piano non li sposta di un grammo. Ma il
+ * **giudizio** su quella giornata continuava a nascere dal piano di adesso, e
+ * cosi' una giornata mai toccata si metteva a dichiarare uno scarto che non
+ * c'era mai stato. Misurato: spuntata una colazione da 635 kcal e poi cambiati
+ * i pesi di quel pasto nel piano, il foglio scriveva "rispetto al piano
+ * \u2212225 kcal"; cambiando la ricetta, \u2212375; riassegnando lo slot a
+ * un'altra ricetta, la riga di Oggi cambiava perfino **nome**, e dichiarava un
+ * piatto che quel giorno non era stato mangiato.
+ *
+ * Il metro giusto e' la ricetta **di allora**, cioe' la copia congelata. Con
+ * una sola eccezione, che e' anche la ragione per cui questa funzione non e'
+ * `ricettaGiorno()`: se quel giorno il pasto era stato **sostituito**, il
+ * confronto interessante e' proprio con la ricetta che il piano prevedeva —
+ * "al posto di X, +242 kcal" — e li' il metro torna a essere il piano. Chi
+ * chiama distingue i due casi guardando se c'e' una sostituzione.
+ */
+function ricettaMetro(sid, k) {
+  const f = pastoFatto(sid, k);
+  if (f?.ingredienti?.length || f?.macro) return f;
+  const b = codiceBase(sid, k);
+  return (b && pasto(b)) || null;
+}
+
 function ricettaGiorno(sid, k) {
   const f = pastoFatto(sid, k);
   if (f?.ingredienti?.length) return f;
@@ -498,9 +525,12 @@ function sheetPorzioni(k, code) {
      metro torna a essere la ricetta stessa: la riga sparisce, invece di
      dichiarare "modificato" un pasto di cui il piano ha perso l'originale. */
   const pianoM = () => {
-    const b = codiceBase(code, k);
-    const orig = b ? pasto(b) : null;
-    return orig ? macroRicetta(orig) : macroRicetta(p);
+    const b = codiceBase(code, k), eff = pastoDelGiorno(code, k);
+    // con una sostituzione il metro e' il piano — e' il senso di "al posto
+    // di" — senza, e' la ricetta di allora, o correggere il piano farebbe
+    // dichiarare "modificato" a una giornata che nessuno ha toccato
+    const metro = (eff !== b ? pasto(b) : ricettaMetro(code, k)) || p;
+    return macroRicetta(metro);
   };
   // gli ingredienti di oggi, non quelli del piano: se uno e' stato sostituito
   // le quantita' si contano sull'alimento che c'e' davvero
