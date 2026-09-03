@@ -87,6 +87,8 @@ scambio.js      esporta/importa un pezzo solo: la dieta, le schede, o tutti e du
 pdf.js          generatore di PDF scritto a mano (font di base, WinAnsi)
 statistiche.js  i conti del resoconto: registro, settimana, pasti, fuori piano
 confronto.js    due alimenti a confronto: a parita' di peso, calorie, proteine
+ai.js           la classe per le chiamate all'AI: compone la domanda e valida
+                la risposta. Non configurata, e finche' non lo e' si ferma
 sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
 giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
 piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
@@ -829,6 +831,22 @@ Un livello solo, quindi: il **giorno della settimana**. Lo strato per data —
 l'eccezione di questa settimana — c'era ed e' stato tolto insieme al pannello:
 li' si dice **quando la fai**, non quando la sposti, e un giorno senza scheda
 e' riposo senza bisogno di dichiararlo.
+
+**Lo stato di un giorno passato si legge su quello che e' stato registrato**,
+non sul programma di adesso. Senza, smettendo di seguire una scheda tutte le
+sedute fatte con lei passavano da verdi a **oro** — da "fatta" ad "allenamento
+extra" — e riassegnando quel giorno tornavano verdi. Misurato: il dato non si
+perdeva mai (la seduta, le serie, la scheda con cui l'avevi fatta restano tutte
+li'), ma **come si vedeva** dipendeva dal programma di oggi. E' la stessa cosa
+gia' vietata per i pasti e per il target, dalla terza porta.
+
+La seduta si porta quindi dietro `previsto`, timbrato nei **due punti in cui
+una serie viene registrata davvero** — la guida e il salvataggio del modulo,
+gli stessi in cui la seduta nasce. Non e' un doppione di `s.scheda`: si puo'
+fare la giornata di spinta registrandola a mano, e allora la scheda non c'e'
+ma il programma di quel giorno si'. Le sedute gia' registrate le timbra
+`pinnaPassato()` una volta sola, con il programma di adesso — l'unico che c'e'
+— e da li' in poi quel giorno non si muove piu'.
 
 **Gli stati sono cinque, non tre.** Ai tre chiesti se ne aggiungono due che
 cadono da soli e che senza un segno loro mentirebbero:
@@ -3688,6 +3706,56 @@ E la sagoma di riferimento, che sullo schermo e' verde tratteggiata, su A4
 prende **un colore suo**: li' la figura sta in quattro centimetri, e due verdi
 a un millimetro di distanza sono la stessa linea.
 
+### La classe per l'AI, e perche' non tiene una chiave
+
+Serve a valutare il piano, proporne una modifica, comporre una ricetta,
+aggiungere un alimento. Per adesso c'e' **solo la classe**: nessuna
+configurazione, nessuna interfaccia, nessuna chiave. Finche' nessuno chiama
+`configura()` ogni richiesta si ferma con `AI_NON_CONFIGURATA`, che e' meglio
+di partire verso un indirizzo inventato.
+
+Tre vincoli la disegnano, e vengono prima di qualunque comodita'.
+
+**1. Non c'e' un server, quindi non c'e' un posto dove nascondere una chiave.**
+E' lo stesso motivo per cui ExerciseDB e API Ninjas sono state scartate quando
+serviva un catalogo esercizi: una chiave nel codice della pagina e' una chiave
+regalata. `configura()` non prende ne' un URL ne' un segreto: prende un
+**trasporto**, cioe' una funzione `(richiesta) => Promise<testo>` che qualcun
+altro fornira'. Che dietro ci sia un Cloudflare Worker, un proxy o un
+incollaggio a mano non la riguarda, e la classe un segreto non lo vede mai.
+
+**2. Niente si applica da solo.** Ogni compito restituisce una **proposta**:
+un testo e un elenco di `azioni` gia' pulite, che pero' le esegue qualcun
+altro dopo un tocco — `applicata: false` e' un campo, non un commento. E' la
+stessa regola del target ricalibrato: cambiare di nascosto il metro con cui
+l'app giudica le giornate vuol dire che un giorno buono diventa storto senza
+che l'utente abbia fatto niente di diverso.
+
+**3. Le regole dell'app sono un filtro in uscita, non un'istruzione.**
+`AI_REGOLE` finisce nel prompt — niente punteggi al cibo, niente pasti saltati,
+niente date di arrivo — ma `valida()` ricontrolla quello che torna, perche' un
+modello che ignora un'istruzione e' un **caso normale**. Quando una risposta
+tocca una di quelle cose il verdetto non si stampa: resta un avviso che dice
+che e' stato tenuto fuori.
+
+E i numeri passano dagli stessi controlli del resto dell'app: `coerenza()` —
+quella di Open Food Facts — butta un alimento che dichiara 30 kcal con 20 g di
+proteine; una ricetta che nomina un alimento che non hai viene scartata invece
+di crearlo; i macro di una ricetta **non** si leggono dalla risposta ma si
+calcolano da `macroDaIngredienti()`; e un alimento generato nasce
+`fonte: 'stima'`, **mai** `verificato` — quello e' di chi ha letto l'etichetta
+sulla confezione.
+
+**Il contesto e' piccolo di proposito, e non per il costo:** e' roba che esce
+dal telefono. Ogni compito dichiara quali fette porta con se' — profilo,
+target, settimana, ricette, alimenti — e **il diario non c'e'**. Se un compito
+un giorno ne avesse bisogno andrebbe aggiunto li', di proposito e con un nome,
+invece di scivolarci dentro.
+
+Ultima cosa, detta nell'errore e non nascosta: **l'assistente e' l'unica parte
+dell'app che non funziona offline**, e senza rete si ferma subito invece di
+far aspettare dieci secondi un trasporto che non puo' riuscire.
+
 ### Passare un pezzo di piano
 
 Il backup completo c'era gia' e risponde a un'altra domanda: *come non perdo
@@ -3997,6 +4065,20 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non leggere un campo dentro un `setTimeout` senza controllare che ci sia
   ancora: fra il tick e l'esecuzione la pagina puo' essere stata sostituita, e
   quello che resta e' un'eccezione in console che nasconde quelle vere
+- Non far leggere allo stato di un giorno passato il programma di adesso: la
+  seduta resta, ma smettendo di seguire una scheda le sue giornate passano da
+  "fatta" a "extra". Il giorno porta il suo `previsto`
+- Non mettere una chiave in `ai.js` e nemmeno un URL: non c'e' un server dove
+  nasconderla, e una chiave nel codice della pagina e' una chiave regalata. La
+  classe prende un **trasporto**, cioe' una funzione
+- Non far applicare da sola una proposta dell'AI: e' la stessa regola del
+  target ricalibrato, e vale a maggior ragione per qualcosa che genera testo
+- Non fidarsi delle regole scritte nel prompt: un modello che ne ignora una e'
+  un caso normale. Si ricontrolla in uscita
+- Non marcare `verificato` un alimento generato da un modello, e non leggere
+  dalla risposta i macro di una ricetta: si calcolano dagli ingredienti
+- Non allargare il contesto mandato all'AI senza deciderlo: il diario non ne
+  fa parte, e ci finirebbe dentro per comodita'
 - Non tenere in Gym un bottone che porta dove porta gia' un riquadro della
   griglia: "Cardio" era in due posti a tre centimetri di distanza
 - Non mostrare un mese intero in una striscia di giorni: si scorre per trovare

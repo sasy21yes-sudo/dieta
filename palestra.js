@@ -667,6 +667,29 @@ function assegnaSettimana(id, giorni) {
 }
 
 /**
+ * Cosa era in programma **quel giorno**, non oggi.
+ *
+ * Una seduta si porta dietro la scheda con cui e' stata fatta (`s.scheda`) e,
+ * da adesso, quella che quel giorno era in programma (`s.previsto`): sono due
+ * cose diverse — si puo' fare la giornata di spinta registrandola a mano — e
+ * tutte e due dicono "quella era la seduta prevista".
+ *
+ * Per una giornata **passata** il programma di adesso non c'entra niente:
+ * senza il timbro, smettendo di seguire una scheda tutte le sedute fatte con
+ * lei diventavano "allenamento extra" — da verdi a oro — e riassegnando quel
+ * giorno tornavano verdi. Misurato: il dato non si perdeva mai, ma il modo in
+ * cui si vedeva dipendeva dal programma di oggi, che e' la stessa cosa gia'
+ * vietata per i pasti e per il target.
+ */
+function previstoQuelGiorno(k) {
+  const s = P().sessioni?.[k];
+  if (s && (s.scheda || s.previsto)) return s.scheda || s.previsto;
+  // il timbro non c'e' e nemmeno la seduta: per il passato non c'e' niente da
+  // sapere, per oggi e per domani vale il programma
+  return k < today() && s ? null : schedaDelGiorno(k);
+}
+
+/**
  * Lo stato di un giorno, e sono **cinque** e non tre.
  *
  * Ai tre chiesti — da allenare, fatta, extra — se ne aggiungono due che
@@ -677,10 +700,23 @@ function assegnaSettimana(id, giorni) {
  */
 function statoAllenamento(k) {
   const fatto = typeof allenatoIl === 'function' && allenatoIl(k);
+  if (fatto) return previstoQuelGiorno(k) ? 'fatta' : 'extra';
   const prev = schedaDelGiorno(k);
-  if (fatto) return prev ? 'fatta' : 'extra';
   if (!prev) return 'riposo';
   return k < today() ? 'saltata' : 'attesa';
+}
+
+/**
+ * Il timbro: cosa era in programma il giorno in cui la seduta nasce.
+ *
+ * Si scrive nei **due punti in cui una serie viene registrata davvero** — la
+ * guida e il salvataggio del modulo — perche' sono gli stessi in cui nasce la
+ * seduta, e aprire una schermata non deve timbrare niente.
+ */
+function timbraPrevisto(k) {
+  const s = P().sessioni?.[k];
+  if (!s || s.previsto !== undefined) return;
+  s.previsto = schedaDelGiorno(k) || '';
 }
 
 const STATO_GYM = {
@@ -2128,6 +2164,7 @@ function sheetDaScheda(k, schedaId, sostPre) {
     // la giornata nasce qui, con la prima serie vera dentro: aprendo il
     // modulo e uscendo non deve restare niente nel registro
     const s = p.sessioni[k] ||= { nome: '', serie: [] };
+    timbraPrevisto(k);
     s.serie = serie;
     s.nome = sc.nome;
     s.scheda = sc.id;
@@ -2262,7 +2299,7 @@ function sheetLibero(k, crea = false) {
      - **tornando da una serie cancellata**: se era l'ultima, la seduta e'
        sparita dal registro, e ricrearla vuota rimetterebbe dentro proprio
        quello che si e' appena tolto. Li' si torna alla scelta. */
-  if (crea) p.sessioni[k] ||= { nome: '', serie: [] };
+  if (crea) { p.sessioni[k] ||= { nome: '', serie: [] }; timbraPrevisto(k); }
   if (!p.sessioni[k]) return sheetSceltaModo(k);
   const s = p.sessioni[k];
   const w = el('div');

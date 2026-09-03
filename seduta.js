@@ -332,6 +332,7 @@ function sheetGuidata(k, schedaId) {
   const p = P(), sc = scheda(schedaId);
   if (!sc) return sheetSceltaModo(k);
   p.sessioni[k] ||= { nome: '', serie: [] };
+  if (typeof timbraPrevisto === 'function') timbraPrevisto(k);
   const s = p.sessioni[k];
 
   // una seduta gia' cominciata con un'altra scheda non si sovrascrive di

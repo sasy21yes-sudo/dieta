@@ -1251,6 +1251,17 @@ function pinnaPassato() {
       const t = dayTargetVivo(k);
       if (t?.kcal > 0) { d.target = { ...t }; tocco = true; }
     }
+    /* E il timbro sulle sedute di palestra gia' registrate: senza, smettendo
+       di seguire una scheda le loro spunte passavano da verdi a oro. La
+       ricostruzione usa il programma di adesso — l'unico che c'e' — e da li'
+       in poi quel giorno non si muove piu'. Come per i pasti: non e' la
+       storia vera, e' la fine della deriva. */
+    const sg = S.palestra?.sessioni?.[k];
+    if (sg && sg.serie?.length && sg.previsto === undefined
+        && typeof schedaDelGiorno === 'function') {
+      sg.previsto = sg.scheda || schedaDelGiorno(k) || '';
+      tocco = true;
+    }
   }
   if (tocco) save();
 }
