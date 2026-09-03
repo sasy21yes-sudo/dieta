@@ -630,25 +630,39 @@ const MESI_L = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'l
                 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 
 function gymSettimana() { P().settimana ||= {}; return P().settimana; }
-function gymGiorni() { P().giorni ||= {}; return P().giorni; }
 
-/** La scheda prevista: l'eccezione della data se c'e', se no il programma. */
+/**
+ * La scheda prevista per quel giorno.
+ *
+ * Un livello solo: il **giorno della settimana**. C'era anche uno strato per
+ * data — l'eccezione di questa settimana — ed e' stato tolto quando
+ * l'assegnazione si e' spostata dentro "Segui questa scheda": li' si dice
+ * quando la fai, non quando la sposti. Un giorno senza scheda e' riposo, e
+ * non serve dichiararlo.
+ */
 function schedaDelGiorno(k) {
-  const g = gymGiorni();
-  const id = Object.prototype.hasOwnProperty.call(g, k) ? g[k] : gymSettimana()[dayIdx(k)];
+  const id = gymSettimana()[dayIdx(k)];
   return id && scheda(id) ? id : null;
 }
 
-/** `true` se quel giorno e' dichiarato di riposo (e non solo "non deciso"). */
-function riposoDichiarato(k) {
-  const g = gymGiorni();
-  const v = Object.prototype.hasOwnProperty.call(g, k) ? g[k] : gymSettimana()[dayIdx(k)];
-  return v === '';
+/** I giorni della settimana in cui quella scheda e' in programma. */
+function giorniScheda(id) {
+  const w = gymSettimana();
+  return [0, 1, 2, 3, 4, 5, 6].filter(i => w[i] === id);
 }
 
-function assegnaGiorno(k, id, ricorrente) {
-  if (ricorrente) { gymSettimana()[dayIdx(k)] = id ?? ''; delete gymGiorni()[k]; }
-  else gymGiorni()[k] = id ?? '';
+/**
+ * Mette la scheda su quei giorni e la toglie dagli altri.
+ *
+ * Un giorno tiene **una** scheda: assegnarne una a un giorno gia' preso la
+ * sostituisce, e il foglio lo scrive invece di farlo scoprire dopo.
+ */
+function assegnaSettimana(id, giorni) {
+  const w = gymSettimana();
+  for (const i of [0, 1, 2, 3, 4, 5, 6]) {
+    if (giorni.includes(i)) w[i] = id;
+    else if (w[i] === id) delete w[i];
+  }
   save();
 }
 
@@ -697,7 +711,13 @@ function stripCalendario() {
     const k = addDays(da, i);
     const st = statoAllenamento(k);
     const id = schedaDelGiorno(k);
-    const b = el('button', 'gcal-d ' + st + (k === oggi ? ' oggi' : ''));
+    /* **Il giorno non e' un bottone se non c'e' niente da vedere.** Apre il
+       riassunto dell'allenamento, e un riassunto di una giornata vuota e' un
+       foglio che si apre per dire che non ha niente da dire. */
+    const apribile = typeof allenatoIl === 'function' && allenatoIl(k);
+    const b = el('button', 'gcal-d ' + st + (k === oggi ? ' oggi' : '')
+      + (apribile ? '' : ' muto'));
+    b.disabled = !apribile;
     b.innerHTML = `<span class="dow">${GG_INI[dayIdx(k)]}</span>
       <span class="num">${+k.slice(8)}</span>
       <span class="box">${st === 'fatta' || st === 'extra'
@@ -705,7 +725,7 @@ function stripCalendario() {
     b.setAttribute('aria-label', `${dataLunga(k)}: ${STATO_GYM[st]}`
       + (id ? ', ' + (scheda(id)?.nome || '') : ''));
     b.title = b.getAttribute('aria-label');
-    b.onclick = () => sheetGiornoGym(k);
+    if (apribile) b.onclick = () => sheetRiassuntoGiorno(k);
     if (k === oggi) qui = b;
     sc.append(b);
   }
@@ -730,100 +750,124 @@ function stripCalendario() {
 }
 
 /**
- * Il giorno, aperto.
+ * Il giorno, aperto: **un riassunto e basta.**
  *
- * Prende il posto dei due bottoni che c'erano prima, e ne fa una cosa sola:
- * qui si vede cosa era previsto, si comincia, si registra, e si assegna la
- * scheda. Per un giorno futuro le azioni di registrazione non ci sono — non
- * si registra un allenamento che non e' stato fatto, che e' la stessa regola
- * gia' scritta per la scheda Oggi del diario.
+ * La prima versione era un pannello di comando — comincia, registra, cardio,
+ * assegna la scheda — e sbagliava due volte. Toccando un giorno qualunque
+ * della striscia si chiedeva di **decidere**, mentre quello che si vuole
+ * guardando indietro e' *com'e' andata*; e l'assegnazione della scheda finiva
+ * su una data, che e' il posto sbagliato per una cosa che si ripete ogni
+ * settimana — quella sta dentro "Segui questa scheda".
+ *
+ * Dove c'e' una seduta di pesi il riassunto e' gia' scritto e vale il suo:
+ * `sheetResoconto()` risponde con volume, dove e' finito il lavoro, i
+ * massimali mai visti prima e il confronto con le sedute confrontabili.
+ * Rifarne uno qui vorrebbe dire mantenere due versioni degli stessi conti.
  */
-function sheetGiornoGym(k) {
-  const oggi = today(), futuro = k > oggi;
-  const id = schedaDelGiorno(k), sc = id ? scheda(id) : null;
+function sheetRiassuntoGiorno(k) {
   const serie = typeof serieDelGiorno === 'function' ? serieDelGiorno(k) : [];
+  if (serie.length && typeof sheetResoconto === 'function') return sheetResoconto(k);
+
   const card = typeof cardioDi === 'function' ? cardioDi(k) : [];
-  const st = statoAllenamento(k);
-
   const w = el('div');
-  w.append(el('div', 'eyebrow', k === oggi ? 'Oggi' : dataLunga(k)));
-  w.append(el('h2', 'sec', sc ? esc(sc.nome)
-    : riposoDichiarato(k) ? 'Riposo' : 'Nessuna scheda assegnata'));
+  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : dataLunga(k)));
+  w.append(el('h2', 'sec', card.length ? 'Cardio' : 'Allenamento'));
   w.lastChild.style.marginTop = '0';
+  const st = statoAllenamento(k);
   w.append(el('div', 'gcal-st ' + st, STATO_GYM[st]));
-
-  if (serie.length || card.length) {
-    const parti = [];
-    if (serie.length) {
-      const ton = typeof tonnellaggioSerie === 'function'
-        ? serie.reduce((a, s) => a + tonnellaggioSerie(s), 0)
-        : serie.reduce((a, s) => a + (+s.kg || 0) * (+s.reps || 0), 0);
-      parti.push(`${serie.length} serie \u00b7 ${nf(ton)} kg`);
-    }
-    for (const c of card)
-      parti.push(`${esc(cardioTipo(c.tipo).n)} \u00b7 ${hms2(c.durata_s || 0)}`);
-    w.append(el('p', 'muted', parti.join(' \u00b7 ')));
-  }
-
-  if (!futuro) {
-    if (sc && typeof sheetGuidata === 'function') {
-      const b = el('button', 'btn wide pri', serie.length
-        ? 'Continua \u00b7 ' + sc.nome : 'Comincia \u00b7 ' + sc.nome);
-      b.onclick = () => sheetGuidata(k, sc.id);
-      w.append(b);
-    }
-    const b2 = el('button', 'btn wide' + (sc ? '' : ' pri'),
-      serie.length ? 'Apri la seduta' : 'Registra pesi');
-    b2.style.marginTop = '8px';
-    b2.onclick = () => sheetSeduta(k);
-    w.append(b2);
-    const b3 = el('button', 'btn wide', 'Cardio');
-    b3.style.marginTop = '8px';
-    b3.onclick = () => { gymTab = 'cardio'; closeSheet(); route(); };
-    w.append(b3);
+  if (card.length) for (const c of card) {
+    const r = el('div', 'cmp-r');
+    r.innerHTML = `<span>${esc(cardioTipo(c.tipo).n)}</span>`
+      + `<span class="mono">${hms2(c.durata_s || 0)}</span>`
+      + `<span class="mono muted">${c.distanza_m ? nf(c.distanza_m / 1000, 2) + ' km' : ''}</span>`
+      + '<span></span>';
+    w.append(r);
   } else {
-    w.append(el('p', 'hint',
-      'Non e\u2019 ancora arrivato: qui si assegna la scheda, si registra quando '
-      + 'e\u2019 il giorno.'));
+    w.append(el('p', 'muted', 'Niente registrato in questo giorno.'));
   }
-
-  /* --- assegna --- */
-  w.append(el('h2', 'sec', 'Cosa e\u2019 previsto'));
-  let ric = true;
-  const seg = el('div', 'seg');
-  const bot = [];
-  [[true, 'Tutti i ' + GYM_GG[dayIdx(k)]], [false, 'Solo questo giorno']]
-    .forEach(([v, lab]) => {
-      const b = el('button', null, lab);
-      b.setAttribute('aria-pressed', String(ric === v));
-      b.onclick = () => { ric = v; bot.forEach(x => x[0].setAttribute('aria-pressed',
-        String(x[1] === ric))); };
-      bot.push([b, v]); seg.append(b);
-    });
-  w.append(seg);
-  w.append(el('p', 'hint', 'Il programma si ripete ogni settimana. "Solo questo '
-    + 'giorno" e\u2019 l\u2019eccezione: sposta una seduta senza toccare il programma.'));
-
-  const lista = el('div');
-  const riga = (nome, sub, val, attivo) => {
-    const r = el('button', 'prod' + (attivo ? ' on' : ''));
-    r.innerHTML = `<div class="grow"><div class="nm">${esc(nome)}</div>
-      <div class="mt">${esc(sub)}</div></div>
-      <div class="kc">${attivo ? '\u2713' : ''}</div>`;
-    r.onclick = () => { assegnaGiorno(k, val, ric); sheetGiornoGym(k); route(); };
-    lista.append(r);
-  };
-  for (const s of schede()) {
-    const n = (s.righe || []).length;
-    riga(s.nome, n + (n === 1 ? ' esercizio' : ' esercizi'), s.id, id === s.id);
-  }
-  if (!schede().length) lista.append(el('p', 'hint',
-    'Non hai ancora nessuna scheda. Si compongono in Gym \u203a Schede.'));
-  riga('Riposo', 'Nessun allenamento previsto', '', !id && riposoDichiarato(k));
-  w.append(lista);
-
   const ind = el('button', 'btn wide', 'Chiudi');
   ind.style.marginTop = '12px';
+  ind.onclick = closeSheet;
+  w.append(ind);
+  sheet(w);
+}
+
+/**
+ * **Quando la fai.** L'assegnazione sta qui, non su una data.
+ *
+ * Seguire una scheda e assegnarla ai giorni sono la stessa decisione detta
+ * due volte: "questa e' la mia giornata di spinta, la faccio il lunedi'".
+ * Tenerle separate — una nel foglio della scheda, l'altra nel calendario —
+ * voleva dire farla due volte e poterle far dire cose diverse.
+ *
+ * **Sporadica** non e' un ripiego: una scheda si puo' seguire senza un giorno
+ * fisso — l'app la monitora lo stesso — e senza quella voce l'unico modo di
+ * dirlo sarebbe non seguirla, che e' un'altra cosa.
+ */
+function sheetSeguiScheda(id) {
+  const sc = scheda(id);
+  if (!sc) return;
+  const sel = new Set(giorniScheda(id));
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Segui la scheda'));
+  w.append(el('h2', 'sec', esc(sc.nome)));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'L\u2019app misura i progressi su di lei: quanto sale ogni esercizio, e quando '
+    + 'conviene passare a un altro blocco.'));
+
+  w.append(el('h2', 'sec', 'Quando la fai'));
+  w.append(el('p', 'muted',
+    'I giorni scelti la mettono in programma nel calendario di Gym. Un giorno '
+    + 'tiene una scheda sola: se ne aveva un\u2019altra, questa la sostituisce.'));
+  const chips = el('div', 'seg wrap chips');
+  const nota = el('p', 'hint');
+  const scrivi = () => {
+    const w7 = gymSettimana();
+    const rub = [...sel].filter(i => w7[i] && w7[i] !== id)
+      .map(i => scheda(w7[i])?.nome).filter(Boolean);
+    nota.innerHTML = sel.size
+      ? `In programma ${[...sel].sort().map(i => GYM_GG[i]).join(', ')}.`
+        + (rub.length ? ` Prende il posto di <strong>${esc([...new Set(rub)].join(', '))}</strong>.` : '')
+      : 'Nessun giorno fisso: la scheda resta <strong>sporadica</strong>. '
+        + 'L\u2019app la monitora lo stesso, e nel calendario non compare in programma.';
+  };
+  for (let i = 0; i < 7; i++) {
+    const b = el('button', null, GYM_GG[i].slice(0, 3));
+    b.setAttribute('aria-pressed', String(sel.has(i)));
+    b.onclick = () => {
+      if (sel.has(i)) sel.delete(i); else sel.add(i);
+      b.setAttribute('aria-pressed', String(sel.has(i)));
+      scrivi();
+    };
+    chips.append(b);
+  }
+  w.append(chips, nota);
+  scrivi();
+
+  const ok = el('button', 'btn wide pri', segui(id) ? 'Salva' : 'Segui questa scheda');
+  ok.style.marginTop = '12px';
+  ok.onclick = () => {
+    seguiScheda(id, true);
+    assegnaSettimana(id, [...sel]);
+    closeSheet(); route();
+    toast(sel.size ? 'In programma ' + [...sel].sort().map(i => GYM_GG[i].slice(0, 3)).join(', ')
+      : 'La segui, senza giorno fisso');
+  };
+  w.append(ok);
+
+  if (segui(id)) {
+    const via = el('button', 'btn wide', 'Smetti di seguirla');
+    via.style.marginTop = '8px';
+    via.onclick = () => {
+      seguiScheda(id, false);
+      assegnaSettimana(id, []);       // esce anche dal calendario
+      closeSheet(); route(); toast('Non la segui piu\u2019');
+    };
+    w.append(via);
+  }
+  const ind = el('button', 'btn wide', 'Annulla');
+  ind.style.marginTop = '8px';
   ind.onclick = closeSheet;
   w.append(ind);
   sheet(w);
@@ -863,10 +907,16 @@ function viewPalestra(v) {
      non si poteva fare da nessuna parte. */
   testa.append(stripCalendario());
   const scOggi = schedaDelGiorno(k);
-  testa.append(el('div', 'gcal-oggi',
-    `<span class="t">${scOggi ? esc(scheda(scOggi).nome)
-      : riposoDichiarato(k) ? 'Riposo' : 'Niente in programma'}</span>`
-    + `<span class="d">${STATO_GYM[statoAllenamento(k)]}</span>`));
+  const pie = el('div', 'gcal-oggi');
+  pie.innerHTML = `<span class="body"><span class="t">${
+      scOggi ? esc(scheda(scOggi).nome) : 'Niente in programma'}</span>`
+    + `<span class="d">${STATO_GYM[statoAllenamento(k)]}</span></span>`;
+  /* Il bottone in basso a destra, e non piu' due in fila sotto la carta:
+     registrare e' l'unica cosa che si fa da qui, e la striscia sopra dice
+     gia' quando. */
+  const bReg = el('button', 'btn pri', oggi ? 'Continua' : 'Registra allenamento');
+  bReg.onclick = () => sheetSeduta(k);
+  pie.append(bReg);
   if (oggi || card2.length) {
     const parti = [];
     if (oggi) {
@@ -880,6 +930,9 @@ function viewPalestra(v) {
   } else {
     testa.append(el('div', 'muted', 'Niente registrato oggi.'));
   }
+  /* Il piede va in fondo davvero: fra la scheda di oggi e cosa hai gia'
+     registrato il bottone spezzava in due righe che si leggono insieme. */
+  testa.append(pie);
   /* I due bottoni erano qui. Se ne va anche "Cardio": e' gia' un riquadro
      della griglia qui sotto, e averlo in due posti a tre centimetri di
      distanza non aggiungeva una destinazione. */
@@ -2589,19 +2642,23 @@ function sheetScheda(id, statoPre) {
     const altre = schedeSeguite().filter(x => x !== id).length;
     const bs = el('button', 'btn wide' + (seguita ? ' pri' : ''));
     bs.style.marginTop = '8px';
-    bs.textContent = seguita ? '\u2713 La stai seguendo' : 'Segui questa scheda';
-    bs.onclick = () => {
-      seguiScheda(id);
-      closeSheet(); route();
-      toast(seguita ? 'Non la segui piu\'' : 'Da ora l\'app la monitora');
-    };
+    const gg = giorniScheda(id);
+    bs.textContent = seguita
+      ? '\u2713 La segui' + (gg.length
+          ? ' \u00b7 ' + gg.map(i => GYM_GG[i].slice(0, 3)).join(', ') : ' \u00b7 sporadica')
+      : 'Segui questa scheda';
+    /* Seguire una scheda e dire **quando** la fai sono la stessa decisione, e
+       prima erano due: una qui, l'altra sul calendario. Farla due volte vuol
+       dire poterle far dire cose diverse. */
+    bs.onclick = () => sheetSeguiScheda(id);
     w.append(bs);
     w.append(el('p', 'hint',
       seguita
         ? 'L\'app guarda le sedute fatte con questa scheda e ti dice quando la '
-          + 'progressione si ferma. Toccando di nuovo smetti, e le altre restano.'
+          + 'progressione si ferma. Da li\' si cambiano i giorni, o si smette.'
         : 'Seguirla vuol dire che l\'app misura i progressi su di lei — quanto sale '
-          + 'ogni esercizio, e quando conviene passare a un altro blocco.'
+          + 'ogni esercizio, e quando conviene passare a un altro blocco. Li\' si '
+          + 'sceglie anche in che giorni la fai, o se e\' sporadica.'
           + (altre ? ` Le altre ${altre === 1 ? 'che segui gia\' resta' : 'che segui gia\' restano'}: `
               + 'un programma e\' fatto di piu\' giornate.' : '')));
 

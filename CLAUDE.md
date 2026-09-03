@@ -797,13 +797,38 @@ sempre; due settimane dietro sono tutto quello che serve per sapere se questa
 e' andata come la scorsa; avanti bastano sette giorni, perche' il programma si
 ripete e l'ottavo mostrerebbe lo stesso.
 
-**L'assegnazione ha due livelli**, come il piano alimentare: il giorno della
-settimana (`P().settimana`) e' il **programma** e si ripete da solo; la data
-(`P().giorni`) e' l'**eccezione** di questa settimana. Senza il primo si
-riscriverebbe tutto ogni sette giorni; senza il secondo non si potrebbe
-spostare una seduta al martedi' perche' lunedi' e' saltato. `''` non e'
-"niente": e' **riposo dichiarato**, e serve a distinguerlo da "non ho ancora
-deciso" — sono due cose diverse, e solo la seconda va riempita.
+**Un giorno non e' un pannello di comando.** La prima versione apriva, per
+ogni giorno della striscia, un foglio con dentro comincia, registra, cardio e
+l'assegnazione della scheda: toccando un giorno qualunque si chiedeva di
+**decidere**, mentre quello che si vuole guardando indietro e' *com'e'
+andata*. Adesso un giorno si apre **solo se c'e' qualcosa da vedere** — il
+bottone e' `disabled` quando la giornata e' vuota, perche' un riassunto che si
+apre per dire che non ha niente da dire e' un tocco sprecato — e quello che
+mostra e' il **resoconto della seduta** che esiste gia': volume, dove e' finito
+il lavoro, i massimali mai visti prima. Rifarne uno qui vorrebbe dire
+mantenere due versioni degli stessi conti.
+
+Registrare e' **un bottone solo, in basso a destra** della striscia. In fondo
+davvero: messo fra la scheda di oggi e cosa hai gia' registrato spezzava in due
+righe che si leggono insieme.
+
+**L'assegnazione sta dentro "Segui questa scheda".** Seguire una scheda e dire
+quando la fai sono la stessa decisione detta due volte — *"questa e' la mia
+giornata di spinta, la faccio il lunedi'"* — e tenerle separate, una nel foglio
+della scheda e una nel calendario, voleva dire farla due volte e poterle far
+dire cose diverse. Il foglio ha le sette pastiglie dei giorni, e un giorno
+tiene **una** scheda sola: assegnarne una a un giorno gia' preso la
+sostituisce, e la nota lo scrive invece di farlo scoprire dopo. Smettere di
+seguirla la toglie anche dal calendario.
+
+**"Sporadica" non e' un ripiego**: una scheda si puo' seguire senza un giorno
+fisso — l'app la monitora lo stesso — e senza quella voce l'unico modo di dirlo
+sarebbe non seguirla, che e' un'altra cosa.
+
+Un livello solo, quindi: il **giorno della settimana**. Lo strato per data —
+l'eccezione di questa settimana — c'era ed e' stato tolto insieme al pannello:
+li' si dice **quando la fai**, non quando la sposti, e un giorno senza scheda
+e' riposo senza bisogno di dichiararlo.
 
 **Gli stati sono cinque, non tre.** Ai tre chiesti se ne aggiungono due che
 cadono da soli e che senza un segno loro mentirebbero:
@@ -3977,11 +4002,17 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non mostrare un mese intero in una striscia di giorni: si scorre per trovare
   il giorno in cui si e' quasi sempre. Due settimane dietro e una avanti, e si
   apre su oggi
-- Non assegnare le schede solo alle date: un programma si ripete, e riscriverlo
-  ogni sette giorni non lo fa nessuno. Il giorno della settimana e' il
-  programma, la data e' l'eccezione
-- Non confondere "riposo" con "non ho ancora deciso": solo il secondo va
-  riempito, e trattarli uguale fa chiedere all'app una cosa che hai gia' deciso
+- Non assegnare le schede alle date: un programma si ripete, e riscriverlo
+  ogni sette giorni non lo fa nessuno. Si assegna al giorno della settimana,
+  e si fa dove si decide di seguire la scheda — sono la stessa decisione
+- Non trasformare un giorno del calendario in un pannello di comando: toccando
+  un giorno passato si vuole sapere com'e' andata, non decidere. E un giorno
+  vuoto non si apre affatto
+- Non riscrivere il riassunto di una seduta dentro il calendario:
+  `sheetResoconto()` c'e' gia', e due versioni degli stessi conti prima o poi
+  dicono due cose diverse
+- Non togliere "sporadica" dalle scelte: una scheda si puo' seguire senza un
+  giorno fisso, e senza quella voce l'unico modo di dirlo sarebbe non seguirla
 - Non dare a un giorno passato e saltato lo stesso segno di domani: direbbe che
   c'e' ancora tempo
 - Non usare l'ambra per l'allenamento extra: in quest'app l'ambra vuol dire

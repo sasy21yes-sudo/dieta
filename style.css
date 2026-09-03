@@ -364,10 +364,19 @@ button.swapopt:active{background:var(--wash)}
 .gcal-d:active .box{transform:scale(.9)}
 
 /* La riga sotto la striscia: cosa tocca oggi, in una riga sola. */
-.gcal-oggi{display:flex;align-items:baseline;justify-content:space-between;
-  gap:10px;margin-top:10px}
-.gcal-oggi .t{font-weight:600;color:var(--ink)}
+/* Il piede della striscia: a sinistra cosa tocca oggi, a destra il solo
+   bottone rimasto. Prima erano due bottoni in fila sotto la carta; registrare
+   e' l'unica cosa che si fa da qui, e la striscia sopra dice gia' quando. */
+.gcal-oggi{display:flex;align-items:center;justify-content:space-between;
+  gap:12px;margin-top:12px}
+.gcal-oggi .body{display:flex;flex-direction:column;min-width:0}
+.gcal-oggi .t{font-weight:600;color:var(--ink);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
 .gcal-oggi .d{font-size:12px;color:var(--ink-3);white-space:nowrap}
+.gcal-oggi .btn{flex:0 0 auto}
+
+/* Un giorno senza niente dentro non si apre, e si vede che non si apre. */
+.gcal-d.muto{cursor:default}
 
 /* La pastiglia dello stato, dentro il foglio del giorno. */
 .gcal-st{display:inline-block;font-size:11px;padding:3px 9px;border-radius:999px;
