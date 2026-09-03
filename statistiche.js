@@ -146,8 +146,12 @@ function statPasti(per) {
       // la spunta e' indicizzata sul PASTO: due pasti con la stessa ricetta
       // sono due righe distinte anche qui
       const preso = !!log?.pasti?.[chiaveP(sl)];
+      /* Il piatto si conta una volta sola anche se in due giorni lo pesi
+         diverso: "quante volte era previsto e quante l'hai spuntato" e' una
+         domanda sulla ricetta, e due righe con lo stesso nome nel resoconto
+         sembrerebbero un errore di stampa. */
       for (const [mappa, chiave, etichetta] of
-           [[perSlot, sl.slot, sl.slot], [perPasto, sl.codice, nome]]) {
+           [[perSlot, sl.slot, sl.slot], [perPasto, codiceBaseRic(sl.codice), nome]]) {
         const r = mappa.get(chiave) || { chiave, nome: etichetta, previsti: 0, spuntati: 0 };
         r.previsti++; if (preso) r.spuntati++;
         mappa.set(chiave, r);

@@ -246,10 +246,88 @@ function foodM(nome, qta) {
 const PRE_ALI = 'ali:';
 const codiceAlimento = (nome, qta) => PRE_ALI + (+qta || 0) + ':' + nome;
 
+/* ============================ la stessa ricetta con pesi diversi
+ *
+ * La stessa ricetta puo' comparire in due giorni con quantita' diverse: pasta
+ * e tonno 100/100 il lunedi', 50/150 il giovedi'. E' lo stesso piatto — stesso
+ * nome, stessi ingredienti, stesso posto nell'elenco — e finora le strade
+ * erano due, tutte e due sbagliate: comporre due ricette quasi identiche, e
+ * ritrovarsi un elenco di "Pasta con tonno", "Pasta con tonno 2" che non si
+ * legge piu'; oppure cambiare le porzioni dal diario, che pero' vale **un
+ * giorno solo** e non entra nella lista della spesa.
+ *
+ * La strada scelta e' la stessa dell'alimento singolo, e per la stessa
+ * ragione: **non tocca il modello.** Il codice del pasto diventa
+ * `ric:<ricetta>:<peso>|<peso>` e `pasto()` lo risolve in un oggetto della
+ * stessa forma di sempre — nome, ingredienti, macro. Da li' in poi il resto
+ * dell'app non si accorge di niente: Oggi, la spunta, i totali del giorno, la
+ * lista della spesa, le porzioni del diario che si applicano sopra, il
+ * resoconto.
+ *
+ * Due dettagli del formato:
+ *
+ * - **si scrive solo quello che cambia**, e si indicizza sul **nome**
+ *   dell'ingrediente, non sulla sua posizione. Correggendo la ricetta piu'
+ *   avanti — un ingrediente aggiunto, uno tolto — i pesi restano attaccati a
+ *   quello che nominano invece di scivolare sul vicino, che e' l'errore gia'
+ *   fatto una volta indicizzando gli alimenti aggiunti sull'indice;
+ * - **nome e codice passano da `encodeURIComponent`**: il separatore e' `:`,
+ *   e un alimento che ne contenesse uno spezzerebbe il codice in silenzio.
+ */
+const PRE_RIC = 'ric:';
+
+/** Il codice di una ricetta con dei pesi suoi. Senza pesi resta il codice. */
+function codiceRicetta(code, pesi) {
+  const v = Object.entries(pesi || {}).filter(([, q]) => q != null && q >= 0);
+  if (!code || !v.length) return code;
+  return PRE_RIC + encodeURIComponent(code) + ':'
+    + v.map(([n, q]) => encodeURIComponent(n) + '=' + (+q || 0)).join('|');
+}
+
+/** `{ code, pesi }` se e' un codice con i pesi, `null` se e' un codice normale. */
+function scomponiRicetta(code) {
+  if (typeof code !== 'string' || !code.startsWith(PRE_RIC)) return null;
+  const i = code.indexOf(':', PRE_RIC.length);
+  if (i < 0) return null;
+  const pesi = {};
+  for (const t of code.slice(i + 1).split('|')) {
+    const j = t.lastIndexOf('=');
+    if (j > 0) pesi[decodeURIComponent(t.slice(0, j))] = +t.slice(j + 1);
+  }
+  return { code: decodeURIComponent(code.slice(PRE_RIC.length, i)), pesi };
+}
+
+/**
+ * La ricetta sotto un codice, quali che siano i pesi.
+ *
+ * Serve dove si confrontano due codici — "e' la ricetta che ho gia' in questo
+ * slot?", "in che momento della giornata compare di solito?" — perche' li' la
+ * risposta e' sul **piatto**, non su quanto ne metti quel giorno.
+ */
+function codiceBaseRic(code) {
+  return scomponiRicetta(code)?.code ?? code;
+}
+
+/** I macro si **ricalcolano**: cambiati i pesi, il totale precalcolato e' void. */
+function ricettaPesata(code) {
+  const r = scomponiRicetta(code);
+  const base = r && pasto(r.code);
+  if (!base) return null;
+  if (!base.ingredienti?.length) return base;
+  const ing = base.ingredienti.map(i => ({ ...i,
+    qta: r.pesi[i.alimento] != null ? r.pesi[i.alimento] : i.qta }));
+  const m = M0();
+  for (const i of ing) addM(m, foodM(i.alimento, i.qta));
+  for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) m[x] = Math.round(m[x] * 10) / 10;
+  return { ...base, ingredienti: ing, macro: m, ricettaBase: r.code, pesiPiano: r.pesi };
+}
+
 /** La ricetta di un codice: quella composta, o l'alimento singolo. */
 function pasto(code) {
   if (!code) return null;
-  if (typeof code !== 'string' || !code.startsWith(PRE_ALI)) return D.pasti[code] || null;
+  if (typeof code !== 'string') return D.pasti[code] || null;
+  if (code.startsWith(PRE_RIC)) return ricettaPesata(code);
+  if (!code.startsWith(PRE_ALI)) return D.pasti[code] || null;
   const i = code.indexOf(':', PRE_ALI.length);
   const qta = +code.slice(PRE_ALI.length, i);
   const nome = code.slice(i + 1);
@@ -806,7 +884,7 @@ function migraPastiPerSlot() {
       const nuovo = {};
       for (const [ch, val] of Object.entries(vecchio)) {
         if (ids.has(ch)) { nuovo[ch] = val; continue; }         // gia' un id
-        const dove = slots.filter(x => x.codice === ch);
+        const dove = slots.filter(x => codiceBaseRic(x.codice) === ch);
         if (!dove.length) { nuovo[ch] = val; continue; }        // non nel piano
         for (const x of dove) nuovo[x.id] = dove.length > 1 ? copia(val) : val;
       }

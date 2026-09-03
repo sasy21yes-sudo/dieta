@@ -1550,7 +1550,8 @@ function sezSettimana(v) {
       const r = el('button', 'prod riga-slot' + (pa ? '' : ' vuoto'));
       r.innerHTML = `${senzOra ? '<span class="drag-h" aria-hidden="true">\u2261</span>' : ''}
         <div class="grow"><div class="mt">${esc(s.slot)}${s.ora ? ' · ' + esc(s.ora) : ''}</div>
-        <div class="nm">${pa ? esc(pa.nome || s.codice) : 'Da assegnare'}</div></div>
+        <div class="nm">${pa ? esc(pa.nome || s.codice) : 'Da assegnare'}${
+          pa?.pesiPiano ? ' <span class="pill">pesi tuoi</span>' : ''}</div></div>
         <div class="kc">${pa ? nf(pa.macro.kcal) : '+'}</div>`;
       r.onclick = () => {
         // il tocco che ha appena trascinato la riga non deve anche aprirla
@@ -1732,6 +1733,157 @@ function nuovoSlot(gi) {
   sheet(w);
 }
 
+/**
+ * **I pesi di questo pasto**, dentro il piano e non solo per oggi.
+ *
+ * E' l'editor del codice `ric:` (vedi `codiceRicetta()` in app.js): la ricetta
+ * resta una — nome, elenco, posto nella lista — e questo slot della settimana
+ * si tiene le sue quantita', tutte le settimane.
+ *
+ * Tre cose che lo distinguono dal foglio delle porzioni del diario:
+ *
+ * - **vale sempre**, non un giorno solo, quindi entra nei totali del giorno,
+ *   nella lista della spesa e nelle barre di Oggi di ogni lunedi';
+ * - **non ha il cestino ne' la sostituzione**: quelli sono strati del diario,
+ *   e togliere un ingrediente dal piano si fa nella ricetta. Qui si porta a
+ *   zero, che e' la stessa cosa detta con i pesi;
+ * - **torna a `cambiaSlot`**, non chiude tutto: e' l'editor di una riga, e
+ *   chiudere il foglio da cui si e' arrivati e' l'errore gia' pagato con le
+ *   righe di scheda in palestra.
+ */
+function sheetPesiSlot(gi, si) {
+  const p = piano();
+  p.settimana ||= JSON.parse(JSON.stringify(
+    S.settings.pianoBase === 'esempio' ? DBASE.settimana : settimanaVuota()));
+  const s = p.settimana[gi].pasti[si];
+  const base = codiceBaseRic(s.codice);
+  const ric = pasto(base);
+  if (!ric?.ingredienti?.length) { cambiaSlot(gi, si); return; }
+  const stato = { ...(scomponiRicetta(s.codice)?.pesi || {}) };
+
+  const w = el('div');
+  w.append(el('div', 'eyebrow',
+    `${esc(p.settimana[gi].giorno || D.settimana[gi]?.giorno || '')} \u00b7 ${esc(s.slot)}`));
+  w.append(el('h2', 'sec', esc(ric.nome || base)));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Quanto ne metti <strong>in questo pasto</strong>. La ricetta non cambia: '
+    + 'resta com\'e\' dappertutto, e negli altri giorni in cui la usi resta con '
+    + 'i suoi pesi. Questi valgono tutte le settimane, non solo oggi.'));
+
+  const tot = el('div', 'read');
+  const diff = el('div', 'diffm');
+  diff.hidden = true;
+  const lista = el('div');
+
+  const macroOra = () => {
+    const m = M0();
+    for (const i of ric.ingredienti) addM(m, foodM(i.alimento, stato[i.alimento] ?? i.qta));
+    for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) m[x] = Math.round(m[x] * 10) / 10;
+    return m;
+  };
+  const aggiorna = () => {
+    const m = macroOra(), b = macroRicetta(ric);
+    tot.innerHTML = `<span><b>${nf(m.kcal)} kcal</b></span>`
+      + `<span>${nf(m.p, 1)} P</span><span>${nf(m.c, 1)} C</span>`
+      + `<span>${nf(m.g, 1)} G</span><span>${nf(m.fibre, 1)} fibre</span>`;
+    const voci = [['kcal', 'kcal', 0], ['p', 'P', 1], ['c', 'C', 1],
+                  ['g', 'G', 1], ['fibre', 'fibre', 1]]
+      .map(([id, l, dec]) => [l, (m[id] || 0) - (b[id] || 0), dec])
+      .filter(([, q, dec]) => Math.abs(q) >= (dec ? 0.5 : 1));
+    diff.hidden = !voci.length;
+    diff.innerHTML = voci.length
+      ? '<span class="l">rispetto alla ricetta</span>'
+        + voci.map(([l, q, dec]) => `<span class="${q > 0 ? 'su' : 'giu'}">`
+          + `${q > 0 ? '+' : '\u2212'}${nf(Math.abs(q), dec)} ${esc(l)}</span>`).join('')
+      : '';
+  };
+
+  for (const i of ric.ingredienti) {
+    const unita = D.alimenti[i.alimento]?.unita || 'g';
+    const q0 = stato[i.alimento] ?? i.qta;
+    const riga = el('div', 'porz' + (q0 !== i.qta ? ' mod' : '') + (q0 === 0 ? ' tolto' : ''));
+    riga.innerHTML = `<span class="nm">${esc(i.alimento)}
+        ${q0 !== i.qta ? `<em class="qta">ricetta: ${nf(i.qta)} ${esc(unita)}</em>` : ''}</span>
+      <button class="btn sm" data-d="-10">\u2212</button>
+      <input type="text" inputmode="decimal" value="${q0}">
+      <button class="btn sm" data-d="10">+</button>
+      <span class="u">${esc(unita)}</span>`;
+    const inp = riga.querySelector('input');
+    const setta = n => {
+      n = Math.max(0, Math.round(n * 10) / 10);
+      if (n === i.qta) delete stato[i.alimento]; else stato[i.alimento] = n;
+      inp.value = n;
+      riga.classList.toggle('mod', n !== i.qta);
+      riga.classList.toggle('tolto', n === 0);
+      const em = riga.querySelector('em.qta');
+      if (n !== i.qta && !em) riga.querySelector('.nm').insertAdjacentHTML('beforeend',
+        `<em class="qta">ricetta: ${nf(i.qta)} ${esc(unita)}</em>`);
+      if (n === i.qta && em) em.remove();
+      aggiorna();
+    };
+    riga.querySelectorAll('[data-d]').forEach(b => b.onclick = () =>
+      setta((parseNum(inp.value) || 0) + (+b.dataset.d)));
+    inp.oninput = () => { const n = parseNum(inp.value); if (n != null && n >= 0) setta(n); };
+    lista.append(riga);
+  }
+  w.append(lista, tot, diff);
+
+  /* Scalare tutta la ricetta e' il caso piu' frequente — "quel giorno ne
+     mangio meta'" — e farlo ingrediente per ingrediente e' cinque tocchi
+     invece di uno. Riparte sempre dai pesi della **ricetta**, non da quelli
+     gia' toccati: due tocchi su x0,5 darebbero un quarto. */
+  const scale = el('div', 'seg');
+  scale.style.marginTop = '10px';
+  for (const f of [0.5, 0.75, 1, 1.25, 1.5, 2]) {
+    const b = el('button', null, f === 1 ? 'ricetta' : '\u00d7' + nf(f, f % 1 ? 2 : 0));
+    b.onclick = () => {
+      for (const i of ric.ingredienti) {
+        const n = Math.max(0, Math.round(i.qta * f * 10) / 10);
+        if (n === i.qta) delete stato[i.alimento]; else stato[i.alimento] = n;
+      }
+      scriviPesi(gi, si, base, stato); sheetPesiSlot(gi, si);
+    };
+    scale.append(b);
+  }
+  w.append(scale);
+
+  const salva = el('button', 'btn wide pri', 'Salva i pesi di questo pasto');
+  salva.style.marginTop = '12px';
+  salva.onclick = () => {
+    scriviPesi(gi, si, base, stato);
+    closeSheet(); route();
+    toast(Object.keys(stato).length ? 'Pesi salvati per questo pasto'
+      : 'Rimessi i pesi della ricetta');
+  };
+  w.append(salva);
+
+  if (Object.keys(scomponiRicetta(s.codice)?.pesi || {}).length) {
+    const via = el('button', 'btn wide');
+    via.style.marginTop = '8px';
+    via.textContent = 'Rimetti i pesi della ricetta';
+    via.onclick = () => {
+      scriviPesi(gi, si, base, {});
+      closeSheet(); route(); toast('Rimessi i pesi della ricetta');
+    };
+    w.append(via);
+  }
+  const ind = el('button', 'btn wide', '\u2039 Torna al pasto');
+  ind.style.marginTop = '8px';
+  ind.onclick = () => cambiaSlot(gi, si);
+  w.append(ind);
+
+  aggiorna();
+  sheet(w);
+}
+
+/** Scrive il codice dello slot: con i pesi se ce ne sono, nudo se non ce ne sono. */
+function scriviPesi(gi, si, base, pesi) {
+  const p = piano();
+  p.settimana[gi].pasti[si].codice = codiceRicetta(base, pesi);
+  save(); fondiPiano();
+}
+
 function cambiaSlot(gi, si) {
   const p = piano();
   // la prima modifica clona la settimana di base: da li' in poi e' tua
@@ -1766,6 +1918,25 @@ function cambiaSlot(gi, si) {
       'Sotto ogni ricetta c\'e\' a quanto arriverebbe <strong>questo giorno</strong> '
       + 'scegliendola. Non e\' un voto sulla ricetta: una colazione da 300 kcal e\' '
       + 'una colazione, non un errore.'));
+  }
+
+  /* **I pesi di questo pasto.** La ricetta e' una, ma la stessa ricetta in due
+     giorni puo' avere quantita' diverse — pasta e tonno 100/100 il lunedi',
+     50/150 il giovedi'. Il bottone c'e' solo quando una ricetta con degli
+     ingredienti e' gia' assegnata: senza, non ci sarebbe niente da pesare. */
+  const attPesi = scomponiRicetta(s.codice)?.pesi;
+  if (attuale?.ingredienti?.length) {
+    const bp = el('button', 'nav-r');
+    bp.style.marginTop = '12px';
+    bp.innerHTML = `<span class="body"><span class="t">Cambia i pesi di questo pasto</span>
+      <span class="d">${attPesi && Object.keys(attPesi).length
+        ? esc(Object.entries(attPesi).map(([n, q]) =>
+            `${n} ${nf(q)}`).slice(0, 3).join(' \u00b7 '))
+          + ' \u2014 diversi dalla ricetta'
+        : 'La stessa ricetta puo\' avere quantita\' sue in questo giorno, '
+          + 'tutte le settimane.'}</span></span><span class="go">\u203a</span>`;
+    bp.onclick = () => sheetPesiSlot(gi, si);
+    w.append(bp);
   }
 
   /**
@@ -1891,8 +2062,12 @@ function cambiaSlot(gi, si) {
         cambia ? ` <span class="pill ${sgD.cls}">${esc(sgD.eti)}</span>` : ''}</div>
       <div class="mt">${nf(pa.macro.p, 0)}P ${nf(pa.macro.c, 0)}C ${nf(pa.macro.g, 0)}G${
         sgD ? ` · il giorno farebbe ${nf(dopo)} kcal` : ''}</div></div>
-      <div class="kc">${nf(pa.macro.kcal)}${code === s.codice ? '<br><span class="mt">attuale</span>' : ''}</div>`;
+      <div class="kc">${nf(pa.macro.kcal)}${code === codiceBaseRic(s.codice)
+        ? '<br><span class="mt">attuale</span>' : ''}</div>`;
     r.onclick = () => {
+      /* I pesi erano di un'altra ricetta: tenerli vorrebbe dire applicare a
+         un piatto le quantita' pensate per un altro. Stessa regola gia'
+         scritta per il cambio pasto nel diario. */
       s.codice = code; save(); fondiPiano(); closeSheet(); route(); toast('Pasto aggiornato');
     };
     elenco.append(r);

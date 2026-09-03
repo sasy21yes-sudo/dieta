@@ -1,5 +1,5 @@
 /* Cache offline: l'app deve funzionare anche in cucina senza rete. */
-const V = 'dieta-v85';
+const V = 'dieta-v86';
 const ASSETS = ['./', './index.html', './style.css', './app.js',
                 './viz.css', './charts.js', './piano.js', './prodotti.js', './foto.js', './palestra.js',
                 './hyrox.js', './sfide.js', './giorno.js', './anim.js', './icone.js', './timer.js', './seduta.js', './carico.js', './cardio.js', './peso.js', './cerca.js', './spesa.js', './salute.js', './scambio.js', './pdf.js', './statistiche.js', './confronto.js', './revisione.js', './previsioni.js', './obiettivo.js', './target.js', './data/fisici.json', './data/sfide.json', './data/palestra.json', './data/corpo.json', './data/hyrox.json',

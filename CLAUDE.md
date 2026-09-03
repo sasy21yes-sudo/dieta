@@ -2794,6 +2794,60 @@ Nel foglio dello slot la sezione si chiama **"Oppure un alimento solo"**, e
 c'e' anche quando di ricette non ne hai nessuna: chi comincia da zero non deve
 comporre un piatto per segnare una mela.
 
+### La stessa ricetta, con pesi diversi
+
+Pasta con tonno e' una ricetta sola. Ma il lunedi' puo' essere 50 di pasta e
+150 di tonno, e il giovedi' 150 e 50: **stesso piatto, stessa spesa, stesso
+posto nell'elenco**, quantita' diverse. Le strade erano due, e tutte e due
+sbagliate: comporre due ricette quasi identiche — e ritrovarsi un elenco con
+"Pasta con tonno" e "Pasta con tonno 2", che e' il modo piu' rapido di rendere
+illeggibile la lista delle ricette — oppure cambiare le porzioni dal diario,
+che pero' vale **un giorno solo** e non entra nella lista della spesa.
+
+La strada scelta e' la stessa dell'alimento singolo, e per la stessa ragione:
+**non tocca il modello.** Il codice del pasto puo' essere `ric:<ricetta>:<pesi>`
+e `pasto()` lo risolve in un oggetto della stessa forma di sempre — nome,
+ingredienti, macro. Da li' in poi il resto dell'app non se ne accorge.
+Verificato una voce alla volta: i totali del giorno cambiano (lunedi' 2412,
+giovedi' 2400 sullo stesso piatto), la lista della spesa somma i pesi veri, la
+scheda Oggi lo elenca, la spunta lo congela con **quelle** quantita', le
+porzioni del diario si applicano ancora sopra, e il resoconto lo conta come
+**una** riga.
+
+Tre decisioni:
+
+- **si scrive solo quello che cambia, indicizzato sul nome dell'ingrediente**
+  e non sulla sua posizione. Correggendo la ricetta piu' avanti — un
+  ingrediente aggiunto in cima, uno tolto — i pesi restano attaccati a quello
+  che nominano invece di scivolare sul vicino: e' l'errore gia' fatto una
+  volta indicizzando gli alimenti aggiunti sull'indice dell'array. Provato:
+  aggiungendo un ingrediente alla ricetta, `50/150` resta `50/150` e il nuovo
+  entra con il suo peso di ricetta;
+- **nome e codice passano da `encodeURIComponent`**: il separatore e' `:`, e
+  un alimento che ne contenesse uno spezzerebbe il codice in silenzio;
+- **i macro si ricalcolano dagli ingredienti**, non si scalano. Cambiati i
+  pesi, il totale precalcolato della ricetta non descrive piu' niente — ed e'
+  la stessa cosa che fa gia' `mealMGiorno()` quando una porzione cambia.
+
+Dove si confrontano due codici la risposta e' sul **piatto**, non sui pesi, e
+per questo c'e' `codiceBaseRic()`: la pastiglia "attuale" nell'elenco delle
+ricette, "in che momento della giornata compare di solito", la migrazione dei
+registri vecchi, e il resoconto — dove due righe con lo stesso nome
+sembrerebbero un errore di stampa.
+
+L'editor sta dentro il foglio del pasto (`sheetPesiSlot`), e **torna al
+pasto**: e' l'editor di una riga, e chiudere il foglio da cui si e' arrivati
+e' l'errore gia' pagato con le righe di scheda in palestra. Non ha il cestino
+ne' la sostituzione — quelli sono strati del **diario**, e togliere un
+ingrediente dal piano si fa nella ricetta; qui si porta a zero, che e' la
+stessa cosa detta con i pesi. Il moltiplicatore riparte sempre dai pesi della
+**ricetta** e non da quelli gia' toccati: due tocchi su ×0,5 darebbero un
+quarto.
+
+Nella settimana la riga porta la pastiglia **"pesi tuoi"**: due righe con lo
+stesso nome e calorie diverse, senza una parola che lo spieghi, sembrano un
+errore.
+
 ### Si chiamano ricette
 
 Per tutta la vita dell'app il piatto composto — quello che si costruisce
@@ -3800,6 +3854,24 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non costringere a comporre una ricetta per mettere un alimento solo in un
   pasto: un codice `ali:<qta>:<nome>` risolto da `pasto()` si comporta come
   una ricetta ovunque, senza sporcare l'elenco delle ricette
+- Non far comporre due ricette quasi identiche per due pesature dello stesso
+  piatto: l'elenco delle ricette si riempie di "Pasta con tonno 2" e smette di
+  essere leggibile. Il codice del pasto porta i pesi (`ric:`), la ricetta resta
+  una
+- Non usare le porzioni del diario per una pesatura che vale tutte le
+  settimane: quelle valgono un giorno e non entrano nella lista della spesa
+- Non indicizzare i pesi di un pasto sulla posizione dell'ingrediente:
+  correggendo la ricetta scivolano sul vicino. La chiave e' il nome
+- Non mettere un separatore in un codice sintetico senza passare da
+  `encodeURIComponent`: un alimento con i due punti nel nome lo spezzerebbe in
+  silenzio
+- Non scalare i macro precalcolati di una ricetta quando i pesi cambiano: si
+  ricalcolano dagli ingredienti, come fa gia' `mealMGiorno()`
+- Non confrontare due codici di pasto per sapere se e' lo stesso piatto:
+  `ric:C1:...` e `C1` sono la stessa ricetta pesata diversamente. Si passa da
+  `codiceBaseRic()`
+- Non contare due volte nel resoconto lo stesso piatto pesato diverso: due
+  righe con lo stesso nome sembrano un errore di stampa
 - Non leggere `D.pasti[code]` per il pasto di uno slot: passa da `pasto()`, o
   gli alimenti singoli spariscono da quel conto. Restano diretti solo
   l'editor delle ricette e il file di scambio

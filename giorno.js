@@ -371,7 +371,8 @@ function slotAbituale(code) {
   const conta = new Map();
   for (const g of (D.settimana || []))
     for (const sl of (g.pasti || []))
-      if (sl.codice === code) conta.set(sl.slot, (conta.get(sl.slot) || 0) + 1);
+      if (codiceBaseRic(sl.codice) === codiceBaseRic(code))
+        conta.set(sl.slot, (conta.get(sl.slot) || 0) + 1);
   if (!conta.size) return '';
   return [...conta.entries()].sort((a, b) => b[1] - a[1])[0][0];
 }
