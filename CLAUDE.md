@@ -1117,53 +1117,40 @@ Regole che il toolkit applica e che non vanno violate:
   esiste. La riga `.read` sotto il grafico e' il tooltip
 - Un grafico senza dati **dice che mancano i dati**, non disegna una scatola vuota
 
-### Il grafico delle misure
+### Il grafico delle misure non c'e' piu'
 
-Tre cose, e la prima era un difetto vero.
+Segnalato come "buggato", ed era vero: una serie con **una sola rilevazione**
+non veniva disegnata affatto, ma restava in legenda. Con le misure prese ogni
+quattordici giorni e la finestra a sette il grafico usciva **vuoto con sette
+voci sotto**; con una sola rilevazione in tutto, lo stesso a trenta giorni.
 
-**Un punto solo e' un dato, non un errore.** Il grafico disegnava una serie
-solo con due rilevazioni o piu' (`if (p.length < 2) continue`). Ma una linea ha
-bisogno di due punti, un valore no — e le circonferenze si prendono una volta a
-settimana o due, quindi il caso capita di continuo. Misurato: con le misure
-prese ogni quattordici giorni e la finestra a **sette**, il grafico usciva
-**vuoto con sette voci in legenda**; con una sola rilevazione in tutto lo stesso
-anche a trenta giorni. La legenda prometteva sei serie e il riquadro non ne
-mostrava nessuna. Adesso un punto solo si disegna come pallino, e legenda e
-disegno tornano a dire la stessa cosa.
+Sistemarlo pero' ha fatto vedere il problema vero, che non era un difetto ma la
+**forma**. Sei circonferenze su un asse solo restano sei righe quasi
+orizzontali a quote diverse: si vede l'ordine — il torace sta sopra la vita,
+che sta sopra il collo — e non il **movimento**, che e' l'unica cosa che
+interessa e vale mezzo centimetro al mese. Ogni tentativo di renderlo leggibile
+aggiungeva un pezzo: prima il target che mancava, poi sei colori con una
+tavolozza da rivalidare fuori dalla regola dei tre categorici, poi la media da
+togliere perche' diventava la settima riga. Quando un disegno ha bisogno di tre
+puntelli per dire una cosa che altrove e' gia' detta meglio, il puntello giusto
+e' toglierlo.
 
-**Il target, che mancava.** Era l'unico grafico dell'app senza la riga di
-riferimento e senza la colonna nel riepilogo — questo file prescrive da sempre
-*"sotto ogni grafico la stessa riga: ultimo valore, media, target, scarto"*, e
-la vita un target ce l'ha. Segue la **serie in evidenza, non la carta**: se la
-vita non e' mai stata misurata in evidenza finisce la prima che c'e', e un
-target della vita sopra un grafico del torace sarebbe la riga di riferimento di
-un'altra misura.
+Le misure hanno **due case migliori**, e le avevano gia': la tabella
+ora/target/manca in **Corpo**, con la sagoma disegnata sulle circonferenze
+vere, e le proiezioni a 28 giorni con la banda in **Dove stai andando**, che
+sul movimento rispondono con un intervallo invece che con una pendenza. Un
+terzo posto che dice peggio la stessa cosa e' un posto in meno da guardare, non
+uno in piu'.
 
-**Un colore per misura, e via la media.** Qui le serie non sono "una che conta
-e cinque di contorno": sono sei cose diverse, e sei grigi si distinguono solo
-leggendo l'etichetta. E' l'eccezione dichiarata alla regola dei tre categorici,
-e ha un prezzo che il validatore della skill dataviz dice a chiare lettere: con
-sei linee **nessun ordinamento** passa il controllo su tutte le coppie —
-provato, magenta contro arancio da' 12,9 a vista normale contro una soglia di
-15. Regge sul pairlist **adiacente**, che qui e' quello giusto perche' le sei
-misure stanno a quote diverse — torace 100, vita 84, collo 39 — e non si
-incrociano mai.
+**Cosa resta della riparazione**: un punto solo adesso si disegna come pallino
+invece di sparire. Il difetto stava in `chartEmphasis()`, non nel grafico delle
+misure, e vale per qualunque serie che si registri ogni tanto — verificato su
+"Fame ed energia" con una serie ridotta a un punto: un pallino, e la legenda
+che dice il vero.
 
-Validato, pairlist adiacente, in tutti e due i temi: chiaro su `#FFFFFF` CVD
-9,1 e vista normale 19,6; scuro su `#0E1417` CVD 8,4 e 19,3. Sul chiaro tre
-tinte stanno sotto 3:1 di contrasto, e li' vale la regola del **rilievo**:
-servono le etichette dirette su ogni serie. Il grafico ce le ha — **e se si
-tolgono la tavolozza non e' piu' valida.**
-
-Il colore si assegna **prima** del filtro delle serie vuote: se seguisse la
-posizione nell'elenco disegnato, smettere di misurare il collo ripitturerebbe
-braccio, coscia e fianchi. Il colore segue la cosa, non il suo posto in
-classifica.
-
-L'evidenza della vita passa quindi allo **spessore** invece che al colore, e la
-**media sparisce**: su un grafico a una serie e' l'annotazione che dice "sei
-sopra o sotto il tuo solito", su sei linee e' la settima — e per giunta la
-media di una sola di loro.
+**Cosa se n'e' andato con lui**: i tre colori categorici in piu' (`--c4/5/6`),
+il colore per serie e l'opzione per togliere la media. Erano l'impalcatura di
+quel grafico e basta, e un'opzione che non usa nessuno e' un pezzo che marcisce.
 
 ### Il motore di previsione
 
@@ -4137,16 +4124,17 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   stessa cosa scritta due volte, e quando divergono ha ragione il disegno
 - Non prendere il target dalla carta quando le serie ne hanno uno ciascuna:
   segue quella in evidenza, o e' la riga di riferimento di un'altra misura
+- Non mettere sei serie su un asse solo perche' condividono l'unita': sei
+  circonferenze fra 33 e 100 cm diventano sei righe quasi orizzontali, e si
+  legge l'ordine invece del movimento. Quel grafico e' stato tolto
+- Non tenere in piedi un grafico a forza di puntelli — un target, sei colori,
+  una media da togliere — quando la stessa cosa e' gia' detta meglio altrove:
+  un terzo posto che dice peggio e' un posto in meno da guardare
 - Non aggiungere colori categorici a occhio: oltre i tre dichiarati serve il
-  validatore della skill dataviz, e con sei linee si regge **solo** sul
-  pairlist adiacente — su tutte le coppie non passa nessun ordinamento
-- Non togliere le etichette dirette dal grafico delle misure: sul tema chiaro
-  tre tinte stanno sotto 3:1, e quelle etichette **sono** il rilievo che rende
-  valida la tavolozza
-- Non assegnare i colori dopo aver filtrato le serie vuote: smettere di
-  misurare una circonferenza ne ripitturerebbe altre tre
-- Non lasciare la riga della media su un grafico a piu' serie: e' la media di
-  una sola di loro, e diventa una linea in piu' fra tante
+  validatore della skill dataviz, e con sei linee non passa nessun ordinamento
+  su tutte le coppie
+- Non lasciare in giro l'impalcatura di una cosa che si toglie: un'opzione che
+  non usa piu' nessuno e' un pezzo che marcisce
 - Non fermare l'asse del manubrio a una costante: con dieci voci qualcuno
   finisce oltre il 135%, e un punto appoggiato al bordo dice una cosa falsa
 - Non lasciare che una carta con i testi in bianco fisso prenda

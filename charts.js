@@ -550,21 +550,9 @@ function chartEmphasis(o) {
   const c = card(o.titolo, o.sub);
   const H = o.h || 140, g = geo(H); g.n = o.days.length;
   const forteE = usabili.find(se => se.forte) || usabili[0];
-  /* **La media si puo' togliere.** Su un grafico a una serie e' l'annotazione
-     che dice "sei sopra o sotto il tuo solito". Su sei linee e' la settima, e
-     per giunta la media di **una** di loro: una riga orizzontale in piu' su un
-     disegno che ne ha gia' sei quasi orizzontali. */
-  const mediaE = o.media === false ? null : mediaPeriodo(o.days, forteE.vals);
-  /* **Il target segue la serie in evidenza, non la carta.** Su "Misure" ogni
-     circonferenza ha il suo, e quello che conta e' il target di quella in
-     evidenza — che non e' sempre la vita: se la vita non e' mai stata
-     misurata, in evidenza finisce la prima che c'e', e un target della vita
-     sopra un grafico del torace sarebbe una riga di riferimento di un'altra
-     misura. Era l'unico grafico dell'app senza la riga del target e senza la
-     colonna nel riepilogo, e in mezzo agli altri sembrava incompleto. */
-  const oo = { ...o, target: forteE.target ?? o.target ?? null };
+  const mediaE = mediaPeriodo(o.days, forteE.vals);
   const tutti = usabili.flatMap(se => se.vals.filter(v => v != null))
-    .concat(oo.target != null ? [oo.target] : []).concat(mediaE != null ? [mediaE] : []);
+    .concat(o.target != null ? [o.target] : []).concat(mediaE != null ? [mediaE] : []);
   const min = Math.min(...tutti), max = Math.max(...tutti);
   const pad = (max - min || 1) * .12;
   g.scale(min - pad, max + pad);
@@ -572,34 +560,27 @@ function chartEmphasis(o) {
   s.append(grid(g));
   // la media della serie in evidenza: sulle altre sarebbe una riga per serie,
   // e tre righe orizzontali su un grafico a tre linee non le legge nessuno
-  const occupate = righeRiferimento(s, g, oo, mediaE, forteE.vals) || [];
+  const occupate = righeRiferimento(s, g, o, mediaE, forteE.vals) || [];
   const etich = [];
   for (const se of usabili) {
     const p = se.vals.map((v, i) => v == null ? null : { i, v }).filter(Boolean);
     if (!p.length) continue;
-    /* Il colore lo porta la serie quando ne ha uno suo; se no vale la regola
-       di sempre — una in accento, le altre grigie. E con un colore proprio
-       l'opacita' resta piena: smorzare una tinta al 50% la fa somigliare a
-       tutte le altre smorzate, che e' esattamente quello che i colori
-       servivano a evitare. */
-    const col = se.col || (se.forte ? 'var(--pine)' : 'var(--ink-3)');
-    const opac = se.col ? 1 : (se.forte ? 1 : .5);
+    const col = se.forte ? 'var(--pine)' : 'var(--ink-3)';
     /* **Un punto solo e' un dato, non un errore.** Una linea ha bisogno di due
-       rilevazioni, un valore no — e le circonferenze si prendono una volta a
-       settimana o due, quindi il caso capita di continuo. Saltarlo lasciava un
-       grafico **vuoto** con i nomi ancora in legenda: misurato, con le misure
-       prese ogni quattordici giorni e la finestra a sette uscivano zero linee
-       e sette voci sotto, e con una sola rilevazione in tutto lo stesso a
-       trenta giorni. Un pallino dice quello che sa. */
+       rilevazioni, un valore no — e su una serie che si registra ogni tanto il
+       caso capita di continuo. Saltarlo lasciava un grafico **vuoto** con i
+       nomi ancora in legenda: trovato sulle misure, dove con una rilevazione
+       ogni quattordici giorni e la finestra a sette uscivano zero linee e
+       sette voci sotto. Quel grafico non c'e' piu', il difetto era di qui.
+       Un pallino dice quello che sa. */
     if (p.length > 1) {
       s.append(mk('path', { d: p.map((q, j) => (j ? 'L' : 'M') + g.x(q.i) + ',' + g.y(q.v)).join(' '),
         fill: 'none', stroke: col,
-        'stroke-width': se.forte ? 2.2 : 1.3, opacity: opac,
+        'stroke-width': se.forte ? 2.2 : 1.3, opacity: se.forte ? 1 : .5,
         'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
     } else {
       s.append(mk('circle', { cx: g.x(p[0].i), cy: g.y(p[0].v),
-        r: se.forte ? 3.4 : 2.6, fill: col,
-        opacity: se.col ? 1 : (se.forte ? 1 : .6) }));
+        r: se.forte ? 3.4 : 2.6, fill: col, opacity: se.forte ? 1 : .6 }));
     }
     // etichetta diritta all'ultimo punto: l'identita' non e' solo colore
     const u = p[p.length - 1];
@@ -612,12 +593,12 @@ function chartEmphasis(o) {
      agli altri sembrava disallineato — perche' lo era: gli mancavano due righe
      che tutti gli altri hanno. */
   c.append(legenda(usabili.map(se => ({
-    n: se.nome, col: se.col || (se.forte ? 'var(--pine)' : 'var(--ink-3)') }))
-    .concat(oo.target != null ? [{ n: 'target ' + forteE.nome, col: 'var(--rif)' }] : [])
+    n: se.nome, col: se.forte ? 'var(--pine)' : 'var(--ink-3)' }))
+    .concat(o.target != null ? [{ n: 'target', col: 'var(--rif)' }] : [])
     .concat(mediaE != null ? [{ n: 'media di ' + forteE.nome, col: 'var(--media)' }] : [])));
   const forte = forteE;
   const rp = riepilogo({ days: o.days, vals: forte.vals, dec: o.dec,
-    unit: o.unit, target: oo.target });
+    unit: o.unit, target: o.target });
   if (rp) c.append(rp);
   const read = el('div', 'read',
     `<span class="ph">Tocca il grafico per leggere un giorno</span>`);
@@ -1203,26 +1184,19 @@ function viewDati(v) {
     ]
   }));
 
-  /* --- misure --- */
-  /* Un colore per misura, e assegnato **prima** del filtro: se seguisse la
-     posizione nell'elenco disegnato, smettere di misurare il collo
-     ripitturerebbe braccio, coscia e fianchi. Il colore segue la cosa, non il
-     suo posto in classifica. */
-  const misSerie = D.misure.map((m, i) => ({
-    nome: m.label.split(' ')[0].toLowerCase(),
-    forte: m.id === 'vita',
-    col: 'var(--c' + (i % 6 + 1) + ')',
-    // il target di **questa** misura: con il piano vuoto e' null, e la riga
-    // di riferimento non compare, come dappertutto
-    target: m.target ?? null,
-    vals: giorni.map(d => S.log[d]?.misure?.[m.id] ?? null)
-  })).filter(s => s.vals.some(x => x != null));
-  v.append(chartEmphasis({
-    titolo: 'Misure',
-    sub: 'Un colore per misura. La vita e\' piu\' spessa: e\' il segnale che '
-      + 'distingue muscolo da grasso, e il target e\' il suo.',
-    days: giorni, unit: 'cm', dec: 0, serie: misSerie, media: false
-  }));
+  /* Qui c'era il grafico delle misure, e non c'e' piu'. Sei circonferenze su
+     un asse solo restavano sei righe quasi orizzontali a quote diverse: si
+     vedeva l'ordine — il torace sta sopra la vita, che sta sopra il collo —
+     e non il movimento, che e' l'unica cosa che interessa e vale mezzo
+     centimetro al mese. Ogni tentativo di renderlo leggibile aggiungeva un
+     pezzo: prima il target, poi sei colori con una tavolozza da rivalidare,
+     poi la media da togliere.
+     Le misure hanno gia' due case migliori: la tabella ora/target/manca in
+     **Corpo**, con la sagoma disegnata sulle circonferenze vere, e le
+     proiezioni a 28 giorni con la banda in **Dove stai andando**, che sul
+     movimento rispondono con un intervallo invece che con una pendenza.
+     Un terzo posto che dice peggio la stessa cosa e' un posto in meno da
+     guardare, non uno in piu'. */
 
   /* --- composizione --- */
   /* Dove c'e' una bioimpedenza vince lei: il giorno in cui e' stata fatta e'
