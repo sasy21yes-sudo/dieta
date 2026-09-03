@@ -2834,6 +2834,48 @@ spuntata: il **nome** sulla riga di Oggi ora viene dalla copia congelata, e
 con lo slot svuotato nel piano quella riga scriveva *"Da assegnare"* sopra un
 pasto che era stato mangiato.
 
+### Un pasto puo' contenere piu' ricette
+
+Un pranzo non e' sempre un piatto: e' la pasta **e** l'insalata, il primo **e**
+la frutta. Lo slot ne teneva una sola, e sceglierne un'altra la
+**sostituiva** — quindi l'unica strada era comporre una ricetta "Pasta e
+insalata" che duplica due ricette gia' esistenti e che va rifatta ogni volta
+che si cambia il contorno.
+
+Terzo codice sintetico dopo `ali:` e `ric:`, e per la terza volta la stessa
+ragione: **non tocca il modello.** `piu:<a>+<b>`, e `pasto()` lo risolve in un
+oggetto della forma di sempre — un nome, un elenco di ingredienti, dei macro.
+Verificato una voce alla volta: i totali del giorno, la scheda Oggi, la
+spunta che congela l'elenco fuso, le porzioni del diario che si applicano
+sopra, la lista della spesa e il resoconto.
+
+**Si annida.** Una parte puo' essere a sua volta un `ric:` con i suoi pesi o
+un `ali:` con la sua quantita': un pranzo puo' essere "pasta con tonno pesata
+150/50" piu' "una mela da 180 g", e lo si e' provato.
+
+Due decisioni:
+
+- **gli ingredienti ripetuti si sommano.** Se tutte e due le ricette hanno il
+  tonno, nel pasto c'e' una riga sola con la somma. Non e' cosmesi: gli strati
+  del diario — porzioni, sostituzioni — sono indicizzati sul **nome**
+  dell'ingrediente, e due righe con la stessa chiave si sovrascriverebbero a
+  vicenda. Misurato su due ricette con un ingrediente in comune: 3 + 4 = 6
+  righe, `latte 300 + 200 = 500`;
+- **i macro si sommano parte per parte**, non si ricalcolano dall'elenco fuso:
+  i valori di una ricetta sono verificati a monte, e rifarli da capo li
+  sostituirebbe con la somma 4/4/9 anche quando nessuno ha toccato niente.
+
+Il foglio dello slot si chiama ora **"Cosa c'e' in questo pasto"** ed e'
+diventato un elenco: ogni parte con i suoi macro, il suo editor dei pesi e il
+suo cestino, il totale sotto quando sono piu' di una. Scegliere una ricetta
+qui sotto **aggiunge** invece di sostituire, e le ricette gia' dentro sono
+marcate. Togliendo una parte quando ne restano due il codice torna a essere
+quello nudo della ricetta: nessun `piu:` con dentro una cosa sola.
+
+**I pesi si toccano una parte alla volta** — `sheetPesiSlot(gi, si, pi)` — e
+non sull'elenco fuso: li' una riga ripetuta non saprebbe piu' a quale ricetta
+appartiene, ed e' lo stesso motivo per cui i doppioni si sommano.
+
 ### La stessa ricetta, con pesi diversi
 
 Pasta con tonno e' una ricetta sola. Ma il lunedi' puo' essere 50 di pasta e
@@ -3906,6 +3948,18 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   il senso di "al posto di X, +102 kcal"
 - Non trattare i pesi che uno slot ha nel piano come una modifica del giorno:
   quelli sono il piano
+- Non far sostituire la ricetta di un pasto quando l'utente ne vuole
+  **aggiungere** una seconda: un pranzo di due piatti non e' una terza ricetta
+  che duplica le altre due
+- Non lasciare due righe con lo stesso ingrediente dentro un pasto: porzioni e
+  sostituzioni sono indicizzate sul nome, e le due chiavi si
+  sovrascriverebbero. I doppioni si sommano
+- Non ricalcolare i macro di un pasto multiplo dall'elenco fuso: i valori
+  delle ricette sono verificati a monte, e si sommano parte per parte
+- Non far toccare i pesi sull'elenco fuso di un pasto multiplo: una riga
+  ripetuta non saprebbe a quale ricetta appartiene. Una parte alla volta
+- Non lasciare un `piu:` con dentro una parte sola quando si toglie l'altra:
+  il codice torna quello nudo della ricetta
 - Non far comporre due ricette quasi identiche per due pesature dello stesso
   piatto: l'elenco delle ricette si riempie di "Pasta con tonno 2" e smette di
   essere leggibile. Il codice del pasto porta i pesi (`ric:`), la ricetta resta

@@ -1751,15 +1751,18 @@ function nuovoSlot(gi) {
  *   chiudere il foglio da cui si e' arrivati e' l'errore gia' pagato con le
  *   righe di scheda in palestra.
  */
-function sheetPesiSlot(gi, si) {
+function sheetPesiSlot(gi, si, pi = 0) {
   const p = piano();
   p.settimana ||= JSON.parse(JSON.stringify(
     S.settings.pianoBase === 'esempio' ? DBASE.settimana : settimanaVuota()));
   const s = p.settimana[gi].pasti[si];
-  const base = codiceBaseRic(s.codice);
+  // un pasto puo' avere piu' ricette dentro: i pesi si toccano su una alla
+  // volta, o non si saprebbe a quale ricetta appartiene una riga ripetuta
+  const cod = partiPasto(s.codice)[pi];
+  const base = codiceBaseRic(cod);
   const ric = pasto(base);
   if (!ric?.ingredienti?.length) { cambiaSlot(gi, si); return; }
-  const stato = { ...(scomponiRicetta(s.codice)?.pesi || {}) };
+  const stato = { ...(scomponiRicetta(cod)?.pesi || {}) };
 
   const w = el('div');
   w.append(el('div', 'eyebrow',
@@ -1842,7 +1845,7 @@ function sheetPesiSlot(gi, si) {
         const n = Math.max(0, Math.round(i.qta * f * 10) / 10);
         if (n === i.qta) delete stato[i.alimento]; else stato[i.alimento] = n;
       }
-      scriviPesi(gi, si, base, stato); sheetPesiSlot(gi, si);
+      scriviPesi(gi, si, pi, base, stato); sheetPesiSlot(gi, si, pi);
     };
     scale.append(b);
   }
@@ -1851,19 +1854,19 @@ function sheetPesiSlot(gi, si) {
   const salva = el('button', 'btn wide pri', 'Salva i pesi di questo pasto');
   salva.style.marginTop = '12px';
   salva.onclick = () => {
-    scriviPesi(gi, si, base, stato);
+    scriviPesi(gi, si, pi, base, stato);
     closeSheet(); route();
     toast(Object.keys(stato).length ? 'Pesi salvati per questo pasto'
       : 'Rimessi i pesi della ricetta');
   };
   w.append(salva);
 
-  if (Object.keys(scomponiRicetta(s.codice)?.pesi || {}).length) {
+  if (Object.keys(scomponiRicetta(cod)?.pesi || {}).length) {
     const via = el('button', 'btn wide');
     via.style.marginTop = '8px';
     via.textContent = 'Rimetti i pesi della ricetta';
     via.onclick = () => {
-      scriviPesi(gi, si, base, {});
+      scriviPesi(gi, si, pi, base, {});
       closeSheet(); route(); toast('Rimessi i pesi della ricetta');
     };
     w.append(via);
@@ -1877,10 +1880,12 @@ function sheetPesiSlot(gi, si) {
   sheet(w);
 }
 
-/** Scrive il codice dello slot: con i pesi se ce ne sono, nudo se non ce ne sono. */
-function scriviPesi(gi, si, base, pesi) {
-  const p = piano();
-  p.settimana[gi].pasti[si].codice = codiceRicetta(base, pesi);
+/** Scrive i pesi di **una** parte del pasto, lasciando le altre come sono. */
+function scriviPesi(gi, si, pi, base, pesi) {
+  const p = piano(), s = p.settimana[gi].pasti[si];
+  const parti = partiPasto(s.codice);
+  parti[pi] = codiceRicetta(base, pesi);
+  s.codice = codicePasto(parti);
   save(); fondiPiano();
 }
 
@@ -1892,7 +1897,7 @@ function cambiaSlot(gi, si) {
   const g = p.settimana[gi], s = g.pasti[si];
   const w = el('div');
   w.append(el('div', 'eyebrow', `${esc(g.giorno)} · ${esc(s.slot)}`));
-  w.append(el('h2', 'sec', 'Scegli la ricetta'));
+  w.append(el('h2', 'sec', 'Cosa c\'e\' in questo pasto'));
   w.lastChild.style.marginTop = '0';
 
   /* **Come viene il giorno.** E' il momento in cui il giorno si compone, e
@@ -1920,24 +1925,64 @@ function cambiaSlot(gi, si) {
       + 'una colazione, non un errore.'));
   }
 
-  /* **I pesi di questo pasto.** La ricetta e' una, ma la stessa ricetta in due
-     giorni puo' avere quantita' diverse — pasta e tonno 100/100 il lunedi',
-     50/150 il giovedi'. Il bottone c'e' solo quando una ricetta con degli
-     ingredienti e' gia' assegnata: senza, non ci sarebbe niente da pesare. */
-  const attPesi = scomponiRicetta(s.codice)?.pesi;
-  if (attuale?.ingredienti?.length) {
-    const bp = el('button', 'nav-r');
-    bp.style.marginTop = '12px';
-    bp.innerHTML = `<span class="body"><span class="t">Cambia i pesi di questo pasto</span>
-      <span class="d">${attPesi && Object.keys(attPesi).length
-        ? esc(Object.entries(attPesi).map(([n, q]) =>
-            `${n} ${nf(q)}`).slice(0, 3).join(' \u00b7 '))
-          + ' \u2014 diversi dalla ricetta'
-        : 'La stessa ricetta puo\' avere quantita\' sue in questo giorno, '
-          + 'tutte le settimane.'}</span></span><span class="go">\u203a</span>`;
-    bp.onclick = () => sheetPesiSlot(gi, si);
-    w.append(bp);
+  /* **Cosa c'e' dentro.** Un pranzo non e' sempre un piatto: e' la pasta
+     **e** l'insalata, il primo **e** la frutta. Le parti si elencano qui,
+     ognuna con i suoi macro, il suo editor dei pesi e il suo cestino — e
+     scegliere una ricetta qui sotto ne **aggiunge** una, invece di
+     sostituire quella che c'e'. */
+  const parti = partiPasto(s.codice);
+  if (parti.length) {
+    const box = el('div');
+    box.style.margin = '14px 0 4px';
+    parti.forEach((c, pi) => {
+      const pa = pasto(c);
+      const pesi = scomponiRicetta(c)?.pesi;
+      const r = el('div', 'prod');
+      r.innerHTML = `<div class="grow"><div class="nm">${esc(pa?.nome || c)}${
+          pesi && Object.keys(pesi).length
+            ? ' <span class="pill">pesi tuoi</span>' : ''}</div>
+        <div class="mt">${pa ? `${nf(pa.macro.p, 0)}P ${nf(pa.macro.c, 0)}C `
+          + `${nf(pa.macro.g, 0)}G` : 'ricetta non trovata'}</div></div>
+        <div class="kc">${pa ? nf(pa.macro.kcal) : '\u2014'}</div>`;
+      const az = el('div', 'porz-az');
+      if (pa?.ingredienti?.length) {
+        const bp = el('button', 'btn sm', 'pesi');
+        bp.title = 'Cambia le quantita\' di questa ricetta in questo pasto';
+        bp.onclick = () => sheetPesiSlot(gi, si, pi);
+        az.append(bp);
+      }
+      const bt = el('button', 'btn sm', '\u2715');
+      bt.title = 'Togli questa ricetta dal pasto';
+      bt.setAttribute('aria-label', 'Togli ' + (pa?.nome || c));
+      bt.onclick = () => {
+        const q = partiPasto(s.codice);
+        q.splice(pi, 1);
+        s.codice = codicePasto(q);
+        save(); fondiPiano(); cambiaSlot(gi, si);
+      };
+      az.append(bt);
+      r.append(az);
+      box.append(r);
+    });
+    if (parti.length > 1 && attuale?.macro) {
+      const t = el('div', 'read');
+      t.innerHTML = `<span><b>${nf(attuale.macro.kcal)} kcal</b></span>`
+        + `<span>${nf(attuale.macro.p, 1)} P</span>`
+        + `<span>${nf(attuale.macro.c, 1)} C</span>`
+        + `<span>${nf(attuale.macro.g, 1)} G</span>`
+        + `<span>${nf(attuale.macro.fibre, 1)} fibre</span>`;
+      box.append(t);
+      box.append(el('p', 'note',
+        'Gli ingredienti ripetuti fra le ricette si sommano in una riga sola: '
+        + 'e\' quello che finisce nella lista della spesa e nelle porzioni del '
+        + 'giorno.'));
+    }
+    w.append(box);
   }
+
+  w.append(el('h2', 'sec', parti.length ? 'Aggiungi un\'altra ricetta' : 'Scegli la ricetta'));
+  if (parti.length) w.append(el('p', 'muted',
+    'Si aggiunge a quello che c\'e\' gia\': un pranzo puo\' essere due piatti.'));
 
   /**
    * **Un pasto puo' essere un alimento solo.**
@@ -1983,7 +2028,7 @@ function cambiaSlot(gi, si) {
       ok.onclick = () => {
         const q2 = parseNum($('#cs-aq').value);
         if (!(q2 > 0)) { toast('Serve una quantita\''); return; }
-        s.codice = codiceAlimento(scelto, q2);
+        s.codice = codicePasto([...partiPasto(s.codice), codiceAlimento(scelto, q2)]);
         save(); fondiPiano(); closeSheet(); route(); toast('Pasto aggiornato');
       };
       eco.append(ok);
@@ -2062,13 +2107,16 @@ function cambiaSlot(gi, si) {
         cambia ? ` <span class="pill ${sgD.cls}">${esc(sgD.eti)}</span>` : ''}</div>
       <div class="mt">${nf(pa.macro.p, 0)}P ${nf(pa.macro.c, 0)}C ${nf(pa.macro.g, 0)}G${
         sgD ? ` · il giorno farebbe ${nf(dopo)} kcal` : ''}</div></div>
-      <div class="kc">${nf(pa.macro.kcal)}${code === codiceBaseRic(s.codice)
-        ? '<br><span class="mt">attuale</span>' : ''}</div>`;
+      <div class="kc">${nf(pa.macro.kcal)}${
+        parti.some(c => codiceBaseRic(c) === code)
+          ? '<br><span class="mt">gia\' dentro</span>' : ''}</div>`;
     r.onclick = () => {
-      /* I pesi erano di un'altra ricetta: tenerli vorrebbe dire applicare a
-         un piatto le quantita' pensate per un altro. Stessa regola gia'
-         scritta per il cambio pasto nel diario. */
-      s.codice = code; save(); fondiPiano(); closeSheet(); route(); toast('Pasto aggiornato');
+      // si **aggiunge** a quello che c'e': sostituire era l'unico modo, ed e'
+      // il motivo per cui un pranzo di due piatti andava composto come una
+      // terza ricetta che duplica le altre due
+      s.codice = codicePasto([...partiPasto(s.codice), code]);
+      save(); fondiPiano(); closeSheet(); route();
+      toast(parti.length ? 'Aggiunta al pasto' : 'Pasto aggiornato');
     };
     elenco.append(r);
   }
@@ -2106,10 +2154,11 @@ function cambiaSlot(gi, si) {
   if (s.codice) {
     const sv = el('button', 'btn wide');
     sv.style.marginTop = '12px';
-    sv.textContent = 'Togli solo la ricetta, lascia il pasto';
+    sv.textContent = parti.length > 1
+      ? 'Svuota il pasto, lascia il posto' : 'Togli solo la ricetta, lascia il pasto';
     sv.onclick = () => {
       s.codice = null; save(); fondiPiano(); closeSheet(); route();
-      toast('Ricetta tolta: il pasto e l\'ora restano');
+      toast('Pasto svuotato: il posto e l\'ora restano');
     };
     w.append(sv);
   }

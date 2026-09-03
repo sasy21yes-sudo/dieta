@@ -322,10 +322,78 @@ function ricettaPesata(code) {
   return { ...base, ingredienti: ing, macro: m, ricettaBase: r.code, pesiPiano: r.pesi };
 }
 
+/* ======================== piu' ricette dentro lo stesso pasto
+ *
+ * Un pranzo non e' sempre un piatto. E' la pasta **e** l'insalata, il primo
+ * **e** la frutta: due ricette nello stesso momento della giornata. Finora lo
+ * slot ne teneva una sola, e sceglierne un'altra la **sostituiva** — quindi
+ * l'unica strada era comporre una ricetta "Pasta e insalata" che duplica due
+ * ricette che gia' esistono, e che va rifatta ogni volta che si cambia il
+ * contorno.
+ *
+ * Terzo codice sintetico, dopo `ali:` e `ric:`, e per la terza volta la stessa
+ * ragione: **non tocca il modello.** `piu:<a>+<b>` e `pasto()` lo risolve in
+ * un oggetto della forma di sempre — un nome, un elenco di ingredienti, dei
+ * macro. Da li' in poi Oggi, la spunta, i totali del giorno, la lista della
+ * spesa, le porzioni e il resoconto non si accorgono di niente.
+ *
+ * Si annida: una parte puo' essere a sua volta un `ric:` con i suoi pesi o un
+ * `ali:` con la sua quantita'. Un pranzo puo' quindi essere "pasta con tonno
+ * pesata 150/50" **piu'** "una mela da 180 g".
+ *
+ * Due decisioni:
+ *
+ * - **gli ingredienti ripetuti si sommano.** Se tutte e due le ricette hanno
+ *   il tonno, nel pasto c'e' una riga di tonno con la somma. Non e' cosmesi:
+ *   gli strati del diario — porzioni, sostituzioni — sono indicizzati sul
+ *   **nome** dell'ingrediente, e due righe con la stessa chiave si
+ *   sovrascriverebbero a vicenda;
+ * - **i macro si sommano parte per parte**, non si ricalcolano dall'elenco
+ *   fuso: i valori di una ricetta sono verificati a monte, e rifarli da capo
+ *   li sostituirebbe con la somma 4/4/9 anche quando nessuno ha toccato niente.
+ */
+const PRE_MULTI = 'piu:';
+
+/** Le parti di un pasto, sempre un elenco: un codice solo ne fa uno. */
+function partiPasto(code) {
+  if (!code) return [];
+  if (typeof code !== 'string' || !code.startsWith(PRE_MULTI)) return [code];
+  return code.slice(PRE_MULTI.length).split('+').filter(Boolean)
+    .map(decodeURIComponent);
+}
+
+/** Il codice di un pasto fatto di queste parti. Zero parti = nessun pasto. */
+function codicePasto(parti) {
+  const v = (parti || []).filter(Boolean);
+  if (!v.length) return null;
+  if (v.length === 1) return v[0];
+  return PRE_MULTI + v.map(encodeURIComponent).join('+');
+}
+
+function ricettaMultipla(code) {
+  const parti = partiPasto(code);
+  const ric = parti.map(c => pasto(c)).filter(Boolean);
+  if (!ric.length) return null;
+  if (ric.length === 1) return ric[0];
+  const map = new Map();
+  for (const r of ric)
+    for (const i of (r.ingredienti || [])) {
+      const e = map.get(i.alimento);
+      if (e) e.qta = Math.round((e.qta + i.qta) * 10) / 10;
+      else map.set(i.alimento, { ...i });
+    }
+  const m = M0();
+  for (const r of ric) addM(m, macroRicetta(r));
+  for (const x of ['kcal', 'p', 'c', 'g', 'fibre']) m[x] = Math.round(m[x] * 10) / 10;
+  return { nome: ric.map(r => r.nome).join(' + '), ingredienti: [...map.values()],
+           macro: m, parti, ricette: ric };
+}
+
 /** La ricetta di un codice: quella composta, o l'alimento singolo. */
 function pasto(code) {
   if (!code) return null;
   if (typeof code !== 'string') return D.pasti[code] || null;
+  if (code.startsWith(PRE_MULTI)) return ricettaMultipla(code);
   if (code.startsWith(PRE_RIC)) return ricettaPesata(code);
   if (!code.startsWith(PRE_ALI)) return D.pasti[code] || null;
   const i = code.indexOf(':', PRE_ALI.length);
