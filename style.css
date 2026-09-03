@@ -1,5 +1,10 @@
 :root{
   --pine:#12594A; --pine-soft:#E7F0ED; --pine-line:#9CC3B7;
+  /* L'oro dell'allenamento extra. Non e' una quinta tinta a caso: e' l'unico
+     stato che non era in programma, e va letto come "in piu'" e non come un
+     altro tipo di errore — per questo non riusa l'ambra, che in quest'app
+     vuol dire "fuori target". */
+  --oro:#B8860B; --oro-1:#F3DE9C; --oro-2:#8A6208; --oro-ink:#3A2A02;
   --alert:#9E2B1B; --alert-soft:#FBECE9;
   --amber:#8A5D0F; --amber-soft:#FCF3E2;
   --ink:#151A1F; --ink-2:#4A5560; --ink-3:#8A93A0;
@@ -17,6 +22,7 @@
 @media (prefers-color-scheme:dark){
   :root{
     --pine:#4FA88F; --pine-soft:#142C26; --pine-line:#2E6355;
+    --oro:#E0B84E; --oro-1:#FFEBB0; --oro-2:#A87F1C; --oro-ink:#2A1F04;
     --alert:#E5715C; --alert-soft:#331714;
     --amber:#D9A441; --amber-soft:#2E2410;
     --ink:#E9EEF1; --ink-2:#A6B2BC; --ink-3:#6E7B87;
@@ -306,3 +312,89 @@ button.swapopt:active{background:var(--wash)}
   border-radius:9px;max-width:88vw;text-align:center}
 #toast[hidden]{display:none}
 .chart{width:100%;height:auto;display:block}
+
+/* ==================================================== il calendario di Gym
+ *
+ * Una riga di giorni che scorre in orizzontale, e un cerchio per giorno. Il
+ * cerchio e' il dato: pieno e verde se ti sei allenato, oro se l'allenamento
+ * non era in programma, grigio pieno se tocca, tratteggiato se e' passato e
+ * non l'hai fatto, quasi invisibile se e' riposo.
+ *
+ * Lo scorrimento sta **dentro la striscia**: la pagina non scorre mai in
+ * orizzontale, e `scrollbar-width:none` toglie la barra perche' su un
+ * telefono non serve e su un desktop taglierebbe la riga in due.
+ */
+.gcal{margin:10px -14px 0;position:relative}
+.gcal-s{display:flex;gap:6px;overflow-x:auto;scroll-behavior:smooth;
+  padding:2px 14px 4px;scrollbar-width:none;-ms-overflow-style:none}
+.gcal-s::-webkit-scrollbar{display:none}
+.gcal-d{flex:0 0 auto;width:40px;padding:6px 0 8px;border:0;background:none;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  border-radius:12px;cursor:pointer;font:inherit;color:var(--ink-3)}
+.gcal-d .dow{font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-3)}
+.gcal-d .num{font-size:13px;font-weight:600;color:var(--ink-2);line-height:1}
+.gcal-d .box{width:24px;height:24px;border-radius:50%;margin-top:2px;
+  display:flex;align-items:center;justify-content:center;
+  border:1.5px solid var(--rule);background:transparent;
+  transition:transform .18s ease}
+.gcal-d .box svg{width:15px;height:15px;fill:none;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* riposo: c'e', e non chiede niente */
+.gcal-d.riposo .box{border-color:var(--rule);opacity:.5}
+/* da fare: grigio pieno, il colore dell'app per "non c'e' ancora un dato" */
+.gcal-d.attesa .box{border-color:var(--ink-3);background:var(--wash)}
+/* saltata: era in programma ed e' passata. Tratteggiata, non grigia piena:
+   uguale a "da fare" direbbe che c'e' ancora tempo */
+.gcal-d.saltata .box{border-style:dashed;border-color:var(--ink-3);opacity:.75}
+/* fatta */
+.gcal-d.fatta .box{background:var(--pine);border-color:var(--pine)}
+.gcal-d.fatta .box svg{stroke:var(--paper)}
+/* extra: oro. Il metallo si fa con due fermate e un colpo di luce in alto a
+   sinistra — un colore piatto sembra senape, non oro. */
+.gcal-d.extra .box{border-color:var(--oro-2);
+  background:linear-gradient(145deg,var(--oro-1) 0%,var(--oro) 46%,var(--oro-2) 100%)}
+.gcal-d.extra .box svg{stroke:var(--oro-ink)}
+
+/* oggi: l'unico giorno con un nome scritto sotto invece di un numero solo */
+.gcal-d.oggi .num{color:var(--ink)}
+.gcal-d.oggi .dow{color:var(--pine);font-weight:700}
+.gcal-d.oggi .box{box-shadow:0 0 0 2px var(--paper),0 0 0 3.5px var(--pine-line)}
+.gcal-d:active .box{transform:scale(.9)}
+
+/* La riga sotto la striscia: cosa tocca oggi, in una riga sola. */
+.gcal-oggi{display:flex;align-items:baseline;justify-content:space-between;
+  gap:10px;margin-top:10px}
+.gcal-oggi .t{font-weight:600;color:var(--ink)}
+.gcal-oggi .d{font-size:12px;color:var(--ink-3);white-space:nowrap}
+
+/* La pastiglia dello stato, dentro il foglio del giorno. */
+.gcal-st{display:inline-block;font-size:11px;padding:3px 9px;border-radius:999px;
+  margin:2px 0 10px;background:var(--wash);color:var(--ink-2)}
+.gcal-st.fatta{background:var(--pine-soft);color:var(--pine)}
+.gcal-st.extra{background:linear-gradient(145deg,var(--oro-1),var(--oro));
+  color:var(--oro-ink)}
+.gcal-st.saltata{background:var(--wash);color:var(--ink-3)}
+
+/* Il colpo di luce che attraversa l'oro, **una volta sola** quando entra in
+   vista. In quest'app l'unica animazione infinita e' la fiamma della
+   striscia, e ci sta perche' il riempimento porta un dato: uno scintillio
+   perpetuo su un pallino sarebbe decorazione, e a batteria. Una volta sola
+   dice "guarda qui", che e' quello che serve. */
+@keyframes oro-luce{
+  0%{transform:translateX(-120%)}
+  100%{transform:translateX(220%)}
+}
+.gcal-d.extra .box{position:relative;overflow:hidden}
+.gcal-d.extra .box::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.85) 50%,
+    transparent 62%);
+  /* fermo e fuori: senza, la banda bianca si vedrebbe ferma in mezzo al
+     pallino prima che l'animazione parta */
+  transform:translateX(-120%)}
+.gcal-d.extra.brilla .box::after{animation:oro-luce 1.1s ease-out 1 both}
+@media (prefers-reduced-motion:reduce){
+  .gcal-d.extra.brilla .box::after{animation:none}
+  .gcal-s{scroll-behavior:auto}
+}

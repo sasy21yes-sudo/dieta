@@ -777,6 +777,61 @@ HYROX ha **tre sezioni**, non sei: il conto alla rovescia sta sempre in testa,
 il piano dice cosa fare, le stazioni dicono a che punto sei e da lì parte la
 simulazione. Tutto il resto era navigazione in più.
 
+### La settimana di allenamento si vede
+
+La carta d'ingresso di Gym aveva due bottoni — "Registra pesi" e "Cardio" — e
+rispondeva a una domanda sola: *cosa faccio adesso*. Ma un programma e' una
+**settimana** — giorno 1 spinta, giorno 2 tirata, giovedi' riposo — e quella
+settimana non si vedeva da nessuna parte: le schede stavano in un elenco senza
+giorni, e per sapere se lunedi' ci si era allenati bisognava aprire lo storico.
+
+Al loro posto una striscia di giorni che scorre. Risponde a tre domande
+insieme — **cosa tocca oggi**, **cosa ho fatto**, **cosa ho saltato** — e i
+due bottoni spariscono perche' ci si arriva toccando il giorno. Che e' anche
+il modo di aprire un giorno **che non e' oggi**: prima non si poteva da
+nessuna parte.
+
+**Tre settimane, non un mese**: due dietro e una avanti, aperta su oggi. Un
+mese intero costringe a scorrere per trovare il giorno in cui si e' quasi
+sempre; due settimane dietro sono tutto quello che serve per sapere se questa
+e' andata come la scorsa; avanti bastano sette giorni, perche' il programma si
+ripete e l'ottavo mostrerebbe lo stesso.
+
+**L'assegnazione ha due livelli**, come il piano alimentare: il giorno della
+settimana (`P().settimana`) e' il **programma** e si ripete da solo; la data
+(`P().giorni`) e' l'**eccezione** di questa settimana. Senza il primo si
+riscriverebbe tutto ogni sette giorni; senza il secondo non si potrebbe
+spostare una seduta al martedi' perche' lunedi' e' saltato. `''` non e'
+"niente": e' **riposo dichiarato**, e serve a distinguerlo da "non ho ancora
+deciso" — sono due cose diverse, e solo la seconda va riempita.
+
+**Gli stati sono cinque, non tre.** Ai tre chiesti se ne aggiungono due che
+cadono da soli e che senza un segno loro mentirebbero:
+
+| | |
+|---|---|
+| **riposo** | anello quasi invisibile: c'e', e non chiede niente |
+| **da fare** | anello grigio pieno |
+| **saltata** | anello **tratteggiato**: era in programma ed e' passata. Grigia come domani direbbe che c'e' ancora tempo |
+| **fatta** | disco verde con la spunta |
+| **extra** | disco **oro**: allenamento che non era in programma |
+
+L'oro non riusa l'ambra, che in quest'app vuol dire "fuori target": un
+allenamento in piu' non e' un altro tipo di errore. E il metallo si fa con due
+fermate e un colpo di luce — un colore piatto sembra senape.
+
+**Il luccichio si vede una volta sola**, quando la striscia entra in vista.
+L'unica animazione infinita di quest'app e' la fiamma della striscia, e ci sta
+perche' il riempimento porta un dato: uno scintillio perpetuo su un pallino
+sarebbe decorazione, e a batteria. Con `reduced-motion` sparisce e l'oro resta
+oro — il colore e' il dato, il moto no.
+
+Nota di collisione, costata una prova: `.cal` e `.cal-d` erano **gia'** il
+calendario della costanza in `viz.css`, che carica dopo `style.css` e quindi
+vince. La striscia usciva come una griglia da sette colonne con i pallini
+sovrapposti. Le classi qui sono `gcal-*`, e la lezione e' che in un solo foglio
+globale un nome corto e' gia' preso da qualcuno.
+
 ### Gym è un ingresso, non una colonna
 
 Erano dodici carte una sotto l'altra — mappa, prontezza, volume, forma-fatica,
@@ -3917,6 +3972,25 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non leggere un campo dentro un `setTimeout` senza controllare che ci sia
   ancora: fra il tick e l'esecuzione la pagina puo' essere stata sostituita, e
   quello che resta e' un'eccezione in console che nasconde quelle vere
+- Non tenere in Gym un bottone che porta dove porta gia' un riquadro della
+  griglia: "Cardio" era in due posti a tre centimetri di distanza
+- Non mostrare un mese intero in una striscia di giorni: si scorre per trovare
+  il giorno in cui si e' quasi sempre. Due settimane dietro e una avanti, e si
+  apre su oggi
+- Non assegnare le schede solo alle date: un programma si ripete, e riscriverlo
+  ogni sette giorni non lo fa nessuno. Il giorno della settimana e' il
+  programma, la data e' l'eccezione
+- Non confondere "riposo" con "non ho ancora deciso": solo il secondo va
+  riempito, e trattarli uguale fa chiedere all'app una cosa che hai gia' deciso
+- Non dare a un giorno passato e saltato lo stesso segno di domani: direbbe che
+  c'e' ancora tempo
+- Non usare l'ambra per l'allenamento extra: in quest'app l'ambra vuol dire
+  "fuori target", e un allenamento in piu' non e' un errore
+- Non far scintillare all'infinito un pallino: la fiamma della striscia e'
+  l'unica animazione perpetua, e ci sta perche' il riempimento porta un dato.
+  Una volta sola all'ingresso dice "guarda qui" e non costa batteria
+- Non scegliere un nome di classe corto senza cercarlo: `.cal` era gia' il
+  calendario della costanza in `viz.css`, che carica dopo e vince
 - Non aggiungere una terza superficie di navigazione: la persona e' "tu", il
   ⋯ e' "l'app e i dati", e una tendina in mezzo che porta dove portano gia'
   quelle due non aggiunge una destinazione

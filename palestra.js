@@ -599,6 +599,236 @@ function iconaGym(id) {
   return s;
 }
 
+/* ===================================================== il calendario di Gym
+ *
+ * La carta d'ingresso aveva due bottoni, "Registra pesi" e "Cardio", e
+ * rispondeva a una domanda sola: *cosa faccio adesso*. Ma un programma di
+ * allenamento e' una settimana — giorno 1 spinta, giorno 2 tirata, giovedi'
+ * riposo — e quella settimana non si vedeva da nessuna parte: le schede
+ * stavano in un elenco senza giorni, e per sapere se lunedi' ci si era
+ * allenati bisogna aprire lo storico.
+ *
+ * La striscia risponde a tutte e tre le domande insieme: **cosa tocca oggi**,
+ * **cosa ho fatto** e **cosa ho saltato**. I due bottoni spariscono perche'
+ * ci si arriva toccando il giorno, che e' anche il modo di aprire un giorno
+ * che non e' oggi — cosa che prima non si poteva fare.
+ *
+ * L'assegnazione ha **due livelli**, come il piano alimentare: il giorno
+ * della settimana (`P().settimana`) e' il programma e si ripete da solo; la
+ * data (`P().giorni`) e' l'eccezione di questa settimana. Senza il primo si
+ * riscriverebbe il programma ogni sette giorni; senza il secondo non si
+ * potrebbe spostare una seduta al martedi' perche' lunedi' e' saltato.
+ *
+ * `''` in uno dei due non e' "niente": e' **riposo dichiarato**, e serve a
+ * distinguerlo da "non ho ancora deciso" — sono due cose diverse, e solo la
+ * seconda va riempita.
+ */
+const GG_INI = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
+const GYM_GG = ['lunedi\u0300', 'martedi\u0300', 'mercoledi\u0300', 'giovedi\u0300',
+                 'venerdi\u0300', 'sabato', 'domenica'];
+const MESI_L = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio',
+                'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+
+function gymSettimana() { P().settimana ||= {}; return P().settimana; }
+function gymGiorni() { P().giorni ||= {}; return P().giorni; }
+
+/** La scheda prevista: l'eccezione della data se c'e', se no il programma. */
+function schedaDelGiorno(k) {
+  const g = gymGiorni();
+  const id = Object.prototype.hasOwnProperty.call(g, k) ? g[k] : gymSettimana()[dayIdx(k)];
+  return id && scheda(id) ? id : null;
+}
+
+/** `true` se quel giorno e' dichiarato di riposo (e non solo "non deciso"). */
+function riposoDichiarato(k) {
+  const g = gymGiorni();
+  const v = Object.prototype.hasOwnProperty.call(g, k) ? g[k] : gymSettimana()[dayIdx(k)];
+  return v === '';
+}
+
+function assegnaGiorno(k, id, ricorrente) {
+  if (ricorrente) { gymSettimana()[dayIdx(k)] = id ?? ''; delete gymGiorni()[k]; }
+  else gymGiorni()[k] = id ?? '';
+  save();
+}
+
+/**
+ * Lo stato di un giorno, e sono **cinque** e non tre.
+ *
+ * Ai tre chiesti — da allenare, fatta, extra — se ne aggiungono due che
+ * cadono da soli e che senza un segno loro mentirebbero: un giorno di
+ * **riposo** non e' "da allenare" e non deve chiedere niente; e un giorno
+ * passato con una scheda mai fatta e' **saltato**, non ancora "da allenare" —
+ * lasciarlo grigio come domani direbbe che c'e' ancora tempo.
+ */
+function statoAllenamento(k) {
+  const fatto = typeof allenatoIl === 'function' && allenatoIl(k);
+  const prev = schedaDelGiorno(k);
+  if (fatto) return prev ? 'fatta' : 'extra';
+  if (!prev) return 'riposo';
+  return k < today() ? 'saltata' : 'attesa';
+}
+
+const STATO_GYM = {
+  fatta: 'fatta', extra: 'allenamento extra', attesa: 'da fare',
+  saltata: 'saltata', riposo: 'riposo'
+};
+
+/** "lunedi' 8 settembre", che in testata si legge meglio di una data ISO. */
+function dataLunga(k) {
+  return `${GYM_GG[dayIdx(k)]} ${+k.slice(8)} ${MESI_L[+k.slice(5, 7) - 1]}`;
+}
+
+/**
+ * La striscia. Tre settimane — due dietro e una avanti — e si apre su oggi.
+ *
+ * Non e' un mese: un mese intero costringe a scorrere per trovare il giorno
+ * in cui si e' quasi sempre, e le due settimane dietro sono tutto quello che
+ * serve per sapere se questa e' andata come la scorsa. Avanti bastano sette
+ * giorni, perche' il programma si ripete e l'ottavo mostrerebbe lo stesso.
+ */
+function stripCalendario() {
+  const oggi = today();
+  const box = el('div', 'gcal');
+  const sc = el('div', 'gcal-s');
+  const da = addDays(oggi, -13);
+  let qui = null;
+  for (let i = 0; i < 21; i++) {
+    const k = addDays(da, i);
+    const st = statoAllenamento(k);
+    const id = schedaDelGiorno(k);
+    const b = el('button', 'gcal-d ' + st + (k === oggi ? ' oggi' : ''));
+    b.innerHTML = `<span class="dow">${GG_INI[dayIdx(k)]}</span>
+      <span class="num">${+k.slice(8)}</span>
+      <span class="box">${st === 'fatta' || st === 'extra'
+        ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6"/></svg>' : ''}</span>`;
+    b.setAttribute('aria-label', `${dataLunga(k)}: ${STATO_GYM[st]}`
+      + (id ? ', ' + (scheda(id)?.nome || '') : ''));
+    b.title = b.getAttribute('aria-label');
+    b.onclick = () => sheetGiornoGym(k);
+    if (k === oggi) qui = b;
+    sc.append(b);
+  }
+  box.append(sc);
+  /* Si apre su oggi, e la centratura si fa al fotogramma dopo: prima
+     dell'impaginazione le larghezze sono tutte zero e lo scorrimento
+     finirebbe a caso. Il controllo sul documento serve perche' fra il tick e
+     l'esecuzione la pagina puo' essere gia' stata sostituita. */
+  requestAnimationFrame(() => {
+    if (!qui || !document.body.contains(sc)) return;
+    sc.scrollLeft = qui.offsetLeft - sc.clientWidth / 2 + qui.offsetWidth / 2;
+  });
+  /* Il colpo di luce sull'oro, **una volta sola** quando la striscia entra in
+     vista: l'unica animazione infinita di quest'app e' la fiamma, e ci sta
+     perche' il riempimento porta un dato. Uno scintillio perpetuo su un
+     pallino sarebbe decorazione — e a batteria. Con `reduced-motion` il CSS
+     la spegne e l'oro resta oro: il colore e' il dato, il moto no. */
+  if (typeof osserva === 'function')
+    osserva(box, () => sc.querySelectorAll('.gcal-d.extra')
+      .forEach((x, i) => setTimeout(() => x.classList.add('brilla'), i * 90)));
+  return box;
+}
+
+/**
+ * Il giorno, aperto.
+ *
+ * Prende il posto dei due bottoni che c'erano prima, e ne fa una cosa sola:
+ * qui si vede cosa era previsto, si comincia, si registra, e si assegna la
+ * scheda. Per un giorno futuro le azioni di registrazione non ci sono — non
+ * si registra un allenamento che non e' stato fatto, che e' la stessa regola
+ * gia' scritta per la scheda Oggi del diario.
+ */
+function sheetGiornoGym(k) {
+  const oggi = today(), futuro = k > oggi;
+  const id = schedaDelGiorno(k), sc = id ? scheda(id) : null;
+  const serie = typeof serieDelGiorno === 'function' ? serieDelGiorno(k) : [];
+  const card = typeof cardioDi === 'function' ? cardioDi(k) : [];
+  const st = statoAllenamento(k);
+
+  const w = el('div');
+  w.append(el('div', 'eyebrow', k === oggi ? 'Oggi' : dataLunga(k)));
+  w.append(el('h2', 'sec', sc ? esc(sc.nome)
+    : riposoDichiarato(k) ? 'Riposo' : 'Nessuna scheda assegnata'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('div', 'gcal-st ' + st, STATO_GYM[st]));
+
+  if (serie.length || card.length) {
+    const parti = [];
+    if (serie.length) {
+      const ton = typeof tonnellaggioSerie === 'function'
+        ? serie.reduce((a, s) => a + tonnellaggioSerie(s), 0)
+        : serie.reduce((a, s) => a + (+s.kg || 0) * (+s.reps || 0), 0);
+      parti.push(`${serie.length} serie \u00b7 ${nf(ton)} kg`);
+    }
+    for (const c of card)
+      parti.push(`${esc(cardioTipo(c.tipo).n)} \u00b7 ${hms2(c.durata_s || 0)}`);
+    w.append(el('p', 'muted', parti.join(' \u00b7 ')));
+  }
+
+  if (!futuro) {
+    if (sc && typeof sheetGuidata === 'function') {
+      const b = el('button', 'btn wide pri', serie.length
+        ? 'Continua \u00b7 ' + sc.nome : 'Comincia \u00b7 ' + sc.nome);
+      b.onclick = () => sheetGuidata(k, sc.id);
+      w.append(b);
+    }
+    const b2 = el('button', 'btn wide' + (sc ? '' : ' pri'),
+      serie.length ? 'Apri la seduta' : 'Registra pesi');
+    b2.style.marginTop = '8px';
+    b2.onclick = () => sheetSeduta(k);
+    w.append(b2);
+    const b3 = el('button', 'btn wide', 'Cardio');
+    b3.style.marginTop = '8px';
+    b3.onclick = () => { gymTab = 'cardio'; closeSheet(); route(); };
+    w.append(b3);
+  } else {
+    w.append(el('p', 'hint',
+      'Non e\u2019 ancora arrivato: qui si assegna la scheda, si registra quando '
+      + 'e\u2019 il giorno.'));
+  }
+
+  /* --- assegna --- */
+  w.append(el('h2', 'sec', 'Cosa e\u2019 previsto'));
+  let ric = true;
+  const seg = el('div', 'seg');
+  const bot = [];
+  [[true, 'Tutti i ' + GYM_GG[dayIdx(k)]], [false, 'Solo questo giorno']]
+    .forEach(([v, lab]) => {
+      const b = el('button', null, lab);
+      b.setAttribute('aria-pressed', String(ric === v));
+      b.onclick = () => { ric = v; bot.forEach(x => x[0].setAttribute('aria-pressed',
+        String(x[1] === ric))); };
+      bot.push([b, v]); seg.append(b);
+    });
+  w.append(seg);
+  w.append(el('p', 'hint', 'Il programma si ripete ogni settimana. "Solo questo '
+    + 'giorno" e\u2019 l\u2019eccezione: sposta una seduta senza toccare il programma.'));
+
+  const lista = el('div');
+  const riga = (nome, sub, val, attivo) => {
+    const r = el('button', 'prod' + (attivo ? ' on' : ''));
+    r.innerHTML = `<div class="grow"><div class="nm">${esc(nome)}</div>
+      <div class="mt">${esc(sub)}</div></div>
+      <div class="kc">${attivo ? '\u2713' : ''}</div>`;
+    r.onclick = () => { assegnaGiorno(k, val, ric); sheetGiornoGym(k); route(); };
+    lista.append(r);
+  };
+  for (const s of schede()) {
+    const n = (s.righe || []).length;
+    riga(s.nome, n + (n === 1 ? ' esercizio' : ' esercizi'), s.id, id === s.id);
+  }
+  if (!schede().length) lista.append(el('p', 'hint',
+    'Non hai ancora nessuna scheda. Si compongono in Gym \u203a Schede.'));
+  riga('Riposo', 'Nessun allenamento previsto', '', !id && riposoDichiarato(k));
+  w.append(lista);
+
+  const ind = el('button', 'btn wide', 'Chiudi');
+  ind.style.marginTop = '12px';
+  ind.onclick = closeSheet;
+  w.append(ind);
+  sheet(w);
+}
+
 /** Un riquadro dell'ingresso: icona, titolo, e una riga che dice a che punto sei. */
 function riquadroGym(id, titolo, stato, fn, acceso) {
   const b = el('button', 'gym-t' + (acceso ? ' on' : ''));
@@ -627,7 +857,16 @@ function viewPalestra(v) {
   const oggi = sess?.serie?.length ? sess : null;
   const card2 = typeof cardioDi === 'function' ? cardioDi(k) : [];
   const testa = el('div', 'card');
-  testa.append(el('div', 'eyebrow', 'Oggi'));
+  testa.append(el('div', 'eyebrow', 'Allenamento'));
+  /* La striscia prende il posto dei due bottoni: ci si arriva toccando il
+     giorno, e cosi' si apre anche un giorno che non e' oggi — cosa che prima
+     non si poteva fare da nessuna parte. */
+  testa.append(stripCalendario());
+  const scOggi = schedaDelGiorno(k);
+  testa.append(el('div', 'gcal-oggi',
+    `<span class="t">${scOggi ? esc(scheda(scOggi).nome)
+      : riposoDichiarato(k) ? 'Riposo' : 'Niente in programma'}</span>`
+    + `<span class="d">${STATO_GYM[statoAllenamento(k)]}</span>`));
   if (oggi || card2.length) {
     const parti = [];
     if (oggi) {
@@ -641,14 +880,9 @@ function viewPalestra(v) {
   } else {
     testa.append(el('div', 'muted', 'Niente registrato oggi.'));
   }
-  const rr = el('div', 'row');
-  rr.style.cssText = 'gap:8px;margin-top:10px';
-  const bReg = el('button', 'btn pri grow', oggi ? 'Continua la seduta' : 'Registra pesi');
-  bReg.onclick = () => sheetSeduta(k);
-  const bCar = el('button', 'btn grow', 'Cardio');
-  bCar.onclick = () => { gymTab = 'cardio'; route(); };
-  rr.append(bReg, bCar);
-  testa.append(rr);
+  /* I due bottoni erano qui. Se ne va anche "Cardio": e' gia' un riquadro
+     della griglia qui sotto, e averlo in due posti a tre centimetri di
+     distanza non aggiungeva una destinazione. */
   v.append(testa);
 
   /* --- solo cio' che non puo' aspettare: uno scarico consigliato, un dolore
