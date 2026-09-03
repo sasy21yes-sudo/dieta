@@ -194,7 +194,7 @@ function day(k = today()) {
    l'unica eccezione alla regola generica qui sotto, ed e' dichiarata perche'
    una copia congelata e il target di allora esistono **solo** su una giornata
    che era gia' piena: contarli la farebbe risultare registrata da sola. */
-const GIORNO_META = new Set(['fatti', 'target']);
+const GIORNO_META = new Set(['fatti', 'target', 'slots']);
 
 function giornoPieno(d) {
   if (!d || typeof d !== 'object') return false;
@@ -1250,6 +1250,15 @@ function pinnaPassato() {
     if (!d.target && giornoPieno(d)) {
       const t = dayTargetVivo(k);
       if (t?.kcal > 0) { d.target = { ...t }; tocco = true; }
+    }
+    /* La fotografia dei pasti che quel giorno prevedeva. Senza, aggiungere
+       uno spuntino al mercoledi' regalava un pasto saltato a ogni mercoledi'
+       gia' registrato. Si tiene solo quello che serve a ricostruire il
+       giorno: il posto, l'ora e la ricetta assegnata. */
+    if (!d.slots && giornoPieno(d)) {
+      const sl = (D.settimana?.[dayIdx(k)]?.pasti || [])
+        .map(s => ({ id: s.id, slot: s.slot, ora: s.ora || '', codice: s.codice || null }));
+      if (sl.length) { d.slots = sl; tocco = true; }
     }
     /* E il timbro sulle sedute di palestra gia' registrate: senza, smettendo
        di seguire una scheda le loro spunte passavano da verdi a oro. La

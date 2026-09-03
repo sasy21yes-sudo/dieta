@@ -2892,6 +2892,44 @@ Nel foglio dello slot la sezione si chiama **"Oppure un alimento solo"**, e
 c'e' anche quando di ricette non ne hai nessuna: chi comincia da zero non deve
 comporre un piatto per segnare una mela.
 
+### La terza cosa che si muoveva: la struttura del giorno
+
+Segnalato cosi': *"se modifico il piano mi vengono aggiunti pasti nuovi che mi
+rovinano i dati"*. Ed era vero, ed era l'unico dei tre buchi rimasto aperto.
+
+Il congelamento alla spunta protegge la **ricetta**; il timbro del target
+protegge il **metro**. Restava scoperta la piu' visibile delle tre: i **pasti
+che quel giorno prevedeva**. `slotsGiorno()` li leggeva da `D.settimana`, cioe'
+dal piano di adesso, quindi aggiungendo uno spuntino al mercoledi' ogni
+mercoledi' gia' registrato si ritrovava un pasto in piu' — mai spuntato,
+quindi contato come **saltato**.
+
+Misurato su dieci giorni tutti spuntati: da **49 su 49** a **49 su 51**, con
+una riga *"Spuntino serale 0/2"* per un pasto che quel giorno non esisteva. E
+`consumed()` restava fermo a 2466 kcal — che e' esattamente cio' che rendeva il
+difetto difficile da vedere: **le calorie erano giuste e l'aderenza no.**
+
+`S.log[k].slots` e' la fotografia della giornata — posto, ora e ricetta
+assegnata — scritta da `pinnaPassato()` quando il giorno smette di essere oggi.
+**Oggi non si timbra**: oggi non e' finito, e un pasto aggiunto stamattina vale
+per stamattina. Verificato: aggiungendo o togliendo un pasto dal piano, un
+mercoledi' di tre giorni fa resta a cinque pasti, 2466 kcal e 49 su 49, mentre
+oggi passa da cinque a sei.
+
+Con questo i tre lati sono chiusi, e vale la pena scriverli insieme perche'
+sono la stessa regola applicata a tre cose diverse:
+
+| Cosa si congela | Quando | Senza, cambiando il piano... |
+|---|---|---|
+| la **ricetta** (`fatti`) | alla spunta | i macro di un giorno registrato si spostavano |
+| il **metro** (`target`) | quando il giorno passa | le barre e gli scarti si riscrivevano |
+| la **struttura** (`slots`) | quando il giorno passa | comparivano pasti mai previsti, contati come saltati |
+
+E `GIORNO_META` cresce di conseguenza: `fatti`, `target`, `slots` non sono
+contenuto, sono **come l'app ha registrato** quella giornata. Senza quella
+eccezione una giornata vuota risulterebbe registrata per via di una
+fotografia.
+
 ### Il passato smette di muoversi, dai due lati
 
 Segnalato con un caso preciso: *"ho modificato dal piano la ricetta portando
@@ -4173,6 +4211,13 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non far leggere a `dayTarget()` la settimana di adesso: cambiare il piano
   riscrive il metro di ogni giornata gia' registrata. Il target di un giorno
   passato si fissa su di lui
+- Non far leggere a `slotsGiorno()` il piano di adesso per un giorno passato:
+  aggiungendo uno spuntino al mercoledi' ogni mercoledi' registrato si ritrova
+  un pasto in piu', contato come saltato. Misurato: da 49/49 a 49/51 con
+  `consumed()` fermo — le calorie giuste e l'aderenza no
+- Non fermarsi al primo dei tre lati: di una giornata registrata si congelano
+  la ricetta, il metro **e** la struttura. Chiuderne due su tre lascia il
+  difetto piu' difficile da vedere
 - Non fissare il target di **oggi**: oggi non e' finito, e una modifica al
   piano fatta stamattina vale per stamattina
 - Non lasciare che una spunta `true` senza copia congelata continui a leggere

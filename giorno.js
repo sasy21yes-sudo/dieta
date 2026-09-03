@@ -160,8 +160,27 @@ function ricettaGiorno(sid, k) {
  * spariva da `consumed()` e dalla scheda Oggi, cioe' un pasto registrato
  * scompariva dal registro senza che nessuno lo avesse tolto.
  */
+/**
+ * **I pasti che quel giorno prevedeva**, non quelli che il piano prevede oggi.
+ *
+ * Il congelamento alla spunta protegge la **ricetta**, e il timbro del target
+ * protegge il metro. Restava scoperta la terza cosa, che e' la piu' visibile:
+ * la **struttura del giorno**. Aggiungendo uno spuntino al mercoledi', ogni
+ * mercoledi' gia' registrato si ritrovava un pasto in piu' — mai spuntato,
+ * quindi contato come **saltato**. Misurato su dieci giorni tutti spuntati: da
+ * "49 su 49" a "49 su 51", con una riga "Spuntino serale 0/2" per un pasto che
+ * quel giorno non esisteva. `consumed()` restava fermo, ed e' proprio questo
+ * che rendeva il difetto difficile da vedere: le calorie erano giuste e
+ * l'aderenza no.
+ *
+ * `S.log[k].slots` e' la fotografia della giornata, scritta da
+ * `pinnaPassato()` quando il giorno smette di essere oggi. Oggi no: oggi non
+ * e' finito, e un pasto aggiunto stamattina vale per stamattina.
+ */
 function slotsGiorno(k) {
-  const base = (D.settimana[dayIdx(k)]?.pasti || []).map(s => ({ ...s }));
+  const foto = S.log[k]?.slots;
+  const base = (Array.isArray(foto) && foto.length
+    ? foto : (D.settimana[dayIdx(k)]?.pasti || [])).map(s => ({ ...s }));
   const f = S.log[k]?.fatti;
   if (!f) return base;
   const visti = new Set(base.map(s => chiaveP(s)));
