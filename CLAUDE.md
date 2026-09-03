@@ -2794,6 +2794,53 @@ Nel foglio dello slot la sezione si chiama **"Oppure un alimento solo"**, e
 c'e' anche quando di ricette non ne hai nessuna: chi comincia da zero non deve
 comporre un piatto per segnare una mela.
 
+### Il passato smette di muoversi, dai due lati
+
+Segnalato con un caso preciso: *"ho modificato dal piano la ricetta portando
+la pasta a 50 g, sono andato in un martedi' vecchio che avevo segnato e i
+macro erano cambiati. Stessa cosa per il target della giornata."* Riprodotto:
+quel giorno passava da **2459 a 2346 kcal**, e il suo target da **2459 a
+2347**.
+
+Due buchi diversi, uno per lato del confronto.
+
+**1. Le spunte senza copia congelata.** Il congelamento alla spunta e'
+arrivato dopo, e chi ha usato l'app prima ha giornate con `pasti[sid] = true`
+e nessun `fatti[sid]`. Questo file lo scriveva gia' — *"una spunta `true`
+senza copia legge la ricetta di adesso, cioe' si comporta come si comportava
+l'app prima"* — ma quella frase descriveva una scelta ragionevole solo finche'
+nessuno correggeva le ricette. Appena lo si fa, quelle giornate si muovono.
+
+La ricetta di allora non esiste piu' da nessuna parte, e inventarla sarebbe
+peggio. Ma si puo' **smettere di muoverle**: `pinnaPassato()` le congela
+com'erano l'ultima volta che l'app le ha calcolate. Non e' la storia vera, e'
+la fine della deriva — ed e' scritto cosi' anche nel codice, perche' e' una
+riparazione e non un ripristino.
+
+**2. Il target.** `dayTarget()` leggeva `D.settimana[...].totali`, cioe' il
+piano **di adesso**: cambiare la settimana riscriveva all'indietro il metro di
+ogni martedi' mai registrato. E' la stessa cosa gia' vietata per i pasti — *il
+piano e' un modello, il diario e' un fatto* — chiusa pero' solo dalla parte del
+**consumato**, mai da quella del metro. Adesso il target di una giornata
+passata si fissa su di lei e da li' in poi e' suo.
+
+**Oggi non si fissa**, ed e' voluto: oggi non e' finito, e se cambi il piano
+stamattina il metro di stamattina e' quello nuovo. Il fermo scatta quando il
+giorno smette di essere oggi.
+
+Un dettaglio che sarebbe passato inosservato: `giornoPieno()` e' **generico
+apposta** — qualunque campo con un contenuto conta — e scrivendo il target
+dentro la giornata una giornata vuota sarebbe risultata registrata. Da qui
+`GIORNO_META`, l'unica eccezione a quella regola, ed e' dichiarata: la copia
+congelata e il target di allora non sono contenuto, sono **come l'app ha
+registrato** quella giornata, ed esistono solo su un giorno che era gia'
+pieno.
+
+Verificato dopo la correzione: rifatta la stessa modifica, tolta del tutto la
+ricetta da quel giorno nel piano e cambiato il target generale a 1500, la
+giornata vecchia resta a 2459 su tutti e due i numeri, mentre oggi segue il
+piano di adesso.
+
 ### I numeri erano al sicuro, il giudizio no
 
 Il congelamento alla spunta protegge i **numeri** di una giornata registrata:
@@ -3936,6 +3983,18 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non costringere a comporre una ricetta per mettere un alimento solo in un
   pasto: un codice `ali:<qta>:<nome>` risolto da `pasto()` si comporta come
   una ricetta ovunque, senza sporcare l'elenco delle ricette
+- Non far leggere a `dayTarget()` la settimana di adesso: cambiare il piano
+  riscrive il metro di ogni giornata gia' registrata. Il target di un giorno
+  passato si fissa su di lui
+- Non fissare il target di **oggi**: oggi non e' finito, e una modifica al
+  piano fatta stamattina vale per stamattina
+- Non lasciare che una spunta `true` senza copia congelata continui a leggere
+  la ricetta di adesso: era ragionevole finche' nessuno correggeva le ricette.
+  La ricetta di allora non si puo' ricostruire, ma si puo' smettere di
+  muoverla — e va detto che e' una riparazione, non un ripristino
+- Non scrivere dentro la giornata un campo che non e' contenuto senza
+  dichiararlo in `GIORNO_META`: `giornoPieno()` e' generico, e una giornata
+  vuota risulterebbe registrata per via di un metadato
 - Non far nascere dal piano di adesso il giudizio su una giornata gia'
   spuntata: i numeri sono congelati ma il confronto no, e correggere il piano
   faceva dichiarare uno scarto a una giornata che nessuno aveva toccato. Il

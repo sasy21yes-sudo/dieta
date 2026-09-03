@@ -190,9 +190,16 @@ function day(k = today()) {
  * un campo nuovo aggiunto in futuro conta da solo, senza che nessuno debba
  * ricordarsi di aggiungerlo a un elenco.
  */
+/* Non sono contenuto: sono come l'app ha registrato quella giornata. E'
+   l'unica eccezione alla regola generica qui sotto, ed e' dichiarata perche'
+   una copia congelata e il target di allora esistono **solo** su una giornata
+   che era gia' piena: contarli la farebbe risultare registrata da sola. */
+const GIORNO_META = new Set(['fatti', 'target']);
+
 function giornoPieno(d) {
   if (!d || typeof d !== 'object') return false;
-  for (const v of Object.values(d)) {
+  for (const [key, v] of Object.entries(d)) {
+    if (GIORNO_META.has(key)) continue;
     if (v == null || v === false || v === '') continue;
     if (Array.isArray(v)) { if (v.length) return true; continue; }
     if (typeof v === 'object') { if (Object.keys(v).length) return true; continue; }
@@ -436,9 +443,29 @@ function consumed(k) {
   return t;
 }
 /** Se al giorno non e' assegnato nessun pasto, il metro sono i target. */
-function dayTarget(k) {
+/** Il target come lo dice il piano **di adesso**. */
+function dayTargetVivo(k) {
   const t = D.settimana[dayIdx(k)].totali;
   return (t && t.kcal > 0) ? t : { ...D.target };
+}
+
+/**
+ * Il target con cui quella giornata e' stata giudicata.
+ *
+ * Leggeva `D.settimana[...].totali`, cioe' il piano **di adesso**: cambiare
+ * la settimana oggi riscriveva all'indietro il metro di ogni martedi' mai
+ * registrato, e una giornata chiusa da tre settimane si ritrovava barre e
+ * scarti diversi da quelli che aveva. E' la stessa cosa gia' vietata per i
+ * pasti — *il piano e' un modello, il diario e' un fatto* — che pero' era
+ * stata chiusa solo dalla parte del **consumato**, non da quella del metro.
+ *
+ * Il target di una giornata passata si fissa (`pinnaPassato()`) e da li' in
+ * poi e' suo. Oggi no: oggi non e' finito, e se cambi il piano stamattina il
+ * metro di stamattina e' quello nuovo.
+ */
+function dayTarget(k) {
+  const s = S.log[k]?.target;
+  return (s && s.kcal > 0) ? s : dayTargetVivo(k);
 }
 
 /* --------------------------------------------------- motore sostituzioni */
@@ -1187,6 +1214,45 @@ function exportBackup() {
            'application/json');
   S.settings.backup = today(); save();
   return n;
+}
+
+/**
+ * **Il passato smette di muoversi.**
+ *
+ * Due giornate registrate potevano ancora cambiare sotto le mani, e per due
+ * ragioni diverse:
+ *
+ * 1. **le spunte senza copia congelata.** Il congelamento alla spunta e'
+ *    arrivato dopo, e chi ha usato l'app prima ha giornate con `pasti[sid] =
+ *    true` e nessun `fatti[sid]`: quelle leggono la ricetta **di adesso**, e
+ *    correggere un ingrediente sposta i loro macro all'indietro. La ricetta di
+ *    allora non esiste piu' da nessuna parte e inventarla sarebbe peggio —
+ *    ma si puo' **smettere di muoverle**, fissandole com'erano l'ultima volta
+ *    che l'app le ha calcolate. Non e' la storia vera, e' la fine della deriva;
+ * 2. **il target.** Stessa cosa dall'altra parte del confronto: `dayTarget()`
+ *    leggeva il piano di adesso, quindi cambiare la settimana riscriveva il
+ *    metro di ogni giornata passata.
+ *
+ * Gira una volta all'avvio, dopo `fondiPiano()` — servono `D.pasti` e
+ * `D.settimana` — e **non tocca oggi**: oggi non e' finito.
+ */
+function pinnaPassato() {
+  const oggi = today();
+  let tocco = false;
+  for (const [k, d] of Object.entries(S.log)) {
+    if (!d || k >= oggi) continue;
+    for (const [sid, v] of Object.entries(d.pasti || {})) {
+      if (!v) continue;
+      const f = d.fatti?.[sid];
+      if (f?.ingredienti?.length || f?.macro) continue;
+      if (typeof congelaPasto === 'function') { congelaPasto(sid, k); tocco = true; }
+    }
+    if (!d.target && giornoPieno(d)) {
+      const t = dayTargetVivo(k);
+      if (t?.kcal > 0) { d.target = { ...t }; tocco = true; }
+    }
+  }
+  if (tocco) save();
 }
 
 /** Promemoria in cima a Oggi, solo quando serve davvero. */
@@ -3676,7 +3742,7 @@ function sheetImport(grezzo) {
       setTimeout(() => location.reload(), 400);
       return;
     }
-    S = o; normalize(); fondiPiano(); migraPastiPerSlot();
+    S = o; normalize(); fondiPiano(); migraPastiPerSlot(); pinnaPassato();
     save(); closeSheet(); route();
     toast('Backup importato');
   };
@@ -3939,6 +4005,8 @@ async function init() {
     fondiPiano();       // D = piano di base + modifiche di questo profilo
     // i registri scritti quando la chiave era la ricetta: una volta sola
     migraPastiPerSlot();
+    // e quelli che potevano ancora muoversi sotto le mani
+    pinnaPassato();
     // il catalogo palestra non e' vitale: se manca, il resto dell'app vive
     try { PD = await (await fetch('data/palestra.json', { cache: 'no-cache' })).json(); }
     catch { PD = null; }
