@@ -2592,10 +2592,17 @@ Le voci erano quattro e due erano etichette, non destinazioni: **"Il piano"**
 apriva l'elenco dei passi — da cui sceglierne ancora uno — e **"Quello che
 mangi"** poteva voler dire gli alimenti, le ricette, o cosa c'e' su Oggi.
 
-Ora sono cinque, nell'ordine in cui un piano si costruisce e in cui ci si
-torna: **Chi sei**, **Foto dei progressi**, **Piano settimanale**, **Ricette**,
-**Lista ingredienti**. Ognuna nomina una schermata sola e ci arriva in un
-tocco, invece di lasciare a meta' strada.
+Ora sono sei, nell'ordine in cui un piano si costruisce e in cui ci si
+torna: **Chi sei**, **Foto dei progressi**, **Quanto mangiare**, **Piano
+settimanale**, **Ricette**, **Lista ingredienti**. Ognuna nomina una schermata
+sola e ci arriva in un tocco, invece di lasciare a meta' strada.
+
+**"Quanto mangiare" e' il target**, ed e' l'unica delle sei che non dipende dal
+piano alimentare: resta anche a modulo spento, perche' il target e' il metro
+con cui l'app giudica ogni giornata registrata — le barre di Oggi, l'analisi,
+il cruscotto, la previsione — e ci si torna spesso, da qualunque schermata.
+Finora ci si arrivava solo passando dall'elenco dei passi, cioe' scegliendo due
+volte.
 
 Le tre che dipendono dal piano alimentare spariscono quando il modulo e'
 spento: portare a un passo che in quella configurazione non esiste vuol dire
@@ -3275,62 +3282,79 @@ sta andando** quella persona: le medie settimanali di qualcuno di cui non si
 sa quanto e' alto, quanto pesa e cosa sta cercando di fare sono numeri senza
 soggetto.
 
-La sezione **Profilo** apre percio' la meta' dati del documento, con quattro
-cose: chi, la sagoma disegnata sulle circonferenze vere, la tabella
-ora/target/manca, e tre piani cartesiani.
+**Profilo e' quindi la prima pagina**, non una sezione a meta' documento, e
+dopo di lei si va a capo pagina: il verdetto comincia pulito invece di
+appoggiarsi in fondo a un grafico.
 
-**Tre piani e non uno**, perche' sono tre domande diverse e la risposta a una
-non contiene le altre:
+Dentro: chi, la sagoma disegnata sulle circonferenze vere con il riferimento
+tratteggiato sopra, la tabella ora/target/manca, e quattro figure.
 
-| Piano | La domanda |
-|---|---|
-| vita/altezza x grasso | quanto sei lontano dalle fasce di riferimento |
-| massa grassa x massa magra | in che direzione ti stai muovendo |
-| FFMI x grasso | quanto muscolo chiede il fisico che hai scelto |
+### Quattro figure, quattro soggetti
 
-Il secondo e' quello che nessuna tabella sa dire: le **diagonali tratteggiate
-sono il peso totale**, quindi lungo una di quelle la bilancia non si muove, e
-una ricomposizione e' esattamente il movimento che le attraversa — a sinistra
-si perde grasso, in alto si guadagna massa magra. Quattro numeri incolonnati
-non lo fanno vedere.
+La prima versione erano **tre piani cartesiani che parlavano tutti e tre di
+grasso** — l'asse y del primo, l'asse x del secondo, l'asse y del terzo. Tre
+disegni per dire tre volte la stessa cosa sono un disegno solo, ripetuto; e
+per giunta erano piccoli, con gli assi su intervalli fissi mezzi vuoti e il
+testo a sei punti. Segnalati come "brutti graficamente, e tutti e tre parlano
+di grasso": tutte e due le critiche erano giuste.
 
-Su tutti e tre c'e' la **scia** delle rilevazioni precedenti: un punto solo
-dice una posizione, due punti dicono una direzione, ed e' la direzione la cosa
-che si guarda. Si costruisce sulle date in cui la **vita** e' stata misurata —
-le uniche in cui la composizione ha un dato nuovo dalla parte del metro — e
-per collo e fianchi prende l'ultima misura **fino a quel giorno**:
-`lastMeas()` risponde sempre con l'ultima in assoluto, che va benissimo per
-"adesso" e falserebbe il passato.
+Adesso quattro soggetti diversi, e **quattro forme diverse** — la forma non e'
+decorazione, e' quello che dice se il dato ha una dimensione o due:
 
-Le fasce disegnate sono **riferimenti di popolazione, non un giudizio**, ed e'
-scritto sotto ogni piano — la stessa regola delle costanti di Banister:
+| Figura | Il soggetto | Perche' quella forma |
+|---|---|---|
+| **Il peso, giorno per giorno** | il tempo | una serie storica e' una linea: pallini per le pesate, linea per la tendenza a sette giorni, e la riga tratteggiata del riferimento |
+| **Le circonferenze** | il metro | un manubrio per voce, tutte in centimetri sullo stesso asse. E' la stessa figura della revisione settimanale, e non e' un caso: e' la stessa domanda |
+| **Grassa e magra** | la composizione | l'unico che resta un piano a due assi, perche' le **diagonali del peso** dicono una cosa che nessuna tabella sa dire |
+| **La percentuale di grasso** | una fascia | un dato a **una** dimensione: su due assi si riempie mezza pagina di bianco per collocare un numero |
 
-- **vita/altezza 0,5 e 0,6** — NICE NG246 chiama la prima fascia "adiposita'
-  centrale aumentata" e la seconda "alta". La nota riporta anche l'obiezione
-  della letteratura, che quelle soglie penalizzano gli adulti bassi perche' la
-  vita non cresce in proporzione all'altezza: una soglia con una critica nota
-  si consegna con la critica;
-- **le fasce di grasso corporeo** — American Council on Exercise, distinte per
-  sesso: atleti 6-13 (uomini) e 14-20 (donne), accettabile 18-24 e 25-31;
-- **il tetto dell'FFMI** — 25 e 22, da Kouri 1995. E' lo stesso numero che usa
-  gia' la scheda del fisico di riferimento: usarne uno diverso qui direbbe due
-  cose diverse sulla stessa persona nello stesso documento.
+Il piano grassa/magra resta perche' lungo una diagonale la bilancia non si
+muove, e una ricomposizione e' esattamente il movimento che le attraversa —
+verso sinistra e verso l'alto. Quattro numeri incolonnati non lo fanno vedere.
+
+Su peso e composizione c'e' la **scia** delle rilevazioni precedenti: un punto
+dice una posizione, due punti dicono una direzione. Si costruisce sulle date in
+cui la **vita** e' stata misurata — le uniche in cui la composizione ha un dato
+nuovo dalla parte del metro — e per collo e fianchi prende l'ultima misura
+**fino a quel giorno**: `lastMeas()` risponde sempre con l'ultima in assoluto,
+che va benissimo per "adesso" e falserebbe il passato.
+
+I riferimenti disegnati sono **di popolazione, non un giudizio**, ed e' scritto
+sotto ogni figura — la stessa regola delle costanti di Banister:
+
+- **vita/altezza 0,5 e 0,6** di NICE (NG246), ma disegnate **in centimetri per
+  questa altezza**, sulla riga della vita: 0,5 e' un rapporto, `90 cm` e' un
+  numero con cui si puo' fare qualcosa davanti a uno specchio. La nota riporta
+  anche l'obiezione della letteratura — quelle soglie penalizzano gli adulti
+  bassi, perche' la vita non cresce in proporzione all'altezza. Una soglia con
+  una critica nota si consegna con la critica;
+- **le fasce di grasso corporeo** dell'American Council on Exercise, distinte
+  per sesso, con la nota che "atleti" descrive dove si trova chi gareggia, non
+  dove dovrebbe stare chi legge.
 
 E la regola di sempre, che qui vale doppio perche' il foglio finisce in mano a
-qualcun altro: **niente date di arrivo.** I piani dicono dove sei e dove
+qualcun altro: **niente date di arrivo.** Le figure dicono dove sei e dove
 punti, la distanza si legge sugli assi; quanto ci vuole non e' scritto da
 nessuna parte.
 
-Due dettagli del disegno, tutti e due trovati guardando la pagina e non il
-codice:
+Cinque difetti trovati **guardando la pagina**, non leggendo il codice:
 
-- **le due etichette vanno da parti opposte**, e quale sia "opposta" lo decide
-  la posizione dei punti. Fisse — target sopra, adesso sotto — si
-  sovrapponevano ogni volta che l'anello finiva sotto il pallino, cioe' nel
-  caso normale di chi sta scendendo di grasso;
-- **una diagonale si taglia sul riquadro, non si scarta**: con `x + y = s`
-  fissato quasi nessuna retta ha tutti e due gli estremi dentro il grafico, e
-  filtrando gli estremi non ne compariva **nessuna**.
+1. la freccia `→` non esiste in WinAnsi, e usciva `84,0 ? 79,0`. Il generatore
+   segnala cosi' un carattere che non ha, ed e' esattamente il tipo di cosa che
+   in un documento da consegnare non si nota finche' non e' stampato. Ci va
+   `›`, che in WinAnsi c'e';
+2. `doc.paragrafo` non conosce il grassetto, e i `**` di una didascalia
+   uscivano come asterischi;
+3. l'etichetta dell'asse x stava sulla riga delle tacche, dove a destra c'e'
+   sempre l'ultima etichetta: si stampavano una sopra l'altra;
+4. l'ultima tacca cade sul bordo destro, che in un grafico largo tutta la
+   pagina **e' il margine**: centrata, l'etichetta ci finiva sopra per meta'.
+   `pdfDentro()` la rientra, misurando con le stesse metriche di Helvetica che
+   usa il ritorno a capo;
+5. nella fascia del grasso i nomi delle fasce e le due etichette degli
+   indicatori stavano sulla stessa riga, e `rif. 10,0%` finiva stampato sopra
+   `atleti`. Tre livelli invece di due, e i due indicatori si scostano quando
+   sono vicini.
 
 Il PDF ha percio' un primitivo in piu': `doc.percorso()` porta dentro la
 pagina un `d` di SVG fatto **solo di `M`, `C` e `Z`**. Non e' un parser e non
@@ -4042,9 +4066,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non aprire il resoconto con i numeri: chi lo riceve non sa di chi sono. La
   sezione Profilo apre la meta' dati, e la sagoma con la tabella ora/target
   vengono prima delle medie
-- Non mettere un piano cartesiano solo: "dove sono sulle fasce", "in che
-  direzione vado" e "quanto muscolo chiede il target" sono tre domande, e la
-  risposta a una non contiene le altre
+- Non fare tre grafici che parlano dello stesso soggetto: tre piani con il
+  grasso su un asse sono un disegno solo ripetuto tre volte. Quattro figure,
+  quattro soggetti — il tempo, il metro, la composizione, la fascia
+- Non disegnare su due assi un dato che ne ha una: la percentuale di grasso su
+  un piano cartesiano riempie mezza pagina di bianco per collocare un numero
 - Non disegnare un piano grassa/magra senza le diagonali del peso: senza
   quelle una ricomposizione — il movimento che le attraversa a bilancia
   ferma — non si vede
@@ -4054,6 +4080,16 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non fissare da che parte va l'etichetta di un punto: "target" sopra e
   "adesso" sotto si sovrappongono ogni volta che l'anello finisce sotto il
   pallino, cioe' nel caso normale di chi sta scendendo di grasso
+- Non centrare l'etichetta dell'ultima tacca sul bordo del grafico: in un
+  grafico largo tutta la pagina quel bordo e' il margine, e meta' etichetta
+  finisce fuori. Si rientra con `pdfDentro()`, misurando
+- Non mettere l'etichetta di un asse sulla riga delle sue tacche: a destra c'e'
+  sempre l'ultima, e si stampano una sopra l'altra
+- Non usare `→` in un PDF: non sta in WinAnsi e diventa `?`. C'e' `›`
+- Non scrivere `**grassetto**` dentro `doc.paragrafo`: non e' markdown, e gli
+  asterischi finiscono stampati
+- Non esprimere una soglia in rapporto quando puoi darla in centimetri: 0,5 e'
+  un numero da ricordare, 90 cm e' un numero da misurare
 - Non presentare le fasce di NICE e ACE come un giudizio: sono riferimenti di
   popolazione, e alla soglia 0,5 la letteratura contesta di penalizzare gli
   adulti bassi. Una soglia con una critica nota si consegna con la critica

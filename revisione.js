@@ -818,6 +818,15 @@ function pdfResoconto(per) {
     X, doc.y, { size: 9.5, col: RES_C.ink2 });
   doc.y += 6;
 
+  /* --- di chi sono questi numeri ---
+     Apre il documento, e non a meta'. Chi lo riceve — un nutrizionista, un
+     medico, un allenatore — quei numeri non li ha mai visti: la prima domanda
+     non e' "com'e' andata la settimana" ma "di chi stiamo parlando". Dopo il
+     profilo si va a capo pagina, cosi' il verdetto comincia pulito invece di
+     appoggiarsi in fondo a un grafico. */
+  pdfProfilo(doc, titolo, per.a);
+  doc.nuovaPagina();
+
   /* --- verdetto --- */
   const hVer = 30 + Math.max(1, pdfRighe(ver.d, W - 24, 9.5, false).length) * 13;
   doc.serve(hVer);
@@ -1005,9 +1014,6 @@ function pdfResoconto(per) {
 
   const nn = (v, d = 0, u = '') => v == null ? '—' : nf(v, d) + (u ? ' ' + u : '');
   const pct = v => v == null ? '—' : nf(v, 0) + '%';
-
-  /* --- di chi sono questi numeri --- */
-  pdfProfilo(doc, titolo, tabella, per.a);
 
   /* --- quanto vale quello che segue --- */
   const reg = statRegistro(per);
@@ -1327,100 +1333,288 @@ function serieComposizione(k = today(), n = 12) {
 }
 
 /**
- * Un piano cartesiano sul PDF.
+ * Il riquadro di un grafico del profilo: griglia leggera, assi aperti, niente
+ * cornice.
  *
- * `o.punti` sono `{x, y, lab, tipo}` con tipo `ora` (pieno), `target`
- * (anello) o `scia` (piccolo). `o.fasceX` e `o.fasceY` sono le bande di
- * riferimento — `[da, a, etichetta]` — e `o.diag` traccia le diagonali a
- * somma costante, che e' il modo in cui un piano grassa/magra dice "stesso
- * peso" senza scriverlo.
+ * La prima versione incorniciava tutto e riempiva le fasce di riferimento con
+ * dei rettangoli grigi: su A4 il risultato era una scatola pesante con dentro
+ * tre pallini, e il disegno pesava piu' del dato. Qui restano solo le righe
+ * orizzontali della griglia, chiare, e una linea di base un filo piu' scura.
  */
-function pdfPianoXY(doc, o) {
+function pdfGriglia(doc, o) {
   const { x, y, w, h } = o;
-  const PX = v => x + (v - o.x0) / (o.x1 - o.x0) * w;
-  const PY = v => y + h - (v - o.y0) / (o.y1 - o.y0) * h;
-  const dentro = p => p && isFinite(p.x) && isFinite(p.y);
-
-  // le bande prima di tutto: sono il fondo, e sopra ci va il resto
-  for (const [da, a, lab] of (o.fasceX || [])) {
-    const xa = PX(Math.max(o.x0, da)), xb = PX(Math.min(o.x1, a));
-    if (xb <= xa) continue;
-    doc.rett(xa, y, xb - xa, h, { fill: RES_C.wash });
-    doc.linea(xa, y, xa, y + h, { col: RES_C.rule, w: .5 });
-    if (lab) doc.testo(lab, (xa + xb) / 2, y + 9,
-      { size: 6, col: RES_C.ink3, align: 'center' });
+  for (const t of (o.tickY || [])) {
+    const py = y + h - (t.v - o.y0) / (o.y1 - o.y0) * h;
+    if (py < y - .5 || py > y + h + .5) continue;
+    doc.linea(x, py, x + w, py, { col: RES_C.rule, w: .4 });
+    doc.testo(t.l, x - 5, py + 2.4, { size: 7, col: RES_C.ink3, align: 'right' });
   }
-  for (const [da, a, lab] of (o.fasceY || [])) {
-    const ya = PY(Math.min(o.y1, a)), yb = PY(Math.max(o.y0, da));
-    if (yb <= ya) continue;
-    doc.rett(x, ya, w, yb - ya, { fill: RES_C.wash });
-    doc.linea(x, ya, x + w, ya, { col: RES_C.rule, w: .5 });
-    if (lab && yb - ya > 9) doc.testo(lab, x + w - 3, (ya + yb) / 2 + 2,
-      { size: 6, col: RES_C.ink3, align: 'right' });
+  doc.linea(x, y + h, x + w, y + h, { col: RES_C.ink3, w: .6 });
+  for (const t of (o.tickX || [])) {
+    const px = x + (t.v - o.x0) / (o.x1 - o.x0) * w;
+    if (px < x - .5 || px > x + w + .5) continue;
+    doc.linea(px, y + h, px, y + h + 3, { col: RES_C.ink3, w: .5 });
+    /* L'etichetta si **rientra** dentro il riquadro invece di restare
+       centrata sulla tacca: l'ultima cade sul bordo destro, che nei grafici
+       larghi tutta la pagina e' il margine, e centrata ci finiva sopra
+       meta' fuori. */
+    doc.testo(t.l, pdfDentro(t.l, px, x, x + w, 7),
+      y + h + 12, { size: 7, col: RES_C.ink3, align: 'center' });
   }
+  if (o.labY) doc.testo(o.labY, x - 5, y - 5, { size: 7.5, col: RES_C.ink2 });
+  /* Una riga sotto le tacche, non sulla loro: a destra c'e' sempre l'ultima
+     etichetta dell'asse, e le due si stampavano una sopra l'altra. */
+  if (o.labX) doc.testo(o.labX, x + w / 2, y + h + 23,
+    { size: 7.5, col: RES_C.ink2, align: 'center' });
+}
 
-  /* Le diagonali a somma costante. Su un piano grassa/magra "peso fermo" e'
-     una retta a 45 gradi, e senza disegnarla una ricomposizione — che e'
-     esattamente il movimento lungo la perpendicolare — non si vede. */
-  for (const s of (o.diag || [])) {
-    /* La retta si **taglia** sul riquadro, non si scarta quando un estremo
-       cade fuori: con `x + y = s` fissato quasi nessuna diagonale ha tutti e
-       due gli estremi dentro, e filtrandoli non ne compariva nemmeno una. */
-    const xa = Math.max(o.x0, s - o.y1), xb = Math.min(o.x1, s - o.y0);
+/**
+ * La `x` di un'etichetta centrata, rientrata perche' non sfori il riquadro.
+ *
+ * L'ultima tacca di un asse cade sul bordo destro, e nei grafici larghi tutta
+ * la pagina quel bordo **e'** il margine: centrata, l'etichetta ci finiva
+ * sopra per meta'. Misurato con le stesse metriche di Helvetica che usa il
+ * ritorno a capo, non a occhio.
+ */
+function pdfDentro(testo, px, x0, x1, size, bold) {
+  const m = pdfLarghezza(String(testo), size, bold) / 2;
+  return Math.max(x0 + m - 6, Math.min(px, x1 - m));
+}
+
+/** Un pallino con l'alone: sopra una linea o una griglia resta leggibile. */
+function pdfPunto(doc, x, y, col, r = 3.4) {
+  doc.cerchio(x, y, r + 1.4, { fill: RES_C.carta });
+  doc.cerchio(x, y, r, { fill: col });
+}
+
+/**
+ * **Il peso, giorno per giorno.**
+ *
+ * Il resoconto non aveva un grafico del peso, che e' la prima cosa che si
+ * cerca aprendo un documento del genere. I pallini sono le pesate, la linea
+ * e' la tendenza a sette giorni — l'unica delle due che significhi qualcosa
+ * su una settimana — e la riga tratteggiata il peso del riferimento, dove c'e'.
+ */
+function pdfGraficoPeso(doc, x, y, w, h, k) {
+  const gg = Object.keys(S.log)
+    .filter(d => d <= k && S.log[d]?.peso > 0).sort();
+  if (gg.length < 2) return false;
+  const da = gg[0], a = gg[gg.length - 1];
+  const t0 = new Date(da).getTime(), t1 = new Date(a).getTime();
+  if (!(t1 > t0)) return false;
+  const pesi = gg.map(d => S.log[d].peso);
+  const tend = gg.map(d => trendW(d)).filter(v => v > 0);
+  const tgt = D.target_fisico?.peso_kg ?? null;
+  const tutti = [...pesi, ...tend, ...(tgt ? [tgt] : [])];
+  const lo = Math.min(...tutti) - 0.6, hi = Math.max(...tutti) + 0.6;
+  const PX = d => x + (new Date(d).getTime() - t0) / (t1 - t0) * w;
+  const PY = v => y + h - (v - lo) / (hi - lo) * h;
+
+  const nt = niceTicks(lo, hi, 4);
+  // quattro date lungo l'asse, la prima e l'ultima comprese
+  const nx = 4;
+  const tickX = Array.from({ length: nx + 1 }, (_, i) => {
+    const t = t0 + (t1 - t0) * i / nx;
+    const dd = new Date(t);
+    return { v: t, l: String(dd.getDate()).padStart(2, '0') + '/'
+      + String(dd.getMonth() + 1).padStart(2, '0') };
+  });
+  pdfGriglia(doc, { x, y, w, h, y0: lo, y1: hi, x0: t0, x1: t1,
+    tickY: nt.map(v => ({ v, l: nf(v, 1) })), tickX, labY: 'kg' });
+
+  if (tgt != null && tgt > lo && tgt < hi) {
+    doc.linea(x, PY(tgt), x + w, PY(tgt), { col: RES_C.ink2, w: .8, tratto: '4 3' });
+    doc.testo('riferimento ' + nf(tgt, 1) + ' kg', x + w, PY(tgt) - 4,
+      { size: 7, col: RES_C.ink2, align: 'right' });
+  }
+  for (const d of gg) doc.cerchio(PX(d), PY(S.log[d].peso), 1.4, { fill: RES_C.rule });
+  let prec = null;
+  for (const d of gg) {
+    const v = trendW(d);
+    if (!(v > 0)) continue;
+    if (prec) doc.linea(PX(prec.d), PY(prec.v), PX(d), PY(v), { col: RES_C.pine, w: 1.5 });
+    prec = { d, v };
+  }
+  if (prec) {
+    pdfPunto(doc, PX(prec.d), PY(prec.v), RES_C.pine, 3);
+    doc.testo(nf(prec.v, 1) + ' kg', PX(prec.d) - 6, PY(prec.v) - 6,
+      { size: 7.5, bold: true, col: RES_C.pine, align: 'right' });
+  }
+  return true;
+}
+
+/**
+ * **Le circonferenze: dove sono e dove puntano.**
+ *
+ * Un manubrio per voce — la stessa figura della revisione settimanale, e non
+ * e' un caso: e' la stessa domanda, "quanto dista da dove punto", e due
+ * disegni diversi per la stessa domanda si leggono due volte.
+ *
+ * Tutte le voci sono in centimetri, quindi stanno su un asse solo. Sulla riga
+ * della vita ci sono anche le due soglie di NICE, ma **in centimetri per
+ * questa altezza**: "0,5 x altezza" e' una frase, `88 cm` e' un numero con cui
+ * si puo' fare qualcosa davanti a uno specchio.
+ */
+function pdfGraficoMisure(doc, x, y, w, k) {
+  const righe = D.misure
+    .map(m => ({ m, ora: lastMeas(m.id), tgt: m.target }))
+    .filter(r => r.ora > 0);
+  if (!righe.length) return 0;
+  const h = D.profilo?.altezza_cm;
+  const soglie = h > 0 ? [[h * 0.5, '0,5·h'], [h * 0.6, '0,6·h']] : [];
+  const vals = righe.flatMap(r => [r.ora, r.tgt]).filter(v => v > 0)
+    .concat(righe.some(r => r.m.id === 'vita') ? soglie.map(s => s[0]) : []);
+  const lo = Math.floor((Math.min(...vals) - 4) / 5) * 5;
+  const hi = Math.ceil((Math.max(...vals) + 4) / 5) * 5;
+  const LAB = 92, VAL = 78;
+  const gx = x + LAB, gw = w - LAB - VAL;
+  const PX = v => gx + (v - lo) / (hi - lo) * gw;
+  const RH = 19, H = righe.length * RH;
+
+  for (const t of niceTicks(lo, hi, 5)) {
+    if (t < lo || t > hi) continue;
+    doc.linea(PX(t), y - 2, PX(t), y + H, { col: RES_C.rule, w: .4 });
+    doc.testo(nf(t, 0), pdfDentro(nf(t, 0), PX(t), gx, gx + gw, 7),
+      y + H + 11, { size: 7, col: RES_C.ink3, align: 'center' });
+  }
+  doc.testo('cm', x + w, y + H + 11, { size: 7.5, col: RES_C.ink2, align: 'right' });
+
+  righe.forEach((r, i) => {
+    const yy = y + i * RH + RH / 2;
+    doc.testo(r.m.label, x, yy + 2.6, { size: 8, col: RES_C.ink2 });
+    if (r.m.id === 'vita') for (const [v, lab] of soglie) {
+      if (v < lo || v > hi) continue;
+      doc.linea(PX(v), yy - 7, PX(v), yy + 7, { col: RES_C.ink3, w: .7, tratto: '1 2' });
+      doc.testo(lab, PX(v), yy - 9, { size: 6, col: RES_C.ink3, align: 'center' });
+    }
+    if (r.tgt > 0) {
+      doc.linea(PX(r.ora), yy, PX(r.tgt), yy, { col: RES_C.pine, w: 1.6 });
+      doc.cerchio(PX(r.tgt), yy, 3.2, { fill: RES_C.carta, stroke: RES_C.pine, w: 1.2 });
+    }
+    pdfPunto(doc, PX(r.ora), yy, RES_C.ink, 2.8);
+    /* `›` e non `→`: la freccia non sta in WinAnsi e usciva un punto
+       interrogativo, che e' il modo in cui questo generatore segnala di non
+       avere un carattere. */
+    doc.testo(nf(r.ora, 1) + (r.tgt > 0 ? ' › ' + nf(r.tgt, 1) : ''),
+      x + w, yy + 2.6, { size: 8, col: RES_C.ink2, align: 'right' });
+  });
+  return H;
+}
+
+/**
+ * **Grassa e magra**, l'unico dei tre che parla di grasso.
+ *
+ * Le diagonali sono il peso totale: lungo una di quelle la bilancia non si
+ * muove, e una ricomposizione e' esattamente il movimento che le attraversa.
+ * E' la cosa che quattro numeri incolonnati non fanno vedere, ed e' il motivo
+ * per cui questo resta un piano a due assi mentre gli altri due no.
+ */
+function pdfGraficoComposizione(doc, x, y, w, h, k, serie) {
+  const C = composition(k);
+  const TF = D.target_fisico || null;
+  const tgt = TF ? { fm: TF.peso_kg * TF.bf_pct / 100, lbm: TF.massa_magra_kg } : null;
+  const fms = [C?.fm, tgt?.fm, ...serie.map(s => s.fm)].filter(v => v > 0);
+  const lbs = [C?.lbm, tgt?.lbm, ...serie.map(s => s.lbm)].filter(v => v > 0);
+  if (!fms.length || !lbs.length) return false;
+  const mx = (arr, p) => {
+    const a = Math.min(...arr), b = Math.max(...arr);
+    const d = Math.max(b - a, p);
+    return [a - d * .35, b + d * .35];
+  };
+  const [x0, x1] = mx(fms, 3), [y0, y1] = mx(lbs, 3);
+  const PX = v => x + (v - x0) / (x1 - x0) * w;
+  const PY = v => y + h - (v - y0) / (y1 - y0) * h;
+
+  pdfGriglia(doc, { x, y, w, h, x0, x1, y0, y1,
+    tickX: niceTicks(x0, x1, 4).map(v => ({ v, l: nf(v, 0) })),
+    tickY: niceTicks(y0, y1, 4).map(v => ({ v, l: nf(v, 0) })),
+    labY: 'massa magra, kg', labX: 'massa grassa, kg' });
+
+  /* Le diagonali del peso si **tagliano** sul riquadro. Filtrando gli estremi
+     non ne compariva nessuna: con `x + y` fissato quasi nessuna retta ha tutti
+     e due gli estremi dentro il grafico. */
+  for (let s = Math.ceil((x0 + y0) / 5) * 5; s <= x1 + y1; s += 5) {
+    const xa = Math.max(x0, s - y1), xb = Math.min(x1, s - y0);
     if (!(xb > xa)) continue;
     doc.linea(PX(xa), PY(s - xa), PX(xb), PY(s - xb),
       { col: RES_C.rule, w: .5, tratto: '1 3' });
-    // l'etichetta all'estremo in alto a sinistra, dove la retta esce dal box
-    doc.testo(nf(s, 0) + ' kg', PX(xa) + 2, PY(s - xa) + 6,
-      { size: 5.5, col: RES_C.ink3 });
+    doc.testo(nf(s, 0) + ' kg', PX(xa) + 3, PY(s - xa) + 7,
+      { size: 6, col: RES_C.ink3 });
   }
 
-  // la cornice e i due assi
-  doc.rett(x, y, w, h, { stroke: RES_C.rule, w: .7 });
-  for (const t of (o.tickX || [])) {
-    const px = PX(t.v);
-    if (px < x - .5 || px > x + w + .5) continue;
-    doc.linea(px, y + h, px, y + h + 3, { col: RES_C.rule });
-    doc.testo(t.l, px, y + h + 11, { size: 6.5, col: RES_C.ink3, align: 'center' });
-  }
-  for (const t of (o.tickY || [])) {
-    const py = PY(t.v);
-    if (py < y - .5 || py > y + h + .5) continue;
-    doc.linea(x - 3, py, x, py, { col: RES_C.rule });
-    doc.testo(t.l, x - 5, py + 2.2, { size: 6.5, col: RES_C.ink3, align: 'right' });
-  }
-  doc.testo(o.labX, x + w / 2, y + h + 21, { size: 7, col: RES_C.ink2, align: 'center' });
-  doc.testo(o.labY, x - 3, y - 6, { size: 7, col: RES_C.ink2 });
-
-  // la scia, poi la freccia, poi i due punti: l'ordine e' l'importanza
-  const scia = (o.punti || []).filter(p => p.tipo === 'scia' && dentro(p));
+  const scia = serie.slice(0, -1).filter(s => s.fm > 0 && s.lbm > 0);
   for (let i = 1; i < scia.length; i++)
-    doc.linea(PX(scia[i - 1].x), PY(scia[i - 1].y), PX(scia[i].x), PY(scia[i].y),
-      { col: RES_C.ink3, w: .8 });
-  for (const p of scia) doc.cerchio(PX(p.x), PY(p.y), 1.5, { fill: RES_C.ink3 });
+    doc.linea(PX(scia[i - 1].fm), PY(scia[i - 1].lbm), PX(scia[i].fm), PY(scia[i].lbm),
+      { col: RES_C.rule, w: 1 });
+  for (const s of scia) doc.cerchio(PX(s.fm), PY(s.lbm), 1.6, { fill: RES_C.rule });
+  if (scia.length)
+    doc.testo(scia[0].k.slice(5).replace('-', '/'), PX(scia[0].fm), PY(scia[0].lbm) - 6,
+      { size: 6.5, col: RES_C.ink3, align: 'center' });
 
-  const ora = (o.punti || []).find(p => p.tipo === 'ora' && dentro(p));
-  const tgt = (o.punti || []).find(p => p.tipo === 'target' && dentro(p));
-  if (ora && tgt)
-    doc.linea(PX(ora.x), PY(ora.y), PX(tgt.x), PY(tgt.y),
-      { col: RES_C.pine, w: .8, tratto: '2 2' });
-  /* Le due etichette vanno da parti opposte, e quale sia "opposta" lo decide
-     la posizione dei due punti. Fisse — target sopra, adesso sotto — si
-     sovrapponevano ogni volta che l'anello finiva sotto il pallino, che e' il
-     caso normale di chi sta scendendo di grasso: sul primo piano uscivano
-     "target" e "adesso" stampate sulla stessa riga. */
-  const sopra = ora && tgt ? (PY(tgt.y) > PY(ora.y) ? 1 : -1) : -1;
   if (tgt) {
-    doc.cerchio(PX(tgt.x), PY(tgt.y), 4, { stroke: RES_C.pine, w: 1.3 });
-    doc.testo('target', PX(tgt.x), PY(tgt.y) + (sopra > 0 ? 12 : -7),
-      { size: 6, col: RES_C.pine, align: 'center' });
+    doc.linea(PX(C.fm), PY(C.lbm), PX(tgt.fm), PY(tgt.lbm),
+      { col: RES_C.pine, w: .9, tratto: '2 2' });
+    doc.cerchio(PX(tgt.fm), PY(tgt.lbm), 4, { fill: RES_C.carta, stroke: RES_C.pine, w: 1.3 });
   }
-  if (ora) {
-    doc.cerchio(PX(ora.x), PY(ora.y), 3.4, { fill: RES_C.ink });
-    doc.testo(ora.lab || 'adesso', PX(ora.x), PY(ora.y) + (sopra > 0 ? -7 : 12),
-      { size: 6, bold: true, col: RES_C.ink, align: 'center' });
-  }
-  return { PX, PY, ora, tgt };
+  pdfPunto(doc, PX(C.fm), PY(C.lbm), RES_C.ink, 3.4);
+
+  /* Le etichette da parti opposte, e quale sia "opposta" lo decide la
+     posizione dei due punti: fisse si sovrappongono ogni volta che l'anello
+     finisce sotto il pallino, cioe' nel caso normale di chi sta scendendo. */
+  const giu = tgt ? PY(tgt.lbm) > PY(C.lbm) : false;
+  doc.testo('adesso', PX(C.fm), PY(C.lbm) + (giu ? -8 : 13),
+    { size: 7.5, bold: true, col: RES_C.ink, align: 'center' });
+  if (tgt) doc.testo('riferimento', PX(tgt.fm), PY(tgt.lbm) + (giu ? 13 : -8),
+    { size: 7.5, col: RES_C.pine, align: 'center' });
+  return true;
+}
+
+/**
+ * La striscia del grasso corporeo: le fasce dell'American Council on
+ * Exercise, e dove cadi tu.
+ *
+ * Un asse solo, alto dodici punti: e' un dato a una dimensione, e disegnarlo
+ * su due assi vorrebbe dire riempire meta' pagina di bianco per collocare un
+ * numero — che e' esattamente il difetto della prima versione.
+ */
+function pdfStrisciaGrasso(doc, x, y, w, k) {
+  const C = composition(k);
+  if (C?.bf == null) return false;
+  const sesso = D.profilo?.sesso === 'f' ? 'f' : 'm';
+  const b = PROF_BF[sesso];
+  const lo = b[0][1], hi = b[b.length - 1][2];
+  const PX = v => x + (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * w;
+  /* Tre righe di testo su tre livelli diversi, e non su due: i numeri delle
+     fasce sopra, i nomi sotto, e i due indicatori piu' in basso ancora. Con
+     due soli livelli "rif. 10,0%" finiva stampato sopra "atleti". */
+  const H = 12;
+  b.forEach(([lab, da, a], i) => {
+    doc.rett(PX(da), y, PX(a) - PX(da), H,
+      { fill: i % 2 ? RES_C.wash : RES_C.carta, stroke: RES_C.rule, w: .4 });
+    doc.testo(lab, (PX(da) + PX(a)) / 2, y + H + 9,
+      { size: 6.5, col: RES_C.ink3, align: 'center' });
+    doc.testo(nf(da, 0), PX(da), y - 4, { size: 6.5, col: RES_C.ink3, align: 'center' });
+  });
+  doc.testo(nf(hi, 0) + '%', PX(hi), y - 4, { size: 6.5, col: RES_C.ink3, align: 'center' });
+
+  const TF = D.target_fisico || null;
+  const segni = [{ v: C.bf, col: RES_C.ink, lab: nf(C.bf, 1) + '% adesso', b: true }];
+  if (TF?.bf_pct != null)
+    segni.push({ v: TF.bf_pct, col: RES_C.pine, lab: nf(TF.bf_pct, 1) + '% riferimento' });
+  /* Due indicatori vicini si scriverebbero uno sopra l'altro: si scostano di
+     quel tanto che basta, in direzioni opposte. */
+  segni.sort((m, n) => m.v - n.v);
+  const dx = segni.length === 2 && Math.abs(PX(segni[1].v) - PX(segni[0].v)) < 76
+    ? [-30, 30] : [0, 0];
+  segni.forEach((sg, i) => {
+    doc.linea(PX(sg.v), y - 2, PX(sg.v), y + H + 2, { col: sg.col, w: 1.6 });
+    const tx = Math.max(x + 22, Math.min(x + w - 22, PX(sg.v) + dx[i]));
+    if (dx[i]) doc.linea(PX(sg.v), y + H + 16, tx, y + H + 16,
+      { col: sg.col, w: .5 });
+    doc.testo(sg.lab, tx, y + H + 22,
+      { size: 7.5, bold: !!sg.b, col: sg.col, align: 'center' });
+  });
+  return H + 16;
 }
 
 /**
@@ -1454,7 +1648,7 @@ function pdfSagoma(doc, x, y, w, cur, tgt) {
  * La sezione. Apre la meta' dati del resoconto: prima di sapere quanto ha
  * mangiato, chi legge deve sapere di chi si parla.
  */
-function pdfProfilo(doc, titolo, tabella, k = today()) {
+function pdfProfilo(doc, titolo, k = today()) {
   const X = doc.M, W = doc.larghezza;
   const P = D.profilo || {};
   const h = P.altezza_cm;
@@ -1565,115 +1759,95 @@ function pdfProfilo(doc, titolo, tabella, k = today()) {
         + 'resta vuota dove non l’hai impostata a mano.'),
     { size: 8, col: RES_C.ink3, interlinea: 11 });
 
-  /* --- i tre piani --- */
-  const serie = typeof serieComposizione === 'function' ? serieComposizione(k) : [];
-  const PW = 232, PH = 150, GAP = 22, CW = W - PW - GAP;
-  const piano = (opts, testo) => {
-    doc.serve(PH + 52);
-    doc.y += 18;
-    const y0 = doc.y;
-    pdfPianoXY(doc, { ...opts, x: X + 26, y: y0, w: PW - 26, h: PH });
-    const yT = doc.y;
-    doc.y = y0 - 2;
-    doc.testo(opts.tit, X + PW + GAP, doc.y + 8, { size: 9.5, bold: true, col: RES_C.ink });
-    doc.y += 14;
-    doc.paragrafo(testo, { x: X + PW + GAP, w: CW, size: 8,
-      col: RES_C.ink3, interlinea: 11 });
-    doc.y = Math.max(doc.y, yT + PH + 26);
+  /* --- i grafici ---
+     Tre soggetti diversi e tre forme diverse. La prima versione erano tre
+     piani cartesiani che parlavano **tutti e tre di grasso** — l'asse y del
+     primo, l'asse x del secondo, l'asse y del terzo — e tre disegni per dire
+     tre volte la stessa cosa sono un disegno solo, ripetuto. Adesso: il peso
+     nel tempo, le circonferenze, e la composizione, che e' l'unico dei tre a
+     nominare il grasso. */
+  const serie = serieComposizione(k);
+
+  /* `sotto` e' lo spazio fra il disegno e la sua didascalia: chi ha
+     l'etichetta dell'asse x sotto le tacche ne chiede di piu', o la didascalia
+     ci finisce sopra. */
+  const grafico = (tit, spazio, disegna, nota, sotto = 20) => {
+    doc.serve(spazio + 76);
+    doc.y += 22;
+    doc.testo(tit, X, doc.y, { size: 10, bold: true, col: RES_C.ink });
+    doc.y += 15;
+    const alt = disegna(doc.y);
+    if (alt === false) {
+      /* Un grafico senza dati dice che mancano i dati: disegnare una scatola
+         vuota e' peggio, perche' sembra un errore invece di un registro
+         corto. */
+      doc.paragrafo('Non ci sono ancora abbastanza rilevazioni per disegnarlo.',
+        { size: 8.5, col: RES_C.ink3 });
+      return;
+    }
+    doc.y += (typeof alt === 'number' ? alt : spazio) + sotto;
+    doc.paragrafo(nota, { size: 8, col: RES_C.ink3, interlinea: 11 });
   };
 
-  const nfWh = v => nf(v, 2);
-  const bfMax = sesso === 'f' ? 46 : 40;
-  const scia = serie.slice(0, -1);
+  grafico('Il peso, giorno per giorno', 138,
+    yy => pdfGraficoPeso(doc, X + 30, yy, W - 30, 138, k),
+    'I pallini chiari sono le pesate, la linea e’ la tendenza a sette giorni. '
+    + 'Quella che conta e’ la seconda: la variazione da un giorno all’altro e’ '
+    + 'in larga parte acqua e contenuto intestinale, e sta dentro il chilo — '
+    + 'piu’ grande di qualunque cambiamento reale in ventiquattro ore. La riga '
+    + 'tratteggiata, dove c’e’, e’ il peso del riferimento scelto.');
 
-  /* 1. vita/altezza x grasso */
-  piano({
-    tit: 'Dove sei, sulle fasce di riferimento',
-    x0: 0.38, x1: 0.68, y0: 0, y1: bfMax,
-    labX: 'vita / altezza', labY: 'grasso %',
-    tickX: [0.40, 0.45, 0.50, 0.55, 0.60, 0.65].map(v => ({ v, l: nfWh(v) })),
-    tickY: [0, 10, 20, 30, 40].filter(v => v <= bfMax).map(v => ({ v, l: String(v) })),
-    fasceX: [[0.5, 0.6, '0,5'], [0.6, 0.68, '0,6']],
-    fasceY: PROF_BF[sesso].filter(b => b[0] === 'atleti' || b[0] === 'accettabile')
-      .map(b => [b[1], b[2], b[0]]),
-    punti: [
-      ...scia.map(s => ({ x: s.wh, y: s.bf, tipo: 'scia' })),
-      C?.vitaAltezza && C?.bf != null
-        ? { x: C.vitaAltezza, y: C.bf, tipo: 'ora' } : null,
-      C?.t?.vitaAltezza && C?.t?.bf != null
-        ? { x: C.t.vitaAltezza, y: C.t.bf, tipo: 'target' } : null
-    ].filter(Boolean)
-  }, 'Le due righe verticali sono le soglie di adiposita’ centrale di NICE '
-    + '(NG246): sotto 0,5 la vita sta sotto meta’ dell’altezza, fra 0,5 e 0,6 '
-    + 'l’adiposita’ centrale e’ definita aumentata, oltre 0,6 alta. Le due fasce '
-    + 'orizzontali sono gli intervalli di grasso corporeo dell’American Council '
-    + 'on Exercise per il sesso dichiarato. Sono riferimenti di popolazione e non '
-    + 'un giudizio su questa persona: la letteratura contesta alla soglia 0,5 di '
+  grafico('Le circonferenze, e dove puntano', 0,
+    yy => pdfGraficoMisure(doc, X, yy, W, k),
+    'Il pallino pieno e’ l’ultima misura, l’anello il target, e la barra fra i '
+    + 'due e’ quanto manca. Sono tutte in centimetri, quindi stanno sullo stesso '
+    + 'asse e si confrontano fra loro. Sulla riga della vita ci sono anche le due '
+    + 'soglie di adiposita’ centrale di NICE (NG246), ma in centimetri per '
+    + 'questa altezza: 0,5 e 0,6 sono rapporti, un numero in centimetri e’ una '
+    + 'cosa che si puo’ misurare. La letteratura contesta a quelle soglie di '
     + 'penalizzare gli adulti bassi, perche’ la vita non cresce in proporzione '
-    + 'all’altezza. I pallini grigi sono le rilevazioni precedenti, in ordine di '
-    + 'tempo: quello che conta e’ la direzione, non il punto.');
+    + 'all’altezza: sono riferimenti di popolazione, non un giudizio.');
 
-  /* 2. grassa x magra */
-  const fm0 = [C?.fm, TF ? TF.peso_kg * TF.bf_pct / 100 : null, ...serie.map(s => s.fm)]
-    .filter(v => v > 0);
-  const lb0 = [C?.lbm, TF?.massa_magra_kg, ...serie.map(s => s.lbm)].filter(v => v > 0);
-  if (fm0.length && lb0.length) {
-    const fA = Math.max(0, Math.min(...fm0) - 4), fB = Math.max(...fm0) + 4;
-    const lA = Math.min(...lb0) - 4, lB = Math.max(...lb0) + 4;
-    const pesi = [];
-    for (let s = Math.ceil((fA + lA) / 5) * 5; s <= fB + lB; s += 5) pesi.push(s);
-    piano({
-      tit: 'In che direzione ti stai muovendo',
-      x0: fA, x1: fB, y0: lA, y1: lB,
-      labX: 'massa grassa (kg)', labY: 'massa magra (kg)',
-      tickX: niceTicks(fA, fB, 4).map(v => ({ v, l: nf(v, 0) })),
-      tickY: niceTicks(lA, lB, 4).map(v => ({ v, l: nf(v, 0) })),
-      diag: pesi,
-      punti: [
-        ...scia.map(s => ({ x: s.fm, y: s.lbm, tipo: 'scia' })),
-        C?.fm != null && C?.lbm != null ? { x: C.fm, y: C.lbm, tipo: 'ora' } : null,
-        TF ? { x: TF.peso_kg * TF.bf_pct / 100, y: TF.massa_magra_kg, tipo: 'target' } : null
-      ].filter(Boolean)
-    }, 'Le diagonali tratteggiate sono il peso totale: lungo una di quelle il '
-      + 'numero sulla bilancia non si muove. E’ il motivo per cui questo piano '
-      + 'esiste — una ricomposizione e’ un movimento verso sinistra e verso '
-      + 'l’alto che attraversa le diagonali senza cambiare il peso, e quattro '
-      + 'numeri incolonnati non lo fanno vedere. Andare a sinistra e’ perdere '
-      + 'grasso, salire e’ guadagnare massa magra: le due cose insieme sono '
-      + 'lente, e proprio per questo la scia dice piu’ del punto.');
-  }
+  grafico('Grassa e magra, e in che direzione vanno', 150,
+    yy => pdfGraficoComposizione(doc, X + 30, yy, W - 30, 150, k, serie),
+    'Le diagonali tratteggiate sono il peso totale: lungo una di quelle il '
+    + 'numero sulla bilancia non si muove. E’ il motivo per cui questo e’ '
+    + 'rimasto un piano a due assi — una ricomposizione e’ il movimento che le '
+    + 'attraversa, verso sinistra e verso l’alto, e quattro numeri incolonnati '
+    + 'non lo fanno vedere. I pallini chiari sono le rilevazioni precedenti, in '
+    + 'ordine di tempo.', 32);
 
-  /* 3. FFMI x grasso */
-  if (fO?.norm || fT?.norm) {
-    const tetto = sesso === 'f' ? 22 : 25;
-    const fx = [fO?.norm, fT?.norm, ...serie.map(s => s.ffmi)].filter(v => v > 0);
-    const xA = Math.min(15, Math.floor(Math.min(...fx) - 1));
-    const xB = Math.max(tetto + 2, Math.ceil(Math.max(...fx) + 1));
-    piano({
-      tit: 'Quanto muscolo chiede il fisico che hai scelto',
-      x0: xA, x1: xB, y0: 0, y1: bfMax,
-      labX: 'FFMI normalizzato a 1,80 m', labY: 'grasso %',
-      tickX: niceTicks(xA, xB, 4).map(v => ({ v, l: nf(v, 0) })),
-      tickY: [0, 10, 20, 30, 40].filter(v => v <= bfMax).map(v => ({ v, l: String(v) })),
-      fasceX: [[tetto, xB, 'oltre il limite naturale']],
-      punti: [
-        ...scia.map(s => ({ x: s.ffmi, y: s.bf, tipo: 'scia' })),
-        fO?.norm && C?.bf != null ? { x: fO.norm, y: C.bf, tipo: 'ora' } : null,
-        fT?.norm && TF?.bf_pct != null ? { x: fT.norm, y: TF.bf_pct, tipo: 'target' } : null
-      ].filter(Boolean)
-    }, 'L’FFMI e’ la massa magra divisa il quadrato dell’altezza, normalizzata a '
-      + '1,80 m: dice quanto muscolo porta un corpo indipendentemente da quanto e’ '
-      + 'alto. La banda a destra comincia a ' + tetto + ', che e’ il valore oltre il '
-      + 'quale si esce da quello che si raggiunge senza aiuti — il riferimento viene '
-      + 'dallo studio di Kouri del 1995 su atleti prima e dopo l’era degli steroidi, '
-      + 'ed e’ pratica comune, non una legge. Serve a distinguere un obiettivo '
-      + 'impegnativo da uno che non succede: quanto ci vuole ad arrivarci non e’ '
-      + 'scritto qui, e dipende da quanti anni ci si allena.');
+  /* La striscia sotto il piano della composizione, e non un grafico suo: la
+     percentuale di grasso e' un dato a **una** dimensione, e metterla su due
+     assi vuol dire riempire mezza pagina di bianco per collocare un numero. */
+  const hS = (() => {
+    doc.serve(64);
+    doc.y += 16;
+    doc.testo('Dove cade la percentuale di grasso', X, doc.y,
+      { size: 10, bold: true, col: RES_C.ink });
+    doc.y += 20;
+    return pdfStrisciaGrasso(doc, X + 14, doc.y, W - 28, k);
+  })();
+  if (hS === false) {
+    doc.paragrafo('Non c’e’ una stima del grasso corporeo: servono vita, collo '
+      + 'e altezza, o una bioimpedenza recente.', { size: 8.5, col: RES_C.ink3 });
+  } else {
+    doc.y += hS + 20;
+    doc.paragrafo('Le fasce sono quelle dell’American Council on Exercise per il '
+      + 'sesso dichiarato. Sono intervalli di popolazione e non un obiettivo: la '
+      + 'fascia “atleti” descrive dove si trova chi gareggia, non dove dovrebbe '
+      + 'stare chi legge. '
+      + (composition(k)?.fonte === 'bia'
+        ? 'Il valore viene da una bioimpedenza registrata.'
+        : 'Il valore e’ stimato con la formula su vita, collo e altezza, che '
+          + 'sbaglia di 3-4 punti: la fascia giusta puo’ essere quella accanto.'),
+      { size: 8, col: RES_C.ink3, interlinea: 11 });
   }
 
   doc.y += 4;
-  doc.paragrafo('Nessuno dei tre piani porta una data di arrivo, ed e’ voluto: la '
-    + 'distanza fra il punto pieno e l’anello si legge sugli assi, il tempo per '
+  doc.paragrafo('Nessuno dei quattro porta una data di arrivo, ed e’ voluto: la '
+    + 'distanza fra dove sei e dove punti si legge sugli assi, il tempo per '
     + 'coprirla dipende dal ritmo di adesso e cambia insieme a quello.',
     { size: 8, col: RES_C.ink3, interlinea: 11 });
+
 }

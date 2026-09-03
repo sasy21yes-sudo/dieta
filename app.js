@@ -3642,6 +3642,12 @@ function sheetProfilo() {
   vai('Foto dei progressi', 'Uno scatto al giorno nella stessa posa: e\' l\'unico modo '
     + 'di vedere un cambiamento che sulla bilancia non si vede.',
     porta('#/foto'));
+  /* Il target sta qui e non solo dentro l'elenco dei passi del piano: e' il
+     metro con cui l'app giudica ogni giornata, quindi ci si torna spesso e da
+     ogni schermata — e finora ci si arrivava scegliendo due volte. */
+  vai('Quanto mangiare', 'Calorie e macro da centrare ogni giorno, con la proposta '
+    + 'ricalibrata sul dispendio che l\'app ha misurato.',
+    porta('#/piano', 'target'));
   if (usaPiano()) {
     vai('Piano settimanale', 'Quale ricetta in quale pasto, nei sette giorni. Da qui '
       + 'escono le barre della scheda Oggi e la lista della spesa.',
