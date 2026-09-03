@@ -3273,6 +3273,55 @@ nessuna riga superi il margine destro — `x + pdfLarghezza(testo)`, con le
 stesse metriche del ritorno a capo. Controllare solo la `x` di partenza non
 serve: una riga che sfora comincia dentro il margine.
 
+### Un periodo solo per tutta la scheda Andamento
+
+Segnalato cosi': *"il PDF non prende i filtri per le date. Se faccio il primo
+PDF settimanale e il secondo mensile, resta sempre settimanale."*
+
+Misurato, il motore era a posto: `pdfResoconto(per)` produceva il periodo
+giusto da tutte e due le strade, con il nome del file e il testo dentro
+corretti. Il difetto stava un piano sopra, ed era **di struttura**: nella
+stessa scheda vivevano **due periodi diversi**.
+
+| | |
+|---|---|
+| `datiRange` / `datiFine` | il selettore dei grafici — 7/30/90/180 e le date |
+| `revPeriodo` | il selettore della revisione — settimana chiusa, oppure le date |
+
+E due bottoni "Scarica il resoconto in PDF", uno per vista, ognuno con il suo.
+Quindi si sceglievano trenta giorni in **Grafici**, si passava a **Revisione**
+e si scaricava la settimana. Da fuori il filtro sembrava rotto, e in un certo
+senso lo era: arrivava il filtro dell'altra pagina.
+
+`periodoAndamento(da, a, preset)` e' adesso il posto solo da cui il periodo si
+scrive, e tutti e sei i selettori delle due viste passano da li'. E' la stessa
+regola gia' scritta un piano sotto per `datiIntervallo()` — *"l'unico modo di
+scriverlo e' passare da qui con tutte e due le date, cosi' non si puo' piu'
+cambiarne una e dimenticarsi l'altra"* — applicata alle due viste invece che
+ai due estremi.
+
+Tre decisioni:
+
+1. **I default restano diversi, ed e' voluto.** Il cruscotto nasce su trenta
+   giorni perche' guarda un andamento; la revisione sulla settimana chiusa
+   perche' e' l'unita' su cui e' costruita, e perche' l'impegno e "ho letto"
+   si agganciano li'. Ma **appena si sceglie, la scelta vale per tutte e due**:
+   e' la scelta a dover essere una sola, non il punto di partenza.
+2. **Sette giorni chiusi scelti a mano sono la settimana chiusa.** Se il tratto
+   coincide con quello della settimana, `revPeriodo` torna `null` invece di
+   diventare un periodo "custom": altrimenti l'impegno e "ho letto"
+   sparirebbero solo perche' ci si e' arrivati dal selettore delle date invece
+   che dal bottone.
+3. **`preset` esiste per non perdere una distinzione che si vede.** I quattro
+   bottoni del cruscotto tengono `datiFine` a `null` — *finisce oggi, e segue
+   oggi* — e scriverci dentro una data accenderebbe "Date" come se le avesse
+   messe l'utente.
+
+E i **due bottoni dicono quale periodo scaricheranno**: `Scarica il resoconto
+in PDF · 27 ago – 2 set` e `90 giorni · 6 giu – 3 set`. Sono due porte allo
+stesso documento, e con due porte "in PDF" da solo lascia aperta esattamente
+la domanda che ha fatto sembrare rotto il filtro.
+
 ### Il PDF si apre con chi e', non con quanto ha mangiato
 
 Il resoconto raccontava **un periodo** e cominciava dai numeri. Ma chi lo
@@ -4063,6 +4112,18 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non confrontare un pasto del giorno con la ricetta che ha oggi: si
   confronta con se stesso e dice sempre zero. Il metro e' `codiceBase()`, la
   ricetta che il piano mette in quello slot
+- Non tenere due stati per lo stesso concetto in due viste della stessa
+  scheda: `datiRange`/`datiFine` e `revPeriodo` erano tutti e due "il periodo",
+  e ogni vista scaricava il PDF con il proprio. Il periodo si scrive da
+  `periodoAndamento()`, e basta
+- Non far diventare "custom" un periodo che coincide con la settimana chiusa:
+  l'impegno e "ho letto" si agganciano alla settimana, e sparirebbero solo
+  perche' ci si e' arrivati dalle date invece che dal bottone
+- Non scrivere una data dentro `datiFine` quando l'utente ha toccato un
+  preset: quel campo a `null` vuol dire "finisce oggi e segue oggi", e una
+  data li' accende "Date" come se le avesse messe lui
+- Non lasciare due bottoni che scaricano lo stesso documento senza dire quale
+  tratto ne esce: e' la domanda che fa sembrare rotto un filtro che funziona
 - Non aprire il resoconto con i numeri: chi lo riceve non sa di chi sono. La
   sezione Profilo apre la meta' dati, e la sagoma con la tabella ora/target
   vengono prima delle medie

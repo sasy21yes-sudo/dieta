@@ -537,7 +537,11 @@ function viewRevisione(v) {
     'Una cena fuori piano non annulla sei giorni buoni e non va compensata saltando il pasto dopo. Questa schermata esiste proprio per guardare la settimana intera invece del singolo giorno.'));
   const bp = el('button', 'btn wide');
   bp.style.marginTop = '10px';
-  bp.textContent = 'Scarica il resoconto in PDF';
+  /* Il periodo sta scritto sul bottone. Con due viste che scaricano lo stesso
+     documento, un bottone che dice solo "in PDF" lascia la domanda aperta —
+     quale periodo? — ed e' esattamente la domanda che ha fatto sembrare rotto
+     il filtro. */
+  bp.textContent = `Scarica il resoconto in PDF · ${revEtichetta(per)}`;
   bp.onclick = () => scaricaResoconto(per);
   fine.append(bp);
   const b = el('button', 'btn wide pri', per.custom
@@ -569,10 +573,10 @@ function cardPeriodoRevisione(per) {
     const b = el('button', null, lab);
     b.setAttribute('aria-pressed', String(per.custom === cust));
     b.onclick = () => {
-      if (!cust) { revPeriodo = null; route(); return; }
+      if (!cust) { periodoAndamento(null, null); route(); return; }
       // si parte dalla settimana che stavi guardando, non da un mese a caso
       const s0 = revPeriodoSettimana();
-      revPeriodo = { da: per.custom ? per.da : s0.da, a: per.custom ? per.a : s0.a };
+      periodoAndamento(per.custom ? per.da : s0.da, per.custom ? per.a : s0.a);
       route();
     };
     seg.append(b);
@@ -593,7 +597,8 @@ function cardPeriodoRevisione(per) {
       i.type = 'date'; i.value = per[chiave]; i.max = today();
       i.onchange = () => {
         if (!i.value) return;
-        revPeriodo = { ...revPeriodo, [chiave]: i.value };
+        const n = { da: per.da, a: per.a, [chiave]: i.value };
+        periodoAndamento(n.da, n.a);
         route();
       };
       f.append(i); g.append(f);
@@ -609,7 +614,7 @@ function cardPeriodoRevisione(per) {
       b.setAttribute('aria-pressed', String(per.n === n && per.a === ieri()));
       b.onclick = () => {
         const gg = windowDays(today(), n);
-        revPeriodo = { da: gg[n - 1], a: gg[0] };
+        periodoAndamento(gg[n - 1], gg[0]);
         route();
       };
       rapide.append(b);

@@ -832,6 +832,42 @@ let datiFine = null;
  * scriverlo e' passare da qui con tutte e due le date, cosi' non si puo' piu'
  * cambiarne una e dimenticarsi l'altra.
  */
+/**
+ * Il periodo della scheda Andamento, scritto in un posto solo.
+ *
+ * Erano **due periodi diversi nella stessa scheda**: `datiRange`/`datiFine`
+ * per i grafici e `revPeriodo` per la revisione. Ogni vista aveva il suo
+ * selettore e il suo bottone "Scarica il resoconto in PDF", quindi si
+ * sceglievano trenta giorni in Grafici, si passava a Revisione e si scaricava
+ * la settimana. Da fuori sembrava che il filtro non arrivasse al PDF, e in un
+ * certo senso era vero: arrivava il filtro dell'altra pagina.
+ *
+ * I **default** restano diversi, ed e' voluto: il cruscotto nasce su trenta
+ * giorni perche' guarda un andamento, la revisione sulla settimana chiusa
+ * perche' e' l'unita' su cui e' costruita e perche' l'impegno e "ho letto" si
+ * agganciano li'. Ma appena si sceglie, la scelta vale per tutte e due.
+ *
+ * `preset` serve a non perdere una distinzione che si vede: i quattro bottoni
+ * del cruscotto tengono `datiFine` a null — "finisce oggi, e segue oggi" — e
+ * scrivendoci una data si accenderebbe "Date" come se le avesse messe
+ * l'utente.
+ */
+function periodoAndamento(da, a, preset = null) {
+  const s = revPeriodoSettimana();
+  if (!da || !a) {                          // la settimana chiusa
+    revPeriodo = null;
+    datiFine = s.a; datiRange = s.n;
+    return;
+  }
+  const [d1, d2] = da <= a ? [da, a] : [a, da];
+  /* Se il tratto scelto **e'** la settimana chiusa, allora e' la settimana
+     chiusa: cosi' l'impegno e "ho letto" non spariscono solo perche' ci si e'
+     arrivati dal selettore delle date invece che dal bottone. */
+  revPeriodo = (d1 === s.da && d2 === s.a) ? null : { da: d1, a: d2 };
+  if (preset) { datiFine = null; datiRange = preset; }
+  else datiIntervallo(d1, d2);
+}
+
 function datiIntervallo(d1, d2) {
   const [da, a] = d1 <= d2 ? [d1, d2] : [d2, d1];
   datiFine = a;
@@ -851,12 +887,19 @@ function viewDati(v) {
   for (const n of [7, 30, 90, 180]) {
     const b = el('button', null, n + ' gg');
     b.setAttribute('aria-pressed', String(!datiFine && datiRange === n));
-    b.onclick = () => { datiFine = null; datiRange = n; route(); };
+    b.onclick = () => { periodoAndamento(span(n, today())[0], today(), n); route(); };
     seg.append(b);
   }
   const bd = el('button', null, 'Date');
   bd.setAttribute('aria-pressed', String(!!datiFine));
-  bd.onclick = () => { datiFine = datiFine ? null : today(); route(); };
+  bd.onclick = () => {
+    // entrando si tengono le date che stai gia' guardando, uscendo si torna
+    // alla stessa lunghezza che finisce oggi: in nessuno dei due versi il
+    // periodo deve cambiare da solo sotto le mani
+    if (datiFine) periodoAndamento(span(datiRange, today())[0], today(), datiRange);
+    else periodoAndamento(giorni[0], giorni[giorni.length - 1]);
+    route();
+  };
   seg.append(bd);
   sel.append(seg);
 
@@ -879,8 +922,8 @@ function viewDati(v) {
        spostando la fine indietro di un mese il periodo scivolava intero e
        anche la data di inizio si muoveva da sola. Dall'esterno sembrava che
        il filtro non funzionasse, ed era esattamente quello che succedeva. */
-    campo(da, 'Dal giorno', x => datiIntervallo(x, a));
-    campo(a, 'Al giorno', x => datiIntervallo(da, x));
+    campo(da, 'Dal giorno', x => periodoAndamento(x, a));
+    campo(a, 'Al giorno', x => periodoAndamento(da, x));
     sel.append(g);
     sel.append(el('p', 'hint', `${datiRange} giorni, dal ${da} al ${a}.`
       + (a >= today() ? ' Oggi non e\' finito: le medie di giornata lo escludono.' : '')));
@@ -975,7 +1018,10 @@ function viewDati(v) {
 
   if (typeof scaricaResoconto === 'function')
     azione('pdf', 'Il resoconto in PDF',
-      `${datiRange} giorni · da dare a chi l’app non ce l’ha`,
+      // il periodo scritto sul bottone, come su quello della revisione: sono
+      // due porte allo stesso documento, e quale tratto ne esce non deve
+      // essere una sorpresa
+      `${datiRange} giorni · ${revEtichetta({ da: giorni[0], a: giorni[giorni.length - 1] })}`,
       () => scaricaResoconto(revPeriodoDate(giorni[0], giorni[giorni.length - 1])));
 
   nav.append(gAz);
