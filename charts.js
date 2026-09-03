@@ -860,10 +860,14 @@ function periodoAndamento(da, a, preset = null) {
     return;
   }
   const [d1, d2] = da <= a ? [da, a] : [a, da];
-  /* Se il tratto scelto **e'** la settimana chiusa, allora e' la settimana
-     chiusa: cosi' l'impegno e "ho letto" non spariscono solo perche' ci si e'
-     arrivati dal selettore delle date invece che dal bottone. */
-  revPeriodo = (d1 === s.da && d2 === s.a) ? null : { da: d1, a: d2 };
+  /* `revPeriodo` e' il **modo** del selettore, non solo le date: `null` vuol
+     dire "settimana chiusa", un oggetto vuol dire "campi data aperti". La
+     prima versione lo riportava a `null` quando il tratto coincideva con la
+     settimana — per non far sparire l'impegno — e cosi' "Scegli le date" non
+     faceva piu' niente: si apriva sulla settimana che stavi guardando e
+     rimbalzava indietro nello stesso istante. L'impegno adesso guarda
+     `per.settimana`, che dice cos'e' il tratto invece di come lo hai scelto. */
+  revPeriodo = { da: d1, a: d2 };
   if (preset) { datiFine = null; datiRange = preset; }
   else datiIntervallo(d1, d2);
 }

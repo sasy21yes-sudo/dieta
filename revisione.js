@@ -41,8 +41,12 @@ function revPeriodoSettimana(k = today()) {
   // le pause non si tolgono qui: la settimana resta di sette giorni per le
   // date in testata. Si tolgono nel conteggio, dove falserebbero le medie
   const giorni = windowDays(k, 7);
+  /* `custom` dice **come si sta scegliendo** (bottone o campi data),
+     `settimana` dice **cos'e' il tratto**. Erano la stessa cosa, e le due
+     domande hanno risposta diversa in un caso che capita subito: aprire i
+     campi data sulla settimana che stavi guardando. */
   return { giorni, prima: windowDays(addDays(k, -7), 7),
-           da: giorni[6], a: giorni[0], n: 7, custom: false,
+           da: giorni[6], a: giorni[0], n: 7, custom: false, settimana: true,
            nome: 'settimana', primaNome: 'la settimana prima',
            confronto: 'Rispetto alla settimana prima', su: 'sulla settimana prima' };
 }
@@ -54,7 +58,13 @@ function revPeriodoDate(d1, d2) {
   // le preposizioni articolate si scrivono qui una volta: "Rispetto a la
   // settimana prima" e' il genere di dettaglio che fa sembrare l'app tradotta
   const q = n === 7 ? 'sette' : String(n);
-  return { giorni, prima: lastDays(addDays(da, -1), n), da, a, n, custom: true,
+  /* Sette giorni chiusi **sono** la settimana chiusa, comunque ci si sia
+     arrivati: le parole e l'impegno seguono il tratto, non il selettore. */
+  const s = revPeriodoSettimana();
+  const sett = da === s.da && a === s.a;
+  if (sett) return { ...s, custom: true, da, a };
+  return { giorni, prima: lastDays(addDays(da, -1), n), da, a, n,
+           custom: true, settimana: false,
            nome: 'periodo', primaNome: `i ${q} giorni prima`,
            confronto: `Rispetto ai ${q} giorni prima`, su: `sui ${q} giorni prima` };
 }
@@ -174,7 +184,7 @@ function revDiagnosi(per) {
   // "questa settimana" e "nel periodo" non sono la stessa frase: la diagnosi
   // deve leggersi uguale in entrambi i casi, e non c'e' modo di scriverlo una
   // volta sola senza che una delle due suoni sbagliata
-  const NP = per.custom ? 'nel periodo' : 'in settimana';
+  const NP = per.settimana ? 'in settimana' : 'nel periodo';
   const m = id => M.find(x => x.id === id);
   const T = D.target;
   const errori = [];
@@ -262,7 +272,7 @@ function revDiagnosi(per) {
 function revVerdetto(diag) {
   const n = diag.errori.length;
   const grave = diag.errori.filter(e => e.peso >= 80).length;
-  const nome = diag.per?.custom ? 'periodo' : 'settimana';
+  const nome = diag.per?.settimana ? 'settimana' : 'periodo';
   if (!n) return { parola: 'Impeccabile', d: 'Nessuno scostamento degno di nota. Continua cosi\' e lascia lavorare il tempo.' };
   if (grave === 0 && n <= 2) return { parola: 'Buona', d: 'Qualche dettaglio da limare, niente che cambi la direzione.' };
   if (grave === 0) return { parola: 'Nella norma', d: 'Diverse cose da sistemare, nessuna urgente. Prendine una.' };
@@ -330,7 +340,7 @@ function viewRevisione(v) {
   /* --- testata --- */
   const testa = el('div', 'rev-hero');
   testa.append(el('div', 'rev-kick',
-    `${per.custom ? per.n + ' giorni' : 'Settimana chiusa'} · ${revEtichetta(per)}`));
+    `${per.settimana ? 'Settimana chiusa' : per.n + ' giorni'} · ${revEtichetta(per)}`));
   const parola = el('div', 'rev-parola', esc(ver.parola));
   testa.append(parola);
   testa.append(el('div', 'rev-sotto', esc(ver.d)));
@@ -364,7 +374,7 @@ function viewRevisione(v) {
   /* --- l'impegno della settimana scorsa ---
      Vale solo sulla settimana: e' un patto che si chiude di domenica, e su un
      periodo scelto a mano non ci sarebbe niente a cui agganciarlo. */
-  const es = per.custom ? null : esitoImpegno(k);
+  const es = per.settimana ? esitoImpegno(k) : null;
   if (es) {
     const ci = el('div', 'card imp-esito' + (es.risolto ? ' ok' : ''));
     ci.append(el('div', 'eyebrow', 'L\'impegno della settimana scorsa'));
@@ -480,7 +490,7 @@ function viewRevisione(v) {
     /* L'impegno. Una diagnosi che nessuno ricorda la settimana dopo e' un
        elenco, non un ciclo: qui si prende nota di UNA cosa e domenica
        prossima l'app chiede se e' andata. */
-    const imp = per.custom ? null : impegno();
+    const imp = per.settimana ? impegno() : null;
     const sett = revPeriodoSettimana(k).giorni[0];
     if (imp && imp.settimana === sett) {
       const g = el('div', 'rev-imp preso');
@@ -491,7 +501,7 @@ function viewRevisione(v) {
       via.onclick = () => { delete S.settings.impegno; save(); route(); };
       g.append(via);
       cp.append(g);
-    } else if (!per.custom) {
+    } else if (per.settimana) {
       const b = el('button', 'btn wide pri');
       b.style.marginTop = '12px';
       b.textContent = 'Prendo questo impegno per la settimana';
@@ -544,13 +554,13 @@ function viewRevisione(v) {
   bp.textContent = `Scarica il resoconto in PDF · ${revEtichetta(per)}`;
   bp.onclick = () => scaricaResoconto(per);
   fine.append(bp);
-  const b = el('button', 'btn wide pri', per.custom
-    ? 'Ho letto, torna a oggi' : 'Ho letto, chiudi la revisione');
+  const b = el('button', 'btn wide pri', per.settimana
+    ? 'Ho letto, chiudi la revisione' : 'Ho letto, torna a oggi');
   b.style.marginTop = '8px';
   b.onclick = () => {
     // "letta" vale per la settimana: chiudere un periodo scelto a mano non
     // deve zittire la revisione di domenica, che e' un'altra cosa
-    if (!per.custom) { S.settings.revisioneLetta = today(); save(); }
+    if (per.settimana) { S.settings.revisioneLetta = today(); save(); }
     apri('#/oggi');
   };
   fine.append(b);
@@ -847,7 +857,7 @@ function pdfResoconto(per) {
   /* --- la tabella dei numeri --- */
   titolo('I numeri, e come si sono mossi');
   const col = [X, X + W - 300, X + W - 215, X + W - 130, X + W];
-  const intest = ['Voce', 'Periodo', per.custom ? 'Prima' : 'Sett. prima', 'Target', 'Scarto'];
+  const intest = ['Voce', 'Periodo', per.settimana ? 'Sett. prima' : 'Prima', 'Target', 'Scarto'];
   doc.y += 14;
   intest.forEach((t, i) => doc.testo(t, col[i], doc.y,
     { size: 8, bold: true, col: RES_C.ink3, align: i ? 'right' : 'left' }));

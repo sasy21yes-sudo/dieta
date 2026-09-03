@@ -3307,11 +3307,19 @@ Tre decisioni:
    perche' e' l'unita' su cui e' costruita, e perche' l'impegno e "ho letto"
    si agganciano li'. Ma **appena si sceglie, la scelta vale per tutte e due**:
    e' la scelta a dover essere una sola, non il punto di partenza.
-2. **Sette giorni chiusi scelti a mano sono la settimana chiusa.** Se il tratto
-   coincide con quello della settimana, `revPeriodo` torna `null` invece di
-   diventare un periodo "custom": altrimenti l'impegno e "ho letto"
-   sparirebbero solo perche' ci si e' arrivati dal selettore delle date invece
-   che dal bottone.
+2. **`custom` e `settimana` sono due domande diverse**, ed erano lo stesso
+   campo. `custom` dice **come** stai scegliendo — bottone o campi data —
+   `settimana` dice **cos'e'** il tratto. La prima versione le teneva insieme
+   riportando `revPeriodo` a `null` quando le date coincidevano con la
+   settimana, per non far sparire l'impegno; e cosi' **"Scegli le date" non
+   faceva piu' niente**: si apriva sulla settimana che stavi guardando — che e'
+   il punto di partenza giusto — e rimbalzava indietro nello stesso istante.
+
+   Adesso `revPeriodo` e' il modo e basta, e le parole e i cancelli guardano
+   `per.settimana`: sette giorni chiusi restano "la settimana prima" e tengono
+   l'impegno anche se ci sei arrivato dai campi data, e trenta giorni no.
+   Segnalato con tre parole — "il pulsante scegli le date non funziona piu'" —
+   ed era un difetto introdotto dalla correzione precedente.
 3. **`preset` esiste per non perdere una distinzione che si vede.** I quattro
    bottoni del cruscotto tengono `datiFine` a `null` — *finisce oggi, e segue
    oggi* — e scriverci dentro una data accenderebbe "Date" come se le avesse
@@ -4116,9 +4124,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   scheda: `datiRange`/`datiFine` e `revPeriodo` erano tutti e due "il periodo",
   e ogni vista scaricava il PDF con il proprio. Il periodo si scrive da
   `periodoAndamento()`, e basta
-- Non far diventare "custom" un periodo che coincide con la settimana chiusa:
-  l'impegno e "ho letto" si agganciano alla settimana, e sparirebbero solo
-  perche' ci si e' arrivati dalle date invece che dal bottone
+- Non tenere nello stesso campo "come stai scegliendo" e "cos'e' il tratto":
+  `custom` e `settimana` rispondono a due domande, e fondendole "Scegli le
+  date" si apre sulla settimana e rimbalza indietro nello stesso istante,
+  cioe' non fa niente. Le parole e l'impegno guardano il tratto, il selettore
+  guarda il modo
 - Non scrivere una data dentro `datiFine` quando l'utente ha toccato un
   preset: quel campo a `null` vuol dire "finisce oggi e segue oggi", e una
   data li' accende "Date" come se le avesse messe lui
