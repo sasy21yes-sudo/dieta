@@ -92,6 +92,23 @@ function serieDelGiorno(k) {
   return s.serie;
 }
 
+/**
+ * I sette giorni di Gym, e finiscono OGGI.
+ *
+ * `windowDays()` e' la finestra dei periodi **chiusi** — la revisione,
+ * l'analisi, il target — e li' fermarsi a ieri e' il punto: la giornata in
+ * corso non e' finita. In palestra la domanda e' un'altra, ed e' "cosa ho
+ * fatto e cosa posso fare adesso": una seduta registrata dieci minuti fa
+ * deve contarsi.
+ *
+ * Senza, dentro la stessa carta convivevano due finestre diverse — il volume
+ * si fermava a ieri, la fatica di Banister arrivava a oggi — e i tre modi
+ * della mappa rispondevano su due periodi. Misurato: registrata la seduta di
+ * oggi, il resoconto diceva "Addome 8,0 serie" e la mappa e il volume
+ * settimanale dicevano zero su tutti i muscoli.
+ */
+const settimanaGym = (k = today()) => lastDays(k, 7);
+
 /** Serie pesate e tonnellaggio per muscolo su un elenco di giorni. */
 function volumeMuscoli(days) {
   const out = {};
@@ -178,7 +195,7 @@ function formaFaticaCache(mus, fino) {
 
 /** Stato di ogni muscolo: volume settimanale + forma/fatica. */
 function statoMuscoli(k = today()) {
-  const sett = windowDays(k, 7);
+  const sett = settimanaGym(k);
   const vol = volumeMuscoli(sett);
   const V = PD?.volume || { min_serie: 10, ottimale: 16, max_serie: 22 };
   // scala comune per la mappa: il massimo corrente, altrimenti i colori
@@ -1014,7 +1031,7 @@ function viewPalestra(v) {
          : 'servono tre sedute per esercizio',
     () => { gymTab = 'progressi'; route(); }));
 
-  const sett = windowDays(k, 7);
+  const sett = settimanaGym(k);
   const nCard = typeof cardioDi === 'function'
     ? sett.reduce((a, d) => a + cardioDi(d).length, 0) : 0;
   const kmCard = typeof cardioDi === 'function'
@@ -1096,7 +1113,7 @@ function sezGymMappa(v, k, st) {
   const cm = el('div', 'cw');
   cm.append(el('h3', null, 'Mappa muscolare'));
   cm.append(el('div', 'sub', {
-    volume: 'Serie pesate nella settimana appena chiusa. Piu' + '’ scuro = piu’ volume.',
+    volume: 'Serie pesate negli ultimi sette giorni, oggi compreso. Piu' + '’ scuro = piu’ volume.',
     fatica: 'Fatica residua secondo il modello forma–fatica. Piu’ scuro = piu’ stanco.',
     forma: 'Forma accumulata: l’adattamento che resta dopo che la fatica se n’e’ andata.'
   }[gymModo]));

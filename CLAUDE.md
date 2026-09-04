@@ -901,6 +901,41 @@ Il contenuto delle sezioni è quello di prima **parola per parola**: è cambiato
 dove sta, non cosa dice. Spostare e riscrivere insieme è il modo migliore di
 introdurre un bug senza accorgersene.
 
+### La seduta di oggi non arrivava nella mappa
+
+Segnalato cosi': *"come mai l'addome non viene registrato nella sessione che
+ho aggiunto oggi"*. Riprodotto, e non c'entrava l'addome: **mancava tutta la
+seduta**, su tutti i muscoli.
+
+`statoMuscoli()` — che alimenta la mappa, il volume settimanale e il
+riquadro Cardio — leggeva `windowDays(k, 7)`, che e' `lastDays(ieri(k), 7)`:
+sette giorni che finiscono **ieri**. E' la finestra giusta per i periodi
+**chiusi** (la revisione, l'analisi, il target ricalibrato), dove il fatto
+che il tratto sia finito e' il punto. In palestra la domanda e' un'altra —
+*cosa ho fatto e cosa posso fare adesso* — e una seduta registrata dieci
+minuti fa deve contarsi.
+
+**Il segno che era un difetto e non una scelta**: dentro la stessa carta
+convivevano due finestre. Il volume si fermava a ieri, la fatica di Banister
+arrivava a oggi. I tre modi della mappa — quanto lo alleno, quanto e' stanco,
+quanto sta crescendo — rispondevano quindi su **due periodi diversi**, e la
+lettura al tocco li mette uno accanto all'altro.
+
+Misurato sulla stessa seduta registrata oggi: il resoconto diceva
+*"Addome 8,0 · Bicipiti 7,5"*, la mappa e il volume settimanale dicevano
+**zero su tutti e tredici i gruppi**, e `seriePesateSettimana()` — il carico
+acuto da cui esce lo scarico consigliato — pure. Dopo: 8,0 · 7,5 · 4,5 · 4,5
+· 3,0 · 3,0 e 33,0 serie pesate.
+
+`settimanaGym(k)` e' quella finestra, ed e' una funzione a se' apposta:
+`windowDays()` resta com'e', perche' spostarla avrebbe portato dentro oggi
+anche la settimana della revisione — verificato che non si e' mossa
+(28 ago › 3 set). Le dieci settimane del confronto acuto/cronico si spostano
+tutte insieme, quindi il rapporto resta confrontabile con se stesso.
+
+E il sottotitolo della mappa diceva *"la settimana appena chiusa"*: era vero,
+ed era il problema. Adesso dice quello che conta.
+
 ### La mappa muscolare è anatomica
 
 Prima era la figura parametrica con sopra dodici ellissi. Diceva *dove*, ma
@@ -4120,6 +4155,13 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non far cancellare dati a un interruttore di modulo: spegnere nasconde, non
   distrugge. E non dare per scontato che `S.settings.moduli` esista — un backup
   scritto prima non ce l'ha, e `modulliDaStato()` lo deduce
+- Non usare `windowDays()` in Gym: e' la finestra dei periodi **chiusi** e si
+  ferma a ieri, quindi la seduta appena registrata non arriva ne' nella mappa
+  ne' nel volume ne' nel carico acuto. In palestra la domanda e' "cosa posso
+  fare adesso", e la finestra e' `settimanaGym()`
+- Non tenere due finestre diverse dentro la stessa carta: il volume che
+  arriva a ieri e la fatica che arriva a oggi fanno rispondere i tre modi
+  della mappa su due periodi, e la lettura al tocco li mette in fila
 - Non far dire alla mappa una frase generica al posto dei numeri: i tre modi
   fanno tre domande, e la lettura le risponde tutte e tre
 - Non presentare come assolute le percentuali della mappa: sono rispetto al

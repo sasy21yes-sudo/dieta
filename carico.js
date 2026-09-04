@@ -102,9 +102,16 @@ function perc(vals, q) {
   return lo === hi ? v[lo] : v[lo] + (v[hi] - v[lo]) * (i - lo);
 }
 
-/** Serie pesate totali di una settimana, sommate su tutti i muscoli. */
+/**
+ * Serie pesate totali di una settimana, sommate su tutti i muscoli.
+ * La finestra e' quella di Gym — sette giorni che finiscono nel giorno
+ * chiesto, non nel precedente: il carico acuto senza la seduta di oggi
+ * dentro non e' il carico acuto. Le dieci settimane del confronto si
+ * spostano tutte insieme, quindi il rapporto resta confrontabile.
+ */
 function seriePesateSettimana(k) {
-  const v = volumeMuscoli(windowDays(k, 7));
+  const v = volumeMuscoli(typeof settimanaGym === 'function'
+    ? settimanaGym(k) : lastDays(k, 7));
   return Object.values(v).reduce((a, x) => a + x.serie, 0);
 }
 
