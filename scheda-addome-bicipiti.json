@@ -1,0 +1,209 @@
+{
+  "formato": "dieta-scambio/1",
+  "quando": "2026-09-04",
+  "da": "",
+  "parti": {
+    "schede": {
+      "schede": [
+        {
+          "id": "sk-addome-bicipiti",
+          "nome": "Addome e bicipiti",
+          "recupero": 60,
+          "esercizi": [
+            {
+              "ex": "mio-hyperext-laterale",
+              "serie": 1,
+              "reps": 12,
+              "repsMax": 12,
+              "kg": 0,
+              "tecnica": "stripping",
+              "strip": [
+                12
+              ],
+              "superserie": false,
+              "recupero": 0,
+              "nota": "12 + 12 a scarico, poi attaccato il plank laterale"
+            },
+            {
+              "ex": "mio-plank-laterale-anca",
+              "serie": 1,
+              "reps": 12,
+              "repsMax": 12,
+              "kg": 0,
+              "tecnica": "normale",
+              "superserie": true,
+              "nota": "12 elevazioni dell'anca per lato, poi 20\" di tenuta statica"
+            },
+            {
+              "ex": "iperestensioni",
+              "serie": 4,
+              "reps": 12,
+              "repsMax": 12,
+              "kg": 0,
+              "tecnica": "normale",
+              "superserie": false,
+              "nota": "con peso: il carico si scrive mentre ti alleni"
+            },
+            {
+              "ex": "mio-crunch-palla",
+              "serie": 3,
+              "reps": 20,
+              "repsMax": 20,
+              "kg": 10,
+              "tecnica": "normale",
+              "superserie": false
+            },
+            {
+              "ex": "mio-crunch-inverso",
+              "serie": 3,
+              "reps": 20,
+              "repsMax": 20,
+              "kg": 0,
+              "tecnica": "normale",
+              "superserie": false,
+              "nota": "palla medica fra le ginocchia e cavigliere"
+            },
+            {
+              "ex": "mio-trazioni-supine",
+              "serie": 3,
+              "reps": 20,
+              "repsMax": 20,
+              "kg": 0,
+              "tecnica": "normale",
+              "superserie": false
+            },
+            {
+              "ex": "curl-bilanciere",
+              "serie": 3,
+              "reps": 10,
+              "repsMax": 10,
+              "kg": 0,
+              "tecnica": "normale",
+              "superserie": false
+            },
+            {
+              "ex": "mio-curl-cavi",
+              "serie": 3,
+              "reps": 10,
+              "repsMax": 10,
+              "kg": 0,
+              "tecnica": "normale",
+              "superserie": false
+            }
+          ]
+        }
+      ],
+      "esercizi": [
+        {
+          "id": "mio-hyperext-laterale",
+          "nome": "Hyperextension in decubito laterale",
+          "attrezzo": "corpo libero",
+          "tipo": "isolamento",
+          "lato": true,
+          "primari": [
+            "addome"
+          ],
+          "secondari": [
+            "lombari",
+            "glutei"
+          ],
+          "range": [
+            10,
+            15
+          ],
+          "incremento": 2.5
+        },
+        {
+          "id": "mio-plank-laterale-anca",
+          "nome": "Plank laterale con elevazioni dell'anca",
+          "attrezzo": "corpo libero",
+          "tipo": "isolamento",
+          "lato": true,
+          "primari": [
+            "addome"
+          ],
+          "secondari": [
+            "spalle",
+            "glutei"
+          ],
+          "range": [
+            10,
+            15
+          ],
+          "incremento": 0,
+          "exdbId": "Side_Bridge"
+        },
+        {
+          "id": "mio-crunch-palla",
+          "nome": "Crunch con palla medica",
+          "attrezzo": "palla medica",
+          "tipo": "isolamento",
+          "primari": [
+            "addome"
+          ],
+          "secondari": [],
+          "range": [
+            15,
+            25
+          ],
+          "incremento": 1,
+          "exdbId": "Weighted_Crunches"
+        },
+        {
+          "id": "mio-crunch-inverso",
+          "nome": "Crunch inverso",
+          "attrezzo": "corpo libero",
+          "tipo": "isolamento",
+          "primari": [
+            "addome"
+          ],
+          "secondari": [],
+          "range": [
+            15,
+            25
+          ],
+          "incremento": 0.5,
+          "exdbId": "Reverse_Crunch"
+        },
+        {
+          "id": "mio-trazioni-supine",
+          "nome": "Trazioni presa supina",
+          "attrezzo": "corpo libero",
+          "tipo": "multi",
+          "primari": [
+            "dorsali"
+          ],
+          "secondari": [
+            "bicipiti",
+            "avambracci"
+          ],
+          "range": [
+            6,
+            12
+          ],
+          "incremento": 2.5,
+          "exdbId": "Chin-Up"
+        },
+        {
+          "id": "mio-curl-cavi",
+          "nome": "Curl ai cavi bassi",
+          "attrezzo": "cavi",
+          "tipo": "isolamento",
+          "primari": [
+            "bicipiti"
+          ],
+          "secondari": [
+            "avambracci"
+          ],
+          "range": [
+            10,
+            14
+          ],
+          "incremento": 2.5,
+          "exdbId": "Standing_Biceps_Cable_Curl"
+        }
+      ],
+      "esec": {}
+    }
+  }
+}
