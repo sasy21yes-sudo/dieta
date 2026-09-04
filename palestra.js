@@ -3148,10 +3148,18 @@ const EXDB_IMG = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exer
 
 function esecMappa() { P().esec ||= {}; return P().esec; }
 
-/** L'id nel catalogo pubblico: dall'import, o dal collegamento fatto a mano. */
+/**
+ * L'id nel catalogo pubblico: dal collegamento fatto a mano, o dall'import.
+ *
+ * In quest'ordine, e non e' indifferente: l'`exdbId` arriva da un import ed
+ * e' una supposizione, il collegamento a mano e' una scelta. Con l'ordine
+ * opposto "non e' questo: collegane un altro" scriveva nella mappa e non
+ * cambiava niente — un bottone che non fa niente sembra rotto, ed era anche
+ * l'unica strada per correggere un'esecuzione sbagliata.
+ */
 function esecDi(exId) {
   const e = esercizio(exId);
-  return e?.exdbId || esecMappa()[exId] || null;
+  return esecMappa()[exId] || e?.exdbId || null;
 }
 
 /** Dal nome del catalogo alla cartella delle immagini: "Barbell Squat" -> "Barbell_Squat". */
@@ -3527,7 +3535,14 @@ function sezGymEsercizi(v) {
           + ' dell\'esecuzione">&#9654;</span>' : ''}`;
       // sempre la scheda: da li' si corregge e si guarda l'esecuzione, e non
       // serve piu' sapere in anticipo se quell'esercizio e' tuo o del catalogo
-      r.onclick = () => sheetSchedaEsercizio(e.id);
+      // la pastiglia dice che c'e' qualcosa da vedere, e toccandola ci porta.
+      // Resta uno <span>: un <button> dentro un <button> non e' HTML valido e
+      // il tocco finirebbe a volte su uno e a volte sull'altro. A distinguere
+      // e' il gestore della riga, che e' uno solo
+      r.onclick = ev => {
+        if (ev.target.closest('.pill.esec')) sheetEsecuzione(e.id);
+        else sheetSchedaEsercizio(e.id);
+      };
       lista.append(r);
     }
     lista.append(el('p', 'hint', `${trovati.length} su ${tutti.length}`
@@ -3604,7 +3619,11 @@ function sheetSchedaEsercizio(id) {
      mai, perche' il collegamento si fa proprio da li'. Adesso il bottone c'e'
      sempre, e dice se il collegamento manca invece di nascondersi. */
   if (typeof sheetEsecuzione === 'function') {
-    const gia = !!esecMappa()[id];
+// non `esecMappa()[id]`: l'esecuzione arriva anche dall'`exdbId`, e
+    // guardando solo la mappa la carta diceva "collega" con i fotogrammi
+    // gia' li' — la stessa domanda a cui la pastiglia dell'elenco, che passa
+    // da esecDi(), rispondeva di si'
+    const gia = !!esecDi(id);
     const b = el('button', 'btn wide',
       gia ? 'Come si esegue' : 'Collega l\'esecuzione');
     b.onclick = () => sheetEsecuzione(id);

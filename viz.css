@@ -1621,4 +1621,4 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .gg-m .q{font-size:10.5px;color:var(--ink-3);white-space:nowrap;flex:none}
 /* la pastiglia dell'esecuzione nell'elenco esercizi: dice che i due
    fotogrammi ci sono, senza aprire la scheda per scoprirlo */
-.pill.esec{color:var(--pine);font-size:10px;padding:2px 6px;letter-spacing:0}
+.pill.esec{color:var(--pine);font-size:10px;letter-spacing:0;cursor:pointer;display:inline-flex;align-items:center;min-height:28px;padding:0 9px;margin:-6px 0}

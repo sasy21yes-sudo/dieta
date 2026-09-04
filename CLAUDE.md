@@ -3498,6 +3498,41 @@ dentro un bottone non e' HTML valido — il tocco finirebbe a volte su uno e a
 volte sull'altro. La pastiglia dice che c'e' qualcosa da vedere; a vederlo ci
 si va dalla scheda, come prima.
 
+### La pastiglia ▶ porta all'esecuzione, e la carta non chiede piu' di collegarla
+
+Segnalato cosi': *"il click sulla capsula del play per gli esercizi con
+video/foto non porta direttamente al video ma bisogna premere collega
+esecuzione"*. Erano **due difetti**, e il secondo non si vedeva senza il primo.
+
+**1. La carta guardava la mappa, l'elenco guardava tutto.** `esecDi()` risponde
+da due posti — il collegamento fatto a mano (`P().esec`) e l'`exdbId` che un
+esercizio si porta dietro dall'import — mentre `sheetSchedaEsercizio()`
+leggeva solo `esecMappa()[id]`. Quindi ogni esercizio importato dal catalogo
+online aveva la pastiglia `▶` nell'elenco (che passa da `esecDi`) e dentro la
+carta il bottone **"Collega l'esecuzione"** con sotto la nota *"il
+collegamento si fa una volta"* — su un collegamento che c'era gia'. Due
+schermate che rispondono in modo opposto alla stessa domanda: quella
+sbagliata e' sempre quella che chiede di rifare un lavoro gia' fatto.
+
+**2. La pastiglia non si toccava.** Diceva "qui c'e' qualcosa da vedere" e
+poi mandava dove mandava tutta la riga, cioe' alla carta. Resta uno `<span>` —
+un `<button>` dentro un `<button>` non e' HTML valido, ed e' scritto poco piu'
+su — ma a distinguere il tocco e' il gestore della riga, che e' uno solo:
+`ev.target.closest('.pill.esec')`. E siccome adesso e' un bersaglio, ha la
+taglia di un bersaglio: 28 px di altezza contro 20, ripresi con un margine
+negativo perche' la riga non si alzi (misurato: pastiglia 37×28, riga ferma a
+62).
+
+**Nello stesso giro, un bottone che non faceva niente.** `esecDi()` metteva
+l'`exdbId` **prima** della scelta a mano, quindi "non e' questo: collegane un
+altro" scriveva nella mappa e sullo schermo non cambiava nulla — ed era
+l'unica strada per correggere un'esecuzione sbagliata. L'ordine giusto e'
+l'opposto, e la ragione e' che i due valori non sono la stessa cosa:
+**l'`exdbId` e' una supposizione dell'import, il collegamento a mano e' una
+scelta.** Verificato: scelto "Cross-Body Crunch" su un crunch inverso
+importato, `esecDi` risponde con quello; tolto il collegamento, torna quello
+dell'import.
+
 ### Esercizi: una pagina, non un foglio
 
 "Esercizi" apriva un foglio con dentro solo i propri, e i 59 del catalogo non
@@ -4224,6 +4259,15 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   tastiera. Il filtro ridisegna solo il suo contenitore
 - Non cercare solo nel nome di una ricetta: la domanda e' "cosa ho con dentro
   il tofu", e "Bowl completa" non risponde. Si cerca anche negli ingredienti
+- Non far rispondere a due schermate in modo diverso alla stessa domanda: la
+  pastiglia dell'elenco passava da `esecDi()` e la carta da `esecMappa()`, e
+  l'esercizio con i fotogrammi gia' li' si vedeva chiedere di collegarli
+- Non far vincere l'`exdbId` dell'import sul collegamento fatto a mano: il
+  primo e' una supposizione, il secondo e' una scelta — e con l'ordine
+  sbagliato "collegane un altro" non cambia niente
+- Non lasciare a una pastiglia che dice "qui c'e' qualcosa da vedere" il
+  destino della riga: se annuncia qualcosa deve portarci, e allora le serve
+  anche la taglia di un bersaglio da dito
 - Non mettere un `<button>` dentro una riga che e' gia' un `<button>`: non e'
   HTML valido e il tocco finisce a volte su uno e a volte sull'altro. Per
   segnare qualcosa su una riga toccabile serve uno `<span>`
