@@ -714,6 +714,10 @@ function viewPiano(v) {
 function pianoSezione(v) {
   const passi = pianoPassi();
   const i = passi.findIndex(x => x.id === pianoTab);
+  // i passi non sono sempre gli stessi sei: col piano alimentare spento sono
+  // due, e chiedere un passo che in questa configurazione non esiste faceva
+  // morire il disegno su `s.t` — una pagina bianca invece dell'elenco
+  if (i < 0) { pianoTab = null; return viewPiano(v); }
   const s = passi[i];
 
   const testa = el('div', 'card');
@@ -722,8 +726,22 @@ function pianoSezione(v) {
   testa.append(back);
   testa.append(el('div', 'eyebrow', `Passo ${i + 1} di ${passi.length}`));
   testa.lastChild.style.marginTop = '10px';
-  testa.append(el('h2', 'sec', esc(s.t)));
-  testa.lastChild.style.marginTop = '2px';
+  /* Il titolo del passo, e accanto quello che si puo' fare al passo intero.
+     Per adesso ce l'ha solo la settimana: il piano su carta e' un'azione su
+     tutti e sette i giorni, quindi non ha una casa dentro nessuno di loro. */
+  const tit = el('div', 'row between');
+  tit.style.marginTop = '2px';
+  tit.append(el('h2', 'sec', esc(s.t)));
+  tit.firstChild.style.marginTop = '0';
+  if (pianoTab === 'settimana' && typeof pdfPiano === 'function') {
+    const dl = el('button', 'btn-piu btn-ico');
+    dl.title = 'Scarica il piano in PDF';
+    dl.setAttribute('aria-label', 'Scarica il piano in PDF');
+    dl.append(icona('download', { size: 18 }));
+    dl.onclick = () => scaricaPiano();
+    tit.append(dl);
+  }
+  testa.append(tit);
   testa.append(el('p', 'muted', s.perche));
   v.append(testa);
 
@@ -2175,4 +2193,170 @@ function cambiaSlot(gi, si) {
   };
   w.append(via);
   sheet(w);
+}
+
+/* ==================================================== il piano su carta
+ *
+ * Il resoconto risponde a "com'e' andata"; questo risponde a "cosa devo
+ * mangiare", ed e' una domanda che si fa **davanti al frigo**, dove il
+ * telefono e' spesso in un'altra stanza e quasi sempre con le mani sporche.
+ * Da qui un foglio: i sette giorni con i loro pasti, e in fondo le ricette
+ * con i grammi.
+ *
+ * Le ricette stanno in fondo e **una volta sola**, non sotto ogni giorno:
+ * la stessa colazione compare sette volte su sette, e ristamparla ogni volta
+ * farebbe quattro pagine di ripetizioni al posto di una di elenco. E si
+ * numerano, cosi' la riga del giorno rimanda al punto in cui i grammi stanno
+ * scritti.
+ *
+ * I colori sono `RES_C`, gli stessi del resoconto, e per la stessa ragione:
+ * un PDF si stampa su carta bianca, e sono due fogli dello stesso quaderno.
+ */
+function pdfPiano() {
+  const doc = pdfNuovo();
+  const X = doc.M, W = doc.larghezza;
+  const nome = (typeof profiloAttivo === 'function' && profiloAttivo()?.nome)
+    || D.profilo?.nome || '';
+  const T = D.target || {};
+
+  /* le ricette usate nella settimana, ognuna con il suo numero. La chiave e'
+     il codice **intero**: "pasta con tonno 50/150" e la stessa pesata 150/50
+     sono due righe diverse nella lista della spesa, e devono esserlo anche
+     qui — e' proprio il caso per cui i pesi per giorno esistono */
+  const ricette = new Map();
+  for (const g of D.settimana)
+    for (const s of (g.pasti || [])) {
+      const pa = s.codice && pasto(s.codice);
+      if (pa && !ricette.has(s.codice))
+        ricette.set(s.codice, { n: ricette.size + 1, pa });
+    }
+
+  const titolo = t => {
+    doc.serve(70);
+    doc.y += 16;
+    doc.linea(X, doc.y, X + W, doc.y, { col: RES_C.rule });
+    doc.y += 13;
+    doc.testo(t, X, doc.y, { size: 11, bold: true, col: RES_C.pine });
+    doc.y += 8;
+  };
+
+  /* --- testata --- */
+  doc.nuovaPagina();
+  doc.y += 6;
+  doc.testo('PIANO SETTIMANALE', X, doc.y, { size: 8.5, bold: true, col: RES_C.ink3 });
+  doc.y += 22;
+  doc.testo(nome || 'Il tuo piano', X, doc.y, { size: 20, bold: true, col: RES_C.ink });
+  doc.y += 15;
+  doc.testo(`Generato il ${today()}`, X, doc.y, { size: 9, col: RES_C.ink3 });
+  doc.y += 6;
+
+  if (T.kcal > 0) {
+    doc.y += 12;
+    doc.rett(X, doc.y, W, 30, { fill: RES_C.wash });
+    doc.testo('Il target giornaliero', X + 10, doc.y + 12,
+      { size: 8, bold: true, col: RES_C.ink3 });
+    doc.testo(`${nf(T.kcal)} kcal · ${macroRiga(T, ' · ')}`, X + W - 10, doc.y + 12,
+      { size: 9, col: RES_C.ink, align: 'right' });
+    doc.testo('E’ il metro, non la somma dei pasti: i due possono non coincidere.',
+      X + 10, doc.y + 24, { size: 7.5, col: RES_C.ink3 });
+    doc.y += 30;
+  }
+
+  /* --- i sette giorni --- */
+  for (const g of D.settimana) {
+    const slots = (g.pasti || []).filter(s => s.codice && pasto(s.codice));
+    doc.serve(46 + (g.pasti || []).length * 14);
+    doc.y += 18;
+    doc.testo(nomeGiorno(g.giorno), X, doc.y, { size: 12, bold: true, col: RES_C.ink });
+    const tot = g.totali || { kcal: 0 };
+    doc.testo(`${nf(tot.kcal)} kcal · ${macroRiga(tot, ' · ')}`, X + W, doc.y,
+      { size: 8.5, col: RES_C.ink2, align: 'right' });
+    doc.y += 4;
+    doc.linea(X, doc.y, X + W, doc.y, { col: RES_C.rule });
+
+    if (!(g.pasti || []).length) {
+      doc.y += 13;
+      doc.testo('Nessun pasto assegnato.', X, doc.y, { size: 9, col: RES_C.ink3 });
+      doc.y += 3;
+      continue;
+    }
+    // le quote dicono com'e' fatta la giornata; le calorie da sole no
+    const qm = typeof quoteMacro === 'function' ? quoteMacro(tot) : null;
+    if (qm) {
+      doc.y += 11;
+      doc.testo(`${nf(qm.p, 0)}% proteine · ${nf(qm.c, 0)}% carboidrati · `
+        + `${nf(qm.g, 0)}% grassi`, X, doc.y, { size: 7.5, col: RES_C.ink3 });
+    }
+    for (const s of (g.pasti || [])) {
+      const pa = s.codice && pasto(s.codice);
+      const r = ricette.get(s.codice);
+      doc.serve(16);
+      doc.y += 13.5;
+      doc.testo(s.ora || '—', X, doc.y, { size: 8.5, col: RES_C.ink3 });
+      doc.testo(s.slot || '', X + 34, doc.y, { size: 8.5, col: RES_C.ink3 });
+      doc.testo(pa ? `${pa.nome || s.codice}${r ? `  (${r.n})` : ''}` : 'Da assegnare',
+        X + 120, doc.y, { size: 9, col: pa ? RES_C.ink : RES_C.ink3 });
+      if (pa) {
+        const m = macroRicetta(pa) || {};
+        doc.testo(macroRiga(m, ' '), X + W - 46, doc.y,
+          { size: 7.5, col: RES_C.ink3, align: 'right' });
+        doc.testo(nf(m.kcal), X + W, doc.y, { size: 9, col: RES_C.ink, align: 'right' });
+      }
+    }
+    doc.y += 5;
+    if (!slots.length) continue;
+  }
+
+  /* --- le ricette, una volta sola --- */
+  if (ricette.size) {
+    titolo('Le ricette, con i grammi');
+    doc.y += 6;
+    for (const [, r] of ricette) {
+      const ing = r.pa.ingredienti || [];
+      doc.serve(26 + ing.length * 12);
+      doc.y += 14;
+      doc.testo(`(${r.n})  ${r.pa.nome || ''}`, X, doc.y,
+        { size: 9.5, bold: true, col: RES_C.ink });
+      const m = macroRicetta(r.pa) || {};
+      doc.testo(`${nf(m.kcal)} kcal · ${macroRiga(m, ' · ')}`, X + W, doc.y,
+        { size: 8, col: RES_C.ink2, align: 'right' });
+      doc.y += 3;
+      doc.linea(X, doc.y, X + W, doc.y, { col: RES_C.rule, w: .35 });
+      if (!ing.length) {
+        doc.y += 12;
+        doc.testo('Un alimento solo, senza ricetta.', X + 10, doc.y,
+          { size: 8.5, col: RES_C.ink3 });
+        doc.y += 2;
+        continue;
+      }
+      for (const i of ing) {
+        doc.serve(14);
+        doc.y += 11.5;
+        doc.testo(i.alimento, X + 10, doc.y, { size: 8.5, col: RES_C.ink2 });
+        const u = typeof unitaIngrediente === 'function' ? unitaIngrediente(i) : 'g';
+        doc.testo(`${nf(i.qta, i.qta % 1 ? 1 : 0)} ${u}`, X + W, doc.y,
+          { size: 8.5, col: RES_C.ink, align: 'right' });
+      }
+      doc.y += 3;
+    }
+    doc.y += 8;
+    doc.paragrafo('I grammi sono quelli del piano. Le porzioni cambiate su una '
+      + 'singola giornata dal diario non compaiono qui: valgono per quel giorno, '
+      + 'e questo foglio e’ la settimana.',
+      { size: 8, col: RES_C.ink3, interlinea: 11 });
+  }
+
+  doc.chiudi((d, i, n) => {
+    const y = d.H - 26;
+    d.linea(X, y, X + W, y, { col: RES_C.rule, w: .4 });
+    d.testo(`Dieta · piano settimanale · ${today()}`, X, y + 10,
+      { size: 7.5, col: RES_C.ink3 });
+    d.testo(`${i} / ${n}`, X + W, y + 10, { size: 7.5, col: RES_C.ink3, align: 'right' });
+  });
+  return doc.bytes();
+}
+
+function scaricaPiano() {
+  scaricaPdf(`piano-settimanale-${today()}.pdf`, pdfPiano());
+  toast('Piano scaricato');
 }

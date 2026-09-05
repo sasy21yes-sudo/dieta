@@ -75,10 +75,12 @@ function revPeriodoAttivo(k = today()) {
   return revPeriodoDate(revPeriodo.da, revPeriodo.a);
 }
 
+const MESI_BR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu',
+                 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+
 /** "12 mar - 18 mar", che in testata si legge meglio di due date ISO. */
 function revEtichetta(per) {
-  const MM = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu',
-              'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  const MM = MESI_BR;
   const f = k => `${+k.slice(8)} ${MM[+k.slice(5, 7) - 1]}`;
   return `${f(per.da)} \u2013 ${f(per.a)}`;
 }
@@ -1161,15 +1163,28 @@ function pdfResoconto(per) {
         righe.push(['Peso di tendenza', nf(pes.tendenzaIn, 2) + ' kg', nf(pes.tendenzaFin, 2) + ' kg',
           `${pes.delta >= 0 ? '+' : ''}${nf(pes.delta, 2)} kg`]);
     }
-    for (const m of mis)
-      righe.push([m.nome, nf(m.prima, 1) + ' cm', nf(m.ultima, 1) + ' cm',
+    // il tratto vero di ogni circonferenza, scritto accanto al nome quando
+    // parte da prima del periodo: senza, la riga direbbe una differenza su un
+    // tratto che il lettore crede lungo quanto il resoconto
+    const gio = k => `${+k.slice(8)} ${MESI_BR[+k.slice(5, 7) - 1]}`;
+    let fuori = 0;
+    for (const m of mis) {
+      if (m.fuori) fuori++;
+      righe.push([m.nome + (m.fuori ? ` · dal ${gio(m.daK)}` : ''),
+        m.prima == null ? '—' : nf(m.prima, 1) + ' cm', nf(m.ultima, 1) + ' cm',
         m.delta == null ? '—' : `${m.delta >= 0 ? '+' : ''}${nf(m.delta, 1)} cm`]);
+    }
     tabella(['', 'Inizio', 'Fine', 'Differenza'], righe, [2.2, 1, 1, 1.2],
       (pes.primo ? `${pes.pesate} pesate su ${reg.giorni} giorni, ritmo `
         + `${pes.kgSettimana >= 0 ? '+' : ''}${nf(pes.kgSettimana, 2)} kg a settimana sulla tendenza. ` : '')
-      + 'La differenza sulle circonferenze e’ fra la prima e l’ultima rilevazione '
-      + 'dentro il periodo, non fra due date fisse: con misure prese di rado puo’ '
-      + 'coprire un tratto piu’ corto del periodo.');
+      + 'La differenza sulle circonferenze e’ fra due rilevazioni vere, non fra '
+      + 'due date fisse: il metro si passa ogni tanto, quindi il tratto coperto '
+      + 'e’ quasi sempre diverso dal periodo.'
+      + (fuori ? ' Dove dentro il periodo ce n’e’ una sola, il confronto parte '
+        + 'dall’ultima precedente e la riga dice da quando.' : '')
+      + (mis.some(m => m.prima == null)
+        ? ' Un trattino vuol dire che prima non c’e’ nessuna rilevazione con cui '
+          + 'confrontarla.' : ''));
   }
 
   /* --- allenamento --- */

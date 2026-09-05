@@ -213,7 +213,23 @@ function statPeso(per) {
   };
 }
 
-/** Le circonferenze: prima e ultima rilevazione dentro il periodo. */
+/**
+ * Le circonferenze: da dove a dove, dentro il periodo.
+ *
+ * Con una rilevazione sola non c'e' un "da dove": la riga stampava lo stesso
+ * numero nella colonna Inizio e in quella Fine, con un trattino al posto
+ * della differenza. Letto su un foglio da consegnare sembra un errore di
+ * stampa — ed e' anche il caso **normale**, perche' il metro si passa ogni
+ * due settimane e il resoconto piu' usato copre sette giorni.
+ *
+ * Quindi si guarda indietro: l'ultima rilevazione **prima** del periodo e' il
+ * punto di partenza, e la riga dichiara da quando. Il tratto diventa piu'
+ * lungo del periodo invece che lungo zero, ed e' la stessa cosa che fa gia'
+ * il peso, che confronta due valori di tendenza e non due pesate.
+ *
+ * Se prima non c'e' niente, `prima` resta `null` e la colonna dice "—": un
+ * dato che non esiste si dichiara, non si riempie ripetendo l'altro.
+ */
 function statMisure(per) {
   const gg = statGiorni(per);
   const out = [];
@@ -221,12 +237,27 @@ function statMisure(per) {
     const punti = gg.map(k => ({ k, v: S.log[k]?.misure?.[m.id] }))
       .filter(x => x.v != null && !isNaN(x.v));
     if (!punti.length) continue;
-    const a = punti[0], b = punti[punti.length - 1];
+    const b = punti[punti.length - 1];
+    let a = punti.length > 1 ? punti[0] : misuraPrimaDi(m.id, per.da);
+    // una rilevazione riscritta uguale il giorno dopo non e' un confronto
+    const fuori = punti.length === 1 && !!a;
     out.push({ id: m.id, nome: m.label || m.id, n: punti.length,
-      prima: a.v, ultima: b.v, delta: punti.length > 1 ? b.v - a.v : null,
+      prima: a ? a.v : null, ultima: b.v,
+      daK: a ? a.k : null, aK: b.k, fuori,
+      delta: a ? b.v - a.v : null,
       target: m.target ?? null });
   }
   return out;
+}
+
+/** L'ultima volta che quella misura e' stata presa prima di un certo giorno. */
+function misuraPrimaDi(id, da, indietro = 180) {
+  for (let i = 1; i <= indietro; i++) {
+    const k = addDays(da, -i);
+    const v = S.log[k]?.misure?.[id];
+    if (v != null && !isNaN(v)) return { k, v };
+  }
+  return null;
 }
 
 /** Allenamento: sedute, serie, cardio. Numeri, non giudizi. */

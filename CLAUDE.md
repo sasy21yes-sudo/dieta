@@ -3661,6 +3661,78 @@ Una sola voce assomiglia a un giudizio, l'"aderenza" per giorno della settimana,
 ed e' definita per esteso nel file: **la distanza delle calorie dal target**.
 Non e' un voto sul cibo, che questa app non da'.
 
+### "Inizio" e "Fine" erano lo stesso numero
+
+Segnalato sul resoconto: *"nelle misure vedo una discrepanza, iniziali e
+finali sono uguali"*. Riprodotto, ed era il **caso normale**: il metro si
+passa ogni due settimane e il resoconto piu' usato copre sette giorni, quindi
+dentro il periodo di rilevazioni ce n'e' **una sola**. `statMisure()`
+prendeva la prima e l'ultima di quelle dentro — che con una sola sono la
+stessa — e la tabella stampava lo stesso numero due volte con un trattino al
+posto della differenza. Misurato sulla settimana chiusa con una misura presa
+tre giorni fa: **sei righe su sei** con il numero ripetuto e sei differenze
+mancanti, mentre una rilevazione di dodici giorni prima era li' e non la
+guardava nessuno.
+
+Adesso, quando dentro il periodo ce n'e' una sola, il confronto **parte
+dall'ultima precedente** — `misuraPrimaDi()`, che guarda indietro fino a sei
+mesi — e la riga dichiara da quando: `Vita (ombelico) · dal 19 ago`. Il tratto
+diventa piu' lungo del periodo invece che lungo zero, ed e' la stessa cosa che
+fa gia' il peso, che confronta due valori di **tendenza** e non due pesate.
+
+Se prima non c'e' niente, `prima` resta `null` e la colonna dice `—`: un dato
+che non esiste si dichiara, non si riempie ripetendo l'altro. E una
+circonferenza che davvero non e' cambiata continua a mostrare due numeri
+uguali — con `+0,0 cm` accanto, che e' il modo in cui le due situazioni si
+distinguono a colpo d'occhio.
+
+Verificato sui cinque casi: una dentro piu' una prima (da 6 ripetizioni a 0),
+una dentro e niente prima (sei `—`, nessun numero inventato), due o piu'
+dentro (non va a pescare fuori), una misura ferma (`0,0` e non un trattino),
+e il periodo lungo, che non si e' mosso.
+
+### Il piano su carta
+
+Il resoconto risponde a *com'e' andata*; questo risponde a *cosa devo
+mangiare*, ed e' una domanda che si fa **davanti al frigo** — dove il telefono
+e' spesso in un'altra stanza e quasi sempre con le mani sporche. `pdfPiano()`
+mette i sette giorni con i loro pasti (ora, nome del pasto, ricetta, macro,
+calorie), il target in testa come metro dichiarato, e le quote per giorno,
+perche' i grammi da soli non si confrontano fra giornate di dimensione
+diversa.
+
+**Le ricette stanno in fondo e una volta sola**, numerate, con la riga del
+giorno che rimanda al numero. La stessa colazione compare sette volte su
+sette: ristamparne gli ingredienti ogni volta farebbe quattro pagine di
+ripetizioni al posto di una di elenco.
+
+Due decisioni piccole e non ovvie:
+
+- **la chiave delle ricette e' il codice intero, non `codiceBaseRic()`.**
+  "Pasta con tonno 50/150" e la stessa pesata 150/50 sono due voci diverse
+  nella lista della spesa e devono esserlo anche qui: e' esattamente il caso
+  per cui i pesi per giorno esistono;
+- **le porzioni del diario non ci sono.** Quelle valgono un giorno solo, e
+  questo foglio e' la settimana — la nota lo scrive invece di lasciare che
+  qualcuno trovi grammi diversi da quelli che si ricordava.
+
+Il bottone e' l'icona classica dello scarico — la freccia che entra nel
+vassoio, da Feather, ricopiata in `icone.js` come tutte le altre — accanto al
+titolo del passo, perche' il piano su carta e' un'azione su **tutti e sette**
+i giorni e non ha una casa dentro nessuno di loro.
+
+Nel farlo e' saltato fuori un difetto vecchio: `pianoSezione()` faceva
+`passi[i].t` senza controllare che quel passo esistesse, e i passi non sono
+sempre gli stessi sei — col piano alimentare spento sono due. Un `pianoTab`
+che in quella configurazione non esiste dava una **pagina bianca** invece
+dell'elenco. Adesso ricade sull'elenco dei passi.
+
+Verificato sulle dieci configurazioni della matrice: il PDF si genera in
+tutte, piano di esempio e **piano vuoto** compresi (34,5 kB contro 9,6),
+nessun `undefined`/`NaN` fra le 404 stringhe di testo, nessuna riga oltre il
+margine destro, gli accenti dei giorni interi (`Lunedi`, `Mercoledi` con la
+`i` accentata, non un `?`), e il bottone assente dove il passo non esiste.
+
 ### Il resoconto in PDF
 
 Serve a una cosa che sullo schermo non si puo' fare: portarselo via. Il medico
@@ -4779,6 +4851,15 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non lasciare al riferimento tratteggiato lo stesso colore della sagoma
   piena: sullo schermo la figura e' grande e due verdi si distinguono, su A4
   sta in quattro centimetri e sono la stessa linea
+- Non trattare una rilevazione sola come un "da dove a dove": con il metro
+  passato ogni due settimane e un resoconto di sette giorni e' il caso
+  normale, e la tabella stampa lo stesso numero in Inizio e in Fine. Si guarda
+  indietro all'ultima precedente e si dichiara da quando; se non c'e', `—`
+- Non ristampare gli ingredienti di una ricetta sotto ogni giorno che la usa:
+  la colazione compare sette volte su sette. Le ricette vanno in fondo, una
+  volta sola, numerate
+- Non leggere `passi[i].t` senza controllare che il passo esista: i passi del
+  piano non sono sempre gli stessi sei, e col piano alimentare spento sono due
 - Non usare `window.print()` per fare un PDF su iOS: dentro una PWA aggiunta
   alla Home la finestra di stampa a volte non si apre, e i margini li decide il
   browser. Il file si genera, e cosi' si sa cosa contiene

@@ -51,6 +51,9 @@ const ICONE = {
   // l'elenco: tre righe e i loro pallini
   list: { d: ['M8 6h13', 'M8 12h13', 'M8 18h13',
               'M3 6h.01', 'M3 12h.01', 'M3 18h.01'] },
+  // la freccia che entra nel vassoio: scaricare un file
+  download: { d: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4',
+                  'M7 10l5 5 5-5', 'M12 15V3'] },
   // la spunta della spesa e la casa della dispensa
   check: { d: ['M20 6L9 17l-5-5'] },
   home: { d: ['M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', 'M9 22V12h6v10'] }
