@@ -3714,6 +3714,16 @@ function sheetImport(grezzo) {
     sheetCaricaScambio(grezzo);
     return;
   }
+  /* Stessa cortesia per il file delle foto: sono tre bottoni che chiedono
+     tutti e tre un .json, e da fuori si somigliano. Chi ha scelto un file lo
+     vuole importare — sapere quale porta l'app si aspettava non e' un
+     problema suo. */
+  if (grezzo && typeof FOTO_FMT === 'string' && grezzo.formato === FOTO_FMT
+      && typeof sheetFotoBackup === 'function') {
+    toast('Questo e\' il file delle foto: te lo apro di la\'');
+    sheetFotoBackup();
+    return;
+  }
   const v2 = grezzo && grezzo.formato === 2 && grezzo.stati;
   const o = v2 ? grezzo : migra(grezzo);
   if (!o) { toast('Formato non riconosciuto'); return; }
@@ -3969,11 +3979,19 @@ function sheetMenu() {
      'Vacanza, influenza, trasferta: i dati restano tutti, ma la revisione settimanale e i punteggi di costanza saltano quei giorni.',
      () => sheetPause());
 
-  mk('Esporta backup', 'Tutti i profili in un file solo. La memoria del browser può essere svuotata, e non esiste '
-     + 'copia altrove. È l\'unico modo per non perdere lo storico.'
+  mk('Esporta backup', 'Tutti i profili in un file solo: diario, piano, palestra, '
+     + 'prodotti, impostazioni. La memoria del browser può essere svuotata, e non esiste '
+     + 'copia altrove. È l\'unico modo per non perdere lo storico. '
+     + 'Le foto no: hanno un file loro, qui sotto.'
      + (S.settings.backup ? ' Ultimo backup: ' + S.settings.backup + '.'
                           : ' Non ne hai ancora fatto nessuno.'),
      () => { const n = exportBackup(); toast(n > 1 ? n + ' profili esportati' : 'Backup scaricato'); });
+
+  /* Che le foto restino fuori era scritto in fondo al foglio dell'IMPORT,
+     cioe' dopo: chi esporta e chiude non lo legge mai. */
+  mk('Le foto, a parte', 'Stanno in IndexedDB e nel backup non ci sono. Da qui si '
+     + 'salvano in un file loro e si rimettono, cosi\' la copia e\' completa davvero.',
+     () => { if (typeof sheetFotoBackup === 'function') sheetFotoBackup(); });
 
   mk('Passa la dieta o le schede',
      'Un pezzo solo, non tutto l\'archivio: il piano alimentare, le schede di palestra, '

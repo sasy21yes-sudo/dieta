@@ -4161,6 +4161,54 @@ Nota di robustezza trovata nello stesso giro: `riassuntoBackup()` dava per
 scontato `o.profili.lista`, e un backup troncato faceva morire l'anteprima a
 meta' foglio invece di dire che il file non conteneva niente.
 
+### Il backup e' completo? Misurato, e mancava una cosa sola
+
+Chiesto di verificarlo, e verificarlo vuol dire riempire **ogni angolo** dello
+stato — quaranta campi fra diario, piano, palestra, prodotti, sfide, modello,
+HYROX e impostazioni, piu' un secondo profilo — esportare, e camminare l'albero
+campo per campo confrontando quello che c'era con quello che e' nel file.
+
+Il risultato: **zero campi persi** e **zero chiavi di `localStorage` fuori dal
+backup**. Il formato 2 porta tutti i profili, l'anteprima dell'import li conta
+tutti e due, e il file di prova pesava 27,9 kB. Su questo lato non c'era niente
+da riparare.
+
+**Mancavano le foto**, e non per dimenticanza: sono Blob in IndexedDB perche'
+in `localStorage` non ci starebbero. La cosa era gia' scritta — ma **in fondo
+al foglio dell'import**, cioe' dopo, quando il file l'hai gia' fatto. Chi
+esporta e chiude non lo legge mai, e si porta a casa una copia che crede
+completa.
+
+Adesso le foto hanno un file loro (`fotoEsporta()` / `fotoImporta()`), e la
+riga in Impostazioni lo dice **prima**. Tre decisioni:
+
+- **JSON con le immagini in base64, non uno zip.** Uno zip scritto a mano
+  andrebbe anche letto a mano, e un export che non si puo' reimportare non e'
+  un backup: e' un salvataggio. Il prezzo e' il 37% di peso in piu' — misurato,
+  non stimato a occhio — e si dichiara **prima** di cominciare, insieme a
+  quante foto sono e a quanto pesano sul telefono;
+- **stesso id, stessa foto.** Rimettere lo stesso file due volte non duplica
+  niente: `fotoSalva` fa un `put`, e uno scatto sostituisce se stesso.
+  Verificato: due import di fila lasciano tre scatti, non sei;
+- **il file delle foto entra dalla porta del backup.** Sono tre bottoni che
+  chiedono tutti e tre un `.json` e da fuori si somigliano — la stessa
+  cortesia gia' fatta per il file di scambio: chi ha scelto un file lo vuole
+  importare, e sapere quale porta l'app si aspettava non e' un problema suo.
+
+E `S.settings.nFoto` — il contatore che i traguardi leggono, perche' si
+calcolano sincroni mentre le foto stanno in IndexedDB — si riallinea dopo
+l'import, o resterebbe quello di prima.
+
+Verificato sul giro completo: tre scatti dentro, esportati, magazzino
+svuotato, reimportati, e confrontati **byte per byte** — tre su tre identici,
+metadati compresi (giorno, posa, dimensioni, peso di quel giorno).
+
+Nota sull'attrezzatura, non sul codice: **IndexedDB non risponde sotto
+`--virtual-time-budget`** in questo headless — misurato, `fdb()` non chiama
+mai `onsuccess`. Il magazzino si sostituisce stubbando `ftx()`, che e' una
+dichiarazione di funzione e quindi vive sull'oggetto globale; `fotoTutte` e
+compagni sono `const` e riassegnarli su `window` non cambia quello che vedono.
+
 ### Passi e sonno senza scriverli
 
 Nessuna API web legge HealthKit. Un **Comando iOS** però ha i permessi che il
@@ -4231,8 +4279,15 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   nessuno
 - Non usare `nf()` per riempire il valore di un `<input>`: formatta 2482 come
   "2.482" e rileggerlo dà 2,482
-- Non mettere le foto nel backup JSON: sono in IndexedDB perché in localStorage
-  non ci starebbero. Vanno salvate a parte, e l'app deve dirlo
+- Non mettere le foto nel backup JSON insieme al resto: sono in IndexedDB
+  perche' in localStorage non ci starebbero. Hanno un file loro — e la cosa va
+  detta **sul lato dell'export**, non in fondo al foglio dell'import: chi
+  esporta e chiude non lo legge mai
+- Non esportare le foto in un formato che non si sa rileggere: uno zip scritto
+  a mano andrebbe letto a mano, e un export che non si reimporta e' un
+  salvataggio, non un backup
+- Non dimenticare `S.settings.nFoto` dopo un import di foto: i traguardi si
+  calcolano sincroni e leggono quel contatore, non IndexedDB
 - Non spostare i dati nutrizionali dentro il codice
 - Non introdurre un punteggio "cibo buono / cibo cattivo"
 - Non aggiungere obiettivi di peso a scadenza né conti alla rovescia

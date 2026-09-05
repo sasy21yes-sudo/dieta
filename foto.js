@@ -642,3 +642,135 @@ function sliderConfronto(a, b) {
   });
   return box;
 }
+
+
+/* ============================================ le foto dentro un backup
+ *
+ * Il backup completo porta **tutto** quello che sta in `localStorage`:
+ * verificato campo per campo, non ne perde nemmeno uno. Le foto pero' non
+ * stanno li' — sono Blob in IndexedDB, perche' in `localStorage` non ci
+ * starebbero — e restavano fuori. La cosa era scritta in fondo al foglio
+ * dell'import, cioe' **dopo**, quando il file l'hai gia' fatto: chi esporta
+ * e chiude non lo legge mai.
+ *
+ * Adesso hanno un file loro, e si rimettono dalla stessa porta. Il formato e'
+ * JSON con le immagini in base64 e non uno zip, per una ragione sola: cosi'
+ * si **rilegge**. Uno zip scritto a mano andrebbe anche letto a mano, e un
+ * export che non si puo' reimportare non e' un backup, e' un salvataggio.
+ *
+ * Il prezzo e' il 33% di peso in piu' della base64, e si dichiara prima di
+ * cominciare invece di far scoprire un file da settanta megabyte a
+ * scaricamento finito.
+ */
+const FOTO_FMT = 'dieta-foto/1';
+
+const bloB64 = b => new Promise((ok, no) => {
+  const r = new FileReader();
+  r.onload = () => ok(r.result);
+  r.onerror = () => no(r.error);
+  r.readAsDataURL(b);
+});
+
+/** Quante sono e quanto pesano, prima di decidere. */
+async function fotoPeso() {
+  const t = await fotoTutte();
+  const byte = t.reduce((a, f) => a + (f.blob?.size || 0), 0);
+  return { n: t.length, byte, stima: Math.round(byte * 1.37) };
+}
+
+async function fotoEsporta() {
+  const t = await fotoTutte();
+  if (!t.length) { toast('Non hai nessuna foto'); return 0; }
+  toast('Preparo ' + t.length + ' foto…');
+  const scatti = [];
+  for (const f of t) scatti.push({
+    id: f.id, giorno: f.giorno, posa: f.posa, w: f.w, h: f.h,
+    peso: f.peso ?? null, dati: await bloB64(f.blob)
+  });
+  download('dieta-foto-' + today() + '.json',
+    JSON.stringify({ formato: FOTO_FMT, quando: today(), n: scatti.length, scatti }),
+    'application/json');
+  return scatti.length;
+}
+
+/** Rimette gli scatti. Stesso id = stessa foto: si sovrascrive, non si duplica. */
+async function fotoImporta(o) {
+  const arr = Array.isArray(o?.scatti) ? o.scatti : [];
+  let n = 0;
+  for (const s of arr) {
+    if (!s?.dati || !s.id) continue;
+    const blob = await (await fetch(s.dati)).blob();
+    await fotoSalva({ id: s.id, giorno: s.giorno || today(), posa: s.posa || 'fronte',
+                      blob, w: s.w || 0, h: s.h || 0, peso: s.peso ?? null });
+    n++;
+  }
+  /* Il contatore dei traguardi vive in `S` perche' i traguardi si calcolano
+     sincroni: dopo un import va riallineato, o resta quello di prima. */
+  const tutte = await fotoTutte();
+  S.settings.nFoto = tutte.length; save();
+  return n;
+}
+
+/** Il foglio: quanto pesa, cosa contiene, e le due direzioni. */
+async function sheetFotoBackup() {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Le foto'));
+  w.append(el('h2', 'sec', 'Un file a parte'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Il backup completo porta tutto quello che sta nella memoria del browser: '
+    + 'diario, piano, palestra, prodotti, impostazioni. Le foto no — sono '
+    + 'immagini in IndexedDB, e in un file di testo ci stanno solo se le si '
+    + 'riscrive come testo. Questo e\u2019 quel file.'));
+
+  const info = el('div', 'read');
+  info.innerHTML = '<span>conto in corso…</span>';
+  w.append(info);
+
+  const esp = el('button', 'btn wide pri', 'Salva le foto');
+  esp.style.marginTop = '10px';
+  esp.disabled = true;
+  esp.onclick = async () => {
+    esp.disabled = true;
+    const n = await fotoEsporta();
+    if (n) toast(n + ' foto salvate');
+    esp.disabled = false;
+  };
+  w.append(esp);
+
+  const imp = el('button', 'btn wide', 'Rimetti le foto da un file');
+  imp.style.marginTop = '8px';
+  imp.onclick = () => {
+    const i = el('input'); i.type = 'file'; i.accept = '.json,application/json';
+    i.onchange = () => {
+      const f = i.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = async () => {
+        try {
+          const o = JSON.parse(r.result);
+          if (o?.formato !== FOTO_FMT) { toast('Non e\u2019 un file di foto'); return; }
+          toast('Rimetto ' + (o.n || 0) + ' foto…');
+          const n = await fotoImporta(o);
+          closeSheet(); route();
+          toast(n + ' foto rimesse');
+        } catch (e) { toast('File non valido: ' + (e.message || 'illeggibile')); }
+      };
+      r.readAsText(f);
+    };
+    i.click();
+  };
+  w.append(imp);
+  w.append(el('p', 'note',
+    'Rimettendole si aggiungono a quelle che hai: uno scatto con lo stesso '
+    + 'codice sostituisce se stesso, non si duplica. Il file e\u2019 circa un '
+    + 'terzo piu\u2019 grande delle foto, perche\u2019 dentro un JSON le immagini '
+    + 'si scrivono come testo.'));
+  sheet(w);
+
+  const p = await fotoPeso();
+  info.innerHTML = `<span>${p.n} ${p.n === 1 ? 'foto' : 'foto'}</span>`
+    + `<span>${nf(p.byte / 1048576, 1)} MB sul telefono</span>`
+    + `<span>file circa ${nf(p.stima / 1048576, 1)} MB</span>`;
+  esp.disabled = !p.n;
+  if (!p.n) esp.textContent = 'Non hai ancora nessuna foto';
+}
