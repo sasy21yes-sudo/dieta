@@ -18,6 +18,15 @@
   --serif:"IBM Plex Serif",Georgia,serif;
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-t:env(safe-area-inset-top,0px);
+  /* Il viola dell'assistente. E' l'unico posto dell'app che non parla di
+     cibo ne' di carichi, e ha una tinta sua per questo: il verde vuol dire
+     "in linea", l'ambra "fuori target", l'oro "in piu'" — tre significati
+     gia' presi. `--ai-1` e' il fondo che porta testo bianco (5,7:1, sopra la
+     soglia anche per il corpo del testo); `--ai-2` sta solo nei gradienti e
+     nei bordi, dove non ci scrive niente sopra. */
+  --ai-1:#6A48E0; --ai-2:#C264E0; --ai-ink:#4A2FA8;
+  --ai-vetro:rgba(255,255,255,.72); --ai-orlo:rgba(255,255,255,.55);
+  --ai-alone:rgba(106,72,224,.28);
 }
 @media (prefers-color-scheme:dark){
   :root{
@@ -28,6 +37,9 @@
     --ink:#E9EEF1; --ink-2:#A6B2BC; --ink-3:#6E7B87;
     --paper:#0E1417; --wash:#161E23; --rule:#26313A;
     --evid:#15302A;
+    --ai-1:#8B6BFF; --ai-2:#D888F0; --ai-ink:#C9B6FF;
+    --ai-vetro:rgba(30,34,48,.72); --ai-orlo:rgba(255,255,255,.14);
+    --ai-alone:rgba(0,0,0,.45);
   }
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}

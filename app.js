@@ -79,7 +79,11 @@ function modulliDaStato() {
   const usati = !!(h.profilo?.gara || Object.keys(h.pb || {}).length
     || (h.sim || []).length || Object.keys(h.sessioni || {}).length
     || Object.keys(h.checklist || {}).length);
-  return { piano: true, hyrox: usati };
+  /* L'assistente nasce spento **anche su un'installazione nuova**, e non e'
+     prudenza: non e' collegato a nessun modello, quindi acceso a tutti
+     sarebbe una nuvoletta che galleggia su ogni schermata per comporre un
+     testo che quasi nessuno ha chiesto. Si accende da "Cosa ti serve". */
+  return { piano: true, hyrox: usati, ai: false };
 }
 function moduli() {
   S.settings ||= {};
@@ -1423,6 +1427,8 @@ function route() {
   const v = $('#view'); v.innerHTML = '';
   if (name === 'oggi') backupBanner(v);
   fn(v); window.scrollTo(0, 0);
+  // la nuvoletta vive fuori da #view: qui si controlla solo se deve esserci
+  if (typeof montaAssistente === 'function') montaAssistente();
 }
 
 /* ---------------------------------------------------------- vista OGGI */

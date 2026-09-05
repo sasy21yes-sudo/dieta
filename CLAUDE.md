@@ -89,6 +89,8 @@ statistiche.js  i conti del resoconto: registro, settimana, pasti, fuori piano
 confronto.js    due alimenti a confronto: a parita' di peso, calorie, proteine
 ai.js           la classe per le chiamate all'AI: compone la domanda e valida
                 la risposta. Non configurata, e finche' non lo e' si ferma
+assistente.js   la nuvoletta e il foglio: il periodo, le tre domande da un
+                tocco, il campo libero. E' l'unico posto da cui si chiede
 sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
 giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
 piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
@@ -3971,6 +3973,93 @@ Ultima cosa, detta nell'errore e non nascosta: **l'assistente e' l'unica parte
 dell'app che non funziona offline**, e senza rete si ferma subito invece di
 far aspettare dieci secondi un trasporto che non puo' riuscire.
 
+### L'assistente: una nuvoletta, tre domande, e nessuna risposta finta
+
+`ai.js` sapeva **comporre** una domanda e **validare** una risposta, e non lo
+usava nessuno: era una classe senza una porta. `assistente.js` e' la porta —
+una nuvoletta che si sposta dove vuoi e un foglio di vetro che apre — e resta
+l'unico posto da cui una domanda si fa.
+
+**Il periodo e' un presupposto, non una domanda.** *"Come sta andando"* senza
+dire da quando a quando non e' una domanda: la stessa richiesta fatta oggi e
+fra un mese direbbe cose diverse senza che si veda perche'. Sta quindi in una
+riga appesa sotto la testata, **fuori da quello che scorre** — la prima
+versione la metteva in cima al corpo e bastava una risposta perche' scorresse
+via, lasciando la conversazione a parlare di un tratto che non si vedeva
+piu'. Chiusa e' una riga (`PERIODO · 29 ago – 4 set · 7 gg · cambia`), aperta
+sono i tre preset e le due date.
+
+E **non e' un selettore nuovo**: passa da `periodoAndamento()`, cioe' lo
+stesso periodo della scheda Andamento, e la nota lo scrive. Due stati per lo
+stesso concetto sono l'errore gia' pagato con il PDF del resoconto, e un terzo
+qui non serviva a niente.
+
+**Si tocca, non si scrive.** Le tre domande che uno si fa davvero — *il piano
+regge? come sta andando? cosa non va?* — sono tre carte che dicono gia' **cosa
+guarderanno**, perche' un bottone che non dice cosa fara' e' un bottone al
+buio. Il campo libero resta in fondo per tutto il resto: e' l'ordine di
+un'assistenza, non di una chat.
+
+E cambiano forma: **prima della prima domanda** sono tre carte alte, che e' il
+momento in cui non sai ancora cosa puoi chiedere; **dopo** diventano tre
+pastiglie in fila, perche' da li' in poi la cosa da leggere e' la risposta e
+tre carte da settanta pixel la spingerebbero sotto il bordo.
+
+**Non c'e' un trasporto, e non si finge che ci sia.** Al posto della risposta
+l'assistente consegna **la domanda gia' scritta**, con dentro i numeri del
+periodo, e un bottone per copiarla. Non e' un ripiego travestito: il lavoro
+vero di `ai.js` e' comporre quel testo, e una domanda da incollare dove vuoi e'
+piu' utile di una schermata che dice "non configurato" e piu' onesta di una
+che finge di rispondere. Quando un modello ci sara', l'unica riga che cambia e'
+quella: `ai.chiedi()` al posto di `ai.testoRichiesta()`, e la risposta passa
+gia' dal filtro in uscita che c'e' da prima.
+
+**Cosa esce dal telefono, e cosa no.** Due fette nuove nel contesto, `periodo`
+e `previsioni`, e sono **numeri gia' aggregati**: il registro, le medie contro
+i target, il ritmo del peso, le sedute, le proiezioni con la banda e l'R².
+Chiesti alle stesse funzioni del resoconto in PDF — due versioni degli stessi
+numeri prima o poi divergono. **Il diario giorno per giorno non c'e'**, e non
+cambia perche' la domanda e' "come sta andando": misurato mettendo dei
+canarini riconoscibili in quaranta giornate (un pasto fuori piano con un nome
+inventato, passi e sonno di un giorno), nessuno dei sette compiti ne fa uscire
+uno, e nel contesto ci sono al massimo **due date intere** — `da` e `a`. I
+prompt pesano fra 2,2 e 13,4 kB.
+
+**Il vetro.** `backdrop-filter: blur(26px) saturate(180%)`, un orlo chiaro di
+un pixel, una luce interna in alto e un'ombra col viola dentro. Dove
+`backdrop-filter` non c'e' resta un fondo pieno leggibile: **il vetro e' il
+modo, non il contenuto** — la stessa regola del `color-mix` della mappa
+muscolare. Il viola e' una tinta sua e non ne riusa nessuna: il verde vuol
+dire "in linea", l'ambra "fuori target", l'oro "in piu'", e sono tre
+significati gia' presi. `--ai-1` (#6A48E0) e' l'unico che porta testo bianco
+sopra — 5,7:1, sopra la soglia anche per il corpo del testo — e `--ai-2` sta
+solo nei gradienti e nei bordi, dove non ci scrive niente.
+
+**La nuvoletta si sposta e si appoggia.** Pointer events e non il
+drag-and-drop dell'HTML5, che su iOS col dito non parte — la stessa scelta
+gia' fatta per riordinare i pasti. Sotto i sei pixel di movimento il gesto e'
+un tocco e apre; sopra e' un trascinamento, e al rilascio la nuvoletta si
+**appoggia al lato piu' vicino**: una pastiglia lasciata a meta' schermo copre
+il contenuto e non si capisce se e' finita li' apposta. La posizione sta in
+**percentuale** (`S.settings.aiPos`), non in pixel, o ruotando il telefono
+finirebbe fuori dallo schermo, e i due estremi verticali sono la topbar e la
+tab bar — verificato su dieci configurazioni per sedici rotte che non ci
+finisce mai sopra.
+
+Il luccichio passa **una volta sola**, all'ingresso. L'unica animazione
+perpetua di quest'app resta la fiamma della striscia, e ci sta perche' il
+riempimento porta un dato: uno scintillio senza fine su una pastiglia sarebbe
+decorazione, e a batteria.
+
+**Nasce spento**, ed e' un modulo come gli altri (`Cosa ti serve`, che adesso
+sono tre): non e' collegato a nessun modello, e acceso a tutti sarebbe una
+nuvoletta che galleggia su ogni schermata per comporre un testo che quasi
+nessuno ha chiesto. Spegnerlo non cancella niente — la posizione resta dov'e'.
+
+Gli strati, dal basso: tab bar 20, nuvoletta 28, foglio dell'app 40, velo 45,
+pannello 46, toast 50. Cosi' con un foglio aperto la nuvoletta sta **sotto**,
+e un toast si vede anche sopra l'assistente.
+
 ### Passare un pezzo di piano
 
 Il backup completo c'era gia' e risponde a un'altra domanda: *come non perdo
@@ -4309,6 +4398,24 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non far leggere allo stato di un giorno passato il programma di adesso: la
   seduta resta, ma smettendo di seguire una scheda le sue giornate passano da
   "fatta" a "extra". Il giorno porta il suo `previsto`
+- Non dare all'assistente un selettore di periodo suo: e' lo stesso della
+  scheda Andamento, e passa da `periodoAndamento()`. Due stati per lo stesso
+  concetto sono l'errore gia' pagato con il PDF del resoconto
+- Non mettere il periodo dentro la parte che scorre: e' il presupposto di ogni
+  domanda, e alla prima risposta sparirebbe di sopra lasciando la
+  conversazione a parlare di un tratto che non si vede
+- Non far finta di rispondere quando non c'e' un trasporto: si consegna la
+  domanda gia' scritta, che e' quello che `ai.js` sa fare davvero
+- Non far entrare il diario giorno per giorno nel contesto perche' la domanda
+  riguarda un periodo: escono le medie, il registro e il ritmo. Si controlla
+  con dei canarini, non a occhio
+- Non tenere tre carte alte in cima quando la conversazione e' cominciata:
+  spingono la risposta sotto il bordo. Diventano pastiglie
+- Non lasciare una nuvoletta trascinabile a meta' schermo: copre il contenuto
+  e non si capisce se ci e' finita apposta. Si appoggia al lato piu' vicino, e
+  la posizione si salva in percentuale o alla rotazione esce dallo schermo
+- Non far dipendere dal `backdrop-filter` la leggibilita' di una superficie:
+  dove non c'e' serve un fondo pieno. Il vetro e' il modo, non il contenuto
 - Non mettere una chiave in `ai.js` e nemmeno un URL: non c'e' un server dove
   nasconderla, e una chiave nel codice della pagina e' una chiave regalata. La
   classe prende un **trasporto**, cioe' una funzione

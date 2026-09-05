@@ -449,7 +449,7 @@ function cardModuli() {
   const c = el('div', 'card');
   c.append(el('div', 'eyebrow', 'Cosa ti serve'));
   c.append(el('p', 'muted',
-    'Due parti dell\'app si possono spegnere. Spegnerle non cancella niente: '
+    'Tre parti dell\'app si possono spegnere. Spegnerle non cancella niente: '
     + 'quello che hai gia\' scritto resta dov\'e\' e riaccendendole torna tutto.'));
 
   const M = moduli();
@@ -478,6 +478,11 @@ function cardModuli() {
   voce('hyrox', 'Road to HYROX',
     'Conto alla rovescia, programma fino alla gara, stazioni e simulazioni dentro la scheda Gym.',
     'La sezione non compare in Gym. La palestra funziona lo stesso, con tutto il resto.');
+  voce('ai', 'Assistente',
+    'Una nuvoletta che si sposta dove vuoi: da li\' chiedi una valutazione del '
+    + 'piano, di come sta andando, o cosa non va nel periodo che stai guardando.',
+    'Nessuna nuvoletta. Non e\' ancora collegato a un modello: per adesso '
+    + 'compone la domanda con i tuoi numeri e te la da\' da copiare.');
 
   c.append(el('p', 'note',
     'I target giornalieri, il peso, la previsione, la palestra, le foto e la revisione '

@@ -97,8 +97,44 @@ const AI_COMPITI = {
     schema: { verdetto: 'string', azioni: ['creaAlimento'] },
     chiedi: 'Dai i valori per 100 g o 100 ml: kcal, proteine, carboidrati, '
       + 'grassi, fibre. Sono valori di tabella, quindi una stima.'
+  },
+
+  /* I tre che si fanno con un tocco. Portano tutti il **periodo**: "come sta
+     andando" senza dire da quando a quando non e' una domanda, e la risposta
+     cambierebbe di significato ogni giorno senza che si veda perche'. */
+  valutaAndamento: {
+    n: 'Come sta andando',
+    contesto: ['profilo', 'target', 'obiettivo', 'periodo', 'previsioni'],
+    schema: { verdetto: 'string', osservazioni: ['string'], azioni: [] },
+    chiedi: 'Guarda il periodo: quanto e\' completo il registro, le medie '
+      + 'contro i target, come si e\' mosso il peso e quanto ci si e\' '
+      + 'allenati. Di\' come sta andando e su cosa ti basi. Il registro viene '
+      + 'per primo: una media su pochi giorni vale poco, e va detto.'
+  },
+  criticita: {
+    n: 'Cosa non va',
+    contesto: ['profilo', 'target', 'obiettivo', 'periodo', 'settimana'],
+    schema: { verdetto: 'string', osservazioni: ['string'], azioni: [] },
+    chiedi: 'Elenca le criticita\' in ordine di gravita\', al massimo cinque, '
+      + 'e per ognuna scrivi il numero da cui la vedi. Poi indica **una** cosa '
+      + 'sola da cambiare: cambiarne cinque insieme rende impossibile capire '
+      + 'cosa ha funzionato.'
+  },
+  domandaLibera: {
+    n: 'La tua domanda',
+    contesto: ['profilo', 'target', 'obiettivo', 'periodo', 'settimana'],
+    schema: { verdetto: 'string', osservazioni: ['string'], azioni: [] },
+    chiedi: 'Rispondi alla domanda qui sotto usando i dati del contesto. Se il '
+      + 'contesto non basta a rispondere, dillo invece di supporre.'
   }
 };
+
+/**
+ * Le domande che si fanno con un tocco, nell'ordine in cui vengono in mente:
+ * prima il piano (e' un modello, si guarda quando lo scrivi), poi l'andamento
+ * (e' un fatto, si guarda dopo), poi cosa non va.
+ */
+const AI_RAPIDE = ['valutaPiano', 'valutaAndamento', 'criticita'];
 
 class AI {
   constructor() {
@@ -137,9 +173,14 @@ class AI {
    * Il diario non c'e' e non ci deve entrare per sbaglio — se un compito ne
    * avesse bisogno andrebbe aggiunto qui, di proposito e con un nome.
    */
-  contesto(quali = []) {
+  contesto(quali = [], opz = {}) {
     const c = {};
     const q = new Set(quali);
+    /* Il periodo arriva da fuori e non si sceglie qui: e' quello della scheda
+       Andamento, l'unico che l'app ha. Due selettori per lo stesso concetto
+       sono l'errore gia' pagato una volta con il PDF del resoconto. */
+    const per = opz.per
+      || (typeof revPeriodoAttivo === 'function' ? revPeriodoAttivo() : null);
     if (q.has('profilo')) c.profilo = {
       eta: D.profilo?.eta ?? null, sesso: D.profilo?.sesso ?? null,
       altezza_cm: D.profilo?.altezza_cm ?? null,
@@ -175,6 +216,78 @@ class AI {
       .map(([nome, a]) => ({ nome, unita: a.unita || 'g', kcal: a.kcal,
                              p: a.p, c: a.c, g: a.g, fibre: a.fibre,
                              fonte: a.fonte }));
+
+    /* Il periodo: **numeri gia' aggregati, non il diario.** La regola di
+       questo file e' che il diario non esce dal telefono, e non cambia
+       perche' la domanda e' "come sta andando": a rispondere servono le
+       medie, il registro e il ritmo, non i singoli giorni. Sono gli stessi
+       conti del resoconto in PDF, chiesti alle stesse funzioni — due versioni
+       degli stessi numeri prima o poi divergono. */
+    if (q.has('periodo') && per) {
+      const nn = (v, d2 = 1) => (v == null || isNaN(v)) ? null : +(+v).toFixed(d2);
+      const reg = typeof statRegistro === 'function' ? statRegistro(per) : null;
+      const mac = typeof statMacro === 'function' ? statMacro(per) : null;
+      const pes = typeof statPeso === 'function' ? statPeso(per) : null;
+      const all = typeof statAllenamento === 'function' ? statAllenamento(per) : null;
+      const pas = typeof statPasti === 'function' ? statPasti(per) : null;
+      c.periodo = {
+        da: per.da, a: per.a, giorni: per.n,
+        registro: reg && { giorni_con_qualcosa: reg.registrati, pesate: reg.pesate,
+                           giorni_con_pasti: reg.conPasti, in_pausa: reg.inPausa },
+        medie: mac && { kcal: nn(mac.kcal, 0), p: nn(mac.p), c: nn(mac.c),
+                        g: nn(mac.g), fibre: nn(mac.fibre),
+                        quote_pct: { p: nn(mac.quotaP, 0), c: nn(mac.quotaC, 0),
+                                     g: nn(mac.quotaG, 0) },
+                        p_per_kg: nn(mac.pPerKg, 2), g_per_kg: nn(mac.gPerKg, 2),
+                        su_giorni: mac.giorni },
+        peso: pes && pes.primo ? { primo: nn(pes.primo.v), ultimo: nn(pes.ultimo.v),
+                                   tendenza_kg_settimana: nn(pes.kgSettimana, 2),
+                                   pesate: pes.pesate } : null,
+        allenamento: all && { sedute: all.totali, serie: nn(all.serie),
+                              tonnellaggio_kg: nn(all.tonnellaggio, 0),
+                              sedute_settimana: nn(all.seduteSettimana, 1) },
+        pasti: pas && pas.piuSaltato
+          ? { piu_saltato: pas.piuSaltato.nome,
+              spuntato_su_previsti: pas.piuSaltato.spuntati + '/' + pas.piuSaltato.previsti }
+          : null
+      };
+    }
+
+    /* Le proiezioni: dove porta il ritmo di adesso, con la banda. Mai una
+       data di arrivo — sta gia' fra le regole, ma qui il numero proprio non
+       esiste. */
+    if (q.has('previsioni')) {
+      const n1 = (v, d2 = 1) => (v == null || isNaN(v)) ? null : +(+v).toFixed(d2);
+      const pr = {};
+      /* Il dispendio del filtro di Kalman, che e' misurato sul bilancio e non
+         preso da una formula. Va detto: e' il numero da cui nasce mezza app. */
+      if (typeof energyModel === 'function') {
+        const E = energyModel();
+        if (E && E.tdee > 0) pr.dispendio_stimato_kcal =
+          { valore: Math.round(E.tdee), su_osservazioni: E.n || 0 };
+      }
+      if (typeof proiezioneComposizione === 'function') {
+        const pc = proiezioneComposizione();
+        pr.composizione_fra_28_giorni = pc && pc.ok
+          ? { grasso_pct: n1(pc.bf), massa_magra_kg: n1(pc.lbm),
+              massa_grassa_kg: n1(pc.fm), delta_grasso_pct: n1(pc.dBf),
+              delta_massa_magra_kg: n1(pc.dLbm) }
+          : { non_calcolabile: pc?.perche || 'dati insufficienti' };
+      }
+      /* `piatta` e `r2` viaggiano perche' senza di loro una retta tirata
+         dentro una nuvola sembra una previsione, ed e' l'errore che questo
+         progetto evita ovunque. */
+      if (typeof proiezioneMisura === 'function') pr.misure_fra_28_giorni =
+        (D.misure || []).map(m => {
+          const x = proiezioneMisura(m.id);
+          return x && x.ok
+            ? { misura: m.label || m.id, ora: n1(x.ora), fra_28_giorni: n1(x.fra),
+                banda: n1(x.banda), cm_settimana: n1(x.cmSettimana, 2),
+                r2: n1(x.r2, 2), ferma: !!x.piatta, rilevazioni: x.n }
+            : null;
+        }).filter(Boolean);
+      if (Object.keys(pr).length) c.previsioni = pr;
+    }
     return c;
   }
 
@@ -193,9 +306,22 @@ class AI {
       compito,
       sistema,
       utente: [c.chiedi, dati.domanda || '',
-        'Contesto:', JSON.stringify(this.contesto(c.contesto))]
+        'Contesto:', JSON.stringify(this.contesto(c.contesto, dati), null, 1)]
         .filter(Boolean).join('\n\n')
     };
+  }
+
+  /**
+   * La stessa richiesta, ma da leggere.
+   *
+   * Finche' non c'e' un trasporto questa non e' una funzione di servizio: e'
+   * **quello che l'assistente consegna**. Una domanda gia' scritta, con
+   * dentro i propri numeri, da incollare dove si vuole — piu' onesto di una
+   * schermata che finge di rispondere, e piu' utile di un messaggio che dice
+   * soltanto "non configurato".
+   */
+  testoRichiesta(r) {
+    return '[SISTEMA]\n' + r.sistema + '\n\n[DOMANDA]\n' + r.utente;
   }
 
   /**
