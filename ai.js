@@ -132,13 +132,17 @@ const AI_COMPITI = {
   stimaPasto: {
     n: 'Stima un piatto da una foto',
     contesto: ['profilo', 'target', 'giorno'],
-    schema: { verdetto: 'string', osservazioni: ['string'], azioni: ['creaExtra'] },
-    chiedi: 'Guarda la foto del piatto e stima **una sola** voce: nome breve, '
-      + 'kcal, proteine, carboidrati, grassi e fibre della porzione che si '
-      + 'vede — non per 100 g. E\' una stima da una fotografia: di\' cosa hai '
-      + 'riconosciuto e quanto sei sicuro, e se non riesci a capire la '
-      + 'porzione dillo invece di inventarla. L\'azione da restituire e\' '
-      + 'una "creaExtra".'
+    immagine: true,
+    schema: { verdetto: 'string', osservazioni: ['string'], azioni: ['pastoDaFoto'] },
+    chiedi: 'Guarda la foto e riconosci **gli alimenti che vedi, uno per uno**, '
+      + 'non il piatto come blocco unico: per ognuno il nome in italiano, la '
+      + 'quantita\' in grammi (o ml se e\' un liquido) e i valori **per 100 g**, '
+      + 'cioe\' kcal, proteine, carboidrati, grassi e fibre. Restituisci una sola '
+      + 'azione "pastoDaFoto" con `nome` (come chiameresti il piatto) e '
+      + '`alimenti`. La quantita\' e\' quella che si vede nella foto: se non '
+      + 'riesci a stimarla, dillo in `osservazioni` e metti la porzione piu\' '
+      + 'comune per quell\'alimento. In `verdetto` scrivi in una riga cosa hai '
+      + 'riconosciuto e quanto sei sicuro.'
   },
   domandaLibera: {
     n: 'La tua domanda',
@@ -381,7 +385,11 @@ class AI {
       sistema,
       utente: [c.chiedi, dati.domanda || '',
         'Contesto:', JSON.stringify(this.contesto(c.contesto, dati), null, 1)]
-        .filter(Boolean).join('\n\n')
+        .filter(Boolean).join('\n\n'),
+      /* L'immagine viaggia a parte e non dentro il testo: ogni trasporto la
+         infila nel suo formato — `image_url`, `inline_data`, un allegato — e
+         quale sia non riguarda questa classe. `immagine` e' un data URL. */
+      ...(c.immagine && dati.immagine ? { immagine: dati.immagine } : {})
     };
   }
 
@@ -438,12 +446,26 @@ class AI {
     }
     if (!o || typeof o !== 'object') throw new Error('AI: risposta vuota.');
 
+    /*
+     * Due cose diverse, e per un po' erano lo stesso elenco.
+     *
+     * `vietato` e' una **regola rotta** — un pasto saltato, un cibo chiamato
+     * cattivo — e li' il verdetto non si stampa affatto. `avvisi` sono le
+     * cose scartate strada facendo: un ingrediente senza quantita', un
+     * alimento con i macro che non tornano. Tenerli insieme voleva dire che
+     * **un ingrediente buttato zittiva tutta la risposta**: misurato su una
+     * foto con cinque alimenti di cui due illeggibili, il verdetto usciva
+     * vuoto e chi guardava non capiva perche'.
+     */
     const avvisi = [];
+    let vietato = false;
     const testo = String(o.verdetto || '');
     for (const re of AI_VIETATE)
-      if (re.test(testo) || (o.osservazioni || []).some(x => re.test(String(x))))
+      if (re.test(testo) || (o.osservazioni || []).some(x => re.test(String(x)))) {
+        vietato = true;
         avvisi.push('La risposta tocca una cosa che questa app non dice: '
           + 'l\'ho tenuta fuori.');
+      }
 
     const azioni = [];
     for (const a of (Array.isArray(o.azioni) ? o.azioni : [])) {
@@ -452,9 +474,9 @@ class AI {
     }
     return {
       compito, n: c.n,
-      verdetto: avvisi.length ? '' : testo,
-      osservazioni: avvisi.length ? [] : (o.osservazioni || []).map(String),
-      azioni, avvisi, grezzo,
+      verdetto: vietato ? '' : testo,
+      osservazioni: vietato ? [] : (o.osservazioni || []).map(String),
+      azioni, avvisi, vietato, grezzo,
       /* Nessuno di questi campi e' stato scritto da nessuna parte: la proposta
          si applica altrove, dopo un tocco. */
       applicata: false
@@ -495,6 +517,38 @@ class AI {
         return { tipo: 'creaRicetta', nome, ingredienti: ing,
                  macro: typeof macroDaIngredienti === 'function'
                    ? macroDaIngredienti(ing) : null };
+      }
+      /*
+       * Un piatto riconosciuto in una foto: **un elenco di alimenti**, non
+       * una riga sola.
+       *
+       * E' scomposto perche' e' cosi' che l'app tiene il cibo: un alimento
+       * con i suoi valori per 100 g piu' una quantita'. Cosi' la voce entra
+       * in un pasto come qualunque altro ingrediente, i grammi si correggono
+       * uno per uno, e se domani colleghi un prodotto reale a quel nome i
+       * conti si aggiornano da soli — cose che una riga "piatto: 640 kcal"
+       * non puo' fare.
+       *
+       * Ogni alimento passa da `coerenza()`, la stessa di Open Food Facts:
+       * su numeri **guardati in una fotografia** serve piu' che altrove.
+       */
+      case 'pastoDaFoto': {
+        const nome = String(a.nome || '').trim();
+        const gr = [];
+        for (const x of (Array.isArray(a.alimenti) ? a.alimenti : [])) {
+          const n = String(x?.nome || '').trim().toLowerCase();
+          const qta = +x?.qta || 0;
+          if (!n || !(qta > 0)) { avvisi.push('Un alimento senza nome o senza quantita\': scartato.'); continue; }
+          const per100 = ['kcal', 'p', 'c', 'g', 'fibre']
+            .reduce((o2, kk) => (o2[kk] = +(x[kk] ?? x.per100?.[kk]) || 0, o2), {});
+          if (!(per100.kcal > 0)) { avvisi.push(`"${n}": niente calorie, scartato.`); continue; }
+          const co = typeof coerenza === 'function' ? coerenza(per100) : { stato: 'ok' };
+          if (co.stato === 'incoerente') { avvisi.push(`"${n}": ${co.d} Scartato.`); continue; }
+          gr.push({ nome: n, qta, unita: x.unita === 'ml' ? 'ml' : 'g', per100,
+                    dubbio: co.stato === 'dubbio' ? co.d : null });
+        }
+        if (!gr.length) return push('Nella foto non e\' stato riconosciuto niente di usabile.');
+        return { tipo: 'pastoDaFoto', nome: nome || 'Piatto dalla foto', alimenti: gr };
       }
       case 'creaExtra': {
         const nome = String(a.nome || '').trim();

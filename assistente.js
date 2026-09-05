@@ -496,83 +496,127 @@ function assAggiorna() {
     behavior: (typeof motionOk === 'function' && !motionOk()) ? 'auto' : 'smooth' }), 0);
 }
 
-/* ================================================ un pasto da una foto
+/* ============================================ un piatto da una foto
  *
- * L'unica cosa qui dentro che **scrive nel diario**, e l'unica domanda che
- * porta con se' un'immagine. Da qui nascono due conseguenze che disegnano
- * tutto il foglio.
+ * Tre passi, e sono tre schermate della stessa: **la foto**, **cosa c'e'
+ * dentro**, **dove va**. Non c'e' niente da copiare e niente da incollare: la
+ * domanda parte, la risposta torna, e quello che si vede e' gia' una
+ * proposta da correggere.
  *
- * **1. Un'immagine non si incolla.** Le altre domande, senza un trasporto, si
- * consegnano come testo da copiare. Questa no: la foto va allegata a mano.
- * Quindi il foglio da' tutti e due i pezzi — la domanda da copiare **e** la
- * foto da salvare — e lo dice, invece di lasciarlo capire.
+ * **La foto si scompone, non si riassume.** Il modello non restituisce "un
+ * piatto da 640 kcal" ma **gli alimenti che vede**, ognuno con i grammi e i
+ * valori per 100 g. E' cosi' che quest'app tiene il cibo da sempre, e da li'
+ * discende tutto il resto: i grammi si correggono uno per uno prima di
+ * salvare, la roba entra in un pasto come qualunque altro ingrediente, e se
+ * un giorno colleghi un prodotto reale a uno di quei nomi i conti si
+ * aggiornano da soli. Una riga sola non saprebbe fare niente di tutto questo.
  *
- * **2. Deve servire anche senza modello.** Un foglio che chiede una foto e
- * poi non sa fare niente e' un foglio che si apre una volta. Quindi i valori
- * si possono scrivere a mano, e la voce si registra lo stesso: la foto resta
- * attaccata, ed e' quello che la rende utile — riaprendo la giornata si vede
- * cosa c'era nel piatto, non solo un nome e un numero.
+ * **Niente si applica da solo**, come per ogni altra proposta dell'AI: la
+ * lista si guarda, si corregge e si conferma. Gli alimenti che non hai
+ * nascono `fonte: 'stima'` — mai `verificato`, che resta di chi ha letto
+ * l'etichetta sulla confezione.
  *
- * Il giorno si sceglie, e non e' un dettaglio: le foto dei pasti si guardano
- * la sera, e "oggi" alle 00:30 e' gia' domani.
+ * Finche' non c'e' un trasporto la chiamata si ferma e **lo dice**, con la
+ * strada che resta aperta: scrivere i valori a mano. Non un messaggio di
+ * errore in un vicolo cieco.
  */
-let pfStato = null;
+let pfS = null;
+
+const PF_PASSI = ['foto', 'analisi', 'dove'];
+
+function pfNuovo(k) {
+  return { k, passo: 'foto', foto: null, url: null, b64: null,
+           stato: null, err: null, prop: null, dest: null };
+}
 
 function sheetPastoFoto(k = today()) {
-  pfStato = pfStato || { k, foto: null, url: null, nome: '', v: {} };
-  pfStato.k = k;
+  if (!pfS || pfS.k !== k) pfS = pfNuovo(k);
   const w = el('div', 'pf');
 
-  w.append(el('div', 'eyebrow', 'Un pasto da una foto'));
-  w.append(el('h2', 'sec', pfStato.foto ? 'Cosa c’e’ nel piatto'
-                                        : 'Fotografa il piatto'));
+  /* --- la testata: il passo, e il giorno --- */
+  w.append(el('div', 'eyebrow', 'Un piatto da una foto'));
+  w.append(el('h2', 'sec', { foto: 'Fotografa il piatto',
+    analisi: 'Cosa c’e’ nel piatto', dove: 'Dove lo metto' }[pfS.passo]));
   w.lastChild.style.marginTop = '0';
 
-  /* --- il giorno --- */
-  const gg = el('div', 'pf-g');
-  const et = k === today() ? 'oggi' : (k === addDays(today(), -1) ? 'ieri' : '');
-  gg.innerHTML = '<span class="et">Giorno</span>'
-    + '<b>' + esc(typeof dataLunga === 'function' ? dataLunga(k) : k) + '</b>'
-    + (et ? '<span class="og">' + et + '</span>' : '');
-  const cd = el('input');
-  cd.type = 'date'; cd.value = k; cd.max = today();
-  cd.setAttribute('aria-label', 'Il giorno del pasto');
-  cd.onchange = () => { if (cd.value) sheetPastoFoto(cd.value); };
-  gg.append(cd);
-  w.append(gg);
+  const gd = el('div', 'pf-passi');
+  for (const [i, p2] of PF_PASSI.entries()) {
+    const t = el('span', 'p' + (p2 === pfS.passo ? ' ora'
+      : (PF_PASSI.indexOf(pfS.passo) > i ? ' fatto' : '')));
+    t.textContent = ['La foto', 'Cosa c’e’', 'Dove va'][i];
+    gd.append(t);
+  }
+  w.append(gd);
 
-  /* --- la foto --- */
   const inp = el('input');
   inp.type = 'file'; inp.accept = 'image/*'; inp.hidden = true;
   inp.onchange = () => { const f = inp.files[0]; if (f) pfPrendi(f); };
   w.append(inp);
 
-  if (!pfStato.foto) {
-    const box = el('div', 'pf-vuoto');
-    const ic = el('div', 'ic'); ic.append(assIcona('scatto'));
-    box.append(ic);
-    box.append(el('p', null, 'Inquadra il piatto dall’alto, con tutto dentro. '
-      + 'Se accanto c’e’ una posata o una mano, la porzione si stima meglio.'));
-    w.append(box);
+  ({ foto: pfPassoFoto, analisi: pfPassoAnalisi, dove: pfPassoDove }[pfS.passo])(w, inp);
+  sheet(w);
+}
 
-    const sc = el('button', 'btn wide pri', 'Scatta adesso');
-    sc.onclick = () => { inp.setAttribute('capture', 'environment'); inp.click(); };
-    w.append(sc);
-    const gal = el('button', 'btn wide', 'Scegli dalla galleria');
-    gal.style.marginTop = '8px';
-    gal.onclick = () => { inp.removeAttribute('capture'); inp.click(); };
-    w.append(gal);
-    w.append(el('p', 'note',
-      'La foto resta sul telefono: viene rimpicciolita a 900 px e salvata '
-      + 'insieme alle altre immagini dell’app. Non parte da sola per nessun '
-      + 'posto — se la vuoi mandare a un modello, la salvi e la alleghi tu.'));
-    sheet(w);
-    return;
+/* ------------------------------------------------------------ 1. la foto */
+function pfPassoFoto(w, inp) {
+  const gg = el('div', 'pf-g');
+  const et = pfS.k === today() ? 'oggi'
+    : (pfS.k === addDays(today(), -1) ? 'ieri' : '');
+  gg.innerHTML = '<span class="et">Giorno</span>'
+    + '<b>' + esc(typeof dataLunga === 'function' ? dataLunga(pfS.k) : pfS.k) + '</b>'
+    + (et ? '<span class="og">' + et + '</span>' : '');
+  const cd = el('input');
+  cd.type = 'date'; cd.value = pfS.k; cd.max = today();
+  cd.setAttribute('aria-label', 'Il giorno del pasto');
+  cd.onchange = () => { if (cd.value) { pfS = pfNuovo(cd.value); sheetPastoFoto(cd.value); } };
+  gg.append(cd);
+  w.append(gg);
+
+  const box = el('div', 'pf-vuoto');
+  const ic = el('div', 'ic'); ic.append(assIcona('scatto'));
+  box.append(ic);
+  box.append(el('p', null, 'Inquadra il piatto dall’alto, con tutto dentro. '
+    + 'Se accanto c’e’ una posata o una mano, la porzione si stima meglio.'));
+  w.append(box);
+
+  const sc = el('button', 'btn wide pri', 'Scatta adesso');
+  sc.onclick = () => { inp.setAttribute('capture', 'environment'); inp.click(); };
+  w.append(sc);
+  const gal = el('button', 'btn wide', 'Scegli dalla galleria');
+  gal.style.marginTop = '8px';
+  gal.onclick = () => { inp.removeAttribute('capture'); inp.click(); };
+  w.append(gal);
+  w.append(el('p', 'note',
+    'La foto viene rimpicciolita a 900 px e resta sul telefono. Per farla '
+    + 'leggere parte solo verso il modello che hai collegato tu, e solo quando '
+    + 'tocchi "analizza".'));
+}
+
+/** La foto scelta: si comprime, si tiene anche in base64 per la domanda. */
+async function pfPrendi(file) {
+  toast('Elaboro…');
+  try {
+    const r = await comprimi(file, 900, 0.72);
+    if (pfS.url) URL.revokeObjectURL(pfS.url);
+    pfS.foto = r.blob;
+    pfS.url = URL.createObjectURL(r.blob);
+    pfS.b64 = await bloB64(r.blob);
+    pfS.passo = 'analisi';
+    pfS.err = null; pfS.prop = null;
+    /* `pfAnalizza()` mette lo stato su "chiedo" **e poi** disegna: disegnare
+       prima vorrebbe dire un passo "analisi" senza attesa, senza errore e
+       senza proposta — cioe' una schermata che non esiste. */
+    pfAnalizza();
+  } catch (e) {
+    toast('Immagine non leggibile: ' + (e.message || 'errore'));
   }
+}
 
+/* ------------------------------------------------------- 2. cosa c'e' dentro */
+function pfPassoAnalisi(w, inp) {
   const fig = el('div', 'pf-img');
   const img = el('img');
-  img.src = pfStato.url; img.alt = 'Il piatto fotografato';
+  img.src = pfS.url; img.alt = 'Il piatto fotografato';
   fig.append(img);
   const rif = el('button', 'pf-rif', 'Cambia');
   rif.type = 'button';
@@ -580,122 +624,289 @@ function sheetPastoFoto(k = today()) {
   fig.append(rif);
   w.append(fig);
 
-  /* --- chiedere a un modello --- */
-  w.append(el('div', 'ai-tit', 'Falla stimare'));
-  const cq = el('div', 'pf-q');
-  cq.append(el('p', null, 'La domanda è già scritta, con dentro quanto ti '
-    + 'resta della giornata. Un’immagine però non si incolla: copi il testo, '
-    + 'salvi la foto, e le alleghi tutte e due dove vuoi.'));
-  const az = el('div', 'ai-az');
-  const cop = el('button', 'pri', 'Copia la domanda');
-  cop.type = 'button';
-  cop.onclick = async () => {
-    let t;
-    try { t = ai.testoRichiesta(ai.richiesta('stimaPasto', { giorno: pfStato.k })); }
-    catch (e) { toast('Non riesco a comporla: ' + e.message); return; }
-    try { await navigator.clipboard.writeText(t); toast('Copiata'); }
-    catch { toast('Il browser non lascia copiare da qui'); }
-  };
-  const sal = el('button', null, 'Salva la foto');
-  sal.type = 'button';
-  sal.onclick = () => {
-    const a = el('a');
-    a.href = pfStato.url;
-    a.download = 'piatto-' + pfStato.k + '.jpg';
-    document.body.append(a); a.click(); a.remove();
-  };
-  az.append(cop, sal);
-  cq.append(az);
-  w.append(cq);
+  if (pfS.stato === 'chiedo' || (!pfS.err && !pfS.prop)) {
+    const at = el('div', 'pf-att');
+    at.innerHTML = '<span class="sp"></span>'
+      + '<b>Sto guardando la foto…</b>'
+      + '<span>Riconosco gli alimenti e stimo i grammi.</span>';
+    w.append(at);
+    return;
+  }
 
-  /* --- scriverli a mano --- */
-  w.append(el('div', 'ai-tit', 'Poi scrivi i valori'));
-  w.append(el('div', 'field',
-    '<label for="pf-nome">Cosa hai mangiato</label>'
-    + '<input type="text" id="pf-nome" value="' + esc(pfStato.nome || '') + '"'
-    + ' placeholder="Per esempio: pasta al pomodoro e insalata">'));
-
-  const campo = (id, lab, unita, val) => {
-    const f = el('div', 'pf-c');
-    f.innerHTML = '<label for="pf-' + id + '">' + esc(lab) + '</label>'
-      + '<span><input id="pf-' + id + '" type="text" inputmode="decimal" value="'
-      + (val == null ? '' : val) + '"><i>' + esc(unita) + '</i></span>';
-    return f;
-  };
-  const gr = el('div', 'pf-gr');
-  gr.append(campo('kcal', 'Calorie', 'kcal', pfStato.v.kcal));
-  gr.append(campo('p', 'Proteine', 'g', pfStato.v.p));
-  gr.append(campo('c', 'Carboidrati', 'g', pfStato.v.c));
-  gr.append(campo('g', 'Grassi', 'g', pfStato.v.g));
-  gr.append(campo('fibre', 'Fibre', 'g', pfStato.v.fibre));
-  w.append(gr);
-
-  const avv = el('p', 'pf-av');
-  avv.hidden = true;
-  w.append(avv);
-
-  const leggi = () => ({
-    nome: (($('#pf-nome') || {}).value || '').trim(),
-    kcal: parseNum(($('#pf-kcal') || {}).value) ?? 0,
-    p: parseNum(($('#pf-p') || {}).value) ?? 0,
-    c: parseNum(($('#pf-c') || {}).value) ?? 0,
-    g: parseNum(($('#pf-g') || {}).value) ?? 0,
-    fibre: parseNum(($('#pf-fibre') || {}).value) ?? 0
-  });
-  /* Lo stesso `coerenza()` di Open Food Facts, e per lo stesso motivo: i
-     numeri di un piatto guardato sbagliano piu' di quelli letti su
-     un'etichetta. Non blocca — dice. */
-  const controlla = () => {
-    const v = leggi();
-    pfStato.nome = v.nome; pfStato.v = v;
-    if (!(v.kcal > 0)) { avv.hidden = true; return; }
-    const co = typeof coerenza === 'function' ? coerenza(v) : { stato: 'ok' };
-    avv.hidden = co.stato === 'ok' || co.stato === 'no-macro';
-    avv.textContent = co.d || '';
-    avv.className = 'pf-av' + (co.stato === 'incoerente' ? ' male' : '');
-  };
-  for (const c2 of gr.querySelectorAll('input')) c2.oninput = controlla;
-
-  const ok = el('button', 'btn wide pri', 'Registra nella giornata');
-  ok.style.marginTop = '12px';
-  ok.onclick = async () => {
-    const v = leggi();
-    if (!v.nome) { toast('Serve un nome'); return; }
-    if (!(v.kcal > 0)) { toast('Servono le calorie'); return; }
-    ok.disabled = true;
-    try {
-      const f = await fotoPasto(pfStato.foto, pfStato.k, v.nome);
-      day(pfStato.k).extra.push({ nome: v.nome, kcal: v.kcal, p: v.p, c: v.c,
-        g: v.g, fibre: v.fibre, foto: f.id, stimato: true });
-      save();
-      if (pfStato.url) URL.revokeObjectURL(pfStato.url);
-      pfStato = null;
-      closeSheet(); assChiudi(); route();
-      toast('Registrato con la foto');
-    } catch (e) {
-      ok.disabled = false;
-      toast('Non sono riuscito a salvare: ' + (e.message || 'errore'));
+  if (pfS.err) {
+    const e = el('div', 'pf-err');
+    e.append(el('b', null, pfS.err.titolo));
+    e.append(el('span', null, pfS.err.testo));
+    w.append(e);
+    if (pfS.err.riprova) {
+      const r = el('button', 'btn wide', 'Riprova');
+      r.onclick = () => { pfS.err = null; sheetPastoFoto(pfS.k); pfAnalizza(); };
+      w.append(r);
     }
-  };
+    const m = el('button', 'btn wide' + (pfS.err.riprova ? '' : ' pri'),
+      'Scrivi tu cosa c’era');
+    m.style.marginTop = '8px';
+    m.onclick = () => {
+      pfS.prop = { nome: '', alimenti: [], mano: true };
+      pfS.err = null;
+      pfAggiungiRiga();
+      sheetPastoFoto(pfS.k);
+    };
+    w.append(m);
+    return;
+  }
+
+  const P = pfS.prop;
+  if (P.verdetto) w.append(el('p', 'pf-verd', esc(P.verdetto)));
+  for (const a of (P.avvisi || [])) w.append(el('p', 'pf-av', esc(a)));
+
+  w.append(el('div', 'ai-tit', 'Gli alimenti'));
+  const lista = el('div', 'pf-lista');
+  for (const [i, a] of P.alimenti.entries()) lista.append(pfRiga(a, i));
+  w.append(lista);
+
+  const piu = el('button', 'pf-piu', '+ aggiungi un alimento');
+  piu.type = 'button';
+  piu.onclick = () => { pfAggiungiRiga(); sheetPastoFoto(pfS.k); };
+  w.append(piu);
+
+  const t = pfTotale();
+  const tot = el('div', 'pf-tot');
+  tot.innerHTML = '<span class="e">In tutto</span>'
+    + '<b>' + nf(t.kcal) + ' kcal</b>'
+    + '<span class="m">' + macroRiga(t) + '</span>';
+  w.append(tot);
+
+  const ok = el('button', 'btn wide pri', 'Continua');
+  ok.style.marginTop = '12px';
+  ok.disabled = !P.alimenti.length;
+  ok.onclick = () => { pfS.passo = 'dove'; sheetPastoFoto(pfS.k); };
   w.append(ok);
   w.append(el('p', 'note',
-    'Va nel fuori piano della giornata, come tutto quello che non viene da una '
-    + 'ricetta del piano, e resta segnato come <strong>stimato</strong>: '
-    + 'e’ un numero guardato, non letto su un’etichetta.'));
-  sheet(w);
-  controlla();
+    P.mano ? 'I valori sono per 100 g, come per ogni alimento dell’app: la '
+      + 'quantita’ e’ quella del piatto.'
+      : 'Sono stime lette in una fotografia, non valori di un’etichetta: i '
+      + 'grammi si correggono qui, prima di salvare. Gli alimenti che non hai '
+      + 'ancora nascono come <strong>stima</strong>.'));
 }
 
-/** La foto scelta o scattata: si comprime subito e si ridisegna il foglio. */
-async function pfPrendi(file) {
-  toast('Elaboro…');
-  try {
-    const r = await comprimi(file, 900, 0.72);
-    if (pfStato.url) URL.revokeObjectURL(pfStato.url);
-    pfStato.foto = r.blob;
-    pfStato.url = URL.createObjectURL(r.blob);
-    sheetPastoFoto(pfStato.k);
-  } catch (e) {
-    toast('Immagine non leggibile: ' + (e.message || 'errore'));
+/** Una riga: nome, quantita', e i valori per 100 g dietro un tocco. */
+function pfRiga(a, i) {
+  const r = el('div', 'pf-r' + (a.aperto ? ' ap' : ''));
+  const testa = el('button', 'pf-rt');
+  testa.type = 'button';
+  const m = pfMacroDi(a);
+  testa.innerHTML = '<span class="grow"><span class="n">' + esc(a.nome) + '</span>'
+    + '<span class="mm">' + macroRiga(m) + '</span></span>'
+    + '<span class="q">' + nf(a.qta) + '<em>' + esc(a.unita || 'g') + '</em></span>'
+    + '<span class="k">' + nf(m.kcal) + '<em>kcal</em></span>';
+  testa.onclick = () => { a.aperto = !a.aperto; sheetPastoFoto(pfS.k); };
+  r.append(testa);
+  if (!a.aperto) return r;
+
+  const c = el('div', 'pf-rc');
+  const campo = (id, lab, val, unita, su) => {
+    const f = el('div', 'pf-c');
+    f.innerHTML = '<label>' + esc(lab) + '</label>'
+      + '<span><input type="text" inputmode="decimal" value="' + (val ?? '') + '">'
+      + '<i>' + esc(unita) + '</i></span>';
+    f.querySelector('input').oninput = e2 => {
+      su(parseNum(e2.target.value) ?? 0);
+    };
+    return f;
+  };
+  const nome = el('div', 'field');
+  nome.innerHTML = '<label>Alimento</label><input type="text" value="'
+    + esc(a.nome) + '">';
+  nome.querySelector('input').oninput = e2 => {
+    a.nome = e2.target.value.trim().toLowerCase();
+  };
+  c.append(nome);
+  const gr = el('div', 'pf-gr');
+  gr.append(campo('q', 'Quantita’', a.qta, a.unita || 'g',
+    v => { a.qta = v; pfRinfresca(); }));
+  gr.append(campo('kcal', 'Per 100: kcal', a.per100.kcal, 'kcal',
+    v => { a.per100.kcal = v; pfRinfresca(); }));
+  gr.append(campo('p', 'Proteine', a.per100.p, 'g', v => { a.per100.p = v; pfRinfresca(); }));
+  gr.append(campo('c', 'Carboidrati', a.per100.c, 'g', v => { a.per100.c = v; pfRinfresca(); }));
+  gr.append(campo('g', 'Grassi', a.per100.g, 'g', v => { a.per100.g = v; pfRinfresca(); }));
+  gr.append(campo('f', 'Fibre', a.per100.fibre, 'g', v => { a.per100.fibre = v; pfRinfresca(); }));
+  c.append(gr);
+  if (a.dubbio) c.append(el('p', 'pf-av', esc(a.dubbio)));
+  const via = el('button', 'pf-via', 'Togli questo alimento');
+  via.type = 'button';
+  via.onclick = () => { pfS.prop.alimenti.splice(i, 1); sheetPastoFoto(pfS.k); };
+  c.append(via);
+  r.append(c);
+  return r;
+}
+
+/** I macro della quantita' vista, dai valori per 100. */
+function pfMacroDi(a) {
+  const q = (a.qta || 0) / 100;
+  const p = a.per100 || {};
+  return { kcal: (p.kcal || 0) * q, p: (p.p || 0) * q, c: (p.c || 0) * q,
+           g: (p.g || 0) * q, fibre: (p.fibre || 0) * q };
+}
+function pfTotale() {
+  const t = { kcal: 0, p: 0, c: 0, g: 0, fibre: 0 };
+  for (const a of (pfS.prop?.alimenti || [])) {
+    const m = pfMacroDi(a);
+    for (const x of Object.keys(t)) t[x] += m[x];
   }
+  return t;
+}
+function pfAggiungiRiga() {
+  pfS.prop.alimenti.push({ nome: '', qta: 100, unita: 'g', aperto: true,
+    per100: { kcal: 0, p: 0, c: 0, g: 0, fibre: 0 } });
+}
+/* I totali cambiano mentre si scrive, ma **il foglio non si ridisegna**:
+   ridisegnarlo a ogni tasto farebbe perdere il fuoco al campo, e sul telefono
+   quello chiude la tastiera. E' la stessa regola dei filtri che cercano. */
+function pfRinfresca() {
+  const t = pfTotale();
+  const box = document.querySelector('.pf-tot');
+  if (box) box.innerHTML = '<span class="e">In tutto</span>'
+    + '<b>' + nf(t.kcal) + ' kcal</b>'
+    + '<span class="m">' + macroRiga(t) + '</span>';
+}
+
+/** La chiamata vera. Senza trasporto si ferma e lo dice. */
+async function pfAnalizza() {
+  pfS.stato = 'chiedo'; pfS.err = null;
+  sheetPastoFoto(pfS.k);
+  try {
+    const r = await ai.chiedi('stimaPasto', { giorno: pfS.k, immagine: pfS.b64 });
+    const az = (r.azioni || []).find(x => x.tipo === 'pastoDaFoto');
+    if (!az) throw Object.assign(new Error(
+      'La risposta non conteneva nessun alimento riconosciuto.'), { codice: 'AI_VUOTA' });
+    pfS.prop = { nome: az.nome, alimenti: az.alimenti.map(x => ({ ...x, aperto: false })),
+                 verdetto: r.verdetto, avvisi: r.avvisi };
+    pfS.stato = 'ok';
+  } catch (e) {
+    pfS.stato = 'errore';
+    pfS.err = {
+      AI_NON_CONFIGURATA: { titolo: 'L’assistente non e’ ancora collegato',
+        testo: 'Manca il collegamento a un modello che sappia guardare le '
+          + 'immagini: la foto e’ pronta e la domanda anche, ma non c’e’ '
+          + 'nessuno a cui mandarla. Intanto puoi scrivere tu cosa c’era.',
+        riprova: false },
+      AI_OFFLINE: { titolo: 'Serve la rete', riprova: true,
+        testo: 'L’assistente e’ l’unica parte dell’app che non funziona '
+          + 'offline: tutto il resto continua a funzionare.' }
+    }[e.codice] || { titolo: 'Non ho capito la risposta', riprova: true,
+      testo: e.message || 'Il modello ha risposto qualcosa che non so leggere.' };
+  }
+  sheetPastoFoto(pfS.k);
+}
+
+/* --------------------------------------------------------- 3. dove va */
+function pfPassoDove(w) {
+  const t = pfTotale();
+  const cap = el('div', 'pf-cap');
+  cap.innerHTML = '<b>' + esc(pfS.prop.nome || 'Il piatto') + '</b>'
+    + '<span>' + pfS.prop.alimenti.length + ' alimenti · ' + nf(t.kcal) + ' kcal · '
+    + macroRiga(t) + '</span>';
+  w.append(cap);
+
+  w.append(el('div', 'ai-tit', 'In quale pasto'));
+  const slots = (typeof slotsGiorno === 'function' ? slotsGiorno(pfS.k) : [])
+    .filter(s => pasto(s.codice));
+  const lista = el('div', 'pf-dest');
+  for (const s of slots) {
+    const sid = chiaveP(s);
+    const b = el('button', 'pf-d' + (pfS.dest === sid ? ' on' : ''));
+    b.type = 'button';
+    const p2 = pasto(s.codice);
+    b.innerHTML = '<span class="grow"><span class="n">' + esc(s.slot) + '</span>'
+      + '<span class="d">' + esc(p2?.nome || '') + '</span></span>'
+      + '<span class="o">' + esc(s.ora || '') + '</span>';
+    b.onclick = () => { pfS.dest = sid; sheetPastoFoto(pfS.k); };
+    lista.append(b);
+  }
+  const fp = el('button', 'pf-d fp' + (pfS.dest === '*extra' ? ' on' : ''));
+  fp.type = 'button';
+  fp.innerHTML = '<span class="grow"><span class="n">Fuori piano</span>'
+    + '<span class="d">Una voce a se’, fuori dai pasti del piano</span></span>';
+  fp.onclick = () => { pfS.dest = '*extra'; sheetPastoFoto(pfS.k); };
+  lista.append(fp);
+  w.append(lista);
+  if (!slots.length) w.append(el('p', 'hint',
+    'Quel giorno non ha nessun pasto assegnato: va nel fuori piano.'));
+
+  const indietro = el('button', 'btn wide', '‹ Torna agli alimenti');
+  indietro.onclick = () => { pfS.passo = 'analisi'; sheetPastoFoto(pfS.k); };
+
+  const ok = el('button', 'btn wide pri', 'Aggiungi alla giornata');
+  ok.style.marginTop = '12px';
+  ok.disabled = !pfS.dest;
+  ok.onclick = () => pfSalva();
+  w.append(ok);
+  w.append(indietro);
+  indietro.style.marginTop = '8px';
+  w.append(el('p', 'note',
+    'Dentro un pasto gli alimenti si sommano alla ricetta come quelli che '
+    + 'aggiungi a mano, e valgono <strong>solo per quel giorno</strong>. Quelli '
+    + 'che non hai ancora entrano nella lista ingredienti come '
+    + '<strong>stima</strong>: i valori li ha guardati un modello, non letti su '
+    + 'un’etichetta.'));
+}
+
+/**
+ * Si applica.
+ *
+ * Prima gli alimenti che mancano — nello strato del piano, `fonte: 'stima'` —
+ * e solo dopo le righe nel giorno: una riga che nomina un alimento che non
+ * esiste vale zero calorie, ed e' l'ordine giusto anche quando fallisce a
+ * meta'.
+ */
+async function pfSalva() {
+  const A = pfS.prop.alimenti.filter(a => a.nome && a.qta > 0 && a.per100.kcal > 0);
+  if (!A.length) { toast('Non c’e’ niente da aggiungere'); return; }
+  const p = piano();
+  p.alimenti ||= {};
+  let nuovi = 0;
+  for (const a of A) {
+    if (typeof alimento === 'function' && alimento(a.nome)) continue;
+    p.alimenti[a.nome] = { kcal: a.per100.kcal, p: a.per100.p, c: a.per100.c,
+      g: a.per100.g, fibre: a.per100.fibre, unita: a.unita || 'g',
+      categoria: '', fonte: 'stima' };
+    nuovi++;
+  }
+  if (nuovi) { save(); fondiPiano(); }
+
+  const d = day(pfS.k);
+  if (pfS.dest === '*extra') {
+    const t = pfTotale();
+    d.extra.push({ nome: pfS.prop.nome || 'Piatto dalla foto', kcal: t.kcal,
+      p: t.p, c: t.c, g: t.g, fibre: t.fibre, stimato: true });
+  } else {
+    for (const a of A) aggiungiAlPasto(pfS.dest, pfS.k, a.nome, a.qta);
+    /* **E il pasto si spunta.** Senza, le calorie non entrano in `consumed()`
+       — che conta solo i pasti spuntati — e chi ha appena fotografato il
+       proprio pranzo vedrebbe le barre di Oggi ferme: l'app direbbe che non
+       ha mangiato niente. Una foto del piatto e' la dichiarazione piu' netta
+       che esista di averlo mangiato. Se era gia' spuntato non si tocca
+       niente: gli aggiunti si sommano sopra la ricetta congelata. */
+    if (!day(pfS.k).pasti[pfS.dest]) {
+      if (typeof congelaPasto === 'function') congelaPasto(pfS.dest, pfS.k);
+      day(pfS.k).pasti[pfS.dest] = true;
+    }
+  }
+
+  /* La foto resta attaccata alla giornata: riaprendola si vede cosa c'era nel
+     piatto, non solo un nome e un numero. */
+  try {
+    const f = await fotoPasto(pfS.foto, pfS.k, pfS.prop.nome || null);
+    d.fotoPasti ||= {};
+    (d.fotoPasti[pfS.dest] ||= []).push(f.id);
+    if (pfS.dest === '*extra') d.extra[d.extra.length - 1].foto = f.id;
+  } catch { /* senza la foto la voce vale lo stesso: e' il numero che conta */ }
+
+  save();
+  if (pfS.url) URL.revokeObjectURL(pfS.url);
+  pfS = null;
+  closeSheet(); assChiudi(); route();
+  toast(nuovi ? A.length + ' alimenti aggiunti, ' + nuovi + ' nuovi'
+              : A.length + ' alimenti aggiunti');
 }

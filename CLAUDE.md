@@ -4060,59 +4060,63 @@ Gli strati, dal basso: tab bar 20, nuvoletta 28, foglio dell'app 40, velo 45,
 pannello 46, toast 50. Cosi' con un foglio aperto la nuvoletta sta **sotto**,
 e un toast si vede anche sopra l'assistente.
 
-### Un pasto da una foto
+### Un piatto da una foto: la chiamata vera, non un testo da copiare
 
-E' l'unica cosa dentro l'assistente che **scrive nel diario** invece di
-comporre un testo, e l'unica domanda che porta con se' un'immagine. Da qui
-nascono le due decisioni che disegnano tutto il foglio.
+Tre passi, e sono tre schermate della stessa: **la foto**, **cosa c'e'
+dentro**, **dove va**. Niente da copiare e niente da incollare — la domanda
+parte, la risposta torna, e quello che si vede e' gia' una proposta da
+correggere. Ci si arriva dalla nuvoletta e, con l'assistente acceso, anche
+**dal fondo di Oggi**: e' la strada piu' corta fra "ho il piatto davanti" e
+"e' registrato", e la sua riga sta prima di "scrivi i valori a mano".
 
-**1. Un'immagine non si incolla.** Le altre domande, senza un trasporto, si
-consegnano come testo da copiare. Questa no. Quindi il foglio da' **tutti e
-due i pezzi** — `Copia la domanda` e `Salva la foto` — e scrive perche':
-*"un'immagine pero' non si incolla: copi il testo, salvi la foto, e le alleghi
-tutte e due dove vuoi"*. Fingere che bastasse un bottone solo avrebbe fatto
-scoprire il problema a chi incollava.
+**La foto si scompone, non si riassume.** Il modello non restituisce "un
+piatto da 640 kcal" ma **gli alimenti che vede**, ognuno con i grammi e i
+valori per 100 g. E' come quest'app tiene il cibo da sempre, e da li' discende
+tutto: i grammi si correggono uno per uno prima di salvare, la roba entra in
+un pasto come qualunque altro ingrediente, e se un giorno colleghi un prodotto
+reale a uno di quei nomi i conti si aggiornano da soli. Una riga sola non
+saprebbe fare niente di tutto questo.
 
-**2. Deve servire anche senza modello.** Un foglio che chiede una foto e poi
-non sa fare niente e' un foglio che si apre una volta. I valori si scrivono
-anche a mano, e la voce si registra lo stesso: **la foto resta attaccata**, ed
-e' quello che la rende utile — riaprendo la giornata si vede cosa c'era nel
-piatto e non solo un nome e un numero.
+Ogni alimento passa da **`coerenza()`**, la stessa di Open Food Facts: su
+numeri guardati in una fotografia serve piu' che altrove. Misurato su una
+risposta con cinque voci, due sbagliate apposta: tre tenute, e due scartate
+con il motivo scritto (`"alimento rotto": i macro darebbero 680 kcal contro le
+100 dichiarate`).
 
-La voce va nel fuori piano, come tutto quello che non viene da una ricetta, e
-porta `stimato: true` — che sulla riga diventa una pastiglia. **Un numero
-guardato in una fotografia non e' un numero letto su un'etichetta**, ed e' la
-stessa regola per cui un alimento da Open Food Facts nasce `stima`. I macro
-passano dallo stesso `coerenza()`: 600 kcal dichiarate con 80 g di proteine e
-80 di carboidrati fanno 1000 kcal di macro, e la riga lo dice invece di
-bloccare.
+**E il pasto si spunta.** `consumed()` conta solo i pasti spuntati: senza,
+chi ha appena fotografato il proprio pranzo vedrebbe le barre di Oggi ferme —
+l'app direbbe che non ha mangiato niente. Una foto del piatto e' la
+dichiarazione piu' netta che esista di averlo mangiato. Misurato: da 0 a 1186
+kcal, con il pasto congelato come da qualunque altra spunta. Se era gia'
+spuntato non si tocca: gli aggiunti si sommano sopra la ricetta congelata.
 
-**Il giorno si sceglie**, e non e' un dettaglio: le foto dei pasti si guardano
-la sera, e "oggi" alle 00:30 e' gia' domani. Il campo ha `max` a oggi — in
-avanti si guarda, non si scrive, come su Oggi.
+Gli alimenti che non hai entrano nello strato del piano con `fonte: 'stima'`,
+**mai `verificato`** — quello resta di chi ha letto l'etichetta. E si creano
+**prima** delle righe nel giorno: una riga che nomina un alimento inesistente
+vale zero calorie, ed e' l'ordine giusto anche se si interrompe a meta'.
 
-**Dove finisce la foto.** Nello stesso magazzino delle foto dei progressi —
-e' un'immagine, e un secondo database per la stessa cosa vorrebbe dire due
-backup — ma con `tipo: 'pasto'`, cosi' non entra nel confronto a cursore ne'
-nel timelapse, che parlano d'altro. Il default e' `progresso` perche' e' quello
-che c'era prima: un record scritto da una versione precedente non ha il campo
-e non deve sparire dalla scheda Foto. E `S.settings.nFoto`, il contatore dei
-traguardi, conta solo i progressi.
+**Senza trasporto la chiamata si ferma e lo dice**, con la strada che resta
+aperta — *"la foto e' pronta e la domanda anche, ma non c'e' nessuno a cui
+mandarla: intanto puoi scrivere tu cosa c'era"*. Non un errore in un vicolo
+cieco. Le tre risposte possibili (non configurato, offline, risposta
+illeggibile) hanno tre testi diversi, e solo le ultime due offrono "riprova":
+riprovare senza trasporto darebbe lo stesso errore.
 
-Piu' piccola dei progressi: **900 px invece di 1280**, qualita' 0,72. Un piatto
-lo si guarda per ricordarsi cosa c'era, non per misurare mezzo centimetro di
-vita — e questa foto va anche allegata a un modello, dove ogni megabyte e' un
-megabyte che parte dal telefono. Misurato: 20 kB di partenza diventano 8, il
-59% in meno.
+L'immagine viaggia **fuori dal testo** (`richiesta().immagine`, un data URL):
+ogni trasporto la infila nel suo formato — `image_url`, `inline_data`, un
+allegato — e quale sia non riguarda `ai.js`. La foto e' a 900 px e 0,72 di
+qualita': misurato, 10 kB di base64 per un piatto.
 
-Il contesto e' minimo: profilo, target, pavimento, dispendio, e **quanto resta
-della giornata** — che e' cio' che rende una stima utile invece che generica.
-Il diario non c'e', verificato leggendo il contesto intero.
+Nel farlo, un difetto in `valida()` che c'era da prima: `verdetto` veniva
+azzerato **appena c'era un avviso qualunque**, e gli avvisi comprendono le
+cose scartate strada facendo. Cosi' due ingredienti illeggibili zittivano
+tutta la risposta e chi guardava non capiva perche'. Adesso `vietato` — una
+regola rotta — e' separato da `avvisi`, e solo il primo cancella il verdetto.
 
-Un dettaglio di colore che vale come regola: dentro questo foglio **il viola e'
-del modello e il verde e' dell'app**. "Copia la domanda" e' viola, "Registra
-nella giornata" e' verde: registrare un pasto e' un'azione dell'app, e darle la
-tinta dell'assistente direbbe che l'ha decisa un modello.
+Dettaglio di colore che vale come regola: **il viola e' del modello, il verde
+e' dell'app.** Il quadratino della riga su Oggi e la barra dei tre passi sono
+viola; "Aggiungi alla giornata" e' verde, perche' registrare non l'ha deciso
+un modello.
 
 ### Un buco nel contesto si dichiara, e si riempie con quello che l'app sa
 
@@ -4561,15 +4565,26 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   sua provenienza
 - Non far scoprire dalla risposta che mancava un pezzo: le carte di
   `assMancanze()` lo dicono prima di chiedere, e portano dove si sistema
-- Non consegnare una domanda che contiene un'immagine come se fosse testo da
-  incollare: la foto va allegata a mano, e il foglio deve dare tutti e due i
-  pezzi e dire perche'
-- Non fare una schermata che chiede una foto e poi, senza modello, non sa fare
-  niente: i valori si scrivono anche a mano, e la foto resta attaccata alla
-  voce — e' quello che la rende utile oggi
-- Non presentare come misurato un numero guardato in una fotografia: la voce
-  porta `stimato`, e i macro passano da `coerenza()` come quelli di Open Food
-  Facts
+- Non far restituire a un modello "un piatto da 640 kcal": si fa scomporre in
+  **alimenti** con grammi e valori per 100 g, che e' come l'app tiene il cibo.
+  Una riga sola non si corregge, non entra in un pasto e non segue un prodotto
+  reale collegato dopo
+- Non aggiungere alimenti a un pasto senza spuntarlo: `consumed()` conta solo
+  i pasti spuntati, e chi ha appena fotografato il pranzo vedrebbe le barre
+  ferme. Una foto del piatto e' la dichiarazione piu' netta di averlo mangiato
+- Non creare le righe del giorno prima degli alimenti che nominano: una riga
+  che punta a un alimento inesistente vale zero calorie
+- Non presentare come misurato un numero guardato in una fotografia: gli
+  alimenti nascono `fonte: 'stima'`, e i macro passano da `coerenza()` come
+  quelli di Open Food Facts
+- Non azzerare il verdetto di una risposta perche' e' stato scartato un
+  ingrediente: una **regola rotta** e una **voce buttata** sono due cose
+  diverse, e confonderle zittisce risposte buone
+- Non mettere l'immagine dentro il testo della domanda: viaggia a parte, e
+  come infilarla nella chiamata lo decide il trasporto
+- Non offrire "riprova" su un errore che si ripetera' identico: senza
+  trasporto non c'e' niente da riprovare, e la strada che resta e' scriverli
+  a mano
 - Non mettere le foto dei piatti nello stesso mucchio di quelle dei progressi:
   `tipo` distingue, il default e' `progresso` (i record vecchi non ce l'hanno),
   e il contatore dei traguardi conta solo i progressi

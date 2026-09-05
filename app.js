@@ -1747,6 +1747,24 @@ function cardExtraEAggiungi(k, d, conPiano) {
   b1.onclick = () => sheetAggiungiAlPasto(k, null);
   az.append(b1);
 
+  /* La foto sta **prima** di "scrivi i valori a mano", e non e' gusto: e' la
+     strada piu' corta fra "ho il piatto davanti" e "e' registrato". Compare
+     solo con l'assistente acceso, perche' senza di lui non c'e' nessuno che
+     guardi la foto — e un bottone che porta a un vicolo cieco e' peggio di un
+     bottone che non c'e'. */
+  if (typeof aiAcceso === 'function' && aiAcceso()
+      && typeof sheetPastoFoto === 'function') {
+    const bf = el('button', 'ex-b ex-foto-b');
+    bf.innerHTML = '<span class="ic"></span>'
+      + '<span class="grow"><span class="n">Fotografa il piatto</span>'
+      + '<span class="d">l\'assistente riconosce gli alimenti e stima i grammi</span></span>'
+      + '<span class="go">&rsaquo;</span>';
+    if (typeof assIcona === 'function')
+      bf.querySelector('.ic').append(assIcona('scatto'));
+    bf.onclick = () => sheetPastoFoto(k);
+    az.append(bf);
+  }
+
   const b2 = el('button', 'ex-b');
   b2.innerHTML = '<span class="ic"></span>'
     + '<span class="grow"><span class="n">Scrivi i valori a mano</span>'

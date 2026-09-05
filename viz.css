@@ -1840,14 +1840,90 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
   font-weight:600;color:#fff;background:rgba(18,22,30,.62);
   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 
-.pf-q{padding:12px;border-radius:15px;background:var(--wash);
-  border:1px solid var(--rule);margin-bottom:4px}
-.pf-q p{margin:0 0 10px;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
+/* i tre passi: dove sei, e quanto manca. Non e' decorazione — la foto e'
+   il primo di tre, e senza il filo si crede che sia finita li' */
+.pf-passi{display:flex;gap:6px;margin:10px 0 14px}
+.pf-passi .p{flex:1;font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  font-weight:600;color:var(--ink-3);padding-top:7px;
+  border-top:2px solid var(--rule)}
+.pf-passi .p.fatto{color:var(--ai-ink);border-top-color:var(--ai-1)}
+.pf-passi .p.ora{color:var(--ink);border-top-color:var(--ai-1)}
 
-/* i cinque numeri: due colonne, e le calorie larghe quanto la riga perche'
-   sono l'unico obbligatorio */
+/* l'attesa: un anello che gira, e cosa sta facendo scritto sotto */
+.pf-att{display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:26px 16px;margin-top:12px;border-radius:16px;text-align:center;
+  background:var(--wash);border:1px solid var(--rule)}
+.pf-att .sp{width:26px;height:26px;border-radius:50%;
+  border:2.5px solid var(--rule);border-top-color:var(--ai-1);
+  animation:pf-gira .9s linear infinite}
+.pf-att b{font-size:13.5px}
+.pf-att span:last-child{font-size:11.5px;color:var(--ink-3)}
+@keyframes pf-gira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.pf-att .sp{animation-duration:2.4s}}
+
+.pf-err{padding:13px;margin-top:12px;border-radius:15px;background:var(--wash);
+  border:1px solid var(--rule);border-left:3px solid var(--ai-1)}
+.pf-err b{display:block;font-size:13.5px;margin-bottom:4px}
+.pf-err span{display:block;font-size:12px;line-height:1.45;color:var(--ink-3)}
+
+.pf-verd{margin:12px 0 0;font-size:13px;line-height:1.5;color:var(--ink-2)}
+
+/* l'elenco degli alimenti riconosciuti: la riga si apre dove si corregge */
+.pf-lista{border-top:1px solid var(--rule)}
+.pf-r{border-bottom:1px solid var(--rule)}
+.pf-rt{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:10px 2px;border:0;background:none;font:inherit;color:var(--ink);
+  cursor:pointer}
+.pf-rt .grow{flex:1;min-width:0}
+.pf-rt .n{display:block;font-size:13.5px;line-height:1.25}
+.pf-rt .mm{display:block;font-family:var(--mono);font-size:10.5px;
+  color:var(--ink-3);margin-top:2px}
+.pf-rt .q,.pf-rt .k{flex:none;font-family:var(--mono);font-size:13px;
+  text-align:right;color:var(--ink)}
+.pf-rt .q{color:var(--ink-2)}
+.pf-rt em{display:block;font-style:normal;font-size:9.5px;color:var(--ink-3)}
+.pf-r.ap .pf-rt{background:var(--wash)}
+.pf-rc{padding:4px 10px 12px;background:var(--wash)}
+.pf-via{width:100%;margin-top:10px;padding:8px;border-radius:10px;font:inherit;
+  font-size:12px;font-weight:600;cursor:pointer;color:var(--alert);
+  border:1px solid var(--rule);background:var(--paper)}
+.pf-piu{width:100%;margin-top:10px;padding:9px;border-radius:11px;font:inherit;
+  font-size:12.5px;font-weight:600;cursor:pointer;color:var(--ai-ink);
+  border:1px dashed var(--rule);background:none}
+
+.pf-tot{display:flex;align-items:baseline;gap:8px;margin-top:12px;padding:11px 12px;
+  border-radius:13px;background:var(--wash);border:1px solid var(--rule)}
+.pf-tot .e{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600}
+.pf-tot b{font-size:16px}
+.pf-tot .m{flex:1;text-align:right;font-family:var(--mono);font-size:10.5px;
+  color:var(--ink-3)}
+
+/* dove va: i pasti veri di quel giorno, piu' il fuori piano */
+/* un bottone spento deve sembrarlo: "aggiungi alla giornata" prima di aver
+   scelto dove e' verde pieno come quello attivo, e si tocca a vuoto */
+.pf button[disabled]{opacity:.4;cursor:default}
+
+.pf-cap{padding:12px;border-radius:15px;background:var(--wash);
+  border:1px solid var(--rule);margin-top:12px}
+.pf-cap b{display:block;font-size:14px}
+.pf-cap span{display:block;font-size:11.5px;color:var(--ink-3);margin-top:3px;
+  font-family:var(--mono)}
+.pf-dest{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.pf-d{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:11px 12px;border-radius:13px;cursor:pointer;font:inherit;
+  border:1px solid var(--rule);background:var(--paper);color:var(--ink)}
+.pf-d .grow{flex:1;min-width:0}
+.pf-d .n{display:block;font-size:13.5px;font-weight:600}
+.pf-d .d{display:block;font-size:11.5px;color:var(--ink-3);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-d .o{flex:none;font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.pf-d.on{border-color:transparent;color:#fff;
+  background:linear-gradient(140deg,var(--ai-1),var(--ai-2))}
+.pf-d.on .d,.pf-d.on .o{color:rgba(255,255,255,.8)}
+
+/* i numeri di una riga: due colonne */
 .pf-gr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
-.pf-c:first-child{grid-column:1/-1}
 .pf-c label{display:block;font-size:11px;color:var(--ink-3);margin-bottom:4px}
 .pf-c span{display:flex;align-items:center;gap:6px;padding:0 10px;
   border-radius:11px;border:1px solid var(--rule);background:var(--paper)}
@@ -1857,6 +1933,11 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .pf-c i{flex:none;font-style:normal;font-size:11px;color:var(--ink-3)}
 .pf-av{margin:10px 0 0;font-size:11.5px;line-height:1.4;color:var(--amber)}
 .pf-av.male{color:var(--alert)}
+
+/* la riga della foto su Oggi: il quadratino e' viola perche' quella strada
+   passa da un modello, mentre le altre due sono tutte dell'app */
+.ex-b.ex-foto-b .ic{color:#fff;background:linear-gradient(140deg,var(--ai-1),var(--ai-2))}
+.ex-b.ex-foto-b .ic svg{width:18px;height:18px}
 
 /* "stimato": un numero guardato in una foto non e' un numero letto su
    un'etichetta, e la riga lo dice invece di farlo credere misurato */
