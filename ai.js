@@ -120,6 +120,26 @@ const AI_COMPITI = {
       + 'sola da cambiare: cambiarne cinque insieme rende impossibile capire '
       + 'cosa ha funzionato.'
   },
+  /*
+   * Un piatto da una foto.
+   *
+   * E' l'unico compito che porta con se' **un'immagine**, e per questo e'
+   * anche l'unico che non si puo' consegnare come testo da incollare: la
+   * foto va allegata a mano. `contesto` resta minimo — quanto e' rimasto
+   * della giornata, che e' cio' che rende la stima utile invece che
+   * generica — e non ci va il diario.
+   */
+  stimaPasto: {
+    n: 'Stima un piatto da una foto',
+    contesto: ['profilo', 'target', 'giorno'],
+    schema: { verdetto: 'string', osservazioni: ['string'], azioni: ['creaExtra'] },
+    chiedi: 'Guarda la foto del piatto e stima **una sola** voce: nome breve, '
+      + 'kcal, proteine, carboidrati, grassi e fibre della porzione che si '
+      + 'vede — non per 100 g. E\' una stima da una fotografia: di\' cosa hai '
+      + 'riconosciuto e quanto sei sicuro, e se non riesci a capire la '
+      + 'porzione dillo invece di inventarla. L\'azione da restituire e\' '
+      + 'una "creaExtra".'
+  },
   domandaLibera: {
     n: 'La tua domanda',
     contesto: ['profilo', 'target', 'obiettivo', 'periodo', 'settimana'],
@@ -292,6 +312,21 @@ class AI {
       };
     }
 
+    /* Il giorno, e **solo quanto ne resta**: e' il numero che rende una
+       stima utile invece che generica ("stai a 1800 su 2482") senza portare
+       fuori niente di piu' del totale del giorno. */
+    if (q.has('giorno')) {
+      const kk = opz.giorno || today();
+      const cons = typeof consumed === 'function' ? consumed(kk) : null;
+      const tg = typeof dayTarget === 'function' ? dayTarget(kk) : D.target;
+      const r1 = (v) => v == null ? null : Math.round(v);
+      c.giorno = { data: kk,
+        gia_registrato: cons ? { kcal: r1(cons.kcal), p: r1(cons.p),
+                                 c: r1(cons.c), g: r1(cons.g) } : null,
+        target: tg ? { kcal: r1(tg.kcal), p: r1(tg.p), c: r1(tg.c), g: r1(tg.g) } : null,
+        restano_kcal: cons && tg ? r1(tg.kcal - cons.kcal) : null };
+    }
+
     /* Le proiezioni: dove porta il ritmo di adesso, con la banda. Mai una
        data di arrivo — sta gia' fra le regole, ma qui il numero proprio non
        esiste. */
@@ -460,6 +495,20 @@ class AI {
         return { tipo: 'creaRicetta', nome, ingredienti: ing,
                  macro: typeof macroDaIngredienti === 'function'
                    ? macroDaIngredienti(ing) : null };
+      }
+      case 'creaExtra': {
+        const nome = String(a.nome || '').trim();
+        if (!nome) return push('Una voce senza nome: scartata.');
+        const v = ['kcal', 'p', 'c', 'g', 'fibre']
+          .reduce((o2, x) => (o2[x] = +a[x] || 0, o2), {});
+        if (!(v.kcal > 0)) return push(`"${nome}": niente calorie, scartata.`);
+        /* Lo stesso `coerenza()` di Open Food Facts: i macro devono tornare
+           con le calorie. Su una stima da una fotografia serve piu' che
+           altrove — li' i numeri li ha inventati qualcuno guardando. */
+        const co = typeof coerenza === 'function' ? coerenza(v) : { stato: 'ok' };
+        if (co.stato === 'incoerente') return push(`"${nome}": ${co.d} Scartata.`);
+        return { tipo: 'creaExtra', nome, valori: v,
+                 dubbio: co.stato === 'dubbio' ? co.d : null };
       }
       case 'assegnaPasto': {
         const gi = +a.giorno;

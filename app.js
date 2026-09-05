@@ -1703,7 +1703,23 @@ function cardExtraEAggiungi(k, d, conPiano) {
   /* --- quello che c'e' gia' --- */
   for (const [i, e] of d.extra.entries()) {
     const row = el('div', 'ex-r');
-    row.innerHTML = `<span class="grow"><span class="n">${esc(e.nome)}</span>`
+    /* La miniatura di un piatto fotografato. Si appende **dopo**, quando il
+       blob arriva da IndexedDB: la riga si disegna sincrona e aspettare
+       l'immagine vorrebbe dire far comparire tutta la giornata in ritardo
+       per una foto. Se la foto non c'e' piu', resta la riga. */
+    if (e.foto && typeof fotoDi === 'function') {
+      const ph = el('img', 'ex-foto');
+      ph.alt = ''; ph.decoding = 'async';
+      row.append(ph);
+      fotoDi(e.foto).then(f => {
+        if (!f?.blob || !ph.isConnected) return;
+        const u = URL.createObjectURL(f.blob);
+        ph.src = u;
+        if (typeof fotoUrls !== 'undefined') fotoUrls.push(u);
+      }).catch(() => ph.remove());
+    }
+    row.innerHTML += `<span class="grow"><span class="n">${esc(e.nome)}`
+      + (e.stimato ? '<i class="ex-st">stimato</i>' : '') + `</span>`
       + `<span class="mm">${macroRiga(e)}</span></span>`
       + `<span class="kc">${nf(e.kcal)}<em>kcal</em></span>`;
     const del = el('button', 'ico-b');

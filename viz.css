@@ -1800,6 +1800,76 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .ai-inv svg{width:17px;height:17px}
 .ai-nota{padding:0 14px 10px;font-size:10.5px;color:var(--ink-3);line-height:1.45}
 
+/* la carta della foto: la stessa forma delle domande, ma con l'orlo viola —
+   e' l'unica qui dentro che scrive nel diario invece di comporre un testo */
+.ai-q.ai-foto{border-color:color-mix(in srgb,var(--ai-1) 34%,var(--rule))}
+@supports not (color:color-mix(in srgb,red,blue)){.ai-q.ai-foto{border-color:var(--rule)}}
+.ai-q.ai-foto .ic{color:#fff;background:linear-gradient(140deg,var(--ai-1),var(--ai-2))}
+
+/* ------------------------------------------------ il foglio del piatto */
+.pf-g{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 12px;
+  padding:9px 11px;border-radius:14px;background:var(--wash);
+  border:1px solid var(--rule);font-size:12px;color:var(--ink-2)}
+.pf-g .et{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600}
+.pf-g b{color:var(--ink);font-weight:600}
+.pf-g .og{padding:2px 7px;border-radius:999px;font-size:10.5px;font-weight:600;
+  color:var(--ai-ink);background:color-mix(in srgb,var(--ai-1) 14%,transparent)}
+@supports not (color:color-mix(in srgb,red,blue)){.pf-g .og{background:var(--paper)}}
+.pf-g input{flex:1;min-width:120px;padding:6px 8px;border-radius:9px;
+  border:1px solid var(--rule);background:var(--paper);color:var(--ink);
+  font:inherit;font-size:12px}
+
+/* il vuoto prima dello scatto: un riquadro tratteggiato dice "qui ci va una
+   foto" senza fingere di essere un'anteprima */
+.pf-vuoto{display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:24px 18px;margin-bottom:12px;border-radius:18px;text-align:center;
+  border:1.5px dashed var(--rule);background:var(--wash)}
+.pf-vuoto .ic{width:46px;height:46px;border-radius:15px;display:flex;
+  align-items:center;justify-content:center;color:#fff;
+  background:linear-gradient(140deg,var(--ai-1),var(--ai-2))}
+.pf-vuoto .ic svg{width:24px;height:24px}
+.pf-vuoto p{margin:0;font-size:12.5px;line-height:1.45;color:var(--ink-3);
+  max-width:30ch}
+
+.pf-img{position:relative;margin-bottom:14px;border-radius:18px;overflow:hidden;
+  background:var(--wash);border:1px solid var(--rule)}
+.pf-img img{display:block;width:100%;max-height:44vh;object-fit:cover}
+.pf-rif{position:absolute;right:10px;bottom:10px;border:0;cursor:pointer;
+  padding:7px 13px;border-radius:999px;font:inherit;font-size:12px;
+  font-weight:600;color:#fff;background:rgba(18,22,30,.62);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+
+.pf-q{padding:12px;border-radius:15px;background:var(--wash);
+  border:1px solid var(--rule);margin-bottom:4px}
+.pf-q p{margin:0 0 10px;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
+
+/* i cinque numeri: due colonne, e le calorie larghe quanto la riga perche'
+   sono l'unico obbligatorio */
+.pf-gr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.pf-c:first-child{grid-column:1/-1}
+.pf-c label{display:block;font-size:11px;color:var(--ink-3);margin-bottom:4px}
+.pf-c span{display:flex;align-items:center;gap:6px;padding:0 10px;
+  border-radius:11px;border:1px solid var(--rule);background:var(--paper)}
+.pf-c span:focus-within{border-color:var(--ai-1)}
+.pf-c input{flex:1;min-width:0;border:0;background:none;color:var(--ink);
+  font:inherit;font-size:15px;padding:10px 0;outline:none}
+.pf-c i{flex:none;font-style:normal;font-size:11px;color:var(--ink-3)}
+.pf-av{margin:10px 0 0;font-size:11.5px;line-height:1.4;color:var(--amber)}
+.pf-av.male{color:var(--alert)}
+
+/* "stimato": un numero guardato in una foto non e' un numero letto su
+   un'etichetta, e la riga lo dice invece di farlo credere misurato */
+.ex-st{margin-left:6px;font-style:normal;font-size:9.5px;font-weight:600;
+  letter-spacing:.04em;text-transform:uppercase;color:var(--ai-ink);
+  padding:2px 6px;border-radius:999px;
+  background:color-mix(in srgb,var(--ai-1) 13%,transparent)}
+@supports not (color:color-mix(in srgb,red,blue)){.ex-st{background:var(--wash)}}
+
+/* la miniatura sulla riga del fuori piano */
+.ex-foto{flex:none;width:34px;height:34px;border-radius:9px;object-fit:cover;
+  background:var(--wash);border:1px solid var(--rule)}
+
 @media (prefers-reduced-motion:reduce){
   .ai-fab,.ai-fab:not(.muovo),.ai-pan,.ai-vel{transition-duration:.01ms}
   .ai-fab.luce::after{animation:none}

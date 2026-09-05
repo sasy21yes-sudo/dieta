@@ -4060,6 +4060,60 @@ Gli strati, dal basso: tab bar 20, nuvoletta 28, foglio dell'app 40, velo 45,
 pannello 46, toast 50. Cosi' con un foglio aperto la nuvoletta sta **sotto**,
 e un toast si vede anche sopra l'assistente.
 
+### Un pasto da una foto
+
+E' l'unica cosa dentro l'assistente che **scrive nel diario** invece di
+comporre un testo, e l'unica domanda che porta con se' un'immagine. Da qui
+nascono le due decisioni che disegnano tutto il foglio.
+
+**1. Un'immagine non si incolla.** Le altre domande, senza un trasporto, si
+consegnano come testo da copiare. Questa no. Quindi il foglio da' **tutti e
+due i pezzi** — `Copia la domanda` e `Salva la foto` — e scrive perche':
+*"un'immagine pero' non si incolla: copi il testo, salvi la foto, e le alleghi
+tutte e due dove vuoi"*. Fingere che bastasse un bottone solo avrebbe fatto
+scoprire il problema a chi incollava.
+
+**2. Deve servire anche senza modello.** Un foglio che chiede una foto e poi
+non sa fare niente e' un foglio che si apre una volta. I valori si scrivono
+anche a mano, e la voce si registra lo stesso: **la foto resta attaccata**, ed
+e' quello che la rende utile — riaprendo la giornata si vede cosa c'era nel
+piatto e non solo un nome e un numero.
+
+La voce va nel fuori piano, come tutto quello che non viene da una ricetta, e
+porta `stimato: true` — che sulla riga diventa una pastiglia. **Un numero
+guardato in una fotografia non e' un numero letto su un'etichetta**, ed e' la
+stessa regola per cui un alimento da Open Food Facts nasce `stima`. I macro
+passano dallo stesso `coerenza()`: 600 kcal dichiarate con 80 g di proteine e
+80 di carboidrati fanno 1000 kcal di macro, e la riga lo dice invece di
+bloccare.
+
+**Il giorno si sceglie**, e non e' un dettaglio: le foto dei pasti si guardano
+la sera, e "oggi" alle 00:30 e' gia' domani. Il campo ha `max` a oggi — in
+avanti si guarda, non si scrive, come su Oggi.
+
+**Dove finisce la foto.** Nello stesso magazzino delle foto dei progressi —
+e' un'immagine, e un secondo database per la stessa cosa vorrebbe dire due
+backup — ma con `tipo: 'pasto'`, cosi' non entra nel confronto a cursore ne'
+nel timelapse, che parlano d'altro. Il default e' `progresso` perche' e' quello
+che c'era prima: un record scritto da una versione precedente non ha il campo
+e non deve sparire dalla scheda Foto. E `S.settings.nFoto`, il contatore dei
+traguardi, conta solo i progressi.
+
+Piu' piccola dei progressi: **900 px invece di 1280**, qualita' 0,72. Un piatto
+lo si guarda per ricordarsi cosa c'era, non per misurare mezzo centimetro di
+vita — e questa foto va anche allegata a un modello, dove ogni megabyte e' un
+megabyte che parte dal telefono. Misurato: 20 kB di partenza diventano 8, il
+59% in meno.
+
+Il contesto e' minimo: profilo, target, pavimento, dispendio, e **quanto resta
+della giornata** — che e' cio' che rende una stima utile invece che generica.
+Il diario non c'e', verificato leggendo il contesto intero.
+
+Un dettaglio di colore che vale come regola: dentro questo foglio **il viola e'
+del modello e il verde e' dell'app**. "Copia la domanda" e' viola, "Registra
+nella giornata" e' verde: registrare un pasto e' un'azione dell'app, e darle la
+tinta dell'assistente direbbe che l'ha decisa un modello.
+
 ### Un buco nel contesto si dichiara, e si riempie con quello che l'app sa
 
 Segnalato leggendo una risposta vera: *"non essendo presente un obiettivo
@@ -4507,6 +4561,21 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   sua provenienza
 - Non far scoprire dalla risposta che mancava un pezzo: le carte di
   `assMancanze()` lo dicono prima di chiedere, e portano dove si sistema
+- Non consegnare una domanda che contiene un'immagine come se fosse testo da
+  incollare: la foto va allegata a mano, e il foglio deve dare tutti e due i
+  pezzi e dire perche'
+- Non fare una schermata che chiede una foto e poi, senza modello, non sa fare
+  niente: i valori si scrivono anche a mano, e la foto resta attaccata alla
+  voce — e' quello che la rende utile oggi
+- Non presentare come misurato un numero guardato in una fotografia: la voce
+  porta `stimato`, e i macro passano da `coerenza()` come quelli di Open Food
+  Facts
+- Non mettere le foto dei piatti nello stesso mucchio di quelle dei progressi:
+  `tipo` distingue, il default e' `progresso` (i record vecchi non ce l'hanno),
+  e il contatore dei traguardi conta solo i progressi
+- Non dare alle azioni dell'app la tinta dell'assistente: il viola e' del
+  modello, il verde e' dell'app. "Registra nella giornata" non l'ha deciso un
+  modello
 - Non dare all'assistente un selettore di periodo suo: e' lo stesso della
   scheda Andamento, e passa da `periodoAndamento()`. Due stati per lo stesso
   concetto sono l'errore gia' pagato con il PDF del resoconto

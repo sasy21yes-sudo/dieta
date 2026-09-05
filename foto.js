@@ -27,8 +27,19 @@ function ftx(mode, fn) {
     t.onerror = () => no(t.error);
   }));
 }
+/**
+ * Tutti gli scatti, di qualunque tipo.
+ *
+ * Da quando l'assistente registra un piatto da una foto, in questo magazzino
+ * non ci sono piu' solo le foto dei progressi: `tipo` distingue, e il default
+ * e' `progresso` perche' e' quello che c'era prima di questa riga — un record
+ * scritto da una versione precedente non ha il campo e non deve sparire dalla
+ * scheda Foto.
+ */
 const fotoTutte = () => ftx('readonly', s => s.getAll()).then(a => (a || [])
   .sort((x, y) => (x.giorno + x.id).localeCompare(y.giorno + y.id)));
+const fotoProgressi = () => fotoTutte().then(a => a.filter(x => (x.tipo || 'progresso') === 'progresso'));
+const fotoDi = id => ftx('readonly', s => s.get(id));
 const fotoSalva = r => ftx('readwrite', s => s.put(r));
 const fotoElimina = id => ftx('readwrite', s => s.delete(id));
 
@@ -188,7 +199,7 @@ function pannelloGuide(box, posa) {
           + 'Non devi combaciarci: serve a non cambiare inquadratura.';
     } else if (scelta === 'fantasma') {
       strato.append(el('div', 'gd-att', 'cerco l\'ultimo scatto…'));
-      fotoTutte().then(tutte => {
+      fotoProgressi().then(tutte => {
         const mie = tutte.filter(f => f.posa === posa);
         const ult = mie[mie.length - 1];
         strato.innerHTML = '';
@@ -434,7 +445,7 @@ function viewFoto(v) {
   const cont = el('div');
   v.append(cont);
 
-  fotoTutte().then(tutte => {
+  fotoProgressi().then(tutte => {
     const mie = tutte.filter(f => f.posa === fotoPosa);
     if (!mie.length) {
       cont.append(el('div', 'card', '<p class="muted">Nessuno scatto in questa posa. '
@@ -675,7 +686,9 @@ const bloB64 = b => new Promise((ok, no) => {
 async function fotoPeso() {
   const t = await fotoTutte();
   const byte = t.reduce((a, f) => a + (f.blob?.size || 0), 0);
-  return { n: t.length, byte, stima: Math.round(byte * 1.37) };
+  const prog = t.filter(f => (f.tipo || 'progresso') === 'progresso').length;
+  return { n: t.length, prog, piatti: t.length - prog, byte,
+           stima: Math.round(byte * 1.37) };
 }
 
 async function fotoEsporta() {
@@ -685,6 +698,7 @@ async function fotoEsporta() {
   const scatti = [];
   for (const f of t) scatti.push({
     id: f.id, giorno: f.giorno, posa: f.posa, w: f.w, h: f.h,
+    tipo: f.tipo || 'progresso', nota: f.nota || null,
     peso: f.peso ?? null, dati: await bloB64(f.blob)
   });
   download('dieta-foto-' + today() + '.json',
@@ -701,12 +715,13 @@ async function fotoImporta(o) {
     if (!s?.dati || !s.id) continue;
     const blob = await (await fetch(s.dati)).blob();
     await fotoSalva({ id: s.id, giorno: s.giorno || today(), posa: s.posa || 'fronte',
-                      blob, w: s.w || 0, h: s.h || 0, peso: s.peso ?? null });
+                      blob, w: s.w || 0, h: s.h || 0, peso: s.peso ?? null,
+                      tipo: s.tipo || 'progresso', nota: s.nota || null });
     n++;
   }
   /* Il contatore dei traguardi vive in `S` perche' i traguardi si calcolano
      sincroni: dopo un import va riallineato, o resta quello di prima. */
-  const tutte = await fotoTutte();
+  const tutte = await fotoProgressi();
   S.settings.nFoto = tutte.length; save();
   return n;
 }
@@ -768,9 +783,31 @@ async function sheetFotoBackup() {
   sheet(w);
 
   const p = await fotoPeso();
-  info.innerHTML = `<span>${p.n} ${p.n === 1 ? 'foto' : 'foto'}</span>`
+  info.innerHTML = `<span>${p.prog} dei progressi</span>`
+    + (p.piatti ? `<span>${p.piatti} di piatti</span>` : '')
     + `<span>${nf(p.byte / 1048576, 1)} MB sul telefono</span>`
     + `<span>file circa ${nf(p.stima / 1048576, 1)} MB</span>`;
   esp.disabled = !p.n;
   if (!p.n) esp.textContent = 'Non hai ancora nessuna foto';
+}
+
+/**
+ * Lo scatto di un piatto.
+ *
+ * Sta nello stesso magazzino delle foto dei progressi — e' un'immagine, e un
+ * secondo database per la stessa cosa vorrebbe dire due backup — ma porta
+ * `tipo: 'pasto'`, cosi' non finisce nel confronto a cursore ne' nel
+ * timelapse, che parlano d'altro.
+ *
+ * Piu' piccola dei progressi: 900 px invece di 1280. Un piatto lo si guarda
+ * per ricordarsi cosa c'era, non per misurare mezzo centimetro di vita, e
+ * questa foto va anche **allegata a un modello** — dove ogni megabyte e' un
+ * megabyte che parte dal telefono.
+ */
+async function fotoPasto(fileOBlob, giorno = today(), nota = null) {
+  const { blob, w, h } = await comprimi(fileOBlob, 900, 0.72);
+  const id = 'pf' + uid();
+  await fotoSalva({ id, giorno, posa: 'pasto', tipo: 'pasto', blob, w, h, nota,
+                    peso: null });
+  return { id, blob, w, h };
 }
