@@ -1723,6 +1723,17 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .ai-pre button[aria-pressed="true"]{border-color:transparent;color:#fff;
   background:linear-gradient(140deg,var(--ai-1),var(--ai-2))}
 
+/* cosa manca per rispondere: un avviso, non un allarme — l'ambra e' gia' il
+   colore di "fuori target" e qui non c'e' niente di storto, c'e' un buco */
+.ai-manca{display:flex;flex-direction:column;gap:3px;margin-top:10px;
+  padding:11px 12px;border-radius:14px;background:var(--wash);
+  border:1px solid var(--rule);border-left:3px solid var(--ai-1)}
+.ai-manca b{font-size:13px;font-weight:600;color:var(--ink)}
+.ai-manca span{font-size:11.5px;line-height:1.4;color:var(--ink-3)}
+.ai-manca button{align-self:flex-start;margin-top:5px;border:0;background:none;
+  padding:2px 0;font:inherit;font-size:12px;font-weight:600;
+  color:var(--ai-ink);cursor:pointer}
+
 /* le domande da un tocco: ognuna dice cosa guardera', o e' un bottone al buio */
 .ai-q{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
   padding:12px;margin-top:8px;border-radius:15px;cursor:pointer;font:inherit;

@@ -4060,6 +4060,51 @@ Gli strati, dal basso: tab bar 20, nuvoletta 28, foglio dell'app 40, velo 45,
 pannello 46, toast 50. Cosi' con un foglio aperto la nuvoletta sta **sotto**,
 e un toast si vede anche sopra l'assistente.
 
+### Un buco nel contesto si dichiara, e si riempie con quello che l'app sa
+
+Segnalato leggendo una risposta vera: *"non essendo presente un obiettivo
+dichiarato, non si puo' dire se questa direzione sia verso o lontano
+dall'obiettivo"*. La frase era **giusta**, ed e' proprio questo che la rende
+un difetto nostro: il contesto usciva con un `"obiettivo": null` nudo, e chi
+lo legge non puo' fare altro che dire che manca.
+
+Ma **un obiettivo, in quest'app, e' una posizione rispetto al dispendio.** Sta
+scritto nel motore da tempo — *"la direzione si misura sul dispendio, non sul
+target, cosi' vale anche per chi ha scelto tieni solo l'obiettivo"* — e
+`controlloPiano()` la calcola cosi'. Senza il nome dell'obiettivo il numero
+resta, e la direzione si legge lo stesso. Il contesto era piu' povero
+dell'app.
+
+Tre correzioni, e sono la stessa cosa detta a tre livelli:
+
+1. **Il dispendio viaggia sempre col target**, e con la sua provenienza:
+   `misurato sul bilancio (filtro di Kalman)` oppure `stimato con
+   Mifflin-St Jeor, non ancora misurato`. E' la regola di sempre — un numero
+   si consegna con da dove viene — e qui e' anche il metro della direzione.
+2. **Niente `null` nudi.** L'obiettivo esce come `{ scelto: false, nota: … }`,
+   e la nota dice cosa si puo' rispondere lo stesso invece di lasciarlo
+   dedurre. Accanto c'e' `piano_vs_dispendio`: media del piano, dispendio, e
+   lo scarto in percentuale. Misurato su un profilo senza obiettivo: prima
+   usciva `{"obiettivo":null}` e basta, adesso escono dispendio 2159 kcal
+   (misurato), pavimento 1874 e un piano che sta il **+15%** sopra — cioe'
+   tutto quello che serve a dire in che direzione va.
+3. **E l'app lo dice prima, non dopo.** Il buco lo scopriva chi leggeva la
+   risposta; adesso il foglio dell'assistente porta in cima le carte di
+   `assMancanze()` — obiettivo non scelto, target a zero, registro
+   incompleto, poche pesate — ognuna con **dove si sistema**, perche' un
+   avviso che non dice come uscirne e' un avviso che si impara a ignorare.
+   Sparisce da sola quando il buco non c'e' piu' (verificato: con l'obiettivo
+   scelto, zero carte).
+
+Il bordo di quelle carte e' viola e non ambra: l'ambra in quest'app vuol dire
+*fuori target*, e qui non c'e' niente di storto — c'e' qualcosa che manca.
+
+Nello stesso giro, un difetto di stato: chiudendo il foglio il pannello resta
+nel DOM per i 220 ms della dissolvenza, e chi riapriva subito si ritrovava due
+`.ai-pan` — il primo che `querySelector` incontra e' quello vecchio, che sta
+sparendo. Da fuori sembra un pannello che non si aggiorna. `assApri()` butta
+i resti prima di cominciare.
+
 ### Passare un pezzo di piano
 
 Il backup completo c'era gia' e risponde a un'altra domanda: *come non perdo
@@ -4398,6 +4443,15 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non far leggere allo stato di un giorno passato il programma di adesso: la
   seduta resta, ma smettendo di seguire una scheda le sue giornate passano da
   "fatta" a "extra". Il giorno porta il suo `previsto`
+- Non mandare un `null` nudo dentro il contesto dell'AI: chi lo legge puo'
+  solo dire che manca. Si dichiara con `{ scelto: false, nota }`, e la nota
+  dice cosa si puo' rispondere lo stesso
+- Non lasciare che il contesto sappia meno dell'app: senza un obiettivo
+  dichiarato la direzione si legge comunque, perche' un obiettivo qui e' una
+  posizione rispetto al **dispendio**. Il dispendio viaggia col target, con la
+  sua provenienza
+- Non far scoprire dalla risposta che mancava un pezzo: le carte di
+  `assMancanze()` lo dicono prima di chiedere, e portano dove si sistema
 - Non dare all'assistente un selettore di periodo suo: e' lo stesso della
   scheda Andamento, e passa da `periodoAndamento()`. Due stati per lo stesso
   concetto sono l'errore gia' pagato con il PDF del resoconto

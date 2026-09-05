@@ -155,6 +155,11 @@ function assEsc(e) { if (e.key === 'Escape') assChiudi(); }
 
 function assApri() {
   if (assPan) { assChiudi(); return; }
+  /* Chiudendo, il pannello resta nel DOM per i 220 ms della dissolvenza. Chi
+     riapre subito si ritroverebbe due `.ai-pan`: quello vecchio, che sta
+     sparendo, e' il primo che `querySelector` incontra — e da fuori sembra un
+     pannello che non si aggiorna. Si buttano i resti prima di cominciare. */
+  document.querySelectorAll('.ai-pan,.ai-vel').forEach(x => x.remove());
   assVel = el('div', 'ai-vel');
   assVel.onclick = assChiudi;
   document.body.append(assVel);
@@ -280,9 +285,74 @@ function assPeriodo(host) {
     + 'anche li’, cosi’ i grafici e la domanda parlano dello stesso tratto.'));
 }
 
+/**
+ * Cosa manca per rispondere davvero, detto **prima** di chiedere.
+ *
+ * Segnalato leggendo una risposta: *"non essendo presente un obiettivo
+ * dichiarato, non si puo' dire se questa direzione sia verso o lontano
+ * dall'obiettivo"*. Era vera, ed era colpa di qui: la domanda partiva senza
+ * dire che quel pezzo mancava, e chi la faceva lo scopriva dalla risposta.
+ *
+ * E' la stessa regola del resto dell'app — il registro va per primo in ogni
+ * resoconto, e una media su pochi giorni si dichiara invece di consegnarla
+ * come se fosse una misura. Ogni riga porta anche **dove si sistema**: un
+ * avviso che non dice come uscirne e' un avviso che si impara a ignorare.
+ */
+function assMancanze() {
+  const out = [];
+  const per = revPeriodoAttivo();
+
+  if (typeof obiettivoAttivo === 'function' && !obiettivoAttivo())
+    out.push({ t: 'Non hai dichiarato un obiettivo',
+      d: 'Senza, la direzione si legge solo rispetto al dispendio: nessuno '
+        + 'puo\' dire se stai andando verso o lontano da qualcosa.',
+      dove: 'Scegli l\u2019obiettivo', tab: 'target' });
+
+  if (!(D.target?.kcal > 0))
+    out.push({ t: 'Manca il target giornaliero',
+      d: 'E\u2019 il metro con cui l\u2019app giudica ogni giornata: senza, non '
+        + 'c\u2019e\u2019 niente con cui confrontare le medie del periodo.',
+      dove: 'Imposta il target', tab: 'target' });
+
+  /* Il registro: la riga che in ogni resoconto viene per prima, perche' tutto
+     il resto vale quanto vale lei. */
+  if (typeof statRegistro === 'function') {
+    const r = statRegistro(per);
+    if (r.giorni && r.registrati < Math.max(3, r.giorni / 2))
+      out.push({ t: `Registro incompleto: ${r.registrati} `
+          + `giorn${r.registrati === 1 ? 'o' : 'i'} su ${r.giorni}`,
+        d: 'Le medie del periodo escono da quei giorni, e su cosi\u2019 pochi '
+          + 'dicono piu\u2019 di quello che hai avuto voglia di scrivere che di '
+          + 'come mangi.' });
+    else if (r.giorni && r.pesate < r.giorni / 3)
+      out.push({ t: `Poche pesate: ${r.pesate} su ${r.giorni} giorni`,
+        d: 'Il ritmo del peso e il dispendio misurato nascono da li\u2019: con '
+          + 'poche pesate restano una stima larga.' });
+  }
+  return out;
+}
+
 /** Il corpo: le domande finche' non se ne fa una, poi la conversazione. */
 function assDisegna(corpo) {
   corpo.innerHTML = '';
+
+  /* --- cosa manca, prima di chiedere --- */
+  for (const m of assMancanze()) {
+    const w = el('div', 'ai-manca');
+    w.append(el('b', null, esc(m.t)));
+    w.append(el('span', null, esc(m.d)));
+    if (m.dove) {
+      const b = el('button', null, m.dove + ' \u203a');
+      b.type = 'button';
+      b.onclick = () => {
+        assChiudi();
+        if (typeof pianoTab !== 'undefined') pianoTab = m.tab;
+        apri('#/piano');
+      };
+      w.append(b);
+    }
+    corpo.append(w);
+  }
 
   /* --- le domande --- */
   const q = [

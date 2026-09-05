@@ -188,14 +188,53 @@ class AI {
     };
     if (q.has('target')) {
       c.target = { ...D.target };
+      /* Il dispendio va **sempre** insieme al target, ed e' il pezzo che
+         mancava: la direzione in quest'app si misura sul dispendio e non sul
+         target — che puo' essere vecchio o messo a mano — ed e' cosi' che la
+         misura `controlloPiano()`. Senza, chi legge il contesto puo' solo
+         confrontare con un numero scelto dall'utente. */
       if (typeof pavimentoCalorico === 'function') {
         const p = pavimentoCalorico();
         c.pavimento_kcal = p?.pavimento ?? null;
+        /* `misurato` non e' un dettaglio: dice se quel numero viene dal
+           filtro di Kalman sul bilancio vero o da Mifflin per il livello di
+           attivita'. E' la stessa regola di tutta l'app — un numero si
+           consegna con la sua provenienza. */
+        if (p?.tdee > 0) c.dispendio_stimato_kcal =
+          { valore: Math.round(p.tdee),
+            da: p.misurato ? 'misurato sul bilancio (filtro di Kalman)'
+                           : 'stimato con Mifflin-St Jeor, non ancora misurato' };
       }
     }
-    if (q.has('obiettivo') && typeof obiettivoAttivo === 'function') {
-      const o = obiettivoAttivo();
-      c.obiettivo = o ? { id: o.id, nome: o.n, pct_peso_settimana: o.pct } : null;
+    /*
+     * L'obiettivo, e **cosa si puo' dire lo stesso quando non c'e'.**
+     *
+     * Prima usciva un `"obiettivo": null` nudo, e chi legge il contesto
+     * poteva solo rispondere "non essendo presente un obiettivo dichiarato
+     * non si puo' dire se la direzione sia verso o lontano dall'obiettivo" —
+     * che e' vero, ed era anche piu' povero di quello che l'app sa. Perche'
+     * un obiettivo, in quest'app, **e' una posizione rispetto al dispendio**:
+     * senza il nome resta comunque il numero, e la direzione si legge.
+     */
+    if (q.has('obiettivo')) {
+      const o = typeof obiettivoAttivo === 'function' ? obiettivoAttivo() : null;
+      c.obiettivo = o
+        ? { scelto: true, id: o.id, nome: o.n, pct_peso_settimana: o.pct }
+        : { scelto: false,
+            nota: 'Nessun obiettivo dichiarato. La direzione si legge lo '
+              + 'stesso: un obiettivo qui e\' una posizione rispetto al '
+              + 'dispendio stimato, quindi di\' dove si trova la persona '
+              + 'rispetto a quello invece di dire che non si puo\' dire.' };
+      /* Dove sta il piano rispetto al dispendio: e' il numero che rende la
+         frase sopra una cosa che si puo' fare, e non un invito. */
+      if (typeof controlloPiano === 'function') {
+        const cp = controlloPiano();
+        if (cp && cp.pieni && cp.pav?.tdee > 0) c.piano_vs_dispendio = {
+          media_kcal_piano: Math.round(cp.media),
+          dispendio_kcal: Math.round(cp.pav.tdee),
+          scarto_pct: +(((cp.media - cp.pav.tdee) / cp.pav.tdee) * 100).toFixed(1)
+        };
+      }
     }
     if (q.has('settimana')) c.settimana = (D.settimana || []).map(g => ({
       giorno: g.giorno,
