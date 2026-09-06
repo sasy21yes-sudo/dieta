@@ -73,10 +73,14 @@ function comprimi(file, lato = 1280, q = .82) {
    sistema — dove il timer c'e', ma bisogna trovarlo, e a ogni scatto si
    ripassa da li'. Serve un autoscatto dentro l'app.
 
-   Percio' qui la fotocamera e' nostra: getUserMedia per l'anteprima dal vivo,
-   un conto alla rovescia, e il fotogramma catturato su canvas che poi passa
-   per la stessa compressione di prima. Il file picker resta: serve per le
-   foto che hai gia' in galleria, e come riserva dove getUserMedia non parte.
+   Percio' la fotocamera e' nostra: getUserMedia per l'anteprima dal vivo, un
+   conto alla rovescia, e il fotogramma catturato su canvas che poi passa per
+   la stessa compressione di prima. Il file picker resta: serve per le foto
+   che hai gia' in galleria, e come riserva dove getUserMedia non parte.
+
+   La **schermata** sta in `camera.js` — a schermo intero, come quella che
+   tutti sanno gia' usare. Qui restano i disegni delle guide e il salvataggio,
+   che sono le due cose che riguardano l'archivio e non l'inquadratura.
 
    Tre dettagli che su iPhone non sono facoltativi:
    - playsinline, altrimenti Safari apre il video a schermo intero e
@@ -111,14 +115,10 @@ function comprimi(file, lato = 1280, q = .82) {
       centrato, ed e' la guida piu' leggera quando le altre due danno fastidio.
 
    L'opacita' si regola perche' con una foto scura il fantasma sparisce e con
-   una chiara copre l'anteprima. */
+   una chiara copre l'anteprima.
 
-const GUIDE_FOTO = [
-  { id: 'nessuna', n: 'Niente' },
-  { id: 'griglia', n: 'Griglia' },
-  { id: 'sagoma', n: 'Sagoma' },
-  { id: 'fantasma', n: 'Ultimo scatto' }
-];
+   Qui restano i **disegni**; a mostrarli, a farli scegliere e a regolarne la
+   trasparenza ci pensa `camera.js`, che e' la schermata in cui si inquadra. */
 
 /** La griglia dei terzi, piu' due tacche per testa e piedi. */
 function svgGriglia() {
@@ -155,232 +155,6 @@ function svgSagoma(posa) {
     for (const d of paths) g.append(mk('path', { d }));
   s.append(g);
   return s;
-}
-
-/**
- * Il pannello delle guide, da attaccare sotto l'anteprima.
- * `box` e' il contenitore .cam su cui si sovrappongono.
- */
-function pannelloGuide(box, posa) {
-  let scelta = S.settings?.guidaFoto || 'fantasma';
-  let opacita = +(S.settings?.guidaOpacita ?? 45);
-  const strato = el('div', 'gd-strato');
-  box.append(strato);
-
-  const w = el('div');
-  w.append(el('div', 'eyebrow', 'Guida per inquadrare'));
-  const seg = el('div', 'seg wrap');
-  const slider = el('div', 'gd-op');
-  const rng = el('input');
-  rng.type = 'range'; rng.min = 10; rng.max = 90; rng.value = opacita;
-  slider.append(el('span', 'l', 'trasparenza'), rng);
-  const nota = el('p', 'hint');
-
-  let urlFantasma = null;
-  const disegna = () => {
-    strato.innerHTML = '';
-    if (urlFantasma) { URL.revokeObjectURL(urlFantasma); urlFantasma = null; }
-    slider.hidden = scelta === 'nessuna' || scelta === 'griglia';
-    nota.textContent = '';
-    if (scelta === 'griglia') {
-      strato.append(svgGriglia());
-      nota.textContent = 'I terzi, piu\' due tacche dove far cadere testa e piedi: '
-        + 'la distanza dal telefono e\' quello che cambia di piu\' fra uno scatto e l\'altro.';
-    } else if (scelta === 'sagoma') {
-      const s = svgSagoma(posa);
-      if (s) { s.style.opacity = opacita / 100; strato.append(s); }
-      // la sorgente non ha una figura di profilo: dirlo invece di far combaciare
-      // una posa di fronte con una foto di lato
-      nota.textContent = posa === 'lato'
-        ? 'Attenzione: questa e\' la figura di fronte, non di profilo — una sagoma '
-          + 'laterale non esiste. Di lato usala solo per l\'altezza e la distanza, '
-          + 'o passa alla griglia.'
-        : 'Una figura di riferimento per la distanza e l\'altezza del telefono. '
-          + 'Non devi combaciarci: serve a non cambiare inquadratura.';
-    } else if (scelta === 'fantasma') {
-      strato.append(el('div', 'gd-att', 'cerco l\'ultimo scatto…'));
-      fotoProgressi().then(tutte => {
-        const mie = tutte.filter(f => f.posa === posa);
-        const ult = mie[mie.length - 1];
-        strato.innerHTML = '';
-        if (!ult) {
-          nota.textContent = 'Non c\'e\' ancora uno scatto in questa posa: il fantasma '
-            + 'compare dalla seconda volta. Per la prima usa la sagoma o la griglia.';
-          const s = svgGriglia(); strato.append(s);
-          return;
-        }
-        urlFantasma = URL.createObjectURL(ult.blob);
-        const img = el('img', 'gd-ghost');
-        img.src = urlFantasma;
-        img.style.opacity = opacita / 100;
-        strato.append(img);
-        nota.textContent = `Sopra c'e' lo scatto del ${ult.giorno}. Muoviti finche' non `
-          + 'ci combaci: e\' l\'unico modo perche\' il confronto a cursore mostri il '
-          + 'corpo e non il fotografo.';
-      }).catch(() => { strato.innerHTML = ''; });
-    }
-  };
-
-  for (const g of GUIDE_FOTO) {
-    const b = el('button', null, g.n);
-    b.setAttribute('aria-pressed', scelta === g.id);
-    b.onclick = () => {
-      scelta = g.id;
-      S.settings.guidaFoto = g.id; save();
-      [...seg.children].forEach(x => x.setAttribute('aria-pressed', x === b));
-      disegna();
-    };
-    seg.append(b);
-  }
-  rng.oninput = () => {
-    opacita = +rng.value;
-    S.settings.guidaOpacita = opacita; save();
-    const t = strato.querySelector('.gd-ghost, .gd-sag');
-    if (t) t.style.opacity = opacita / 100;
-  };
-  w.append(seg, slider, nota);
-  disegna();
-  return { pannello: w, pulisci: () => { if (urlFantasma) URL.revokeObjectURL(urlFantasma); } };
-}
-
-const CAM_ATTESE = [3, 5, 10, 15];
-let camStream = null, camTimer = null, camPulisci = null;
-
-function camChiudi() {
-  camPulisci?.(); camPulisci = null;
-  if (camTimer) { clearInterval(camTimer); camTimer = null; }
-  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
-}
-
-/** Il fotogramma corrente del video, come Blob JPEG. */
-function camScatta(video) {
-  const cv = document.createElement('canvas');
-  cv.width = video.videoWidth || 720;
-  cv.height = video.videoHeight || 960;
-  cv.getContext('2d').drawImage(video, 0, 0, cv.width, cv.height);
-  return new Promise((ok, no) => cv.toBlob(
-    b => b ? ok(b) : no(new Error('cattura fallita')), 'image/jpeg', .92));
-}
-
-function sheetFotocamera(posa) {
-  let fronte = false;                       // di norma la posteriore: e' migliore
-  let attesa = +(S.settings?.autoscatto ?? 10);
-  const w = el('div');
-  w.append(el('div', 'eyebrow', 'Autoscatto · ' + esc(posa)));
-  w.append(el('h2', 'sec', 'Mettiti in posa'));
-  w.lastChild.style.marginTop = '0';
-
-  const box = el('div', 'cam');
-  const video = el('video');
-  video.autoplay = true; video.muted = true; video.playsInline = true;
-  video.setAttribute('playsinline', '');    // iOS vuole anche l'attributo
-  const conto = el('div', 'cam-n');
-  conto.hidden = true;
-  box.append(video, conto);
-  w.append(box);
-
-  const stato = el('p', 'muted', 'Accendo la fotocamera…');
-  w.append(stato);
-
-  const G = pannelloGuide(box, posa);
-  camPulisci = G.pulisci;
-  w.append(G.pannello);
-
-  /* --- scelta dell'attesa --- */
-  w.append(el('div', 'eyebrow', 'Quanti secondi'));
-  const seg = el('div', 'seg');
-  for (const s of CAM_ATTESE) {
-    const b = el('button', null, s + '″');
-    b.setAttribute('aria-pressed', attesa === s);
-    b.onclick = () => {
-      attesa = s;
-      S.settings.autoscatto = s; save();
-      [...seg.children].forEach(x => x.setAttribute('aria-pressed', x === b));
-    };
-    seg.append(b);
-  }
-  w.append(seg);
-
-  const via = el('button', 'btn wide pri', 'Avvia l\'autoscatto');
-  via.disabled = true;
-  w.append(via);
-
-  const gira = el('button', 'btn wide', 'Gira la fotocamera');
-  gira.style.marginTop = '8px';
-  gira.disabled = true;
-  w.append(gira);
-
-  w.append(el('p', 'note',
-    'Il conto alla rovescia si vede sullo schermo e si sente, ma solo con l\'app '
-    + 'in primo piano: una pagina web non puo\' suonare da spenta. Appoggia il '
-    + 'telefono, torna al tuo posto e aspetta i tre bip finali.'));
-
-  const ind = el('button', 'btn wide', 'Scegli una foto dalla galleria');
-  ind.style.marginTop = '8px';
-  ind.onclick = () => { camChiudi(); closeSheet(); document.getElementById('foto-file')?.click(); };
-  w.append(ind);
-
-  async function accendi() {
-    camChiudi();
-    try {
-      camStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: fronte ? 'user' : 'environment',
-                 width: { ideal: 1280 }, height: { ideal: 1706 } },
-        audio: false
-      });
-      video.srcObject = camStream;
-      box.classList.toggle('specchio', fronte);
-      stato.textContent = fronte
-        ? 'Fotocamera frontale: ti vedi come allo specchio, ma lo scatto viene salvato dritto.'
-        : 'Fotocamera posteriore. Appoggia il telefono contro qualcosa di stabile.';
-      via.disabled = false; gira.disabled = false;
-    } catch (e) {
-      stato.innerHTML = 'Non riesco ad accendere la fotocamera. Su iPhone succede se '
-        + 'hai negato il permesso — si rimette da <em>Impostazioni &rsaquo; Safari</em> — '
-        + 'oppure se stai aprendo l\'app da un indirizzo non sicuro. '
-        + 'Intanto puoi usare la galleria qui sotto.';
-      via.disabled = true; gira.disabled = true;
-    }
-  }
-  gira.onclick = () => { fronte = !fronte; accendi(); };
-
-  via.onclick = () => {
-    if (camTimer) return;
-    if (typeof recSbloccaAudio === 'function') recSbloccaAudio();
-    let n = attesa;
-    conto.hidden = false; conto.textContent = n;
-    via.disabled = true; gira.disabled = true; via.textContent = 'Conto alla rovescia…';
-    // si conta sui secondi veri, non sui tick: se il telefono strozza il timer
-    // il conto resta onesto
-    const fine = Date.now() + attesa * 1000;
-    camTimer = setInterval(async () => {
-      const r = Math.ceil((fine - Date.now()) / 1000);
-      if (r === n) return;
-      n = r;
-      if (n > 0) {
-        conto.textContent = n;
-        if (typeof pulsa === 'function') pulsa(conto, { scala: 1.25, dur: 320 });
-        if (n <= 3 && typeof recBip === 'function') recBip(1);
-        return;
-      }
-      clearInterval(camTimer); camTimer = null;
-      conto.textContent = '';
-      box.classList.add('flash');
-      if (typeof recBip === 'function') recBip(2);
-      try {
-        const blob = await camScatta(video);
-        camChiudi();
-        await salvaScatto(blob, posa);
-      } catch (err) {
-        box.classList.remove('flash');
-        stato.textContent = 'Lo scatto non e\' riuscito: riprova.';
-        via.disabled = false; gira.disabled = false; via.textContent = 'Avvia l\'autoscatto';
-      }
-    }, 120);
-  };
-
-  sheet(w);
-  accendi();
 }
 
 /** Comprime, salva, aggiorna. Unico punto in cui una foto entra in archivio. */
@@ -431,7 +205,8 @@ function viewFoto(v) {
   v.append(inp);
 
   const auto = el('button', 'btn wide pri', 'Autoscatto');
-  auto.onclick = () => sheetFotocamera(fotoPosa);
+  auto.onclick = () => camApri({ modo: 'progressi', posa: fotoPosa,
+    onScatto: b => salvaScatto(b, fotoPosa) });
   v.append(auto);
   v.append(el('p', 'hint',
     'Appoggia il telefono, avvia il conto alla rovescia e mettiti in posa. '

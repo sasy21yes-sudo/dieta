@@ -98,8 +98,10 @@ palestra.js     registro sedute, mappa muscolare, forma-fatica, progressione,
                 catalogo esercizi da internet
 prodotti.js     prodotti reali, codici a barre, ricerca alimenti su Open Food
                 Facts, override degli alimenti
-foto.js         foto dei progressi (IndexedDB) + autoscatto + timelapse +
-                confronto a cursore
+foto.js         foto dei progressi (IndexedDB) + guide di inquadratura +
+                timelapse + confronto a cursore
+camera.js       la fotocamera a schermo intero: una schermata, due mestieri
+                (i progressi col timer, il piatto con la cornice)
 sw.js           cache offline; rete-prima su tutto, cache come riserva
 manifest.json   PWA
 data/dieta.json IL DOMINIO alimentare — vedi sotto
@@ -238,8 +240,9 @@ non un dettaglio.
 - **Cerca un alimento su internet** — Open Food Facts per nome, con il
   controllo che i macro tornino con le calorie dichiarate
 - **Scala il pasto** — moltiplicatore da ×0,5 a ×2 su tutti gli ingredienti
-- **Autoscatto** — fotocamera dentro l app con conto alla rovescia: le foto dei
-  progressi si fanno da soli, e con <input capture> non si poteva
+- **Fotocamera a schermo intero** — anteprima piena, comandi sopra, cerchio
+  bianco in fondo. Per i progressi ha il timer e le guide; per il piatto la
+  cornice e "inquadra bene il piatto". Con <input capture> non si poteva
 - **Guide di inquadratura** — griglia, sagoma, e il fantasma dello scatto
   precedente in trasparenza: e quello che rende confrontabili due foto
 - **Misure guidate** — una alla volta, con dove passare il metro disegnato sulla
@@ -2411,6 +2414,70 @@ Tre dettagli che su iPhone non sono facoltativi:
 
 Il conto alla rovescia riusa `recBip()` di `timer.js`, e come quello suona solo
 con l'app in primo piano — la UI lo dice.
+
+### La fotocamera e' una schermata, non un riquadro dentro un foglio
+
+Per un po' la fotocamera e' vissuta **dentro un foglio**: un riquadro 3:4
+alto meta' schermo, e sotto i bottoni, le pastiglie delle guide, il cursore
+della trasparenza e tre paragrafi di spiegazione. Funzionava, e chiedeva la
+cosa sbagliata: **quando si inquadra si guarda l'immagine**, e un'anteprima
+grande come un francobollo in mezzo a un modulo non si guarda. Con il piatto
+davanti era anche peggio — li' la domanda e' "ci sta tutto dentro?", e a
+quella risponde solo l'immagine grande.
+
+Adesso e' quella che tutti sanno gia' usare, perche' non c'e' niente da
+imparare: **l'anteprima e' lo schermo**, i comandi ci stanno sopra, e in
+fondo c'e' il cerchio bianco. Le opzioni non spariscono: stanno dietro le
+pastiglie in alto e si aprono in una riga sola, come il timer e il flash
+della fotocamera di sistema.
+
+**Una schermata, due mestieri**, e cambia solo quello che deve cambiare:
+
+| | `progressi` (Chi sei › Foto) | `piatto` (l'assistente) |
+|---|---|---|
+| perche' | ti fotografi da solo, in casa | hai il piatto davanti |
+| timer | **serve**: devi tornare al tuo posto | no: il telefono ce l'hai in mano |
+| guida | ultimo scatto, sagoma, griglia | la **cornice** del piatto |
+| fotocamera | quasi sempre la frontale | quasi sempre la posteriore |
+| la riga sotto | *Mettiti in posa* | *Inquadra bene il piatto* |
+
+Quattro decisioni che non sono cosmetiche:
+
+1. **Si salva quello che si vede.** L'anteprima e' `object-fit: cover`, quindi
+   ai lati (o sopra e sotto) del fotogramma c'e' sempre una parte che sullo
+   schermo non c'e'. Salvarla vuol dire consegnare una foto **diversa da
+   quella che si e' inquadrata** — e su una foto dei progressi, dove il punto
+   e' che due scatti siano confrontabili, sarebbe proprio il difetto che le
+   guide esistono per evitare. `camfRitaglio()` rifa' il conto che fa il CSS,
+   ed e' una funzione a se' perche' e' l'unica riga di calcolo del file e
+   l'unica che si puo' provare senza una fotocamera. Misurato su tre
+   proporzioni: il ritaglio ha sempre la stessa proporzione del riquadro, e
+   il centro resta al centro.
+2. **La cornice del piatto sono quattro angoli, non un rettangolo chiuso.** Un
+   bordo intero invita a far combaciare il piatto col bordo, e non e' quello
+   che serve: serve che il piatto ci stia **dentro** tutto. Ed e' disegnata in
+   CSS e non in SVG, perche' deve restare **quadrata** a qualunque proporzione
+   di schermo — con `preserveAspectRatio: none` gli angoli si allungavano in
+   verticale su un telefono stretto e alto, e quattro angoli di forma diversa
+   non sembrano piu' una cornice.
+3. **Il pannello delle opzioni si apre in alto, mai in fondo.** In fondo c'e'
+   il cerchio bianco: un pannello che lo spinge piu' in giu' lo sposta da
+   sotto il pollice proprio mentre si sta per scattare. E si apre dove sta la
+   riga d'aiuto, che intanto sparisce — due testi bianchi sovrapposti non si
+   leggono ne' l'uno ne' l'altro.
+4. **Un permesso negato non e' un vicolo cieco.** Il cerchio e il bottone per
+   girare si spengono, ma la galleria resta viva, e il motivo vero — il
+   permesso, oppure un indirizzo non sicuro — si scrive invece di lasciarlo
+   indovinare.
+
+Restano le regole di prima, che non sono cambiate perche' e' cambiata la
+schermata: la frontale **si vede specchiata e si salva dritta**; il conto alla
+rovescia si conta sui secondi veri e non sui tick, perche' iOS strozza
+`setInterval`; e i tre bip finali si sentono solo con l'app in primo piano.
+
+E `camfChiudi()` sta attaccato a `hashchange` e `pagehide`: **una spia della
+fotocamera che resta accesa e' la cosa peggiore che questa schermata possa
+lasciarsi dietro.**
 
 ### Le guide di inquadratura
 
@@ -4604,6 +4671,21 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non salvare specchiato lo scatto della fotocamera frontale: l'anteprima sì
   (è come ci si aspetta di vedersi), il file no, o il confronto a cursore fra
   due foto a mesi di distanza si ribalta a metà
+- Non mettere l'anteprima della fotocamera dentro un foglio, sopra un modulo:
+  quando si inquadra si guarda l'immagine, e un riquadro alto meta' schermo
+  con sotto tre paragrafi non si guarda. L'anteprima e' lo schermo
+- Non salvare il fotogramma intero quando l'anteprima e' `object-fit:cover`:
+  ai lati c'e' sempre una parte che sullo schermo non si vede, e si
+  consegnerebbe una foto diversa da quella inquadrata. Si ritaglia come
+  ritaglia il CSS
+- Non disegnare la cornice del piatto con `preserveAspectRatio: none`: su un
+  telefono stretto e alto gli angoli si allungano in verticale, e quattro
+  angoli di forma diversa non sono piu' una cornice. E quattro angoli, non un
+  rettangolo chiuso: il piatto ci deve stare dentro, non combaciare col bordo
+- Non aprire il pannello delle opzioni sotto l'anteprima: in fondo c'e' il
+  cerchio bianco, e spostarlo mentre si sta per scattare fa sbagliare il tocco
+- Non lasciare la fotocamera accesa dopo un cambio di rotta o un passaggio in
+  secondo piano: `camfChiudi()` sta su `hashchange` e `pagehide`
 - Non far cancellare dati a un interruttore di modulo: spegnere nasconde, non
   distrugge. E non dare per scontato che `S.settings.moduli` esista — un backup
   scritto prima non ce l'ha, e `modulliDaStato()` lo deduce

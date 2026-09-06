@@ -580,7 +580,16 @@ function pfPassoFoto(w, inp) {
   w.append(box);
 
   const sc = el('button', 'btn wide pri', 'Scatta adesso');
-  sc.onclick = () => { inp.setAttribute('capture', 'environment'); inp.click(); };
+  /* La fotocamera vera se il browser la da', il selettore di sistema se no.
+     Con `<input capture>` si finisce nella fotocamera dell'iPhone: scatta
+     benissimo e non sa niente di quello che stiamo fotografando — nessuna
+     cornice, nessun "inquadra dall'alto", e per riprovare si ripassa da qui
+     ogni volta. */
+  const viva = !!navigator.mediaDevices?.getUserMedia && typeof camApri === 'function';
+  sc.onclick = () => {
+    if (!viva) { inp.setAttribute('capture', 'environment'); inp.click(); return; }
+    camApri({ modo: 'piatto', onScatto: b => pfPrendi(b) });
+  };
   w.append(sc);
   const gal = el('button', 'btn wide', 'Scegli dalla galleria');
   gal.style.marginTop = '8px';
