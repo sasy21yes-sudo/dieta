@@ -249,9 +249,9 @@ non un dettaglio.
   trascina
 - **Passi e sonno da un Comando iOS**, senza scriverli a mano
 - **Oggi** — giorno navigabile, il conto del giorno su un anello (mangiato,
-  quanto resta, bruciate — che non si somma) con sotto le quattro barre dei
-  macro, pasti spuntabili con i macro di ognuno, registrazione pasti fuori
-  piano senza tono colpevolizzante
+  quanto resta, bruciate — che non si somma) con sotto le tre barre dei macro,
+  e si tocca per aprire il dettaglio della giornata; pasti spuntabili con i
+  macro di ognuno, registrazione pasti fuori piano senza tono colpevolizzante
 - **Sostituzioni** — motore che, dato un alimento e una quantità, riscala per far
   combaciare il macro dominante (proteine se danno >20% delle calorie, altrimenti
   calorie) e ordina per distanza sui quattro macro **e per affinità di nome**.
@@ -2722,6 +2722,38 @@ stessa giornata — ma Oggi e' "cosa mangio adesso" e Diario e' "cosa registro
 sulla giornata": trecento righe di campi che dentro Oggi diventerebbero una
 pagina senza fondo.
 
+### La tab bar ha le icone
+
+Cinque parole in maiuscoletto, tutte lunghe uguali, tutte dello stesso grigio:
+per trovare "Corpo" bisognava **leggere**, ogni volta. Una barra di
+navigazione si usa col pollice senza guardarla, e quello che la rende
+riconoscibile a colpo d'occhio e' la forma, non il testo.
+
+Icona sopra, nome sotto. Le cinque stanno in `icone.js` con tutte le altre —
+stessa griglia 24×24, stesso tratto da 2, stesso arrotondamento: e' quello che
+le fa sembrare una famiglia invece di cinque disegni presi in giro. Il piatto
+con le posate era gia' li' (e' l'icona degli slot senza nome) e va a Oggi
+senza inventarne un'altra; il libro e' il Diario, la persona e' Corpo, il
+manubrio e' Gym, la curva che sale e' Andamento.
+
+**Il nome resta, e non e' ridondanza.** Cinque disegni senza parole
+costringono a impararli, e "Andamento" non ha un'icona ovvia: un grafico che
+sale puo' voler dire i dati, i progressi o le previsioni. Verificato che a
+**320 px** — il telefono piu' stretto in giro — le cinque voci stanno in
+64 px l'una e nessuna etichetta viene tagliata.
+
+Due dettagli:
+
+- **le icone si mettono una volta sola.** `route()` gira a ogni cambio di
+  schermata, e rifare cinque SVG ogni volta sarebbe lavoro buttato. Si guarda
+  se ci sono gia';
+- **il testo sta nell'HTML, non nel codice.** Se `icone.js` non ci fosse la
+  barra resterebbe quella di prima invece di svuotarsi.
+
+Resta il filo verde sopra la voce attiva: il colore da solo non basta a dire
+dove sei, ed e' la stessa ragione per cui i due tratteggi dei grafici sono
+diversi e non solo di due colori.
+
 ### La topbar ha un centro, e due lati con un mestiere
 
 Il titolo stava a sinistra e le due icone tutte e due a destra, appiccicate:
@@ -4077,20 +4109,39 @@ sbagliano — MyFitnessPal calcola `restano = target − mangiato + bruciato` �
 qui e' vietato da sempre: il dispendio che il filtro di Kalman misura nasce dal
 bilancio fra quanto mangi e come cambia il peso, quindi **contiene gia' tutto
 il movimento**, allenamenti compresi. Sommarlo di nuovo sarebbe contarlo due
-volte. Sta li' perche' e' un dato vero — quanto lavoro hai fatto oggi — e la
-nota sotto l'anello dice a cosa serve e a cosa no, invece di lasciarlo
-intendere. Quando non c'e' un allenamento la colonna resta, spenta: un giorno
-di riposo e' un fatto anche lui.
+volte. Sta li' perche' e' un dato vero — quanto lavoro hai fatto oggi — e
+sotto il numero c'e' scritto **`non si sommano`**. Erano tre righe di
+spiegazione sotto l'anello, ed erano troppe per una carta che si legge in un
+secondo: adesso sono due parole attaccate al numero, dove il numero si guarda.
+Quello che non si poteva fare era toglierle del tutto — quella e' la sola cosa
+che distingue questo numero da un credito da spendere. Quando non c'e' un
+allenamento la colonna resta, spenta e senza la nota: un giorno di riposo e'
+un fatto anche lui, ma non c'e' niente da non sommare.
 
 `restano = target − mangiato`, e basta. Oltre il target il numero non diventa
 negativo: cambia parola (`1200 oltre` invece di `1069 restano`), l'anello si
 riempie e passa all'ambra e poi al rosso, e la riga sotto resta quella di
 sempre — *"Non compensare domani: conta la media della settimana."*
 
-**Liberata la colonna delle calorie, le fibre tornano.** Erano state tolte
-perche' erano la quinta di cinque e stringevano le altre quattro su un
-telefono, non perche' non contassero: hanno un target vero (38 g) e una rampa
-apposta. Le tre barre diventano quattro, in grammi `usato / target g`.
+**Tre barre sotto, non quattro, e nessuna riga che le spieghi.** Le fibre
+hanno un target vero (38 g) e una rampa apposta, ma non sono una cosa che si
+guarda dieci volte al giorno come le altre tre: la loro riga sta nel dettaglio
+della giornata. Le tre restano in grammi, `usato / target g`.
+
+E sotto non c'e' niente. La prima versione portava una riga che diceva *"per
+arrivarci mancano 40 g di proteine, 140 g di carboidrati e 37 g di grassi"* —
+cioe' **gli stessi numeri delle tre barre due dita sopra**, riscritti in
+italiano. Una didascalia che ripete la figura non e' una spiegazione, e' una
+riga in piu' da saltare. Restano solo le due frasi che dicono qualcosa che i
+numeri non dicono: che manca il metro, e che oltre il target non si compensa
+il giorno dopo.
+
+**La carta si tocca e apre il dettaglio della giornata.** Chi vuole sapere di
+piu' sul conto che ha davanti tocca il conto — le fibre, i pasti uno per uno,
+gli scarti — invece di risalire a cercare un'altra porta. E' un `<button>` e
+non un `div` con un `onclick`, o la tastiera e VoiceOver non ci arrivano; e
+allora gli serve anche il reset dello stile, o al buio prende il fondo chiaro
+di sistema.
 
 **Senza target l'anello non giudica.** Con `D.target.kcal` a zero — il primo
 avvio, finche' il profilo non c'e' — sarebbe uscito *"0 restano di 0"*, cioe'
@@ -4365,6 +4416,18 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non scrivere "0 restano di 0" quando il target non c'e': e' un verdetto
   inventato al posto di un metro mancante. Al centro va quello che si sa —
   quanto hai mangiato — e sotto dove si mette il metro
+- Non mettere sotto una figura una riga che ripete la figura: "per arrivarci
+  mancano 40 g di proteine" e' quello che dicono gia' le barre due dita sopra,
+  e una didascalia che non aggiunge un dato e' una riga che si impara a
+  saltare. Sotto ci va solo quello che i numeri non dicono
+- Non far diventare tre righe di spiegazione quello che si puo' dire in due
+  parole attaccate al numero: `non si sommano` sotto le calorie bruciate dice
+  la stessa cosa nel punto in cui si guarda. Ma non si toglie del tutto, o
+  quel numero diventa un credito da spendere
+- Non lasciare una tab bar di sole parole: si usa col pollice senza guardarla,
+  e a colpo d'occhio si riconosce la forma, non il testo. Ma il nome resta —
+  cinque disegni senza parole si devono imparare, e "Andamento" non ha
+  un'icona ovvia
 - Nei grafici a barre le etichette dell'asse x devono usare `g.xb` (centro della
   barra), non `g.x` (scala delle linee): lo scarto è mezza barra, invisibile su
   novanta giorni ed evidente su sette

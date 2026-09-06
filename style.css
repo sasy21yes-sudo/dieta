@@ -88,11 +88,17 @@ body,#view,#sheet,#sheet-card,#topbar,#tabbar{touch-action:manipulation}
 #tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;
   background:var(--paper);border-top:1px solid var(--rule);
   padding-bottom:var(--safe-b)}
-#tabbar a{flex:1;text-align:center;padding:11px 2px 12px;font-size:11px;
-  font-weight:600;letter-spacing:.03em;text-transform:uppercase;
+/* Icona sopra e nome sotto. Il nome resta: cinque disegni senza parole
+   costringono a impararli, e "Andamento" non ha un'icona ovvia. */
+#tabbar a{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:8px 2px 9px;font-size:10.5px;font-weight:600;letter-spacing:.01em;
   color:var(--ink-3);text-decoration:none;border-top:2px solid transparent;
-  margin-top:-1px}
+  margin-top:-1px;min-width:0}
+#tabbar a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  max-width:100%}
+#tabbar a svg{display:block;flex:none}
 #tabbar a[aria-current]{color:var(--pine);border-top-color:var(--pine)}
+#tabbar a[aria-current] svg{stroke-width:2.4}
 
 #view{padding:16px 16px 24px;max-width:640px;margin:0 auto}
 
@@ -146,7 +152,8 @@ button.btn.sm{min-height:36px;padding:7px 11px;font-size:13px}
   text-transform:uppercase;color:var(--ink-3)}
 .sum-c .v{font-family:var(--mono);font-size:20px;font-weight:600;
   line-height:1.2;margin:3px 0 1px}
-.sum-c .u{font-family:var(--mono);font-size:9.5px;color:var(--ink-3)}
+.sum-c .u{font-family:var(--mono);font-size:9.5px;line-height:1.35;
+  color:var(--ink-3)}
 .sum-r{position:relative;width:132px;height:132px;flex:none}
 .sum-r svg{display:block;width:132px;height:132px;transform:rotate(-90deg)}
 .sum-r .tr{stroke:var(--rule)}
@@ -161,10 +168,16 @@ button.btn.sm{min-height:36px;padding:7px 11px;font-size:13px}
 .sum-r .u{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
   text-transform:uppercase;color:var(--ink-3);margin-top:4px}
 .sum-r .t{font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:2px}
-.sum-nota{font-size:11.5px;line-height:1.45;color:var(--ink-3);
-  border-top:1px solid var(--rule);padding-top:9px;margin:-4px 0 12px}
+/* La carta e' un bottone: senza il reset prende il fondo chiaro di sistema,
+   e al buio diventa un rettangolo bianco in mezzo alla pagina. */
+.sum-card{position:relative;display:block;width:100%;text-align:left;
+  font:inherit;color:inherit;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+.sum-card:active{background:var(--wash)}
+.sum-go{position:absolute;top:10px;right:12px;color:var(--ink-3);
+  font-size:19px;line-height:1}
 
-.macros{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.macros{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
 .macro .lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
   text-transform:uppercase;color:var(--ink-3)}
 .macro .val{font-family:var(--mono);font-size:17px;font-weight:600;

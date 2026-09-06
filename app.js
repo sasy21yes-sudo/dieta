@@ -1422,8 +1422,15 @@ function route() {
   if (typeof rottaAndamento === 'function') name = rottaAndamento(name);
   const fn = ROUTES[name] || viewOggi;
   $('#top-title').textContent = TITLES[name] || 'Oggi';
-  document.querySelectorAll('#tabbar a').forEach(a =>
-    a.toggleAttribute('aria-current', a.dataset.tab === name));
+  /* Le icone si mettono una volta sola e poi restano: `route()` gira a ogni
+     cambio di schermata, e ridisegnarle ogni volta sarebbe cinque SVG buttati
+     via per niente. Il testo sta gia' nell'HTML — se `icone.js` non ci fosse,
+     la barra resterebbe quella di prima invece di svuotarsi. */
+  document.querySelectorAll('#tabbar a').forEach(a => {
+    if (typeof icona === 'function' && !a.querySelector('svg'))
+      a.prepend(icona(a.dataset.ic, { size: 23 }));
+    a.toggleAttribute('aria-current', a.dataset.tab === name);
+  });
   const v = $('#view'); v.innerHTML = '';
   if (name === 'oggi') backupBanner(v);
   fn(v); window.scrollTo(0, 0);
@@ -1534,7 +1541,17 @@ function viewOggi(v) {
    * una rampa apposta.
    */
   const cons = consumed(k), tgt = dayTarget(k);
-  const box = el('div', 'card');
+  /* La carta si tocca e apre il dettaglio della giornata. E' la stessa cosa
+     che fa gia' la data in testa, ma qui e' dove si guarda: chi vuole sapere
+     di piu' sul conto che ha davanti tocca il conto, non risale a cercare
+     un'altra porta. Un `<button>` e non un `div` con `onclick`, o la tastiera
+     e VoiceOver non ci arrivano — e allora gli serve anche il reset dello
+     stile, o al buio prende il fondo chiaro di sistema. */
+  const box = el('button', 'card sum-card');
+  if (typeof sheetGiorno === 'function') box.onclick = () => sheetGiorno(k);
+  const go = el('span', 'sum-go', '&rsaquo;');
+  go.setAttribute('aria-hidden', 'true');
+  box.append(go);
   /* Senza un target non si dice niente: e' la regola gia' scritta per
      `analyse()`, che con `D.target.kcal` a zero divideva per zero e scriveva
      "Mangi piu' del piano" a chi ne aveva mangiate 1200. Qui sarebbe uscito
@@ -1574,9 +1591,14 @@ function viewOggi(v) {
   if (typeof anelloFermo === 'function') anelloFermo(arco, Math.min(quota, 1));
   sum.append(ring);
 
+  /* "non si sommano" non e' una didascalia che si puo' togliere: e' la riga
+     su cui quasi tutte le app sbagliano, ed e' la sola cosa che distingue
+     questo numero da un credito da spendere. Erano tre righe di spiegazione
+     sotto l'anello — troppe per una carta che si legge in un secondo — e
+     adesso sono due parole attaccate al numero, dove il numero si guarda. */
   sum.append(el('div', 'sum-c' + (bruc ? '' : ' spenta'),
     `<div class="k">Bruciate</div><div class="v">${nf(bruc)}</div>
-     <div class="u">kcal</div>`));
+     <div class="u">kcal${bruc ? ', non si sommano' : ''}</div>`));
   box.append(sum);
 
   if (typeof osserva === 'function') osserva(ring, () => {
@@ -1586,14 +1608,14 @@ function viewOggi(v) {
     contaSu(sum.querySelector('.js-mang'), Math.round(cons.kcal), { dec: 0, dur: 800 });
   });
 
-  if (bruc) box.append(el('div', 'sum-nota',
-    `Le <strong>${nf(bruc)} kcal</strong> di allenamento non si sommano al target: `
-    + 'il dispendio da cui nasce quel numero le contiene gia\'. '
-    + 'Servono a misurare il carico nel tempo, non a mangiare di piu\'.'));
-
+  /* Tre barre, non quattro. Le fibre hanno un target vero e una rampa
+     apposta, ma non sono una cosa che si guarda dieci volte al giorno come
+     gli altri tre: la loro riga sta nel dettaglio della giornata, che adesso
+     si apre toccando questa carta. Quattro colonne su un telefono stringono
+     le tre che si guardano davvero. */
   const g = el('div', 'macros');
   for (const [id, lab, dec] of [['p', 'prot', 0], ['c', 'carb', 0],
-                                ['g', 'gras', 0], ['fibre', 'fibre', 1]]) {
+                                ['g', 'gras', 0]]) {
     const pc = tgt[id] ? cons[id] / tgt[id] : 0;
     const cls = pc > 1.15 ? 'way' : pc > 1.02 ? 'over' : '';
     const mb = el('div', 'macro',
@@ -1614,25 +1636,15 @@ function viewOggi(v) {
   }
   box.append(g);
 
-  /* Il numero delle calorie che restano sta gia' nell'anello, quindi la riga
-     sotto non lo ripete: dice quello che l'anello non puo' dire, cioe' di
-     cosa e' fatto quel buco. Quando invece si e' oltre, la frase resta intera
-     — e resta il suo tono: il bilancio e' settimanale, e questa app non
-     suggerisce di compensare. */
-  const manca = ([id, nome]) => {
-    const q = (tgt[id] || 0) - (cons[id] || 0);
-    return q > 0.5 ? `<strong>${nf(q)} g</strong> di ${nome}` : null;
-  };
-  const resti = [['p', 'proteine'], ['c', 'carboidrati'], ['g', 'grassi']]
-    .map(manca).filter(Boolean);
+  /* Sotto le barre non c'e' nessuna riga che descrive quello che si vede
+     gia': l'anello dice quante calorie restano e le tre barre dicono di cosa
+     sono fatte, e riscriverlo in italiano non aggiunge un dato. Restano le
+     due frasi che dicono qualcosa che i numeri non dicono — che manca il
+     metro, e che oltre il target non si compensa il giorno dopo. */
   const frase = senzaMetro
     ? 'Manca il metro: finche\' non c\'e\' un target giornaliero non si puo\' dire '
       + 'se una giornata e\' dentro o fuori. Si mette in Piano, passo "Quanto mangiare".'
-    : rest > 0
-    ? (resti.length
-        ? 'Per arrivarci mancano ' + resti.slice(0, -1).join(', ')
-          + (resti.length > 1 ? ' e ' : '') + resti[resti.length - 1] + '.'
-        : '')
+    : rest >= 0 ? ''
     : `Sei a <strong>${nf(-rest)} kcal</strong> oltre il totale del giorno. Non compensare domani: conta la media della settimana.`;
   if (frase) {
     box.append(el('div', 'muted', frase));

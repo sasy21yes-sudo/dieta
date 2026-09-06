@@ -5,13 +5,13 @@
  * essere caricati da un CDN. Il motivo e' lo stesso per cui i tracciati del
  * corpo stanno in `data/corpo.json`: quest'app funziona offline e non ha un
  * build step, e una `<link>` a unpkg vorrebbe dire icone che spariscono in
- * palestra dove non prende. Sono dodici disegni, non una dipendenza.
+ * palestra dove non prende. Sono diciannove disegni, non una dipendenza.
  *
  * Copyright (c) 2013-2024 Cole Bemis e i contributori di Lucide.
  * Feather: MIT. Lucide: ISC. Entrambe permettono la copia con questa nota.
  *
  * Tutte condividono la stessa griglia 24×24 e lo stesso tratto da 2, che e'
- * quello che le fa sembrare una famiglia invece di dodici disegni presi in giro
+ * quello che le fa sembrare una famiglia invece di diciannove disegni presi in giro
  * — la stessa ragione per cui le icone di Gym sono disegnate a mano tutte con
  * sette tratti e lo stesso arrotondamento.
  */
@@ -56,7 +56,16 @@ const ICONE = {
                   'M7 10l5 5 5-5', 'M12 15V3'] },
   // la spunta della spesa e la casa della dispensa
   check: { d: ['M20 6L9 17l-5-5'] },
-  home: { d: ['M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', 'M9 22V12h6v10'] }
+  home: { d: ['M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', 'M9 22V12h6v10'] },
+
+  /* Le cinque della tab bar. Stessa griglia e stesso tratto di tutte le
+     altre: e' quello che le fa sembrare una famiglia. Il manubrio non sta
+     ne' in Feather ne' in Lucide con questa forma ed e' disegnato qui, con
+     lo stesso spessore. */
+  book: { d: ['M4 19.5A2.5 2.5 0 0 1 6.5 17H20', 'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z'] },
+  persona: { c: [[12, 7, 4]], d: ['M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1'] },
+  manubrio: { d: ['M6.5 6.5v11', 'M3.5 9v6', 'M17.5 6.5v11', 'M20.5 9v6', 'M6.5 12h11'] },
+  andamento: { d: ['M3 3v18h18', 'M7 15l4-5 3 3 5-7'] }
 };
 
 function icona(nome, { size = 20, col = 'currentColor', cls = '' } = {}) {
