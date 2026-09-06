@@ -5,13 +5,13 @@
  * essere caricati da un CDN. Il motivo e' lo stesso per cui i tracciati del
  * corpo stanno in `data/corpo.json`: quest'app funziona offline e non ha un
  * build step, e una `<link>` a unpkg vorrebbe dire icone che spariscono in
- * palestra dove non prende. Sono diciannove disegni, non una dipendenza.
+ * palestra dove non prende. Sono ventitre disegni, non una dipendenza.
  *
  * Copyright (c) 2013-2024 Cole Bemis e i contributori di Lucide.
  * Feather: MIT. Lucide: ISC. Entrambe permettono la copia con questa nota.
  *
  * Tutte condividono la stessa griglia 24×24 e lo stesso tratto da 2, che e'
- * quello che le fa sembrare una famiglia invece di diciannove disegni presi in giro
+ * quello che le fa sembrare una famiglia invece di ventitre disegni presi in giro
  * — la stessa ragione per cui le icone di Gym sono disegnate a mano tutte con
  * sette tratti e lo stesso arrotondamento.
  */
@@ -65,7 +65,18 @@ const ICONE = {
   book: { d: ['M4 19.5A2.5 2.5 0 0 1 6.5 17H20', 'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z'] },
   persona: { c: [[12, 7, 4]], d: ['M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1'] },
   manubrio: { d: ['M6.5 6.5v11', 'M3.5 9v6', 'M17.5 6.5v11', 'M20.5 9v6', 'M6.5 12h11'] },
-  andamento: { d: ['M3 3v18h18', 'M7 15l4-5 3 3 5-7'] }
+  andamento: { d: ['M3 3v18h18', 'M7 15l4-5 3 3 5-7'] },
+
+  /* Le voci del menu del profilo. `persona` e `list` le hanno gia'; queste
+     quattro mancavano. Il cappello da cuoco viene da Lucide, le altre tre da
+     Feather. */
+  fotocamera: { c: [[12, 13, 4]],
+                d: ['M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z'] },
+  bersaglio: { c: [[12, 12, 10], [12, 12, 6], [12, 12, 2]] },
+  calendario: { d: ['M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+                    'M16 2v4', 'M8 2v4', 'M3 10h18'] },
+  cappello: { d: ['M17 21a1 1 0 0 0 1-1v-5.35c0-.46.32-.85.73-1.05a4 4 0 0 0-2.13-7.59 5 5 0 0 0-9.2 0 4 4 0 0 0-2.13 7.59c.41.2.73.59.73 1.05V20a1 1 0 0 0 1 1z',
+                  'M6 17h12'] }
 };
 
 function icona(nome, { size = 20, col = 'currentColor', cls = '' } = {}) {

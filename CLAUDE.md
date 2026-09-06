@@ -2754,6 +2754,15 @@ Resta il filo verde sopra la voce attiva: il colore da solo non basta a dire
 dove sei, ed e' la stessa ragione per cui i due tratteggi dei grafici sono
 diversi e non solo di due colori.
 
+**Lo stesso vale per il menu del profilo**, che erano sei righe di testo tutte
+uguali: chi ci torna per la decima volta le rilegge tutte e sei per trovare
+quella giusta. Adesso ognuna ha il suo quadratino a sinistra — persona,
+fotocamera, bersaglio, calendario, cappello da cuoco, elenco — ed e' **lo
+stesso quadratino da 34 px** delle liste di Oggi e dei prodotti: stessa
+taglia, stesso raggio, stessa tinta. Due misure diverse per la stessa cosa in
+due fogli si vedono, ed e' il motivo per cui `.nav-r .ic` copia `.ex-b .ic`
+invece di inventarsi una sua misura.
+
 ### La topbar ha un centro, e due lati con un mestiere
 
 Il titolo stava a sinistra e le due icone tutte e due a destra, appiccicate:
@@ -4428,6 +4437,9 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   e a colpo d'occhio si riconosce la forma, non il testo. Ma il nome resta —
   cinque disegni senza parole si devono imparare, e "Andamento" non ha
   un'icona ovvia
+- Non dare a un elenco di voci un quadratino di una misura sua: 34 px, raggio
+  10, `--pine-soft`, e' quello che l'app usa gia' nelle liste di Oggi e dei
+  prodotti. Due misure diverse per la stessa cosa in due fogli si vedono
 - Nei grafici a barre le etichette dell'asse x devono usare `g.xb` (centro della
   barra), non `g.x` (scala delle linee): lo scarto è mezza barra, invisibile su
   novanta giorni ed evidente su sette

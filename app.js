@@ -4017,10 +4017,17 @@ function sheetProfilo() {
     apri(hash);
   };
 
-  const vai = (t, sub2, fn) => {
+  /* Sei righe di testo tutte uguali si leggono una per una anche quando si
+     torna sulla stessa per la decima volta. L'icona a sinistra e' quella che
+     fa riconoscere la riga prima di leggerla — ed e' il quadratino da 34 px
+     che l'app usa gia' nelle liste di Oggi e dei prodotti, non un disegno
+     nuovo per questo foglio. */
+  const vai = (t, ic, sub2, fn) => {
     const b = el('button', 'nav-r');
-    b.innerHTML = `<span class="body"><span class="t">${esc(t)}</span>
+    b.innerHTML = `<span class="ic"></span>
+      <span class="body"><span class="t">${esc(t)}</span>
       <span class="d">${esc(sub2)}</span></span><span class="go">›</span>`;
+    if (typeof icona === 'function') b.querySelector('.ic').append(icona(ic, { size: 19 }));
     b.onclick = () => { closeSheet(); fn(); };
     w.append(b);
   };
@@ -4030,26 +4037,26 @@ function sheetProfilo() {
      la riempiono e gli ingredienti che compongono le ricette. E ogni voce
      nomina **una** schermata: "Il piano" e "Quello che mangi" erano etichette
      a cui rispondevano tre pagine diverse. */
-  vai('Chi sei', 'Nome, eta\', altezza, peso di partenza, e quali parti dell\'app ti servono.',
+  vai('Chi sei', 'persona', 'Nome, eta\', altezza, peso di partenza, e quali parti dell\'app ti servono.',
     porta('#/piano', 'profilo'));
-  vai('Foto dei progressi', 'Uno scatto al giorno nella stessa posa: e\' l\'unico modo '
+  vai('Foto dei progressi', 'fotocamera', 'Uno scatto al giorno nella stessa posa: e\' l\'unico modo '
     + 'di vedere un cambiamento che sulla bilancia non si vede.',
     porta('#/foto'));
   /* Il target sta qui e non solo dentro l'elenco dei passi del piano: e' il
      metro con cui l'app giudica ogni giornata, quindi ci si torna spesso e da
      ogni schermata — e finora ci si arrivava scegliendo due volte. */
-  vai('Quanto mangiare', 'Calorie e macro da centrare ogni giorno, con la proposta '
+  vai('Quanto mangiare', 'bersaglio', 'Calorie e macro da centrare ogni giorno, con la proposta '
     + 'ricalibrata sul dispendio che l\'app ha misurato.',
     porta('#/piano', 'target'));
   if (usaPiano()) {
-    vai('Piano settimanale', 'Quale ricetta in quale pasto, nei sette giorni. Da qui '
+    vai('Piano settimanale', 'calendario', 'Quale ricetta in quale pasto, nei sette giorni. Da qui '
       + 'escono le barre della scheda Oggi e la lista della spesa.',
       porta('#/piano', 'settimana'));
-    vai('Ricette', 'I piatti composti pesando gli ingredienti, con i macro calcolati '
+    vai('Ricette', 'cappello', 'I piatti composti pesando gli ingredienti, con i macro calcolati '
       + 'da soli mentre aggiungi.',
       porta('#/piano', 'pasti'));
   }
-  vai('Lista ingredienti', 'Tutto quello che mangi in un elenco solo, con da dove viene '
+  vai('Lista ingredienti', 'list', 'Tutto quello che mangi in un elenco solo, con da dove viene '
     + 'il numero di ognuno. Da qui si aggiunge e si confronta.',
     porta('#/prodotti'));
 
