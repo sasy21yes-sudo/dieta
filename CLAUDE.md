@@ -248,9 +248,10 @@ non un dettaglio.
 - **Confronto foto a cursore** — prima e dopo sovrapposte, con la riga che si
   trascina
 - **Passi e sonno da un Comando iOS**, senza scriverli a mano
-- **Oggi** — giorno navigabile, cinque barre consumato/target (kcal, proteine,
-  carboidrati, grassi, fibre), pasti spuntabili con i macro di ognuno,
-  totale residuo, registrazione pasti fuori piano senza tono colpevolizzante
+- **Oggi** — giorno navigabile, il conto del giorno su un anello (mangiato,
+  quanto resta, bruciate — che non si somma) con sotto le quattro barre dei
+  macro, pasti spuntabili con i macro di ognuno, registrazione pasti fuori
+  piano senza tono colpevolizzante
 - **Sostituzioni** — motore che, dato un alimento e una quantità, riscala per far
   combaciare il macro dominante (proteine se danno >20% delle calorie, altrimenti
   calorie) e ordina per distanza sui quattro macro **e per affinità di nome**.
@@ -4060,6 +4061,55 @@ Gli strati, dal basso: tab bar 20, nuvoletta 28, foglio dell'app 40, velo 45,
 pannello 46, toast 50. Cosi' con un foglio aperto la nuvoletta sta **sotto**,
 e un toast si vede anche sopra l'assistente.
 
+### Il conto del giorno: un anello, e "bruciate" che non si somma
+
+Erano quattro barre in fila — calorie, proteine, carboidrati, grassi — e le
+calorie erano una colonna come le altre. Ma delle quattro non sono una come le
+altre: **le calorie sono la domanda, gli altri tre sono come e' fatta la
+risposta.** Una barra alta quattro pixel e larga un quarto di schermo per il
+numero che si guarda dieci volte al giorno era il posto sbagliato.
+
+Adesso le calorie sono un **anello**, con dentro quello che resta, e ai lati i
+due fatti che lo spiegano: **quanto e' entrato** e **quanto e' stato bruciato**.
+
+**E "bruciate" NON entra nel conto.** E' la riga su cui quasi tutte le app
+sbagliano — MyFitnessPal calcola `restano = target − mangiato + bruciato` — e
+qui e' vietato da sempre: il dispendio che il filtro di Kalman misura nasce dal
+bilancio fra quanto mangi e come cambia il peso, quindi **contiene gia' tutto
+il movimento**, allenamenti compresi. Sommarlo di nuovo sarebbe contarlo due
+volte. Sta li' perche' e' un dato vero — quanto lavoro hai fatto oggi — e la
+nota sotto l'anello dice a cosa serve e a cosa no, invece di lasciarlo
+intendere. Quando non c'e' un allenamento la colonna resta, spenta: un giorno
+di riposo e' un fatto anche lui.
+
+`restano = target − mangiato`, e basta. Oltre il target il numero non diventa
+negativo: cambia parola (`1200 oltre` invece di `1069 restano`), l'anello si
+riempie e passa all'ambra e poi al rosso, e la riga sotto resta quella di
+sempre — *"Non compensare domani: conta la media della settimana."*
+
+**Liberata la colonna delle calorie, le fibre tornano.** Erano state tolte
+perche' erano la quinta di cinque e stringevano le altre quattro su un
+telefono, non perche' non contassero: hanno un target vero (38 g) e una rampa
+apposta. Le tre barre diventano quattro, in grammi `usato / target g`.
+
+**Senza target l'anello non giudica.** Con `D.target.kcal` a zero — il primo
+avvio, finche' il profilo non c'e' — sarebbe uscito *"0 restano di 0"*, cioe'
+un numero inventato al posto di un metro che manca: la stessa cosa gia'
+vietata per `analyse()`. Il cerchio resta vuoto, al centro c'e' quello che si
+sa davvero (le calorie mangiate, con scritto **senza target**) e la riga sotto
+dice dove si mette il metro.
+
+E l'anello **si disegna gia' pieno al valore giusto** prima di qualunque
+animazione: se l'IntersectionObserver non scatta la pagina e' comunque
+leggibile. E' la stessa regola della bottiglia dell'acqua e della fiamma della
+striscia — il dato sta nel riempimento, il movimento e' solo il modo in cui ci
+si arriva.
+
+Il numero delle calorie che restano non si ripete nella riga sotto: quella
+dice quello che l'anello non puo' dire, cioe' **di cosa e' fatto quel buco**
+(*"Per arrivarci mancano 40 g di proteine, 140 g di carboidrati e 37 g di
+grassi"*).
+
 ### Un piatto da una foto: la chiamata vera, non un testo da copiare
 
 Tre passi, e sono tre schermate della stessa: **la foto**, **cosa c'e'
@@ -4306,7 +4356,15 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   più file per restare modificabile dal telefono, non per essere impacchettata
 - Non far leggere a `bodyFat()` la formula maschile su un profilo femminile:
   sono due equazioni diverse e quella femminile richiede anche i fianchi
-- Non sommare le calorie bruciate al target: sono già dentro il dispendio stimato
+- Non sommare le calorie bruciate al target: sono già dentro il dispendio
+  stimato. Mostrarle si', perche' sono un dato vero — ma accanto al conto e con
+  scritto che non ci entrano, mai dentro "quanto ti resta"
+- Non dare a una barra alta quattro pixel il numero che si viene a guardare:
+  le calorie sono la domanda e i macro sono come e' fatta la risposta, e due
+  forme diverse lo dicono senza scriverlo
+- Non scrivere "0 restano di 0" quando il target non c'e': e' un verdetto
+  inventato al posto di un metro mancante. Al centro va quello che si sa —
+  quanto hai mangiato — e sotto dove si mette il metro
 - Nei grafici a barre le etichette dell'asse x devono usare `g.xb` (centro della
   barra), non `g.x` (scala delle linee): lo scarto è mezza barra, invisibile su
   novanta giorni ed evidente su sette

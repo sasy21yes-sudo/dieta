@@ -1507,21 +1507,98 @@ function viewOggi(v) {
     if (typeof cardSfida === 'function') { const cs = cardSfida(k); if (cs) v.append(cs); }
   }
 
-  // barre macro
+  /* ------------------------------------------------- il conto del giorno
+   *
+   * Erano quattro barre in fila — kcal, proteine, carboidrati, grassi — e le
+   * calorie erano una colonna come le altre. Ma delle cinque non sono una
+   * come le altre: sono **la domanda**, e le altre sono come e' fatta la
+   * risposta. Una barra alta quattro pixel larga un quarto di schermo per il
+   * numero che si viene a guardare dieci volte al giorno e' il posto
+   * sbagliato.
+   *
+   * Adesso le calorie sono un anello, con dentro quello che resta, e ai lati
+   * i due fatti che lo spiegano: quanto e' entrato e quanto e' stato bruciato.
+   *
+   * **E "bruciate" NON entra nel conto.** E' la riga su cui quasi tutte le
+   * app sbagliano — MyFitnessPal calcola `restano = target − mangiato +
+   * bruciato` — e qui e' vietato da sempre: il dispendio che il filtro di
+   * Kalman misura nasce dal bilancio fra quanto mangi e come cambia il peso,
+   * quindi contiene gia' tutto il movimento, allenamenti compresi. Sommarlo
+   * di nuovo sarebbe contarlo due volte. Sta li' perche' e' un dato vero —
+   * quanto lavoro hai fatto oggi — e la nota sotto dice a cosa serve e a cosa
+   * no, invece di lasciarlo intendere.
+   *
+   * Liberata la colonna delle calorie, le fibre tornano: erano state tolte
+   * perche' erano la quinta di cinque e stringevano le altre quattro su un
+   * telefono, e non perche' non contassero — hanno un target vero (38 g) e
+   * una rampa apposta.
+   */
   const cons = consumed(k), tgt = dayTarget(k);
   const box = el('div', 'card');
+  /* Senza un target non si dice niente: e' la regola gia' scritta per
+     `analyse()`, che con `D.target.kcal` a zero divideva per zero e scriveva
+     "Mangi piu' del piano" a chi ne aveva mangiate 1200. Qui sarebbe uscito
+     un anello vuoto con dentro "0 restano di 0" — un numero inventato al
+     posto di un metro che manca. L'anello resta, con dentro quello che c'e'
+     davvero: quanto e' entrato. */
+  const senzaMetro = !(tgt.kcal > 0);
+  const rest = tgt.kcal - cons.kcal;
+  const quota = senzaMetro ? 0 : cons.kcal / tgt.kcal;
+  const clsK = quota > 1.15 ? 'way' : quota > 1.02 ? 'over' : '';
+  const bruc = typeof kcalAllenamento === 'function'
+    ? Math.round(kcalAllenamento(k).tot || 0) : 0;
+
+  const sum = el('div', 'sum');
+  sum.append(el('div', 'sum-c',
+    `<div class="k">Mangiato</div><div class="v js-mang">${nf(Math.round(cons.kcal))}</div>
+     <div class="u">kcal</div>`));
+
+  const ring = el('div', 'sum-r');
+  ring.innerHTML = `<svg viewBox="0 0 132 132" aria-hidden="true">
+      <circle class="tr" cx="66" cy="66" r="57" fill="none" stroke-width="13"></circle>
+      <circle class="ar ${clsK}" cx="66" cy="66" r="57" fill="none"
+        stroke-width="13" stroke-linecap="round"></circle>
+    </svg>
+    <div class="mid">${senzaMetro
+      ? `<div class="n">${nf(Math.round(cons.kcal))}</div>
+         <div class="u">kcal</div><div class="t">senza target</div>`
+      : `<div class="n ${clsK}">${nf(Math.abs(Math.round(rest)))}</div>
+         <div class="u">${rest >= 0 ? 'restano' : 'oltre'}</div>
+         <div class="t">di ${nf(Math.round(tgt.kcal))}</div>`}
+    </div>`;
+  /* L'anello si disegna gia' pieno al valore giusto: se l'IntersectionObserver
+     non scatta — scheda in secondo piano, elemento fuori vista — la pagina
+     deve essere comunque leggibile. L'animazione riparte da capo e ci
+     riarriva. */
+  const arco = ring.querySelector('.ar');
+  if (typeof anelloFermo === 'function') anelloFermo(arco, Math.min(quota, 1));
+  sum.append(ring);
+
+  sum.append(el('div', 'sum-c' + (bruc ? '' : ' spenta'),
+    `<div class="k">Bruciate</div><div class="v">${nf(bruc)}</div>
+     <div class="u">kcal</div>`));
+  box.append(sum);
+
+  if (typeof osserva === 'function') osserva(ring, () => {
+    if (typeof riempiAnello === 'function') riempiAnello(arco, Math.min(quota, 1));
+    contaSu(ring.querySelector('.n'),
+      senzaMetro ? Math.round(cons.kcal) : Math.abs(Math.round(rest)), { dec: 0, dur: 800 });
+    contaSu(sum.querySelector('.js-mang'), Math.round(cons.kcal), { dec: 0, dur: 800 });
+  });
+
+  if (bruc) box.append(el('div', 'sum-nota',
+    `Le <strong>${nf(bruc)} kcal</strong> di allenamento non si sommano al target: `
+    + 'il dispendio da cui nasce quel numero le contiene gia\'. '
+    + 'Servono a misurare il carico nel tempo, non a mangiare di piu\'.'));
+
   const g = el('div', 'macros');
-  /* Quattro voci e non cinque: le fibre hanno il loro grafico nel cruscotto e
-     la loro riga in ogni pasto, ma qui erano la quinta colonna su un telefono
-     e stringevano le altre quattro — che sono quelle che si guardano dieci
-     volte al giorno. */
-  for (const [id, lab, dec] of [['kcal', 'kcal', 0], ['p', 'prot', 0],
-                                ['c', 'carb', 0], ['g', 'gras', 0]]) {
+  for (const [id, lab, dec] of [['p', 'prot', 0], ['c', 'carb', 0],
+                                ['g', 'gras', 0], ['fibre', 'fibre', 1]]) {
     const pc = tgt[id] ? cons[id] / tgt[id] : 0;
     const cls = pc > 1.15 ? 'way' : pc > 1.02 ? 'over' : '';
     const mb = el('div', 'macro',
       `<div class="lab">${lab}</div><div class="val">${nf(cons[id], dec)}</div>
-       <div class="of">/ ${nf(tgt[id], dec)}</div>
+       <div class="of">/ ${nf(tgt[id], dec)} g</div>
        <div class="bar"><i class="${cls}" style="width:${Math.min(pc * 100, 100)}%"></i></div>`);
     g.append(mb);
     // la barra cresce da sinistra con scaleX: animare width farebbe ricalcolare
@@ -1536,19 +1613,31 @@ function viewOggi(v) {
     });
   }
   box.append(g);
-  const rest = tgt.kcal - cons.kcal;
+
+  /* Il numero delle calorie che restano sta gia' nell'anello, quindi la riga
+     sotto non lo ripete: dice quello che l'anello non puo' dire, cioe' di
+     cosa e' fatto quel buco. Quando invece si e' oltre, la frase resta intera
+     — e resta il suo tono: il bilancio e' settimanale, e questa app non
+     suggerisce di compensare. */
   const manca = ([id, nome]) => {
     const q = (tgt[id] || 0) - (cons[id] || 0);
     return q > 0.5 ? `<strong>${nf(q)} g</strong> di ${nome}` : null;
   };
   const resti = [['p', 'proteine'], ['c', 'carboidrati'], ['g', 'grassi']]
     .map(manca).filter(Boolean);
-  box.append(el('div', 'muted', rest > 0
-    ? `Restano <strong>${nf(rest)} kcal</strong>${resti.length
-        ? ': ' + resti.slice(0, -1).join(', ') + (resti.length > 1 ? ' e ' : '') + resti[resti.length - 1]
-        : ''}.`
-    : `Sei a <strong>${nf(-rest)} kcal</strong> oltre il totale del giorno. Non compensare domani: conta la media della settimana.`));
-  box.lastChild.style.marginTop = '10px';
+  const frase = senzaMetro
+    ? 'Manca il metro: finche\' non c\'e\' un target giornaliero non si puo\' dire '
+      + 'se una giornata e\' dentro o fuori. Si mette in Piano, passo "Quanto mangiare".'
+    : rest > 0
+    ? (resti.length
+        ? 'Per arrivarci mancano ' + resti.slice(0, -1).join(', ')
+          + (resti.length > 1 ? ' e ' : '') + resti[resti.length - 1] + '.'
+        : '')
+    : `Sei a <strong>${nf(-rest)} kcal</strong> oltre il totale del giorno. Non compensare domani: conta la media della settimana.`;
+  if (frase) {
+    box.append(el('div', 'muted', frase));
+    box.lastChild.style.marginTop = '10px';
+  }
   v.append(box);
 
   // pasti — solo se il piano e' acceso

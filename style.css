@@ -134,6 +134,36 @@ button.btn.sm{min-height:36px;padding:7px 11px;font-size:13px}
 .upd .btn.pri{background:#fff;border-color:#fff;color:var(--pine);font-weight:600}
 
 /* ---------------- barre macro ---------------- */
+/* --------- il conto del giorno: l'anello, i due lati, le quattro barre ---
+   Tre colonne e non un flex con space-between: il centro dello spazio che
+   avanza non e' il centro della carta, e basta una parola piu' lunga a
+   sinistra per vedere l'anello storto. */
+.sum{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+  gap:6px;margin-bottom:14px}
+.sum-c{text-align:center;min-width:0}
+.sum-c.spenta{opacity:.55}
+.sum-c .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3)}
+.sum-c .v{font-family:var(--mono);font-size:20px;font-weight:600;
+  line-height:1.2;margin:3px 0 1px}
+.sum-c .u{font-family:var(--mono);font-size:9.5px;color:var(--ink-3)}
+.sum-r{position:relative;width:132px;height:132px;flex:none}
+.sum-r svg{display:block;width:132px;height:132px;transform:rotate(-90deg)}
+.sum-r .tr{stroke:var(--rule)}
+.sum-r .ar{stroke:var(--pine)}
+.sum-r .ar.over{stroke:var(--amber)}
+.sum-r .ar.way{stroke:var(--alert)}
+.sum-r .mid{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center}
+.sum-r .n{font-family:var(--mono);font-size:29px;font-weight:600;line-height:1}
+.sum-r .n.over{color:var(--amber)}
+.sum-r .n.way{color:var(--alert)}
+.sum-r .u{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:4px}
+.sum-r .t{font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:2px}
+.sum-nota{font-size:11.5px;line-height:1.45;color:var(--ink-3);
+  border-top:1px solid var(--rule);padding-top:9px;margin:-4px 0 12px}
+
 .macros{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
 .macro .lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
   text-transform:uppercase;color:var(--ink-3)}
