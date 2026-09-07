@@ -4109,6 +4109,30 @@ guarderanno**, perche' un bottone che non dice cosa fara' e' un bottone al
 buio. Il campo libero resta in fondo per tutto il resto: e' l'ordine di
 un'assistenza, non di una chat.
 
+**E tre che chiedono una proposta, non un giudizio.** `ai.js` sapeva comporre
+anche `modificaPiano`, `nuovaRicetta` e `nuovoAlimento` — sono nati con la
+classe — e non c'era **nessun modo di sceglierli**: i compiti che producono
+un'azione (`assegnaPasto`, `creaRicetta`, `creaAlimento`) restavano scritti
+nel codice e basta. Stanno in un gruppo loro (`Chiedi una proposta`) e non
+mescolati agli altri tre: i primi **guardano** quello che c'e' gia', questi
+**propongono** qualcosa di nuovo, e sono due momenti diversi. Come tutto il
+resto, quello che torna resta una proposta: la esegue l'utente con un tocco.
+
+Due delle tre non si possono fare senza sapere **cosa**: *"componi una
+ricetta"* senza dire quale, e *"aggiungi un alimento"* senza dire quale, sono
+domande a cui si puo' rispondere qualunque cosa. Quelle non partono: **puntano
+il campo di scrittura**, che e' gia' il posto in cui si scrive — aprire un
+foglio a parte sarebbe un secondo posto per la stessa cosa. Una pastiglia
+viola sopra il campo dice a chi sta parlando, il segnaposto dice cosa
+scrivere, e la ✕ riporta alla domanda libera: un campo che ha cambiato
+mestiere senza una strada indietro e' un campo bloccato. Mandata la richiesta
+si scioglie da solo, o la domanda dopo partirebbe come un secondo brief per la
+stessa ricetta.
+
+Col piano alimentare spento restano solo quelle che hanno senso — via
+`valutaPiano`, `modificaPiano` e `nuovaRicetta`, resta `nuovoAlimento`, che
+l'elenco degli alimenti c'e' comunque. Verificato: da sette carte a quattro.
+
 E cambiano forma: **prima della prima domanda** sono tre carte alte, che e' il
 momento in cui non sai ancora cosa puoi chiedere; **dopo** diventano tre
 pastiglie in fila, perche' da li' in poi la cosa da leggere e' la risposta e
@@ -4819,6 +4843,18 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   con dei canarini, non a occhio
 - Non tenere tre carte alte in cima quando la conversazione e' cominciata:
   spingono la risposta sotto il bordo. Diventano pastiglie
+- Non lasciare un compito di `ai.js` senza una porta: `modificaPiano`,
+  `nuovaRicetta` e `nuovoAlimento` erano scritti da sempre e non li poteva
+  scegliere nessuno. Un compito che non si puo' chiedere e' codice che marcisce
+- Non mescolare le domande che **guardano** con quelle che **propongono**:
+  sono due momenti diversi, e due gruppi
+- Non far partire "componi una ricetta" senza sapere quale: e' una domanda a
+  cui si puo' rispondere qualunque cosa. Si punta il campo di scrittura, che
+  e' gia' il posto in cui si scrive — un foglio a parte sarebbe un secondo
+  posto per la stessa cosa
+- Non lasciare puntato il campo dopo che la richiesta e' partita: la domanda
+  dopo diventerebbe un secondo brief per la stessa ricetta. E finche' e'
+  puntato serve una ✕, o e' un campo bloccato
 - Non lasciare una nuvoletta trascinabile a meta' schermo: copre il contenuto
   e non si capisce se ci e' finita apposta. Si appoggia al lato piu' vicino, e
   la posizione si salva in percentuale o alla rotazione esce dallo schermo

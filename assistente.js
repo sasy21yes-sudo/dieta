@@ -52,7 +52,15 @@ function assIcona(nome) {
       + 'a2 2 0 0 1-2 2H5.2a2 2 0 0 1-2-2z', 'M12 15.6a3.4 3.4 0 1 0 0-6.8'
       + 'a3.4 3.4 0 0 0 0 6.8z'],
     galleria: ['M3.4 5.6h17.2v12.8H3.4z', 'M3.4 15l4.6-4.4 3.4 3.2 3.8-3.6 5.4 5',
-      'M8.6 9.4h.01']
+      'M8.6 9.4h.01'],
+    /* le tre proposte: la matita sulle righe del piano, il cappello da cuoco,
+       il piu' dentro un riquadro */
+    ritocca: ['M5 4.2h9', 'M5 8.6h9', 'M5 13h5',
+      'M19.6 12.2l-6.6 6.6-3.2.6.6-3.2 6.6-6.6z'],
+    ricetta: ['M16.6 20.4a.9.9 0 0 0 .9-.9v-4.9c0-.42.3-.78.67-.96a3.7 3.7 0 0 0-1.97-7'
+      + 'a4.6 4.6 0 0 0-8.4 0 3.7 3.7 0 0 0-1.97 7c.37.18.67.54.67.96v4.9a.9.9 0 0 0 .9.9z',
+      'M6.4 16.8h11.2'],
+    alimento: ['M4.8 4.8h14.4v14.4H4.8z', 'M12 8.6v6.8', 'M8.6 12h6.8']
   }[nome] || [];
   const pieno = nome === 'scintilla';
   const s = mk('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true',
@@ -196,33 +204,11 @@ function assApri() {
 
   /* La barra di scrittura sta fuori dal corpo che scorre: e' l'unica cosa
      che si vuole avere sempre sotto il pollice. */
+  assMira = null;
   const comp = el('div', 'ai-comp');
-  const ta = el('textarea');
-  ta.rows = 1;
-  ta.placeholder = 'Oppure scrivi la tua domanda…';
-  ta.setAttribute('aria-label', 'La tua domanda');
-  const inv = el('button', 'ai-inv');
-  inv.type = 'button';
-  inv.disabled = true;
-  inv.setAttribute('aria-label', 'Manda la domanda');
-  inv.append(assIcona('invia'));
-  ta.oninput = () => {
-    inv.disabled = !ta.value.trim();
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 96) + 'px';
-  };
-  const manda = () => {
-    const t = ta.value.trim();
-    if (!t) return;
-    ta.value = ''; ta.style.height = 'auto'; inv.disabled = true;
-    assChiedi('domandaLibera', t);
-  };
-  inv.onclick = manda;
-  ta.onkeydown = e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); manda(); }
-  };
-  comp.append(ta, inv);
+  comp.id = 'ai-comp';
   assPan.append(comp);
+  assComp(comp);
   assPan.append(el('p', 'ai-nota',
     'Fuori dal telefono non esce niente: qui la domanda si compone e basta. '
     + 'Il contesto contiene profilo, target e numeri gia’ aggregati del '
@@ -338,6 +324,44 @@ function assMancanze() {
 }
 
 /** Il corpo: le domande finche' non se ne fa una, poi la conversazione. */
+/*
+ * Le tre domande che chiedono **una proposta**, non un giudizio.
+ *
+ * `ai.js` le sapeva comporre da sempre — sono nate con la classe — e non
+ * c'era **nessun modo di sceglierle**: il foglio offriva le tre valutazioni e
+ * il campo libero, e i compiti che producono un'azione (`assegnaPasto`,
+ * `creaRicetta`, `creaAlimento`) restavano scritti nel codice e basta.
+ *
+ * Stanno in un gruppo loro, sotto, e non mescolate alle altre tre: le prime
+ * **guardano** quello che c'e' gia', queste **propongono** qualcosa di nuovo,
+ * e sono due momenti diversi. E come tutto il resto qui dentro, quello che
+ * torna e' una proposta: la esegue l'utente con un tocco, mai il modello.
+ *
+ * Due delle tre non si possono fare senza sapere **cosa**: "componi una
+ * ricetta" senza dire quale, e "aggiungi un alimento" senza dire quale, sono
+ * domande a cui si puo' rispondere qualunque cosa. Quelle puntano il campo di
+ * scrittura invece di partire — vedi `assPunta()`.
+ */
+const AI_PROPOSTE = [
+  { id: 'modificaPiano', ic: 'ritocca', corto: 'Modifica il piano', piano: true,
+    det: 'Le modifiche minime alla settimana per avvicinarla al target, '
+      + 'usando solo le ricette che hai gia’.' },
+  { id: 'nuovaRicetta', ic: 'ricetta', corto: 'Una ricetta', piano: true,
+    det: 'Gli ingredienti pesati in grammi, presi dai tuoi alimenti. '
+      + 'I macro non li scrive lui: li calcola l’app.',
+    chiede: 'Che ricetta? Es. una cena da 700 kcal' },
+  { id: 'nuovoAlimento', ic: 'alimento', corto: 'Un alimento',
+    det: 'I valori per 100 g di una cosa che nel tuo elenco non c’e’ ancora. '
+      + 'Nasce come stima, mai come etichetta letta.',
+    chiede: 'Quale alimento? Es. tempeh naturale' }
+];
+
+/** Quelle che hanno senso in questa configurazione. */
+function assProposte() {
+  const p = typeof usaPiano === 'function' ? usaPiano() : true;
+  return AI_PROPOSTE.filter(x => p || !x.piano);
+}
+
 function assDisegna(corpo) {
   corpo.innerHTML = '';
 
@@ -403,20 +427,116 @@ function assDisegna(corpo) {
       b.onclick = () => assChiedi(id);
       corpo.append(b);
     }
+
+    /* Le prime tre **guardano** quello che c'e' gia', queste **propongono**
+       qualcosa di nuovo: due momenti diversi, due gruppi. */
+    const pro = assProposte();
+    if (pro.length) {
+      corpo.append(el('div', 'ai-tit', 'Chiedi una proposta'));
+      for (const p of pro) {
+        const b = el('button', 'ai-q');
+        b.type = 'button';
+        const box = el('span', 'ic'); box.append(assIcona(p.ic));
+        b.append(box);
+        b.append(el('span', 'gr',
+          `<b>${esc(AI_COMPITI[p.id].n)}</b><span>${esc(p.det)}</span>`));
+        b.append(el('span', 'ch', '›'));
+        b.onclick = () => (p.chiede ? assPunta(p) : assChiedi(p.id));
+        corpo.append(b);
+      }
+    }
     return;
   }
 
   for (const m of assMsg) corpo.append(assBolla(m));
   const fila = el('div', 'ai-chip');
-  for (const [id, ic, , corto] of dom) {
+  const pill = (ic, testo, fn) => {
     const b = el('button', null);
     b.type = 'button';
     b.append(assIcona(ic));
-    b.append(document.createTextNode(corto));
-    b.onclick = () => assChiedi(id);
+    b.append(document.createTextNode(testo));
+    b.onclick = fn;
     fila.append(b);
-  }
+  };
+  for (const [id, ic, , corto] of dom) pill(ic, corto, () => assChiedi(id));
+  /* Anche le proposte restano raggiungibili a conversazione cominciata: la
+     fila scorre di lato, quindi sei pastiglie non spingono niente sotto il
+     bordo. */
+  for (const p of assProposte())
+    pill(p.ic, p.corto, () => (p.chiede ? assPunta(p) : assChiedi(p.id)));
   corpo.append(fila);
+}
+
+/*
+ * Il campo di scrittura, e a chi sta parlando.
+ *
+ * Di norma manda una **domanda libera**. Ma "componi una ricetta" e "aggiungi
+ * un alimento" hanno bisogno di sapere quale, e chiederlo con un foglio a
+ * parte sarebbe un secondo posto in cui si scrive: il posto in cui si scrive
+ * e' gia' qui. Toccando quelle due il campo si **punta** su quel compito — lo
+ * dice con una pastiglia sopra e con il segnaposto — e da quel momento quello
+ * che scrivi parte come brief di quella richiesta invece che come domanda.
+ *
+ * La pastiglia ha la sua ✕, perche' un campo che ha cambiato mestiere senza
+ * dare una strada indietro e' un campo bloccato.
+ */
+let assMira = null;
+
+function assComp(host) {
+  host.innerHTML = '';
+
+  if (assMira) {
+    const m = el('div', 'ai-mira');
+    m.append(el('span', 'n', esc(AI_COMPITI[assMira.id].n)));
+    const x = el('button', null, '✕');
+    x.type = 'button';
+    x.setAttribute('aria-label', 'Torna a una domanda libera');
+    x.onclick = () => { assMira = null; assComp(host); };
+    m.append(x);
+    host.append(m);
+  }
+
+  const riga = el('div', 'ai-comp-r');
+  const ta = el('textarea');
+  ta.rows = 1;
+  ta.placeholder = assMira ? assMira.chiede : 'Oppure scrivi la tua domanda…';
+  ta.setAttribute('aria-label', assMira ? AI_COMPITI[assMira.id].n : 'La tua domanda');
+  const inv = el('button', 'ai-inv');
+  inv.type = 'button';
+  inv.disabled = true;
+  inv.setAttribute('aria-label', 'Manda la domanda');
+  inv.append(assIcona('invia'));
+  ta.oninput = () => {
+    inv.disabled = !ta.value.trim();
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 96) + 'px';
+  };
+  const manda = () => {
+    const t = ta.value.trim();
+    if (!t) return;
+    const c = assMira ? assMira.id : 'domandaLibera';
+    ta.value = ''; ta.style.height = 'auto'; inv.disabled = true;
+    assChiedi(c, t);
+  };
+  inv.onclick = manda;
+  ta.onkeydown = e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); manda(); }
+  };
+  riga.append(ta, inv);
+  host.append(riga);
+  return ta;
+}
+
+/** Punta il campo su un compito che ha bisogno di sapere **cosa**. */
+function assPunta(p) {
+  const host = document.getElementById('ai-comp');
+  if (!host) return;
+  assMira = p;
+  const ta = assComp(host);
+  /* Il fuoco lo apre la tastiera, ed e' giusto: qui si e' appena chiesto di
+     scrivere qualcosa. Quello che non si tocca e' lo scroll — e' l'errore
+     gia' pagato una volta con `scrollIntoView` dentro `oninput`. */
+  ta.focus();
 }
 
 function assBolla(m) {
@@ -461,6 +581,10 @@ function assBolla(m) {
  * dal filtro in uscita. Il resto — periodo, contesto, bottoni — e' lo stesso.
  */
 function assChiedi(compito, domanda) {
+  /* Mandata la richiesta il campo torna quello di prima: lasciarlo puntato
+     farebbe partire la domanda dopo come un secondo brief per la stessa
+     ricetta. */
+  if (assMira) { assMira = null; const h = document.getElementById('ai-comp'); if (h) assComp(h); }
   const per = revPeriodoAttivo();
   const nome = (AI_COMPITI[compito] || {}).n || 'Domanda';
   assMsg.push({ io: true, testo: domanda || nome });
