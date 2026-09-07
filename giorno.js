@@ -989,6 +989,169 @@ function sheetCambiaPasto(k, code) {
   sheet(w);
 }
 
+/* ============================================== un pasto che non ha niente
+ *
+ * Segnalato cosi': *"se premo il pulsante «da assegnare», invece di farmi
+ * mettere cosa ho mangiato mi rimanda al piano settimanale"*. Ed era
+ * letteralmente quello che faceva — e non e' un dettaglio di navigazione, e'
+ * la **terza porta** aperta di nuovo: il piano e' un modello, il diario e' un
+ * fatto, e "cosa ho mangiato giovedi'" non si scrive nel modello.
+ *
+ * Il difetto vero pero' si vede solo mettendoci dentro il congelamento, ed e'
+ * il caso che e' stato riportato: **un giorno passato con uno slot vuoto**.
+ * La struttura di quel giorno e' congelata (`S.log[k].slots`, timbrata quando
+ * il giorno smette di essere oggi), quindi assegnare la ricetta nel piano
+ * settimanale — che e' giusto, ed e' quello che l'app suggeriva — **non tocca
+ * piu' quel giorno**: si torna indietro, la riga dice ancora "Da assegnare",
+ * e il bottone riporta a una schermata dove il lavoro risulta gia' fatto. Un
+ * vicolo cieco con le due meta' che si danno ragione a vicenda.
+ *
+ * La strada che mancava e' la stessa che c'e' gia' per ogni altra cosa del
+ * giorno: `pastoSwap`, cioe' **lo strato del diario**. Vale per quel giorno,
+ * non tocca il piano, e passa sopra la fotografia congelata perche' e' scritto
+ * dopo e a un livello piu' alto.
+ *
+ * Due decisioni:
+ *
+ * - **su un giorno passato il pasto si spunta da solo.** Scrivere "giovedi' a
+ *   pranzo ho mangiato questo" e' una dichiarazione di averlo mangiato, non un
+ *   piano: senza la spunta `consumed()` continuerebbe a contare zero e la
+ *   giornata resterebbe vuota. E' la stessa regola gia' scritta per la foto
+ *   del piatto. Su **oggi** no — alle nove del mattino si puo' decidere la
+ *   cena — e sul futuro non si scrive affatto.
+ * - **il piano resta a un tocco di distanza**, in fondo e in piccolo: se quel
+ *   pasto manca tutte le settimane, il posto giusto e' li'.
+ */
+function sheetSlotVuoto(k, sid) {
+  const s = pastoSlot(sid, k);
+  const passato = k < today();
+  const w = el('div');
+  w.append(el('div', 'eyebrow',
+    (s?.slot || 'Pasto') + (s?.ora ? ' \u00b7 ' + s.ora : '')));
+  w.append(el('h2', 'sec', passato ? 'Cosa hai mangiato' : 'Cosa metti qui'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted', passato
+    ? 'Vale <strong>solo per questo giorno</strong>: il piano della settimana '
+      + 'non si tocca. E siccome il giorno e\' passato, il pasto viene anche '
+      + 'spuntato — scriverlo qui vuol dire che l\'hai mangiato.'
+    : 'Vale <strong>solo per questo giorno</strong>: il piano della settimana '
+      + 'non si tocca, e domani torna quello che prevede lui.'));
+
+  const metti = (code, nome) => {
+    mettePastoSwap(sid, k, code, 1);
+    /* La spunta dopo la sostituzione, non prima: `mettePastoSwap` rifa' la
+       copia congelata solo se il pasto risulta gia' spuntato, quindi
+       spuntando prima si congelerebbe il nulla. */
+    if (passato) {
+      const d = day(k);
+      if (!d.pasti[sid]) {
+        if (typeof congelaPasto === 'function') congelaPasto(sid, k);
+        d.pasti[sid] = true;
+        save();
+      }
+    }
+    closeSheet(); route();
+    toast(passato ? nome + ' registrato' : nome + ', solo per oggi');
+  };
+
+  /* --- una ricetta --- */
+  w.append(el('h2', 'sec', 'Una delle tue ricette'));
+  const opz = Object.entries(D.pasti)
+    .map(([id, pa]) => ({ v: id, lab: pa.nome || id,
+      sub: `${nf(macroRicetta(pa).kcal)} kcal \u00b7 ${nf(macroRicetta(pa).p, 0)}P `
+        + `${nf(macroRicetta(pa).c, 0)}C ${nf(macroRicetta(pa).g, 0)}G` }))
+    .sort((a, b) => a.lab.localeCompare(b.lab));
+  if (!opz.length) {
+    w.append(el('p', 'muted',
+      'Non hai ancora composto nessuna ricetta. Qui sotto puoi comunque mettere '
+      + 'un alimento solo, che spesso e\' tutto quello che serve.'));
+  } else {
+    const eco = el('div');
+    w.append(selettoreCercabile(opz, null, id => {
+      eco.innerHTML = '';
+      const pa = pasto(id); if (!pa) return;
+      const m = macroRicetta(pa);
+      const r = el('div', 'read');
+      r.innerHTML = `<span><b>${nf(m.kcal)}</b> kcal</span>`
+        + `<span>${macroRiga(m)}</span>`;
+      eco.append(r);
+      const ok = el('button', 'btn wide pri');
+      ok.style.marginTop = '8px';
+      ok.textContent = 'Metti "' + (pa.nome || id) + '"';
+      ok.onclick = () => metti(id, pa.nome || id);
+      eco.append(ok);
+    }, 'Cerca fra le tue ricette\u2026'));
+    w.append(eco);
+  }
+
+  /* --- oppure un alimento solo: la stessa strada del piano --- */
+  w.append(el('h2', 'sec', 'Oppure un alimento solo'));
+  w.append(el('p', 'muted',
+    'Uno yogurt, una mela, un panino: non serve farne una ricetta.'));
+  const alOpz = Object.keys(D.alimenti).sort((a, b) => a.localeCompare(b))
+    .map(nome => {
+      const al = alimento(nome) || {};
+      return { v: nome, lab: nome.charAt(0).toUpperCase() + nome.slice(1),
+        sub: `${nf(al.kcal || 0)} kcal / 100 ${al.unita || 'g'}` };
+    });
+  if (!alOpz.length) {
+    w.append(el('p', 'muted', 'Nemmeno un alimento in elenco: si aggiungono da '
+      + 'Piano, passo "Lista ingredienti".'));
+  } else {
+    let scelto = null;
+    const eco2 = el('div');
+    const campo = el('div', 'field',
+      '<label>Quanto</label>'
+      + '<input type="text" inputmode="decimal" id="sv-q" value="150">');
+    const disegna = () => {
+      eco2.innerHTML = '';
+      if (!scelto) return;
+      const q = parseNum(document.getElementById('sv-q')?.value) ?? 0;
+      const m = foodM(scelto, q);
+      const r = el('div', 'read');
+      r.innerHTML = `<span><b>${nf(m.kcal)}</b> kcal</span>`
+        + `<span>${nf(m.p, 0)}P ${nf(m.c, 0)}C ${nf(m.g, 0)}G</span>`;
+      eco2.append(r);
+      const ok = el('button', 'btn wide pri');
+      ok.style.marginTop = '8px';
+      ok.textContent = 'Metti ' + scelto;
+      ok.onclick = () => {
+        const q2 = parseNum(document.getElementById('sv-q').value);
+        if (!(q2 > 0)) { toast('Serve una quantita\''); return; }
+        metti(codiceAlimento(scelto, q2), scelto);
+      };
+      eco2.append(ok);
+    };
+    w.append(selettoreCercabile(alOpz, null, v => { scelto = v; disegna(); },
+      'Cerca un alimento\u2026'));
+    w.append(campo);
+    campo.querySelector('input').oninput = disegna;
+    w.append(eco2);
+  }
+
+  /* --- e se manca tutte le settimane --- */
+  const pia = el('button', 'nav-r');
+  pia.style.marginTop = '16px';
+  pia.innerHTML = '<span class="ic"></span>'
+    + '<span class="body"><span class="t">Mettilo nel piano settimanale</span>'
+    + '<span class="d">Se questo pasto manca ogni settimana, il posto e\' li\'.'
+    + (passato ? ' I giorni gia\' passati non cambiano.' : '') + '</span></span>'
+    + '<span class="go">\u203a</span>';
+  if (typeof icona === 'function') pia.querySelector('.ic').append(icona('calendario', { size: 19 }));
+  pia.onclick = () => {
+    closeSheet();
+    if (typeof pianoTab !== 'undefined') pianoTab = 'settimana';
+    apri('#/piano');
+  };
+  w.append(pia);
+
+  const ch = el('button', 'btn wide', 'Chiudi');
+  ch.style.marginTop = '12px';
+  ch.onclick = closeSheet;
+  w.append(ch);
+  sheet(w);
+}
+
 /* ------------------------------------------------ la giornata in dettaglio */
 /** Tutto quello che l'app sa di un giorno, in una scheda sola. */
 function sheetGiorno(k) {

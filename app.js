@@ -1660,13 +1660,26 @@ function viewOggi(v) {
   if (!plan.pasti.some(s => pasto(s.codice))) {
     const av = el('div', 'card flat');
     av.append(el('div', 'eyebrow', 'Giornata da comporre'));
-    av.append(el('div', 'muted',
-      'A questo giorno non e ancora assegnata nessuna ricetta. Vai in Piano, passo "Quando li mangi", e scegli cosa mettere in ogni slot.'));
-    const b = el('button', 'btn wide pri', 'Apri il piano');
-    b.style.marginTop = '10px';
-    b.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'settimana';
-      apri('#/piano'); };
-    av.append(b);
+    /* Su un giorno passato mandare al piano e' un consiglio sbagliato: la
+       struttura di quel giorno e' gia' congelata, e assegnare le ricette nel
+       piano non lo tocchera'. Quello che si puo' ancora fare e' scrivere qui
+       cosa e' stato mangiato, un pasto alla volta. */
+    av.append(el('div', 'muted', k < today()
+      ? 'Questo giorno e\' passato senza nessuna ricetta assegnata. Tocca un '
+        + 'pasto qui sotto per scrivere cosa hai mangiato: vale per questo '
+        + 'giorno e basta. Cambiare il piano adesso non lo tocca piu\'.'
+      : 'A questo giorno non e ancora assegnata nessuna ricetta. Vai in Piano, passo "Quando li mangi", e scegli cosa mettere in ogni slot.'));
+    /* E il bottone sparisce: su un giorno chiuso porterebbe a fare un lavoro
+       che quel giorno non vedra' mai. La strada per il piano resta dentro il
+       foglio del pasto, dove pero' e' scritto anche che i giorni passati non
+       si muovono. */
+    if (k >= today()) {
+      const b = el('button', 'btn wide pri', 'Apri il piano');
+      b.style.marginTop = '10px';
+      b.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'settimana';
+        apri('#/piano'); };
+      av.append(b);
+    }
     v.append(av);
   }
   for (const s of plan.pasti) {
@@ -1686,8 +1699,14 @@ function viewOggi(v) {
       vuoto.innerHTML = `<div class="meal-h"><div class="grow">
         <div class="meal-slot">${esc(s.slot)}${s.ora ? ' · ' + esc(s.ora) : ''}</div>
         <div class="meal-name">Da assegnare</div></div></div>`;
-      vuoto.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'settimana';
-        apri('#/piano'); };
+      /* Su un giorno che non e' ancora arrivato non si scrive niente — in
+         avanti si legge — e li' l'unica strada e' il piano. */
+      vuoto.onclick = () => {
+        if (!futuro && typeof sheetSlotVuoto === 'function')
+          return sheetSlotVuoto(k, chiaveP(s));
+        if (typeof pianoTab !== 'undefined') pianoTab = 'settimana';
+        apri('#/piano');
+      };
       v.append(vuoto);
       continue;
     }
@@ -1740,8 +1759,13 @@ function viewOggi(v) {
       || (typeof porzioniCambiate === 'function' && porzioniCambiate(chiaveP(s), k))
       || !!(d.swap?.[chiaveP(s)] && Object.keys(d.swap[chiaveP(s)]).length)
       || !!(d.aggiunti?.[chiaveP(s)] || []).length;
+    /* "Al posto di" presuppone che ci fosse qualcosa: su uno slot che il
+       piano lasciava vuoto non c'e' niente al cui posto stare, e la riga
+       usciva con `al posto di null`. Li' il pasto non sostituisce, si
+       **aggiunge** — ed e' anche l'unica parola che dice la verita' su un
+       giorno passato in cui il piano non prevedeva niente. */
     const tag = eff !== s.codice
-      ? 'al posto di ' + (pasto(s.codice)?.nome || s.codice)
+      ? (s.codice ? 'al posto di ' + (pasto(s.codice)?.nome || s.codice) : 'aggiunto')
       : toccato ? 'modificato' : '';
     const testa = el('div', 'grow tap',
       `<div class="meal-slot">${esc(s.slot)}${s.ora ? ' · ' + esc(s.ora) : ''}</div>

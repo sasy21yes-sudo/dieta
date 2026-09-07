@@ -3184,6 +3184,60 @@ contenuto, sono **come l'app ha registrato** quella giornata. Senza quella
 eccezione una giornata vuota risulterebbe registrata per via di una
 fotografia.
 
+### "Da assegnare" mandava nel posto sbagliato
+
+Segnalato cosi': *"se premo il pulsante «da assegnare», invece di farmi mettere
+cosa ho mangiato mi rimanda al piano settimanale"*. Ed era letteralmente
+quello che faceva — e non e' un dettaglio di navigazione, e' **la terza porta
+riaperta**: il piano e' un modello, il diario e' un fatto, e *"cosa ho mangiato
+giovedi'"* non si scrive nel modello.
+
+Il difetto vero pero' si vede solo mettendoci dentro il congelamento, ed e'
+esattamente il caso riportato: **un giorno passato con uno slot vuoto**.
+
+1. giovedi' quel pasto non era assegnato, e lo salti;
+2. il giorno dopo lo assegni nel **piano settimanale** — che e' giusto, ed e'
+   quello che l'app suggeriva;
+3. torni a giovedi', premi "Da assegnare"… e la riga dice ancora "Da
+   assegnare", perche' la **struttura di quel giorno e' congelata**
+   (`S.log[k].slots`, timbrata quando il giorno smette di essere oggi). Il
+   bottone ti riporta al piano, dove il lavoro risulta gia' fatto.
+
+Un vicolo cieco con le due meta' che si danno ragione a vicenda: il
+congelamento fa il suo mestiere — quel giovedi' non deve muoversi piu' — e il
+bottone offriva l'unica strada che su quel giorno non poteva funzionare.
+
+La strada che mancava e' quella che c'e' gia' per ogni altra cosa del giorno:
+**`pastoSwap`, cioe' lo strato del diario**. Vale per quel giorno, non tocca il
+piano, e passa sopra la fotografia congelata perche' e' scritto dopo e a un
+livello piu' alto. `sheetSlotVuoto()` e' quel foglio: una delle tue ricette,
+oppure un alimento solo (lo stesso codice `ali:` del piano), e in fondo la
+strada per il piano settimanale — che resta quella giusta se quel pasto manca
+*tutte* le settimane.
+
+Tre decisioni:
+
+- **su un giorno passato il pasto si spunta da solo.** Scrivere "giovedi' a
+  pranzo ho mangiato questo" e' una dichiarazione di averlo mangiato, non un
+  piano: senza la spunta `consumed()` continuerebbe a contare zero e la
+  giornata resterebbe vuota. E' la stessa regola gia' scritta per la foto del
+  piatto. Su **oggi** no — alle nove del mattino si puo' decidere la cena — e
+  sul futuro non si scrive affatto, che e' la regola di sempre;
+- **"al posto di" presuppone che ci fosse qualcosa.** Su uno slot vuoto non
+  c'e' niente al cui posto stare, e la riga usciva con `al posto di null`. Li'
+  il pasto non sostituisce, si **aggiunge**;
+- **su un giorno passato la carta "Giornata da comporre" non manda piu' al
+  piano.** Dice invece che quel giorno e' passato senza ricette e che si puo'
+  ancora scrivere cosa e' stato mangiato, un pasto alla volta — e il bottone
+  "Apri il piano" sparisce, perche' porterebbe a fare un lavoro che quel
+  giorno non vedra' mai.
+
+Misurato sul caso segnalato, passo per passo: giorno congelato con lo slot
+vuoto, ricetta assegnata dopo nel piano, il giorno passato resta vuoto (il
+congelamento tiene), il tocco apre "Cosa hai mangiato" senza cambiare rotta,
+e assegnando la giornata passa da 0 a 635 kcal con il pasto spuntato — mentre
+il piano settimanale non si muove di una riga.
+
 ### Il passato smette di muoversi, dai due lati
 
 Segnalato con un caso preciso: *"ho modificato dal piano la ricetta portando
@@ -5062,6 +5116,17 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non far leggere a `dayTarget()` la settimana di adesso: cambiare il piano
   riscrive il metro di ogni giornata gia' registrata. Il target di un giorno
   passato si fissa su di lui
+- Non mandare al piano settimanale chi vuole scrivere cosa ha mangiato: il
+  piano e' un modello e il diario e' un fatto. E su un giorno **passato** e'
+  anche un vicolo cieco, perche' la struttura di quel giorno e' congelata e il
+  piano non la tocchera' piu'. La strada e' `pastoSwap`, che e' lo strato del
+  giorno
+- Non far assegnare un pasto a un giorno passato senza spuntarlo: senza la
+  spunta `consumed()` conta zero e la giornata resta vuota. Su oggi invece no —
+  alle nove del mattino si puo' decidere la cena
+- Non scrivere "al posto di" dove il piano non prevedeva niente: non c'e'
+  niente al cui posto stare, e usciva `al posto di null`. Quel pasto si
+  **aggiunge**
 - Non far leggere a `slotsGiorno()` il piano di adesso per un giorno passato:
   aggiungendo uno spuntino al mercoledi' ogni mercoledi' registrato si ritrova
   un pasto in piu', contato come saltato. Misurato: da 49/49 a 49/51 con
