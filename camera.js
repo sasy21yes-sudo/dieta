@@ -165,7 +165,7 @@ function camApri(o = {}) {
 
   const flip = c.flip = el('button', 'camf-s', '');
   flip.setAttribute('aria-label', 'Gira la fotocamera');
-  flip.append(icona('gira', { size: 21 }));
+  flip.append(icona('giracam', { size: 21 }));
   flip.onclick = () => {
     c.fronte = !c.fronte;
     if (!piatto) { S.settings.camFronte = c.fronte; save(); }

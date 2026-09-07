@@ -5,13 +5,13 @@
  * essere caricati da un CDN. Il motivo e' lo stesso per cui i tracciati del
  * corpo stanno in `data/corpo.json`: quest'app funziona offline e non ha un
  * build step, e una `<link>` a unpkg vorrebbe dire icone che spariscono in
- * palestra dove non prende. Sono ventitre disegni, non una dipendenza.
+ * palestra dove non prende. Sono trenta disegni, non una dipendenza.
  *
  * Copyright (c) 2013-2024 Cole Bemis e i contributori di Lucide.
  * Feather: MIT. Lucide: ISC. Entrambe permettono la copia con questa nota.
  *
  * Tutte condividono la stessa griglia 24×24 e lo stesso tratto da 2, che e'
- * quello che le fa sembrare una famiglia invece di ventitre disegni presi in giro
+ * quello che le fa sembrare una famiglia invece di trenta disegni presi in giro
  * — la stessa ragione per cui le icone di Gym sono disegnate a mano tutte con
  * sette tratti e lo stesso arrotondamento.
  */
@@ -84,7 +84,22 @@ const ICONE = {
                   'M21 15l-5-5L5 21'] },
   gira: { d: ['M23 4v6h-6', 'M1 20v-6h6',
               'M3.51 9a9 9 0 0 1 14.85-3.36L23 10',
-              'M1 14l4.64 4.36A9 9 0 0 0 20.49 15'] }
+              'M1 14l4.64 4.36A9 9 0 0 0 20.49 15'] },
+
+  /* Le voci del menu dell'app. `check` (la spesa), `home` (la dispensa),
+     `calendario`, `download` e `immagine` le ha gia'. */
+  /* le due frecce attorno a un corpo macchina: girare la fotocamera non e'
+     "aggiornare", e due significati sullo stesso disegno si vedono */
+  giracam: { d: ['M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5',
+                 'M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5',
+                 'M15 8.5l3 2.5-3 2.5', 'M9 15.5l-3-2.5 3-2.5'] },
+  carica: { d: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4',
+                'M17 8l-5-5-5 5', 'M12 3v12'] },
+  telefono: { d: ['M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
+                  'M12 18h.01'] },
+  pausa: { c: [[12, 12, 10]], d: ['M10 15V9', 'M14 15V9'] },
+  condividi: { c: [[18, 5, 3], [6, 12, 3], [18, 19, 3]],
+               d: ['M8.6 13.5l6.8 4', 'M15.4 6.5l-6.8 4'] }
 };
 
 function icona(nome, { size = 20, col = 'currentColor', cls = '' } = {}) {

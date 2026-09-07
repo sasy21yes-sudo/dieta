@@ -1225,6 +1225,46 @@ su orizzonti di 7 e 28 giorni con banda al 95%, e mostra separatamente la forbic
 bilancia di domani per far vedere perché il numero del mattino non va letto. Nessuna
 proiezione a data fissa: sarebbe un conto alla rovescia, che questo file vieta.
 
+### La previsione si legge, non si decifra
+
+Segnalato con tre parole: *"la parte delle previsioni e' incomprensibile"*. Ed
+era vero, e non perche' i numeri fossero sbagliati. La carta apriva con
+`Dispendio stimato 2159 kcal/die ±120 · ricalibrato 3 volte`, proseguiva con
+una tabella intestata **`Tendenza · Banda · Δ`** e chiudeva con quattro righe
+di `09-02 → 69,41  reale 69,60  +0,19`. Sono tutti numeri veri, ed e' **un
+cruscotto da motore**: chi apre Corpo non chiede come funziona il filtro,
+chiede *dove sta andando*.
+
+L'ordine adesso e' quello della domanda:
+
+1. **la risposta, in italiano** — *"Stai scendendo di 0,32 kg a settimana"* — e
+   sotto le tre colonne che la reggono: oggi, fra una settimana, fra un mese;
+2. **quanto vale la pesata di domani**, che e' la cosa che fa sbagliare
+   lettura ogni mattina;
+3. **da dove escono quei numeri** — il dispendio misurato e la pagella del
+   motore — in fondo e **dietro un tocco**, perche' e' come lo sa, non cosa
+   dice. Il `<summary>` porta gia' il numero del dispendio, cosi' chi lo
+   cercava lo trova senza aprire.
+
+Le parole al posto delle sigle: `Δ` diventa quanto cambieresti, "banda"
+diventa un `±` spiegato una volta sotto le tre colonne, e la pagella smette di
+essere una griglia di numeri nudi — *"ha sbagliato in media 0,23 kg, e 88 volte
+su 100 il peso vero e' caduto dentro la forbice che aveva dichiarato"*, con la
+tabella sotto e un'intestazione (`quando · diceva · era · scarto`) che prima
+non c'era.
+
+**E il verdetto si rifiuta.** Sotto i cinquanta grammi a settimana non si
+scrive una direzione: e' dentro il rumore della bilancia, e *"stai scendendo di
+0,02 kg a settimana"* e' una direzione inventata. Li' si scrive che il peso sta
+fermo. E' la stessa regola di `tempoAlTarget()`, che non da' un numero quando
+l'intervallo del ritmo contiene lo zero.
+
+Una cosa in piu' che prima era una nota a pie' di pagina e adesso e' un
+riquadro suo: **il piano e' un'intenzione, quello che mangi e' un fatto.**
+Quando le due cose non coincidono il ritmo vero e' l'altro, e la carta lo dice
+con il numero — *"nelle ultime due settimane hai mangiato 2 210 kcal invece di
+2 482: con quel ritmo il peso starebbe fermo"*.
+
 ### Chi non e' seguito da nessuno non sa da che numero partire
 
 **E' il caso normale, e l'app lo trattava come se non esistesse.** Chi ha un
@@ -2829,6 +2869,39 @@ stesso quadratino da 34 px** delle liste di Oggi e dei prodotti: stessa
 taglia, stesso raggio, stessa tinta. Due misure diverse per la stessa cosa in
 due fogli si vedono, ed e' il motivo per cui `.nav-r .ic` copia `.ex-b .ic`
 invece di inventarsi una sua misura.
+
+### Il menu del ⋯ era un muro di testo
+
+Segnalato cosi': *"il menu che si apre e' pieno di informazioni"*. Erano dieci
+bottoni larghi quanto lo schermo, ognuno seguito da un paragrafo di tre o
+quattro righe — perche' esiste il file `.ics`, perche' nessuna pagina web puo'
+leggere Salute, cosa succede se svuoti Safari. Sono tutte cose vere e vale la
+pena averle scritte; tutte insieme pero' fanno **un muro di testo davanti a un
+elenco di dieci voci**, e un elenco che va letto tutto per trovarne una non e'
+un elenco, e' una pagina. Il foglio era alto oltre 1200 px.
+
+Tre mosse:
+
+1. **la forma delle liste dell'app** — icona, nome, una riga, chevron: la
+   stessa `.nav-r` del menu del profilo, con lo stesso quadratino da 34 px di
+   Oggi e dei prodotti. Dieci righe alte 69 px invece di dieci blocchi alti
+   centoventi;
+2. **una riga sola per voce, e dice cosa fa, non perche' esiste.** Il perche'
+   non si perde: sta gia' dentro la schermata che si apre, che e' il momento
+   in cui serve. Chi tocca *"Passi e sonno dal telefono"* trova li' la
+   spiegazione del Comando; chi non la tocca non aveva bisogno di leggerla;
+3. **tre gruppi** — la spesa, i tuoi dati, l'app — perche' dieci voci in fila
+   si scorrono e basta.
+
+Quello che **non** e' diventato una riga di descrizione, ed e' voluto: la data
+dell'ultimo backup e la versione in uso. Sono **stato**, non spiegazione — la
+prima e' la sola cosa che dice se quella voce ti riguarda oggi — e stanno a
+destra, dove si leggono scorrendo senza aprire niente.
+
+Una cosa e' rimasta dov'era ed e' un guadagno: *"Le foto, a parte"* sta
+**accanto** a "Esporta il backup", e il suo sottotitolo e' *"nel backup non ci
+sono"*. Prima quell'informazione viveva in fondo al foglio dell'import, cioe'
+dopo — e chi esporta e chiude non ci arrivava mai.
 
 ### La topbar ha un centro, e due lati con un mestiere
 
@@ -4531,6 +4604,8 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non dare a un elenco di voci un quadratino di una misura sua: 34 px, raggio
   10, `--pine-soft`, e' quello che l'app usa gia' nelle liste di Oggi e dei
   prodotti. Due misure diverse per la stessa cosa in due fogli si vedono
+- Non dare lo stesso disegno a due significati: le due frecce circolari sono
+  "aggiorna", e girare la fotocamera ha un'icona sua (`giracam`)
 - Nei grafici a barre le etichette dell'asse x devono usare `g.xb` (centro della
   barra), non `g.x` (scala delle linee): lo scarto è mezza barra, invisibile su
   novanta giorni ed evidente su sette
@@ -4787,6 +4862,19 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   `apri()`, che quando l'indirizzo non cambia chiede il disegno
 - Non dare a una voce di menu un nome a cui rispondono tre schermate: "Il
   piano" e "Quello che mangi" erano domande, non destinazioni
+- Non mettere sotto ogni voce di un menu il paragrafo che spiega perche' quella
+  cosa esiste: dieci paragrafi fanno un muro davanti a dieci voci. Una riga che
+  dice **cosa fa**, e il perche' dentro la schermata che si apre — che e' il
+  momento in cui serve
+- Non trattare come descrizione quello che e' **stato**: l'ultimo backup e la
+  versione in uso vanno a destra della riga, dove si leggono senza aprire
+- Non aprire una carta di previsione con il dispendio e una tabella intestata
+  "Tendenza · Banda · Δ": e' un cruscotto da motore, e chi la guarda chiede
+  dove sta andando. Prima la risposta in italiano, poi i numeri che la
+  reggono, e **come fa a saperlo** in fondo e chiuso
+- Non scrivere una direzione quando il ritmo e' dentro il rumore della
+  bilancia: "stai scendendo di 0,02 kg a settimana" e' una direzione inventata.
+  Sotto i cinquanta grammi si scrive che il peso sta fermo
 - Non lasciare in un menu una voce che porta a un passo spento: con il piano
   alimentare tolto, ricette e settimana non esistono
 - Non leggere un campo dentro un `setTimeout` senza controllare che ci sia

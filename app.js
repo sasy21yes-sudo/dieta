@@ -3163,85 +3163,165 @@ function viewCorpo(v) {
   }
 }
 
-/* ------------------------------------------------------- previsione */
+/* =========================================================== previsione
+ *
+ * Segnalato con tre parole: **"la parte delle previsioni e' incomprensibile"**.
+ * Ed era vero, e non perche' i numeri fossero sbagliati: la carta apriva con
+ * `Dispendio stimato 2159 kcal/die ±120 · ricalibrato 3 volte`, proseguiva con
+ * una tabella intestata `Tendenza · Banda · Δ` e chiudeva con quattro righe di
+ * `09-02 → 69,41  reale 69,60  +0,19`. Sono tutti numeri veri, ed e' un
+ * cruscotto da motore: chi apre Corpo non chiede **come funziona il filtro**,
+ * chiede **dove sta andando**.
+ *
+ * Adesso l'ordine e' quello della domanda:
+ *
+ * 1. **la risposta, in italiano** — "stai scendendo di 0,32 kg a settimana" —
+ *    e sotto i due numeri che la reggono, fra una settimana e fra un mese;
+ * 2. **quanto vale la pesata di domani**, che e' la cosa che fa sbagliare
+ *    lettura ogni mattina;
+ * 3. **da dove escono quei numeri** — il dispendio e la pagella del motore —
+ *    in fondo e dietro un tocco, perche' e' come lo sa, non cosa dice.
+ *
+ * Le parole al posto delle sigle: "quanto puo' sbagliare" invece di "banda",
+ * "quanto cambia" invece di "Δ", "quello che il motore aveva previsto" invece
+ * di una freccia. E il verdetto **si rifiuta** quando il ritmo e' dentro il
+ * rumore: dire "stai scendendo di 0,02 kg a settimana" e' inventare una
+ * direzione che i dati non hanno.
+ */
 function forecastCard(k) {
   const c = el('div', 'card'), E = energyModel(k), M = D.modello;
-  c.append(el('h2', 'sec', 'Previsione'));
+  c.append(el('h2', 'sec', 'Dove sta andando il peso'));
   c.lastChild.style.marginTop = '0';
 
   const w = trendW(k);
   if (w == null) {
     c.append(el('p', 'muted',
-      'Serve almeno una pesata. Il motore prevede la linea di tendenza, non il numero del mattino: quello oscilla di ±1 kg per acqua e contenuto intestinale, e non contiene informazione.'));
+      'Serve almeno una pesata. Quello che l\'app prevede e\' la linea di '
+      + 'tendenza, non il numero del mattino: quello oscilla di un chilo per '
+      + 'acqua e contenuto intestinale, e non contiene informazione.'));
     return c;
   }
-
-  const cal = E.n > 0;
-  c.append(el('div', 'kpi',
-    `<div><div class="eyebrow">Dispendio stimato</div>
-       <div class="big mono">${nf(E.tdee)}<em>kcal/die</em></div>
-       <div class="hint">±${nf(E.sigma)} · ${cal
-         ? `ricalibrato ${E.n} volt${E.n === 1 ? 'a' : 'e'} sui tuoi dati`
-         : `ancora da formula (Mifflin-St Jeor × ${M.laf}), non dai tuoi dati`}</div></div>`));
 
   const fp = forecast(7, D.target.kcal, k);
   const f28 = forecast(28, D.target.kcal, k);
   const ri = realIntake(k);
   const fr = ri != null ? forecast(7, ri, k) : null;
 
-  const line = (lab, f) => `<div class="cmp-r">
-      <span>${lab}</span>
-      <span class="mono">${nf(f.peso, 2)}<em> kg</em></span>
-      <span class="mono muted">±${nf(f.banda, 2)}</span>
-      <span class="mono">${f.delta >= 0 ? '+' : ''}${nf(f.delta, 2)}</span></div>`;
-  const g = el('div', 'cmp');
-  g.append(el('div', 'cmp-h', '<span>Se segui il piano</span><span>Tendenza</span><span>Banda</span><span>Δ</span>'));
-  g.append(el('div', null, line('Fra 7 giorni', fp) + line('Fra 28 giorni', f28)));
-  c.append(g);
+  /* --- 1. la risposta --- */
+  const rit = fp.settimana;
+  /* Sotto i cinquanta grammi a settimana non si scrive una direzione: e'
+     dentro il rumore della bilancia, e un "stai scendendo" li' dentro e' una
+     direzione inventata. E' la stessa regola di `tempoAlTarget()`, che si
+     rifiuta quando l'intervallo del ritmo contiene lo zero. */
+  const fermo = Math.abs(rit) < 0.05;
+  const su = rit > 0;
+  const ver = el('div', 'fc-ver' + (fermo ? ' fermo' : ''));
+  ver.innerHTML = fermo
+    ? '<b>Il peso sta fermo</b><span>Seguendo il piano il ritmo e\' cosi\' '
+      + 'piccolo da non distinguersi dall\'oscillazione della bilancia.</span>'
+    : `<b>Stai ${su ? 'salendo' : 'scendendo'} di ${nf(Math.abs(rit), 2)} kg a settimana</b>`
+      + `<span>E\' il ritmo che avresti seguendo il piano da ${nf(D.target.kcal)} kcal, `
+      + 'a partire dalla tendenza di oggi.</span>';
+  c.append(ver);
 
-  if (fr && Math.abs(fr.settimana - fp.settimana) > 0.05)
-    c.append(el('p', 'hint',
-      `Mangiando invece come nelle ultime due settimane (${nf(ri)} kcal di media) il ritmo sarebbe ${fr.settimana >= 0 ? '+' : ''}${nf(fr.settimana, 2)} kg a settimana invece di ${fp.settimana >= 0 ? '+' : ''}${nf(fp.settimana, 2)}.`));
+  const oggi = el('div', 'fc-tre');
+  /* Una riga sola sotto il numero, e non due: su un telefono stretto tre
+     colonne con dentro una frase diventano tre paragrafi affiancati. */
+  const cella = (et, kg, pm, delta) => `<div class="fc-c">
+      <span class="et">${et}</span>
+      <span class="v mono">${nf(kg, 1)}<em>kg</em></span>
+      ${delta == null ? '' : `<span class="d mono">${delta >= 0 ? '+' : '\u2212'}${nf(Math.abs(delta), 1)}`
+        + ` \u00b7 \u00b1${nf(pm, 1)}</span>`}
+    </div>`;
+  oggi.innerHTML = cella('Oggi', w, null, null)
+    + cella('Fra una settimana', fp.peso, fp.banda, fp.delta)
+    + cella('Fra un mese', f28.peso, f28.banda, f28.delta);
+  c.append(oggi);
+  c.append(el('p', 'hint',
+    'Il primo numero e\' quanto cambieresti; il <strong>±</strong> e\' di '
+    + 'quanto quella previsione puo\' sbagliare. Non e\' imprecisione da '
+    + 'correggere: e\' quanto si puo\' sapere oggi, e piu\' lontano guardi piu\' '
+    + 'si allarga. Nessuna data di arrivo: oltre il mese sarebbe finzione.'));
 
+  /* Il confronto che serve davvero: il piano e' un'intenzione, quello che
+     mangi e' un fatto, e quando i due non coincidono il ritmo vero e' l'altro. */
+  if (fr && Math.abs(fr.settimana - fp.settimana) > 0.05) {
+    const d = el('div', 'fc-vero');
+    d.innerHTML = '<b>Ma non stai mangiando cosi\'</b>'
+      + `<span>Nelle ultime due settimane hai mangiato <strong>${nf(ri)} kcal</strong> `
+      + `al giorno invece di ${nf(D.target.kcal)}. Con quel ritmo il peso `
+      + (Math.abs(fr.settimana) < 0.05 ? 'starebbe <strong>fermo</strong>.'
+         : `${fr.settimana > 0 ? 'salirebbe' : 'scenderebbe'} di `
+           + `<strong>${nf(Math.abs(fr.settimana), 2)} kg a settimana</strong>.`)
+      + '</span>';
+    c.append(d);
+  }
+
+  /* --- 2. la pesata di domani --- */
   const rum = fp.rumore;
   c.append(el('div', 'card flat',
-    `<div class="eyebrow">Domani sulla bilancia</div>
-     <div class="muted">Fra ${nf(w - 1.96 * rum, 1)} e ${nf(w + 1.96 * rum, 1)} kg.
-     È una banda larga ${nf(3.92 * rum, 1)} kg perché il tuo rumore giornaliero
-     misurato è ±${nf(rum, 2)} kg: qualsiasi singola pesata dentro questo
-     intervallo non dice assolutamente niente. Per questo il motore prevede la
-     media, non il mattino.</div>`));
+    `<div class="eyebrow">La pesata di domani</div>
+     <div class="muted">Cadra\' quasi certamente fra
+     <strong>${nf(w - 1.96 * rum, 1)}</strong> e <strong>${nf(w + 1.96 * rum, 1)} kg</strong>,
+     e dentro quella forbice <strong>non vuol dire niente</strong>: sono
+     ${nf(3.92 * rum, 1)} kg di acqua e contenuto intestinale, misurati sulle
+     tue pesate. E\' il motivo per cui qui si guarda la media e non il
+     mattino.</div>`));
 
-  /* pagella */
+  /* --- 3. come fa a saperlo: in fondo, e chiuso --- */
+  const cal = E.n > 0;
+  const det = el('details', 'fc-det');
+  const sm = el('summary');
+  sm.innerHTML = '<span>Come fa a saperlo</span>'
+    + `<span class="mono">${nf(E.tdee)} kcal/giorno</span>`;
+  det.append(sm);
+
+  det.append(el('p', 'muted',
+    `L'app stima che tu spenda <strong>${nf(E.tdee)} kcal al giorno</strong>, `
+    + (cal
+        ? `e non e\' una formula: e\' <strong>misurato sul tuo bilancio</strong> — `
+          + `quanto mangi contro come si muove il peso — e corretto ${E.n} volt`
+          + `${E.n === 1 ? 'a' : 'e'} da quando registri. Allenamenti compresi: `
+          + 'per questo le calorie bruciate non si sommano da nessuna parte.'
+        : `ma per ora e\' solo una <strong>formula</strong> (Mifflin-St Jeor `
+          + `x ${M.laf}), non un dato tuo: diventa una misura dopo un paio di `
+          + 'settimane di pesate e di pasti registrati.')
+    + ` Il margine di questa stima e\' di ±${nf(E.sigma)} kcal.`));
+
   const L = ledgerScore(k);
-  const p = el('div', 'card flat');
-  p.append(el('div', 'eyebrow', 'Quanto ci prende'));
+  det.append(el('div', 'eyebrow', 'Quanto ci prende'));
   if (!L.n) {
-    p.append(el('div', 'muted',
-      `${L.aperte} prevision${L.aperte === 1 ? 'e' : 'i'} in attesa di verifica. Ogni giorno il motore deposita una previsione a 7 e a 14 giorni; quando la data arriva la confronta con il peso reale e si corregge. La prima pagella compare fra una settimana.`));
+    det.append(el('p', 'muted',
+      `Ogni giorno l'app scrive quanto peserai fra una e due settimane, e quando `
+      + `la data arriva confronta con la bilancia. Ci sono ${L.aperte} prevision`
+      + `${L.aperte === 1 ? 'e' : 'i'} in attesa: la prima pagella compare fra `
+      + 'una settimana.'));
   } else {
-    p.append(el('div', 'muted',
-      `Su ${L.n} prevision${L.n === 1 ? 'e' : 'i'} verificat${L.n === 1 ? 'a' : 'e'}:
-       errore medio <strong>${nf(L.mae, 2)} kg</strong>,
-       ${nf(L.colpiti * 100)}% dentro la banda dichiarata.
-       ${Math.abs(L.bias) > 0.15
-         ? `Sbaglia sistematicamente per ${L.bias > 0 ? 'difetto' : 'eccesso'}
-            (${L.bias > 0 ? '+' : ''}${nf(L.bias, 2)} kg): il dispendio stimato si sta
-            ancora spostando, e il filtro ha allargato il passo per recuperare.`
-         : 'Nessuna deriva sistematica: la stima del dispendio è assestata.'}`));
+    det.append(el('p', 'muted',
+      `Su ${L.n} prevision${L.n === 1 ? 'e' : 'i'} gia\' verificat`
+      + `${L.n === 1 ? 'a' : 'e'} ha sbagliato in media `
+      + `<strong>${nf(L.mae, 2)} kg</strong>, e ${nf(L.colpiti * 100)} volte su 100 `
+      + 'il peso vero e\' caduto dentro la forbice che aveva dichiarato. '
+      + (Math.abs(L.bias) > 0.15
+         ? `Sbaglia sempre dalla stessa parte (${L.bias > 0 ? '+' : '\u2212'}`
+           + `${nf(Math.abs(L.bias), 2)} kg): il dispendio si sta ancora spostando, `
+           + 'e il filtro ha allargato il passo per stargli dietro.'
+         : 'Non sbaglia sempre dalla stessa parte, quindi la stima del dispendio '
+           + 'e\' assestata.')));
     const t = el('div', 'led');
+    t.append(el('div', 'led-r led-h',
+      '<span>quando</span><span>diceva</span><span>era</span><span>scarto</span>'));
     for (const x of L.ultime.slice().reverse())
       t.append(el('div', 'led-r' + (x.dentro ? ' ok' : ''),
         `<span class="mono">${x.fatta.slice(5)}</span>
-         <span class="mono">→ ${nf(x.previsto, 2)}</span>
-         <span class="mono">reale ${nf(x.reale, 2)}</span>
-         <span class="mono">${x.errore >= 0 ? '+' : ''}${nf(x.errore, 2)}</span>`));
-    p.append(t);
+         <span class="mono">${nf(x.previsto, 2)}</span>
+         <span class="mono">${nf(x.reale, 2)}</span>
+         <span class="mono">${x.errore >= 0 ? '+' : '\u2212'}${nf(Math.abs(x.errore), 2)}</span>`));
+    det.append(t);
+    det.append(el('p', 'hint', 'Le righe verdi sono quelle in cui il peso vero '
+      + 'e\' caduto dentro la forbice.'));
   }
-  c.append(p);
-
-  c.append(el('p', 'hint',
-    'Nessuna data di arrivo: a questi ritmi qualsiasi proiezione oltre il mese è finzione, e un conto alla rovescia peggiorerebbe le decisioni invece di migliorarle. Il motore dice a che velocità stai andando adesso, e quanto si fida di sé.'));
+  c.append(det);
   return c;
 }
 
@@ -4085,99 +4165,143 @@ function sheetProfilo() {
   sheet(w);
 }
 
+/* ============================================== il menu dell'app (il ⋯)
+ *
+ * Erano dieci bottoni larghi quanto lo schermo, ognuno seguito da un
+ * paragrafo di tre o quattro righe: perche' esiste il file .ics, perche'
+ * nessuna pagina web puo' leggere Salute, cosa succede se svuoti Safari.
+ * Sono tutte cose vere e vale la pena averle scritte — ma tutte insieme, a
+ * schermo, fanno **un muro di testo davanti a un elenco di dieci voci**, e un
+ * elenco che si legge tutto per trovarne una non e' un elenco, e' una pagina.
+ *
+ * Tre mosse:
+ *
+ * 1. **la forma delle liste dell'app** — icona a sinistra, nome, una riga
+ *    sotto, chevron a destra: la stessa `.nav-r` del menu del profilo, con lo
+ *    stesso quadratino da 34 px di Oggi e dei prodotti;
+ * 2. **una riga sola per voce**, e dice *cosa fa*, non *perche' esiste*. Il
+ *    perche' non si perde: sta gia' dentro la schermata che si apre, che e'
+ *    il momento in cui serve — chi tocca "Passi e sonno dal telefono" trova
+ *    li' la spiegazione del Comando, e chi non lo tocca non aveva bisogno di
+ *    leggerla;
+ * 3. **tre gruppi**, perche' dieci voci in fila si scorrono e basta: la spesa,
+ *    i tuoi dati, l'app.
+ *
+ * Quello che resta **fuori** da una riga, ed e' voluto: la data dell'ultimo
+ * backup e la versione in uso. Sono **stato**, non descrizione — la prima e'
+ * la sola cosa che dice se quella voce ti riguarda oggi — e stanno a destra
+ * della riga, dove si leggono scorrendo senza aprire niente.
+ */
 function sheetMenu() {
   const w = el('div');
   w.append(el('div', 'eyebrow', 'Impostazioni'));
-  w.append(el('h2', 'sec', 'Dati e promemoria'));
+  w.append(el('h2', 'sec', 'L\'app e i tuoi dati'));
   w.lastChild.style.marginTop = '0';
 
-  const mk = (label, hint, fn) => {
-    const b = el('button', 'btn wide', label);
-    b.style.marginBottom = '4px'; b.onclick = fn;
-    w.append(b); w.append(el('p', 'muted', hint));
-    w.lastChild.style.margin = '0 0 14px';
+  const days = loggedDays().length;
+  const riga = el('p', 'muted',
+    `${days} giorn${days === 1 ? 'o' : 'i'} registrat${days === 1 ? 'o' : 'i'} · `
+    + `target ${nf(D.target.kcal)} kcal · dati v${D.meta.versione}`);
+  w.append(riga);
+
+  const tit = t => { w.append(el('div', 'ai-tit', t)); };
+  /**
+   * Una voce. `stato` e' quello che si vuole sapere **senza aprire**: quando
+   * hai fatto l'ultimo backup, che versione stai usando.
+   */
+  const vai = (ic, t, d, fn, stato) => {
+    const b = el('button', 'nav-r');
+    b.innerHTML = '<span class="ic"></span>'
+      + `<span class="body"><span class="t">${esc(t)}</span>`
+      + `<span class="d">${esc(d)}</span></span>`
+      + (stato ? `<span class="st">${esc(stato)}</span>` : '')
+      + '<span class="go">\u203a</span>';
+    if (typeof icona === 'function') b.querySelector('.ic').append(icona(ic, { size: 19 }));
+    b.onclick = fn;
+    w.append(b);
+    return b;
   };
 
+  /* --- la spesa --- */
   if (usaPiano()) {
-    mk('Lista della spesa',
-       'Il fabbisogno della settimana, ordinato come le corsie del tuo negozio. '
-       + 'Le quantita\' vengono dalle ricette assegnate ai giorni: non le scrivi tu.',
-       () => { closeSheet(); apri('#/spesa'); });
-    mk('Dispensa',
-       'Quello che hai gia\' in casa, e per quante settimane ti basta. Si '
-       + 'sottrae dalla lista della spesa.',
-       () => { closeSheet(); apri('#/dispensa'); });
+    tit('La spesa');
+    vai('check', 'Lista della spesa',
+      'Il fabbisogno della settimana, in ordine di corsia.',
+      () => { closeSheet(); apri('#/spesa'); });
+    vai('home', 'Dispensa',
+      'Quello che hai in casa si sottrae dalla lista.',
+      () => { closeSheet(); apri('#/dispensa'); });
   }
 
-  mk('Scarica i promemoria (.ics)',
-     'iOS non permette a una web app di programmare notifiche locali. Questo file crea gli eventi ricorrenti nel Calendario: pasti, integratori, pesata e revisione domenicale. Aprilo una volta e le notifiche arrivano native, senza server.',
-     () => { download('dieta-promemoria.ics', icsFile(), 'text/calendar'); toast('Aprilo con Calendario'); });
+  /* --- i tuoi dati --- */
+  tit('I tuoi dati');
+  vai('download', 'Esporta il backup',
+    'Tutti i profili in un file: diario, piano, palestra, prodotti.',
+    () => { const n = exportBackup();
+            toast(n > 1 ? n + ' profili esportati' : 'Backup scaricato'); },
+    S.settings.backup ? 'ultimo ' + S.settings.backup : 'mai fatto');
 
-  mk('Passi e sonno dal telefono',
-     'Nessuna pagina web puo\' leggere Salute — il permesso non esiste. Un Comando pero\' si\': legge il dato e apre l\'app col numero dentro l\'indirizzo. Qui c\'e\' la procedura.',
-     () => { closeSheet(); apri('#/salute'); });
-
-  mk('Giorni che non contano',
-     'Vacanza, influenza, trasferta: i dati restano tutti, ma la revisione settimanale e i punteggi di costanza saltano quei giorni.',
-     () => sheetPause());
-
-  mk('Esporta backup', 'Tutti i profili in un file solo: diario, piano, palestra, '
-     + 'prodotti, impostazioni. La memoria del browser può essere svuotata, e non esiste '
-     + 'copia altrove. È l\'unico modo per non perdere lo storico. '
-     + 'Le foto no: hanno un file loro, qui sotto.'
-     + (S.settings.backup ? ' Ultimo backup: ' + S.settings.backup + '.'
-                          : ' Non ne hai ancora fatto nessuno.'),
-     () => { const n = exportBackup(); toast(n > 1 ? n + ' profili esportati' : 'Backup scaricato'); });
-
-  /* Che le foto restino fuori era scritto in fondo al foglio dell'IMPORT,
-     cioe' dopo: chi esporta e chiude non lo legge mai. */
-  mk('Le foto, a parte', 'Stanno in IndexedDB e nel backup non ci sono. Da qui si '
-     + 'salvano in un file loro e si rimettono, cosi\' la copia e\' completa davvero.',
-     () => { if (typeof sheetFotoBackup === 'function') sheetFotoBackup(); });
-
-  mk('Passa la dieta o le schede',
-     'Un pezzo solo, non tutto l\'archivio: il piano alimentare, le schede di palestra, '
-     + 'o tutti e due. Serve a darli a qualcun altro o a portarli sul secondo profilo. '
-     + 'Caricandone uno si aggiunge a quello che hai, non lo sostituisce.',
-     () => sheetScambio());
-
-  mk('Importa backup', 'Prima ti mostra cosa contiene il file, poi chiede conferma.', () => {
-    const i = el('input'); i.type = 'file'; i.accept = '.json,application/json';
-    i.onchange = () => {
-      const f = i.files[0]; if (!f) return;
-      const r = new FileReader();
-      r.onload = () => {
-        try {
-          const grezzo = JSON.parse(r.result);
-          // sovrascrivere tutto alla cieca e' il modo piu' rapido di perdere
-          // l'archivio: prima si guarda cosa c'e' nel file
-          sheetImport(grezzo);
-        } catch (e) { toast('File non valido: ' + (e.message || 'illeggibile')); }
+  vai('carica', 'Importa un backup',
+    'Prima ti mostra cosa contiene il file, poi chiede conferma.', () => {
+      const i = el('input'); i.type = 'file'; i.accept = '.json,application/json';
+      i.onchange = () => {
+        const f = i.files[0]; if (!f) return;
+        const r = new FileReader();
+        r.onload = () => {
+          try {
+            const grezzo = JSON.parse(r.result);
+            // sovrascrivere tutto alla cieca e' il modo piu' rapido di perdere
+            // l'archivio: prima si guarda cosa c'e' nel file
+            sheetImport(grezzo);
+          } catch (e) { toast('File non valido: ' + (e.message || 'illeggibile')); }
+        };
+        r.readAsText(f);
       };
-      r.readAsText(f);
-    };
-    i.click();
-  });
+      i.click();
+    });
 
-  mk('Versione e aggiornamenti',
-     'Quale versione stai usando e se ce n\'e\' una piu\' nuova. Su iPhone una web app '
-     + 'aggiunta alla Home a volte viene ripristinata dalla memoria invece di ricaricare, '
-     + 'e resta indietro senza dirlo.',
-     () => sheetVersione());
+  /* Che le foto restino fuori dal backup era scritto in fondo al foglio
+     dell'IMPORT, cioe' dopo: chi esporta e chiude non lo legge mai. Adesso e'
+     il nome stesso della riga, accanto a quella dell'export. */
+  vai('immagine', 'Le foto, a parte',
+    'Nel backup non ci sono: stanno in un file loro.',
+    () => { if (typeof sheetFotoBackup === 'function') sheetFotoBackup(); });
 
-  const days = loggedDays().length;
-  const stato = el('div', 'card flat',
-    `<div class="eyebrow">Stato</div>
-     <div class="muted">${days} giorni registrati · target ${nf(D.target.kcal)} kcal,
-     ${D.target.p} g proteine · versione dati ${D.meta.versione}
-     <span class="vers"></span></div>`);
-  w.append(stato);
+  vai('condividi', 'Passa la dieta o le schede',
+    'Un pezzo solo, da dare a qualcuno o al secondo profilo.',
+    () => sheetScambio());
+
+  vai('pausa', 'Giorni che non contano',
+    'Vacanza o influenza: i dati restano, i punteggi li saltano.',
+    () => sheetPause());
+
+  /* --- l'app --- */
+  tit('L\'app');
+  vai('calendario', 'Promemoria nel Calendario',
+    'Un file .ics con pasti, integratori, pesata e revisione.',
+    () => { download('dieta-promemoria.ics', icsFile(), 'text/calendar');
+            toast('Aprilo con Calendario'); });
+
+  vai('telefono', 'Passi e sonno dal telefono',
+    'Un Comando iOS li legge e li scrive qui, senza copiarli a mano.',
+    () => { closeSheet(); apri('#/salute'); });
+
+  const bv = vai('gira', 'Versione e aggiornamenti',
+    'Quale versione stai usando, e se ce n\'e\' una piu\' nuova.',
+    () => sheetVersione(), '\u2026');
+  /* Una sola lettura per due posti: la riga in testa e lo stato della voce.
+     Due `versioneInUso()` in parallelo davano lo stesso numero due volte, e
+     bastava che una delle due arrivasse dopo il disegno perche' uno dei due
+     posti restasse vuoto. */
   versioneInUso().then(v => {
-    const t = stato.querySelector('.vers');
-    if (t && v) t.textContent = ' · app ' + v;
+    const st = bv.querySelector('.st');
+    if (!v) { st?.remove(); return; }
+    riga.append(' · app ' + v);
+    if (st) st.textContent = v.replace('dieta-', '');
   });
 
   const b = el('button', 'btn wide pri', 'Chiudi');
+  b.style.marginTop = '18px';
   b.onclick = closeSheet; w.append(b);
   sheet(w);
 }
