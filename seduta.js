@@ -132,6 +132,79 @@ function anelloRecupero(st) {
   return { svg, arco, C };
 }
 
+/**
+ * Cosa devi **preparare** prima di cominciare il passo che arriva.
+ *
+ * Non e' un doppione della carta della tecnica che sta dentro la serie:
+ * quella descrive **come si fa** e la si legge con il bilanciere in mano;
+ * questa dice **cosa procurarsi**, e si legge nell'unico momento in cui c'e'
+ * ancora tempo per farlo — il recupero. Uno stripping annunciato quando sei
+ * gia' sotto il carico e' un'informazione arrivata tardi: i dischi leggeri
+ * sono dall'altra parte della sala, e fra uno scarico e l'altro non c'e'
+ * recupero per andarli a prendere.
+ *
+ * Restituisce un elenco, perche' due cose possono valere insieme: una
+ * superserie di stripping chiede **due postazioni** e **i carichi pronti**.
+ *
+ * Quello che **non** fa e' dire quanti chili mettere sugli scarichi: la
+ * scheda tiene le ripetizioni (`strip: [6, 4]`), non i pesi, e quelli si
+ * decidono mentre si scarica. Inventarli qui sarebbe un numero che nessuno
+ * ha scelto.
+ */
+function preparaPasso(sc, passo, k) {
+  const out = [];
+  const riga = passo?.riga;
+  if (!riga) return out;
+  const scar = typeof scarichiDiRiga === 'function' ? scarichiDiRiga(riga) : [];
+  const rp = typeof usaRestPause === 'function' && usaRestPause(sc, riga);
+
+  /* Prima la postazione e poi il carico: se la seconda panca non e' libera,
+     i dischi pronti non servono a niente. */
+  if (passo.insieme && passo.prossimo) {
+    const alt = esercizio(passo.prossimo.ex)?.nome || '';
+    out.push({ cls: 'ss', tit: 'Superserie \u00b7 due postazioni',
+      testo: `Questa e <b>${esc(alt)}</b> si fanno attaccate, senza recupero in `
+        + 'mezzo: tieni libere <b>tutte e due</b> le postazioni prima di '
+        + 'cominciare, o la seconda la trovi occupata a meta\' giro.' });
+  }
+
+  if (scar.length) {
+    const quanti = scar.length;
+    const reps = scar.every(x => x == null) ? ''
+      : ' (' + scar.map(x => x == null ? '?' : x).join(' poi ') + ' ripetizioni)';
+    out.push({ cls: 'st', tit: `Stripping \u00b7 ${quanti} scaric`
+        + (quanti === 1 ? 'o' : 'hi'),
+      testo: 'Finita la serie cali il peso e riparti subito, senza recupero'
+        + reps + '. <b>Prepara adesso i carichi piu\' leggeri</b> e tienili a '
+        + 'portata di mano: in mezzo non c\'e\' tempo per andarli a cercare.' });
+  } else if (rp) {
+    const n = typeof ripartenze === 'function' ? ripartenze(riga) : 2;
+    out.push({ cls: 'rp', tit: `Rest-pause \u00d7${n}`,
+      testo: `Finita la serie, 15-20 secondi fermo e riparti, per ${n} `
+        + (n === 1 ? 'volta' : 'volte') + '. Il carico non cambia: resta al '
+        + 'posto tuo, non serve preparare altro.' });
+  } else if (riga.tecnica === 'piramidale') {
+    const b = typeof bersaglioTesto === 'function' ? bersaglioTesto(riga, passo.si) : '';
+    out.push({ cls: 'pi', tit: 'Piramidale \u00b7 il carico cambia',
+      testo: `Questa serie chiede <b>${esc(b)}</b> ripetizioni`
+        + (riga.piram?.length ? ` (l'elenco e\' ${esc(listaTesto(riga.piram))})` : '')
+        + '. Il carico sale a ogni gradino: <b>metti il disco adesso</b>, non '
+        + 'quando ti alzi.' });
+  }
+  return out;
+}
+
+/** Una parola sola per la stessa cosa, dove non c'e' spazio per la frase. */
+function tecnicaCorta(sc, passo) {
+  const riga = passo?.riga;
+  if (!riga) return '';
+  if (typeof scarichiDiRiga === 'function' && scarichiDiRiga(riga).length)
+    return 'stripping';
+  if (typeof usaRestPause === 'function' && usaRestPause(sc, riga)) return 'rest-pause';
+  if (riga.tecnica === 'piramidale') return 'piramidale';
+  return '';
+}
+
 /* ================================================ dove sei dentro la seduta
  *
  * Il recupero e' l'unico momento della seduta in cui non c'e' niente da fare
@@ -218,8 +291,10 @@ function elencoPassi(k, sc, passi, idx, s) {
     if (ora) {
       const bers = typeof bersaglioTesto === 'function'
         ? bersaglioTesto(passi[idx].riga, passi[idx].si) : '';
+      const tec = tecnicaCorta(sc, passi[idx]);
       b.innerHTML += `<span class="d">tocca a te \u00b7 serie ${passi[idx].si + 1}`
-        + (bers ? ' \u00b7 bersaglio ' + esc(bers) : '') + '</span>';
+        + (bers ? ' \u00b7 bersaglio ' + esc(bers) : '')
+        + (tec ? ` \u00b7 <b>${esc(tec)}</b>` : '') + '</span>';
     } else if (fatte) {
       const q = coda.get(exId) || [];
       const da = preso.get(exId) || 0;
@@ -313,6 +388,12 @@ function schermataRecupero(k, sc, passi, idx, s) {
       `<span class="l">poi</span><span class="n">${esc(ex.nome)}</span>
        <span class="d">serie ${prossimo.si + 1} di ${serieDiRiga(prossimo.riga)}
        · bersaglio ${esc(bers)}</span>`));
+    /* E cosa serve **prepararlo**. Qui e non dentro la serie: il recupero e'
+       l'ultimo momento in cui c'e' ancora tempo per liberare una panca o
+       tirare fuori i dischi leggeri. */
+    for (const p of preparaPasso(sc, prossimo, k))
+      w.append(el('div', 'gd-tec gd-prep ' + p.cls,
+        `<strong>${p.tit}</strong> — ${p.testo}`));
   }
 
   const vai = el('button', 'btn wide pri gd-ok', 'Recupero finito, vai');

@@ -732,6 +732,37 @@ E "Chiudi" **torna da `sheetGuidata()`**, non ricostruendo la schermata a
 mano: e' lei che sa se il recupero e' ancora vivo o se nel frattempo e'
 scaduto.
 
+**E il recupero dice cosa devi preparare.** Le carte della tecnica esistevano
+gia', ma stavano **dentro la serie**: descrivono *come si fa*, e si leggono
+con il bilanciere in mano. Uno stripping annunciato li' e' un'informazione
+arrivata tardi — i dischi leggeri sono dall'altra parte della sala e fra uno
+scarico e l'altro non c'e' recupero per andarli a prendere. La domanda vera
+non e' "come si fa" ma **"cosa mi serve"**, e ha una risposta utile solo
+finche' c'e' tempo per procurarselo: il recupero.
+
+`preparaPasso()` restituisce un **elenco** e non una carta sola, perche' due
+cose possono valere insieme — una superserie di stripping chiede due
+postazioni *e* i carichi pronti — e l'ordine non e' casuale: prima la
+postazione, poi il carico. Se la seconda panca non e' libera, i dischi pronti
+non servono a niente.
+
+| Cosa arriva | Cosa si dice |
+|---|---|
+| **superserie** | *due postazioni*: questa e X si fanno attaccate, tieni libere tutte e due o la seconda la trovi occupata a meta' giro |
+| **stripping** | *N scarichi*: prepara adesso i carichi piu' leggeri e tienili a portata di mano |
+| **rest-pause** | ×N: il carico non cambia, **resta al posto tuo** — cioe' non c'e' niente da preparare, e dirlo evita di alzarsi |
+| **piramidale** | il carico sale a ogni gradino: metti il disco adesso, non quando ti alzi |
+
+Quello che **non** fa e' dire quanti chili mettere sugli scarichi: la scheda
+tiene le ripetizioni (`strip: [6, 4]`), non i pesi, e quelli si decidono
+mentre si scarica. Inventarli qui sarebbe un numero che non ha scelto
+nessuno.
+
+Su una serie normale non compare niente: un avviso che c'e' sempre e' un
+avviso che si impara a saltare. E nell'elenco dell'occhio la stessa cosa sta
+in **una parola** attaccata al bersaglio (`\u00b7 stripping`), perche' li' non
+c'e' spazio per la frase e la frase l'hai gia' letta sul recupero.
+
 ### Una guida lasciata a meta' riprende da dove era
 
 Chiudere il foglio per sbaglio — o perche' e' suonato il telefono — non e' una
@@ -5434,6 +5465,15 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non costringere a uscire dalla guida per sapere quanto manca: durante il
   recupero non c'e' niente da fare tranne aspettare, ed e' li' che viene la
   domanda. L'elenco si apre da un occhio e si chiude tornando al recupero
+- Non annunciare uno stripping quando sei gia' sotto il bilanciere: la carta
+  della tecnica dice **come si fa** e va bene dentro la serie, ma "cosa mi
+  serve" ha una risposta utile solo finche' c'e' tempo per procurarselo. Le
+  due postazioni di una superserie e i carichi leggeri di uno stripping si
+  dicono **nel recupero prima**
+- Non far comparire un avviso di preparazione su una serie normale: uno che
+  c'e' sempre si impara a saltare
+- Non inventare i chili degli scarichi di uno stripping: la scheda tiene le
+  ripetizioni, non i pesi, e quelli si decidono mentre si scarica
 - Non dare tre stati a un elenco di esercizi dentro una scheda con le
   superserie: mentre tocca ad A2, A1 ha gia' delle serie fatte e non e' ne'
   finita ne' da fare. Spegnerla direbbe che non l'hai cominciata

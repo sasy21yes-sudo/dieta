@@ -989,6 +989,12 @@
   border-left:3px solid var(--pine-line);border-radius:0 9px 9px 0;
   padding:8px 10px;margin:8px 0}
 .gd-tec.ss{border-left-color:var(--amber)}
+/* "cosa devi preparare": la stessa carta della tecnica, ma sulla schermata
+   del recupero — dove il testo e' centrato e questo va rimesso a sinistra,
+   o una frase di tre righe centrata non si legge. L'ambra dice "guarda
+   adesso": non e' un errore, e' una cosa da fare prima di cominciare. */
+.gd-prep{text-align:left;border-left-color:var(--amber);margin:10px 0 2px}
+.gd-prep strong{color:var(--ink)}
 .gd-in{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px}
 .gd-in.due{grid-template-columns:1fr 1fr}
 .gd-in input{font-family:var(--mono);font-size:19px;text-align:center;padding:11px 6px}
