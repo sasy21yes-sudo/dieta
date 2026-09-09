@@ -692,6 +692,46 @@ l'ora non si scrive niente, che non e' un recupero ma il telefono lasciato
 aperto sul tavolo. Da li' escono la durata della seduta e il recupero medio
 del resoconto.
 
+### Durante il recupero: l'occhio, e a che punto sei
+
+Il recupero e' l'unico momento della seduta in cui non c'e' niente da fare
+tranne aspettare, ed e' esattamente li' che viene la domanda: **quanto ne
+manca?** La guida sapeva rispondere e non lo diceva — mostrava la serie di
+adesso e quella dopo, e per vedere il resto bisognava uscire dalla guida,
+cioe' perdere il posto.
+
+Un occhio in alto a destra dell'anello apre l'elenco. **Tre stati e tre pesi
+diversi**: quello che hai fatto spuntato in verde, con i chili che hai
+davvero sollevato; **quello di adesso in rilievo** — bordo verde e un'ombra
+vera, perche' in un elenco di sei righe il colore lo si cerca e l'ombra si
+vede; e quello che manca spento. In fondo, "Chiudi e torna al recupero".
+
+Quattro decisioni:
+
+1. **Una riga per esercizio, non per serie.** Dodici passi diventano quattro
+   righe, e *"a che punto sono"* e' una domanda sugli esercizi. Le serie
+   stanno dentro la riga, come `1/2 serie`.
+2. **Gli stati sono quattro, non tre**, e il quarto salta fuori dalle
+   **superserie**: dentro una coppia A1/A2 si alternano, quindi mentre tocca
+   ad A2 la riga di A1 ha gia' delle serie fatte e non e' ne' finita ne' da
+   fare. Con tre stati finiva fra quelle "da fare", spenta al 62% — cioe'
+   l'app diceva che non l'avevi cominciata mentre ci stavi dentro.
+3. **I chili si prendono con un cursore per esercizio**, non con l'indice
+   della riga: la stessa panca puo' comparire su due righe, e leggerle tutte e
+   due dalla stessa posizione le farebbe apparire duplicate. E' la stessa
+   regola gia' pagata sul modulo da scheda. Il conto `fatte/totale` viene
+   invece dai **passi**, che sono l'unica cosa che non mente: una serie
+   saltata fa avanzare il passo e non scrive niente nel registro.
+4. **Il recupero continua, e si vede.** L'anello sparisce dallo schermo, e
+   `recDisegna()` — che nasconde la barra in basso finche' l'anello e' li' —
+   la rimette. Mentre guardi l'elenco il conto e' in cima, con i suoi
+   −30/+30: non e' un effetto collaterale, e' il motivo per cui quella regola
+   guarda l'anello e non il foglio.
+
+E "Chiudi" **torna da `sheetGuidata()`**, non ricostruendo la schermata a
+mano: e' lei che sa se il recupero e' ancora vivo o se nel frattempo e'
+scaduto.
+
 ### Una guida lasciata a meta' riprende da dove era
 
 Chiudere il foglio per sbaglio — o perche' e' suonato il telefono — non e' una
@@ -5391,6 +5431,14 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   ha reso necessario, cioe' a quella appena fatta
 - Non far ripassare da "come registri?" chi ha chiuso il foglio per sbaglio a
   meta' seduta: se c'e' una guida in corso si riprende da li'
+- Non costringere a uscire dalla guida per sapere quanto manca: durante il
+  recupero non c'e' niente da fare tranne aspettare, ed e' li' che viene la
+  domanda. L'elenco si apre da un occhio e si chiude tornando al recupero
+- Non dare tre stati a un elenco di esercizi dentro una scheda con le
+  superserie: mentre tocca ad A2, A1 ha gia' delle serie fatte e non e' ne'
+  finita ne' da fare. Spegnerla direbbe che non l'hai cominciata
+- Non contare le serie fatte dal registro: una serie **saltata** fa avanzare
+  il passo e non scrive niente. Il conto viene dai passi, i chili dal registro
 - Non ricopiare a mano "mezza serie per scarico": sono `serieEquivalenti()`,
   `tonnellaggioSerie()` e `ripetizioniSerie()`, e le chiamano tutti. Copiarle
   significa che la stessa seduta vale di piu' o di meno a seconda di chi la

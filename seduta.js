@@ -132,13 +132,141 @@ function anelloRecupero(st) {
   return { svg, arco, C };
 }
 
+/* ================================================ dove sei dentro la seduta
+ *
+ * Il recupero e' l'unico momento della seduta in cui non c'e' niente da fare
+ * tranne aspettare, ed e' esattamente li' che viene la domanda: **quanto ne
+ * manca?** Fino a ora la guida sapeva rispondere e non lo diceva — mostrava
+ * la serie di adesso e la prossima, e per vedere il resto bisognava uscire
+ * dalla guida, cioe' perdere il posto.
+ *
+ * L'occhio in alto a destra apre l'elenco. Tre stati e tre pesi diversi:
+ * quello che hai fatto (spuntato, con i chili che hai davvero sollevato),
+ * **quello di adesso in rilievo**, e quello che manca in grigio. Il recupero
+ * intanto continua — e siccome l'anello sparisce dallo schermo, la barra in
+ * basso torna a fare il suo mestiere e il conto resta sotto gli occhi.
+ *
+ * Una riga per **esercizio della scheda** e non per serie: dodici passi
+ * diventano quattro righe, e "a che punto sono" e' una domanda sugli
+ * esercizi. Le serie stanno dentro la riga, come `2 di 4`.
+ *
+ * I chili si prendono da `s.serie` con **un cursore per esercizio**, non con
+ * l'indice della riga: la stessa panca puo' comparire su due righe, e
+ * leggerle tutte e due dalla stessa posizione le farebbe apparire duplicate.
+ * E' la stessa regola gia' pagata una volta sul modulo da scheda. Una serie
+ * saltata non scrive niente nel registro, quindi il conto `fatte/totale`
+ * viene dai **passi**, che sono l'unica cosa che non mente.
+ */
+function elencoPassi(k, sc, passi, idx, s) {
+  const w = el('div', 'guida gd-el');
+
+  const cap = el('div', 'gd-cap');
+  cap.append(el('span', 'eyebrow', esc(sc.nome) + ' \u00b7 a che punto sei'));
+  w.append(cap);
+
+  /* le serie registrate, in coda per esercizio: si consumano in ordine */
+  const coda = new Map();
+  for (const x of (s.serie || [])) {
+    if (!coda.has(x.ex)) coda.set(x.ex, []);
+    coda.get(x.ex).push(x);
+  }
+  const preso = new Map();
+
+  /* le righe della scheda, nell'ordine in cui i passi le incontrano: dentro
+     una superserie A1 e A2 si alternano, e l'ordine dei passi e' quello vero */
+  const ordine = [];
+  const perRiga = new Map();
+  passi.forEach((p, i) => {
+    if (!perRiga.has(p.ei)) { perRiga.set(p.ei, []); ordine.push(p.ei); }
+    perRiga.get(p.ei).push(i);
+  });
+
+  let fatteTot = 0, totTot = 0;
+  for (const ei of ordine) {
+    const ind = perRiga.get(ei);
+    const p0 = passi[ind[0]];
+    const riga = p0.riga;
+    const exId = typeof exDiRiga === 'function' ? exDiRiga(riga, k) : riga.ex;
+    const ex = esercizio(exId);
+    const fatte = ind.filter(i => i < idx).length;
+    const tot = ind.length;
+    fatteTot += fatte; totTot += tot;
+    const ora = ind.includes(idx);
+    /* Quattro stati e non tre. Il quarto salta fuori dalle **superserie**:
+       dentro una coppia A1/A2 si alternano, quindi mentre tocca ad A2 la riga
+       di A1 ha gia' delle serie fatte e non e' ne' finita ne' da fare. Con
+       tre stati finiva fra quelle "da fare", spenta al 62% — cioe' l'app
+       diceva che non l'avevi cominciata mentre ci stavi dentro. */
+    const cl = fatte >= tot ? 'fatto' : ora ? 'ora' : fatte ? 'corso' : 'poi';
+
+    const r = el('div', 'gp-r ' + cl);
+    const seg = el('span', 'seg');
+    seg.textContent = { fatto: '\u2713', ora: '\u25b6', corso: '\u00b7' }[cl] || '';
+    r.append(seg);
+
+    /* `et` e' l'oggetto delle etichette (`A1`, `B`\u2026), non una stringa: la
+       lettera sta in `.testo`, e la si mostra solo quando c'e' un gruppo —
+       una "A" davanti a un esercizio da solo non distingue niente. */
+    const b = el('span', 'b');
+    const et = p0.et?.inGruppo ? p0.et.testo : '';
+    b.innerHTML = (et ? `<span class="et">${esc(et)}</span>` : '')
+      + `<span class="n">${esc(ex?.nome || exId)}</span>`
+      + `<span class="q">${fatte}/${tot} serie</span>`;
+
+    /* Sotto la riga di adesso, cosa stai per fare; sotto quelle finite, cosa
+       hai sollevato davvero. Le altre non hanno niente da dire ancora. */
+    if (ora) {
+      const bers = typeof bersaglioTesto === 'function'
+        ? bersaglioTesto(passi[idx].riga, passi[idx].si) : '';
+      b.innerHTML += `<span class="d">tocca a te \u00b7 serie ${passi[idx].si + 1}`
+        + (bers ? ' \u00b7 bersaglio ' + esc(bers) : '') + '</span>';
+    } else if (fatte) {
+      const q = coda.get(exId) || [];
+      const da = preso.get(exId) || 0;
+      const mie = q.slice(da, da + fatte);
+      preso.set(exId, da + mie.length);
+      if (mie.length)
+        b.innerHTML += `<span class="d mono">${mie.map(x => `${nf(x.kg, 1)}\u00d7${x.reps}`
+          + (x.drop?.length ? '+' + x.drop.length : '')).join(' \u00b7 ')}</span>`;
+    }
+    r.append(b);
+    w.append(r);
+  }
+
+  const chiusi = ordine.filter(ei => perRiga.get(ei).every(i => i < idx)).length;
+  const testa = el('p', 'muted');
+  testa.innerHTML = `<strong>${fatteTot} serie su ${totTot}</strong> \u00b7 `
+    + (chiusi === 1 ? '1 esercizio finito' : chiusi + ' esercizi finiti')
+    + ` su ${ordine.length}.`;
+  cap.after(testa);
+
+  const ch = el('button', 'btn wide pri', 'Chiudi e torna al recupero');
+  ch.style.marginTop = '14px';
+  /* Torna da `sheetGuidata`, non ricostruendo la schermata a mano: e' lei che
+     sa se il recupero e' ancora vivo o se nel frattempo e' scaduto. */
+  ch.onclick = () => sheetGuidata(k, sc.id);
+  w.append(ch);
+  return w;
+}
+
 function schermataRecupero(k, sc, passi, idx, s) {
   const st = recStato();
   const prossimo = passi[idx];
   const ex = esercizio(prossimo?.riga?.ex);
   const w = el('div', 'guida gd-rec');
 
-  w.append(el('div', 'eyebrow', `${esc(sc.nome)} · recupero`));
+  /* Testata a due lati: quello che stai facendo a sinistra, l'occhio a
+     destra. Il recupero e' il solo momento in cui c'e' tempo per guardare
+     l'elenco, ed e' anche l'unico in cui la domanda viene in mente. */
+  const cap = el('div', 'gd-cap');
+  cap.append(el('span', 'eyebrow', `${esc(sc.nome)} · recupero`));
+  const occ = el('button', 'gd-occhio');
+  occ.type = 'button';
+  occ.setAttribute('aria-label', 'Vedi a che punto sei');
+  if (typeof icona === 'function') occ.append(icona('occhio', { size: 19 }));
+  occ.onclick = () => sheet(elencoPassi(k, sc, passi, idx, s));
+  cap.append(occ);
+  w.append(cap);
   const { svg, arco, C } = anelloRecupero(st);
   const box = el('div', 'gd-ring');
   box.append(svg);
