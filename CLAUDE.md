@@ -2590,6 +2590,54 @@ E `camfChiudi()` sta attaccato a `hashchange` e `pagehide`: **una spia della
 fotocamera che resta accesa e' la cosa peggiore che questa schermata possa
 lasciarsi dietro.**
 
+### "Quando apro la fotocamera e' zoomata"
+
+Segnalato cosi', ed era vero — solo che non era uno zoom: era un **ritaglio**,
+e ne arrivavano due, uno sopra l'altro.
+
+Il primo lo faceva il CSS. L'anteprima era larga quanto lo schermo e alta
+altrettanto, con `object-fit: cover`: un fotogramma 3:4 dentro un riquadro
+alto e stretto perde i fianchi. Misurato su un telefono da 390x844, con la
+barra dei comandi in fondo: **il 19% della larghezza fuori dai bordi**,
+cioe' un ingrandimento di 1,24x che nessuno ha chiesto. Su uno schermo piu'
+lungo peggiora ancora.
+
+Il secondo lo faceva il **driver**, e questo era il piu' insidioso: la
+richiesta diceva `width 1280, height 1706`, cioe' anche **che forma**. Una
+fotocamera che quella proporzione non ce l'ha nativa la ottiene ritagliando
+il sensore prima ancora di consegnare il fotogramma — e quel taglio si
+sommava all'altro. Adesso si chiede solo **quanto grande** (`width: 1440`):
+la forma la decide il dispositivo.
+
+E il riquadro si adatta a lei. `camfProporzione()` lo dimensiona sul
+fotogramma che sta arrivando — il piu' grande che ci sta **tutto** dentro il
+palco — quindi `cover` non ha piu' niente da tagliare e quello che si vede e'
+l'inquadratura intera. Il nero sopra e sotto non e' spazio sprecato: e'
+esattamente quello che fa la fotocamera di sistema, ed e' dove stanno i
+comandi.
+
+Tre dettagli che non sono cosmetici:
+
+- **la misura si scrive in pixel, non con `aspect-ratio`.** Con la larghezza
+  fissa al 100% quella proprieta' rispetta la forma finche' l'altezza ci sta e
+  la schiaccia quando non ci sta — cioe' proprio nel caso che deve reggere,
+  uno schermo basso o un fotogramma molto verticale. `min()` fra i due fattori
+  e' il conto giusto, ed e' due righe;
+- **si rimisura girando la fotocamera e ruotando il telefono**: la frontale e
+  la posteriore non danno lo stesso fotogramma, e un `resize` cambia il palco
+  sotto il riquadro;
+- **`camfRitaglio()` resta dov'era.** Adesso non taglia quasi mai niente, ma e'
+  lui che tiene la promessa di sempre — si salva quello che si vede — nel caso
+  in cui il palco costringa comunque a un ritaglio.
+
+Nota sull'attrezzatura, non sul codice: in questo headless **il fotogramma non
+arriva mai** (`videoWidth` resta 0 anche con `--use-fake-device-for-media-stream`)
+e i rettangoli non si aggiornano piu' dopo il primo calcolo di layout. La forma
+si prova percio' sul conto e sui valori scritti (`style.width`), non sui
+`getBoundingClientRect()`: 1080x1440 dentro un palco 492x1643 da' 492x656,
+1440x1080 da' 492x369, 1080x1920 da' 492x875 — tutti dentro il palco, tutti
+con la proporzione della sorgente.
+
 ### Le guide di inquadratura
 
 Il problema delle foto dei progressi non è la qualità dello scatto: è che fra
@@ -4908,6 +4956,17 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   rettangolo chiuso: il piatto ci deve stare dentro, non combaciare col bordo
 - Non aprire il pannello delle opzioni sotto l'anteprima: in fondo c'e' il
   cerchio bianco, e spostarlo mentre si sta per scattare fa sbagliare il tocco
+- Non stirare l'anteprima a tutto lo schermo con `object-fit: cover`: un
+  fotogramma 3:4 dentro un riquadro alto e stretto perde i fianchi, e da fuori
+  si vede come uno zoom. Il riquadro prende la forma del fotogramma e sta al
+  centro di un palco nero, come la fotocamera di sistema
+- Non chiedere a `getUserMedia` anche la **forma** del fotogramma: una
+  proporzione che la fotocamera non ha nativa la ottiene ritagliando il
+  sensore, e quel ritaglio si somma a quello del CSS. Si chiede quanto
+  grande, non che forma
+- Non dare la proporzione a un riquadro con `aspect-ratio` e la larghezza al
+  100%: finche' l'altezza ci sta va bene, e quando non ci sta lo schiaccia
+  invece di rimpicciolirlo. Si misura, con `min()` fra i due fattori
 - Non lasciare la fotocamera accesa dopo un cambio di rotta o un passaggio in
   secondo piano: `camfChiudi()` sta su `hashchange` e `pagehide`
 - Non far cancellare dati a un interruttore di modulo: spegnere nasconde, non

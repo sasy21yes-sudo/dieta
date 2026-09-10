@@ -1258,7 +1258,13 @@ button.sp-h{cursor:pointer}
 @keyframes camfin{from{opacity:0}to{opacity:1}}
 html.camf-on,html.camf-on body{overflow:hidden}
 
-.camf-v{position:relative;flex:1;min-height:0;overflow:hidden;background:#000}
+/* Il palco: nero, e il riquadro dell'anteprima al centro. Il riquadro porta
+   la proporzione del fotogramma (scritta dal codice), cosi' `cover` non
+   ritaglia niente; su uno schermo troppo basso `max-height` lo accorcia e li'
+   il ritaglio c'e', ma e' lo stesso che `camfCattura()` mette nel file. */
+.camf-stage{flex:1;min-height:0;display:flex;align-items:center;
+  justify-content:center;overflow:hidden}
+.camf-v{position:relative;overflow:hidden;background:#000}
 .camf-v video{width:100%;height:100%;object-fit:cover;display:block}
 .camf-v.specchio video{transform:scaleX(-1)}
 /* la guida non si specchia insieme all'anteprima: il fantasma e' un altro

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Dieta</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12594A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dieta">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="viz.css">
+</head>
+<body>
+
+<header id="topbar">
+  <button id="btn-menu" aria-label="Impostazioni">⋯</button>
+  <div id="top-title">Oggi</div>
+  <button id="btn-profilo" aria-label="Il tuo profilo" title="Il tuo profilo">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/>
+      <path d="M4.8 20c.6-3.7 3.6-5.8 7.2-5.8s6.6 2.1 7.2 5.8" fill="none"
+        stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+  </button>
+</header>
+
+<main id="view" aria-live="polite"></main>
+
+<nav id="tabbar">
+  <a href="#/oggi"      data-tab="oggi"      data-ic="utensils"><span>Oggi</span></a>
+  <a href="#/diario"    data-tab="diario"    data-ic="book"><span>Diario</span></a>
+  <a href="#/corpo"     data-tab="corpo"     data-ic="persona"><span>Corpo</span></a>
+  <a href="#/palestra"  data-tab="palestra"  data-ic="manubrio"><span>Gym</span></a>
+  <a href="#/andamento" data-tab="andamento" data-ic="andamento"><span>Andamento</span></a>
+</nav>
+
+<div id="sheet" hidden>
+  <div id="sheet-backdrop"></div>
+  <div id="sheet-panel" role="dialog" aria-modal="true">
+    <div id="sheet-grip"></div>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<div id="toast" hidden></div>
+
+<script src="piano.js"></script>
+<script src="anim.js"></script>
+<script src="cerca.js"></script>
+<script src="spesa.js"></script>
+<script src="peso.js"></script>
+<script src="icone.js"></script>
+<script src="charts.js"></script>
+<script src="timer.js"></script>
+<script src="palestra.js"></script>
+<script src="seduta.js"></script>
+<script src="carico.js"></script>
+<script src="cardio.js"></script>
+<script src="sfide.js"></script>
+<script src="giorno.js"></script>
+<script src="revisione.js"></script>
+<script src="previsioni.js"></script>
+<script src="obiettivo.js"></script>
+<script src="target.js"></script>
+<script src="hyrox.js"></script>
+<script src="prodotti.js"></script>
+<script src="foto.js"></script>
+<script src="camera.js"></script>
+<script src="salute.js"></script>
+<script src="scambio.js"></script>
+<script src="pdf.js"></script>
+<script src="statistiche.js"></script>
+<script src="confronto.js"></script>
+<script src="ai.js"></script>
+<script src="assistente.js"></script>
+<script src="app.js"></script>
+<script src="probe.js"></script></body>
+</html>

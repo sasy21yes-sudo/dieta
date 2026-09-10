@@ -45,6 +45,10 @@ function camfChiudi() {
   if (!camf) return;
   const c = camf; camf = null;
   if (c.tick) clearInterval(c.tick);
+  if (c.onres) {
+    removeEventListener('resize', c.onres);
+    removeEventListener('orientationchange', c.onres);
+  }
   if (c.url) URL.revokeObjectURL(c.url);
   if (c.stream) c.stream.getTracks().forEach(t => t.stop());
   c.root?.remove();
@@ -107,7 +111,14 @@ function camApri(o = {}) {
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-label', piatto ? 'Fotografa il piatto' : 'Autoscatto');
 
-  /* --- l'anteprima, che e' lo schermo --- */
+  /* --- l'anteprima --- */
+  /* Il riquadro prende la **proporzione del fotogramma** e sta al centro di
+     un palco nero, come la fotocamera di sistema. Prima era largo quanto lo
+     schermo e alto altrettanto, con il video in `cover`: su un telefono
+     stretto e alto quel ritaglio si mangiava un terzo dell'inquadratura, e da
+     fuori si vede come uno zoom che nessuno ha chiesto. Il nero sopra e sotto
+     non e' spazio sprecato: e' dove stanno i comandi. */
+  const stage = c.stage = el('div', 'camf-stage');
   const v = c.box = el('div', 'camf-v');
   const video = c.video = el('video');
   video.autoplay = true; video.muted = true; video.playsInline = true;
@@ -119,7 +130,15 @@ function camApri(o = {}) {
      non una conseguenza, e messa dopo fa vedere l'anteprima ribaltarsi un
      istante dopo essere comparsa. */
   v.classList.toggle('specchio', c.fronte);
-  root.append(v);
+  stage.append(v);
+  root.append(stage);
+  /* La proporzione vera arriva con il flusso, e cambia girando la fotocamera:
+     la frontale e la posteriore non danno lo stesso fotogramma. E cambia di
+     nuovo se il telefono ruota, quindi il riquadro si rimisura. */
+  video.onloadedmetadata = () => camfProporzione();
+  c.onres = () => camfProporzione();
+  addEventListener('resize', c.onres);
+  addEventListener('orientationchange', c.onres);
 
   /* --- la barra in alto: chiudi a sinistra, le pastiglie al centro --- */
   const top = el('div', 'camf-top');
@@ -176,9 +195,33 @@ function camApri(o = {}) {
 
   document.body.append(root);
   document.documentElement.classList.add('camf-on');
+  camfProporzione();   // 3:4 finche' il flusso non dice la sua
   camfChips();
   camfGuida();
   camfAccendi();
+}
+
+/**
+ * Il riquadro prende la forma del fotogramma che sta arrivando: il piu' grande
+ * che sta **tutto** dentro il palco.
+ *
+ * Cosi' `object-fit: cover` non ritaglia niente — sorgente e riquadro hanno la
+ * stessa proporzione — e quello che si vede e' tutta l'inquadratura, che e'
+ * poi quello che finisce nel file.
+ *
+ * La misura si scrive in pixel e non con `aspect-ratio`: il riquadro deve
+ * stare dentro il palco in tutte e due le direzioni, e un `aspect-ratio` con
+ * la larghezza fissa al 100% rispetta la forma finche' l'altezza ci sta e la
+ * schiaccia quando non ci sta — cioe' proprio nel caso che deve reggere.
+ */
+function camfProporzione() {
+  const c = camf; if (!c) return;
+  const vw = c.video.videoWidth || 3, vh = c.video.videoHeight || 4;
+  const s = c.stage.getBoundingClientRect();
+  if (!s.width || !s.height) return;
+  const f = Math.min(s.width / vw, s.height / vh);
+  c.box.style.width = Math.round(vw * f) + 'px';
+  c.box.style.height = Math.round(vh * f) + 'px';
 }
 
 /* ------------------------------------------------------- il flusso video */
@@ -188,12 +231,17 @@ async function camfAccendi() {
   c.err.hidden = true;
   try {
     c.stream = await navigator.mediaDevices.getUserMedia({
+      /* Solo quanto grande, non che forma: chiedere una proporzione che la
+         fotocamera non ha nativamente la fa ritagliare **prima** di arrivare
+         qui, e quel ritaglio si sommava a quello del CSS. La forma la decide
+         il dispositivo, e il riquadro si adatta a lei. */
       video: { facingMode: c.fronte ? 'user' : 'environment',
-               width: { ideal: 1280 }, height: { ideal: 1706 } },
+               width: { ideal: 1440 } },
       audio: false
     });
     if (camf !== c) { c.stream.getTracks().forEach(t => t.stop()); return; }
     c.video.srcObject = c.stream;
+    camfProporzione();
     c.box.classList.toggle('specchio', c.fronte);
     c.shot.disabled = false; c.flip.disabled = false;
   } catch (e) {
