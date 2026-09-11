@@ -491,6 +491,9 @@ function cardModuli() {
 }
 
 function viewBenvenuto(v) {
+  /* Dopo una cancellazione l'app riparte da qui: se sul telefono c'e' una
+     copia, la risposta a "da cosa vuoi partire" e' "da dove eri". */
+  if (typeof cartaRipristino === 'function') v.append(cartaRipristino());
   const c = el('div', 'card');
   c.append(el('div', 'eyebrow', 'Primo avvio'));
   c.append(el('h2', 'sec', 'Da cosa vuoi partire?'));

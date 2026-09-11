@@ -5,13 +5,13 @@
  * essere caricati da un CDN. Il motivo e' lo stesso per cui i tracciati del
  * corpo stanno in `data/corpo.json`: quest'app funziona offline e non ha un
  * build step, e una `<link>` a unpkg vorrebbe dire icone che spariscono in
- * palestra dove non prende. Sono trentuno disegni, non una dipendenza.
+ * palestra dove non prende. Sono trentadue disegni, non una dipendenza.
  *
  * Copyright (c) 2013-2024 Cole Bemis e i contributori di Lucide.
  * Feather: MIT. Lucide: ISC. Entrambe permettono la copia con questa nota.
  *
  * Tutte condividono la stessa griglia 24×24 e lo stesso tratto da 2, che e'
- * quello che le fa sembrare una famiglia invece di trentuno disegni presi in giro
+ * quello che le fa sembrare una famiglia invece di trentadue disegni presi in giro
  * — la stessa ragione per cui le icone di Gym sono disegnate a mano tutte con
  * sette tratti e lo stesso arrotondamento.
  */
@@ -101,6 +101,10 @@ const ICONE = {
   condividi: { c: [[18, 5, 3], [6, 12, 3], [18, 19, 3]],
                d: ['M8.6 13.5l6.8 4', 'M15.4 6.5l-6.8 4'] },
 
+  /* le copie automatiche: l'orologio con la freccia che torna indietro
+     (Lucide "history"). Non le due frecce circolari, che sono "aggiorna". */
+  copie: { d: ['M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8', 'M3 3v5h5',
+               'M12 7v5l4 2'] },
   /* "fammi vedere": l'occhio della guida, sopra il recupero. */
   occhio: { c: [[12, 12, 3]],
             d: ['M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'] }

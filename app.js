@@ -4263,7 +4263,22 @@ function sheetMenu() {
     'Tutti i profili in un file: diario, piano, palestra, prodotti.',
     () => { const n = exportBackup();
             toast(n > 1 ? n + ' profili esportati' : 'Backup scaricato'); },
-    S.settings.backup ? 'ultimo ' + S.settings.backup : 'mai fatto');
+    S.settings.backup
+      ? 'ultimo ' + (typeof copieData === 'function' ? copieData(S.settings.backup) : S.settings.backup)
+      : 'mai fatto');
+
+  /* Le copie automatiche stanno accanto all'export perche' sono la stessa
+     cosa fatta da sola: e lo stato a destra dice quando e' stata l'ultima,
+     che e' la sola cosa da sapere senza aprire. */
+  if (typeof sheetCopie === 'function') {
+    const bc = vai('copie', 'Copie automatiche',
+      'Ogni tre giorni, qui sul telefono. Si rimettono con un tocco.',
+      () => sheetCopie(), '\u2026');
+    copieElenco().then(a => {
+      const st = bc.querySelector('.st');
+      if (st) st.textContent = a[0] ? 'ultima ' + copieData(a[0].quando) : 'nessuna';
+    }).catch(() => bc.querySelector('.st')?.remove());
+  }
 
   vai('carica', 'Importa un backup',
     'Prima ti mostra cosa contiene il file, poi chiede conferma.', () => {
@@ -4364,6 +4379,8 @@ async function init() {
   route();
   persist();
   registraSW();
+  // la copia automatica non compete col primo disegno
+  if (typeof copiaSeServe === 'function') setTimeout(copiaSeServe, 1500);
 }
 init();
 

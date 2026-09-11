@@ -84,6 +84,7 @@ carico.js       scarico automatico + dolori e infortuni
 cardio.js       corsa e simili, tracciato GPS, cartolina PNG da condividere
 salute.js       import di passi e sonno da un Comando iOS
 scambio.js      esporta/importa un pezzo solo: la dieta, le schede, o tutti e due
+copie.js        le copie automatiche del backup in IndexedDB, ogni tre giorni
 pdf.js          generatore di PDF scritto a mano (font di base, WinAnsi)
 statistiche.js  i conti del resoconto: registro, settimana, pasti, fuori piano
 confronto.js    due alimenti a confronto: a parita' di peso, calorie, proteine
@@ -316,6 +317,8 @@ non un dettaglio.
 - **Analisi** — motore a regole "cosa sto sbagliando" (vedi sotto)
 - **Spesa** — fabbisogno settimanale aggregato per categoria, con spunta
 - **Impostazioni** — generatore `.ics`, export/import backup JSON
+- **Copie automatiche** — ogni tre giorni lo stesso backup finisce in
+  IndexedDB, sul telefono; dopo una cancellazione il benvenuto la propone
 - **Passa il piano, non l'archivio** — export/import del solo piano alimentare,
   delle sole schede di palestra, o di tutti e due. Il file si carica **sopra** a
   quello che hai, non al posto: sui nomi che esistono gia' si sceglie. Sta in
@@ -4714,6 +4717,67 @@ mai `onsuccess`. Il magazzino si sostituisce stubbando `ftx()`, che e' una
 dichiarazione di funzione e quindi vive sull'oggetto globale; `fotoTutte` e
 compagni sono `const` e riassegnarli su `window` non cambia quello che vedono.
 
+### Le copie automatiche: il backup che non dipende dalla memoria
+
+Segnalato cosi': *"il mio iPhone e' andato out of memory e ha cancellato
+tutti i dati; l'ultimo backup era di una settimana prima, le foto
+nell'IndexedDB si sono mantenute"*. localStorage e' sparito, il magazzino
+accanto no. E il backup fino a quel giorno stava solo nel file che bisogna
+ricordarsi di esportare — cioe' l'unica copia che dipende dalla memoria di
+una persona.
+
+Adesso ogni tre giorni `copie.js` mette da parte **lo stesso backup del
+menu** — `esportabile()`, tutti i profili, formato 2 — in un database
+IndexedDB suo. Non c'e' un formato nuovo: rimettere una copia passa da
+`sheetImport()`, cioe' dalla stessa anteprima e dalla stessa conferma di un
+file esportato. Verificato: il testo della copia e' identico, carattere per
+carattere, a quello che scaricherebbe "Esporta il backup".
+
+**Dove si trova quando serve.** Dopo una cancellazione l'app riparte dal
+benvenuto, e li' la domanda *"da cosa vuoi partire?"* ha una risposta che
+nessuna delle due strade offriva: **da dove eri**. Se sul telefono c'e' una
+copia, `cartaRipristino()` sta sopra tutto — la data, i giorni registrati,
+"Guarda e rimetti". Se non c'e' la carta non compare, e chi installa per la
+prima volta non vede niente. Nel menu del ⋯ la voce sta accanto all'export,
+con a destra la data dell'ultima: e' la stessa cosa fatta da sola.
+
+Cinque decisioni:
+
+1. **Un database suo, non una tabella in quello delle foto.** Aggiungerla
+   vorrebbe dire alzare la versione di `dieta-foto` e passare
+   dall'aggiornamento di un magazzino che contiene gli scatti di mesi: per
+   una comodita' non vale il rischio.
+2. **Una giornata vuota non si copia.** Dopo una cancellazione l'app riparte
+   a zero, e una copia di zero spingerebbe fuori quelle buone. Il benvenuto
+   non copia per costruzione (`pianoScelto()`), e uno stato senza nemmeno un
+   giorno pieno nemmeno.
+3. **La copia piu' completa non si butta mai.** Se ne tengono le ultime
+   cinque *piu'* quella con piu' giorni registrati. Di solito coincidono, e
+   smettono di coincidere esattamente dopo una perdita — cioe' proprio
+   quando serve. Misurato su otto copie con la piu' vecchia da 400 giorni:
+   ne restano sei, lei compresa.
+4. **Il controllo gira anche al ritorno in primo piano**, non solo
+   all'avvio: una web app aggiunta alla Home resta in memoria per giorni
+   senza ripartire, e un controllo solo all'avvio in quei giorni non
+   girerebbe mai.
+5. **Non lancia e non si appende.** Se IndexedDB non c'e' l'app vive lo
+   stesso; e siccome su iOS `indexedDB.open` a volte resta sospeso senza
+   rispondere ne' si' ne' no, il controllo ha un tetto di quindici secondi —
+   senza, il lucchetto contro le copie doppie resterebbe chiuso fino al
+   prossimo riavvio. Trovato in prova: la chiamata d'avvio, partita
+   sull'IndexedDB vero che nell'headless non risponde, bloccava tutte le
+   successive.
+
+**Il limite si dice, dove si decide quanto fidarsi.** Le copie stanno sullo
+stesso telefono: proteggono da una perdita come quella segnalata — il diario
+sparito, il resto rimasto — non da "Cancella dati siti web" ne' dalla
+rimozione dell'app dalla Home, dove se ne vanno insieme a tutto. La copia
+fuori dal telefono resta il file esportato, e il foglio lo scrive.
+
+Dettaglio di lingua trovato sulla carta: *"Del 11 set"*. Si scrive
+*dell'11*, e cosi' *dell'1* e *dell'8* — i tre numeri del mese che
+cominciano per vocale.
+
 ### Passi e sonno senza scriverli
 
 Nessuna API web legge HealthKit. Un **Comando iOS** però ha i permessi che il
@@ -4818,6 +4882,20 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   salvataggio, non un backup
 - Non dimenticare `S.settings.nFoto` dopo un import di foto: i traguardi si
   calcolano sincroni e leggono quel contatore, non IndexedDB
+- Non lasciare il backup solo al file che bisogna ricordarsi di esportare: e'
+  l'unica copia che dipende dalla memoria di una persona. Ogni tre giorni
+  `copie.js` lo mette in IndexedDB da solo
+- Non copiare uno stato vuoto, e non buttare mai la copia con piu' giorni: dopo
+  una cancellazione l'app riparte a zero, ed e' proprio li' che una rotazione
+  ingenua sostituirebbe le copie buone con quelle vuote
+- Non nascondere una copia di sicurezza in un menu: dopo una cancellazione si
+  arriva al benvenuto, ed e' li' che deve stare, sopra tutto
+- Non presentare le copie in IndexedDB come un backup fuori dal telefono:
+  proteggono dal diario perso con il resto rimasto, non da "Cancella dati siti
+  web". Il file esportato resta l'unica copia fuori
+- Non aspettare IndexedDB senza un tetto: su iOS `open` a volte resta sospeso,
+  e un lucchetto che aspetta per sempre blocca tutto quello che viene dopo
+- Non scrivere "del 11": uno, otto e undici cominciano per vocale
 - Non spostare i dati nutrizionali dentro il codice
 - Non introdurre un punteggio "cibo buono / cibo cattivo"
 - Non aggiungere obiettivi di peso a scadenza né conti alla rovescia

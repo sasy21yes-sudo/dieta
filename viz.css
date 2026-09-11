@@ -995,6 +995,10 @@
    adesso": non e' un errore, e' una cosa da fare prima di cominciare. */
 .gd-prep{text-align:left;border-left-color:var(--amber);margin:10px 0 2px}
 .gd-prep strong{color:var(--ink)}
+
+/* la copia trovata sul telefono, in cima al benvenuto: verde perche' e'
+   l'app che la propone, e il filo a sinistra la stacca dalle due strade sotto */
+.copie-rip{border-left:3px solid var(--pine)}
 .gd-in{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px}
 .gd-in.due{grid-template-columns:1fr 1fr}
 .gd-in input{font-family:var(--mono);font-size:19px;text-align:center;padding:11px 6px}
