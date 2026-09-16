@@ -21,16 +21,48 @@
  */
 'use strict';
 
+/**
+ * Cosa si puo' registrare qui dentro, oltre ai pesi.
+ *
+ * All'inizio erano solo corsa, bici e nuoto — roba che si misura in
+ * chilometri — e il posto si chiamava "Cardio". Ma chi fa **BJJ** due sere a
+ * settimana ha lo stesso identico problema: sono ore di allenamento vero che
+ * l'app non vedeva, quindi non entravano nel conto delle sedute, non
+ * comparivano nella striscia dei giorni e non pesavano nella spesa
+ * energetica. Registrarle qui invece che in un magazzino nuovo vuol dire che
+ * tutti i motori che leggono gia' `cardioDi()` se ne accorgono da soli.
+ *
+ * I **MET** vengono dal Compendium of Physical Activities: sono medie di
+ * popolazione per tipo di attivita', non misure su di te. Per le arti
+ * marziali il Compendium ne ha due — 10,3 a ritmo pieno e 5,3 per una
+ * pratica lenta da principianti — e qui c'e' il primo: una lezione fatta
+ * soprattutto di tecnica sta piu' vicino al secondo, cioe' vale circa la
+ * meta'. In ogni caso queste calorie **non si sommano al target**, come
+ * tutte le altre: servono a misurare il lavoro, non a mangiare di piu'.
+ */
 const CARDIO_TIPI = [
-  { id: 'corsa', n: 'Corsa', met: 9.8, gps: true, passo: 'min' },
-  { id: 'camminata', n: 'Camminata', met: 3.8, gps: true, passo: 'min' },
-  { id: 'bici', n: 'Bici', met: 7.5, gps: true, passo: 'kmh' },
-  { id: 'nuoto', n: 'Nuoto', met: 7.0, gps: false, passo: 'min' },
-  { id: 'vogatore', n: 'Vogatore', met: 8.0, gps: false, passo: 'min' },
-  { id: 'ellittica', n: 'Ellittica', met: 5.0, gps: false, passo: null },
-  { id: 'altro', n: 'Altro cardio', met: 6.0, gps: false, passo: null }
+  { id: 'corsa', n: 'Corsa', met: 9.8, gps: true, passo: 'min', gruppo: 'cardio' },
+  { id: 'camminata', n: 'Camminata', met: 3.8, gps: true, passo: 'min', gruppo: 'cardio' },
+  { id: 'bici', n: 'Bici', met: 7.5, gps: true, passo: 'kmh', gruppo: 'cardio' },
+  { id: 'nuoto', n: 'Nuoto', met: 7.0, gps: false, passo: 'min', gruppo: 'cardio' },
+  { id: 'vogatore', n: 'Vogatore', met: 8.0, gps: false, passo: 'min', gruppo: 'cardio' },
+  { id: 'ellittica', n: 'Ellittica', met: 5.0, gps: false, passo: null, gruppo: 'cardio' },
+  { id: 'altro', n: 'Altro cardio', met: 6.0, gps: false, passo: null, gruppo: 'cardio' },
+  { id: 'bjj', n: 'BJJ / arti marziali', met: 10.3, gps: false, passo: null, gruppo: 'sport' },
+  { id: 'boxe', n: 'Boxe / kickboxing', met: 7.8, gps: false, passo: null, gruppo: 'sport' },
+  { id: 'calcio', n: 'Calcio', met: 7.0, gps: false, passo: null, gruppo: 'sport' },
+  { id: 'tennis', n: 'Tennis / padel', met: 7.3, gps: false, passo: null, gruppo: 'sport' },
+  { id: 'basket', n: 'Basket', met: 6.5, gps: false, passo: null, gruppo: 'sport' },
+  { id: 'arrampicata', n: 'Arrampicata', met: 8.0, gps: false, passo: null, gruppo: 'sport' },
+  { id: 'yoga', n: 'Yoga / mobilita\u0300', met: 2.5, gps: false, passo: null, gruppo: 'sport' },
+  { id: 'sport', n: 'Altro sport', met: 6.0, gps: false, passo: null, gruppo: 'sport' }
 ];
-const cardioTipo = id => CARDIO_TIPI.find(t => t.id === id) || CARDIO_TIPI[6];
+/* Il ripiego era `CARDIO_TIPI[6]`, cioe' "altro cardio" **per posizione**:
+   bastava aggiungere un tipo in mezzo perche' diventasse un altro. */
+const CARDIO_ALTRO = { id: 'altro', n: 'Altro cardio', met: 6.0, gps: false, passo: null, gruppo: 'cardio' };
+const cardioTipo = id => CARDIO_TIPI.find(t => t.id === id) || CARDIO_ALTRO;
+/** Le sessioni di quel giorno che non sono cardio ma sport. */
+const cardioSport = id => cardioTipo(id).gruppo === 'sport';
 
 function cardioTutti() { P().cardio ||= {}; return P().cardio; }
 function cardioDi(k) { return cardioTutti()[k] || []; }
@@ -320,14 +352,15 @@ function cardCardio(k = today()) {
   const oggi = cardioDi(k);
   const c = el('div', 'card');
   c.append(el('div', 'row between',
-    `<strong>Cardio</strong><span class="mono muted" style="font-size:11px">${
+    `<strong>Cardio e sport</strong><span class="mono muted" style="font-size:11px">${
       oggi.length ? oggi.length + ' oggi' : 'niente oggi'}</span>`));
 
   if (!oggi.length) {
     c.append(el('div', 'muted',
-      'Corsa, camminata, bici, nuoto. Entra nel conto delle sedute della settimana '
-      + 'e nella spesa energetica — che resta una misura del lavoro fatto, non '
-      + 'calorie da rimangiare: quelle stanno gia\' dentro il dispendio stimato.'));
+      'Corsa, bici, nuoto — e gli altri sport: BJJ, boxe, calcio, arrampicata. '
+      + 'Entrano nel conto delle sedute della settimana e nella spesa energetica '
+      + '— che resta una misura del lavoro fatto, non calorie da rimangiare: '
+      + 'quelle stanno gia\' dentro il dispendio stimato.'));
   }
   for (const [i, r] of oggi.entries()) {
     const t = cardioTipo(r.tipo), an = andatura(r);
@@ -393,22 +426,30 @@ function sheetCardioRec(k, i) {
 }
 
 /** Registrazione a mano: due campi e via. */
-function sheetCardioManuale(k) {
-  let tipo = 'corsa';
+function sheetCardioManuale(k, tipo0) {
+  let tipo = tipo0 && cardioTipo(tipo0).id === tipo0 ? tipo0 : 'corsa';
   const w = el('div');
   w.append(el('div', 'eyebrow', 'Senza GPS'));
   w.append(el('h2', 'sec', 'Cosa hai fatto'));
   w.lastChild.style.marginTop = '0';
 
-  const seg = el('div', 'seg wrap');
-  for (const t of CARDIO_TIPI) {
-    const b = el('button', null, t.n);
-    b.setAttribute('aria-pressed', t.id === tipo);
-    b.onclick = () => { tipo = t.id;
-      [...seg.children].forEach(x => x.setAttribute('aria-pressed', x === b)); };
-    seg.append(b);
+  /* Quindici pastiglie in fila sono un muro: due gruppi con un'intestazione
+     ciascuno si leggono, e chi cerca il BJJ sa gia' in quale dei due
+     guardare. La scelta pero' resta **una sola** fra tutti e due i gruppi. */
+  const tutte = [];
+  const marca = () => tutte.forEach(b => b.setAttribute('aria-pressed', b.dataset.t === tipo));
+  for (const [g, lab] of [['cardio', 'Cardio'], ['sport', 'Sport']]) {
+    w.append(el('div', 'eyebrow', lab));
+    const seg = el('div', 'seg wrap');
+    for (const t of CARDIO_TIPI.filter(x => (x.gruppo || 'cardio') === g)) {
+      const b = el('button', null, t.n);
+      b.dataset.t = t.id;
+      b.onclick = () => { tipo = t.id; marca(); };
+      seg.append(b); tutte.push(b);
+    }
+    w.append(seg);
   }
-  w.append(seg);
+  marca();
 
   const g = el('div');
   g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px;margin-top:12px';
@@ -432,7 +473,13 @@ function sheetCardioManuale(k) {
   w.append(el('p', 'note',
     'La distanza e\' facoltativa ovunque tranne che sulla corsa, dove serve al '
     + 'conto delle calorie: li\' si usa il costo per chilometro invece del MET, '
-    + 'perche\' cambia molto meno con l\'andatura.'));
+    + 'perche\' cambia molto meno con l\'andatura. Gli altri sport si contano a '
+    + 'minuti, con i MET del Compendium of Physical Activities: sono medie di '
+    + 'popolazione per tipo di attivita\', non misure su di te. Sulle arti '
+    + 'marziali e\' il valore del ritmo pieno (10,3): una lezione fatta '
+    + 'soprattutto di tecnica ne vale circa la meta\'. E come tutte le calorie '
+    + 'bruciate non si sommano al target \u2014 servono a misurare il lavoro, '
+    + 'non a mangiare di piu\'.'));
   sheet(w);
 }
 

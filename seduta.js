@@ -33,23 +33,60 @@
  * righe del gruppo — se una ne ha tre e l'altra due, l'ultimo giro ha una riga
  * sola, che e' quello che succede davvero in sala.
  */
-function passiScheda(sc) {
-  const righe = (sc.esercizi || []).filter(r => esercizio(r.ex));
+/**
+ * I gruppi della scheda: una riga piu' tutte quelle attaccate dopo di lei.
+ *
+ * E' l'unita' con cui una seduta si fa davvero — dentro una superserie A1 e
+ * A2 si alternano e non si separano — e quindi e' anche l'unita' con cui
+ * l'ordine si puo' cambiare. L'`id` di un gruppo e' l'indice della sua prima
+ * riga nella scheda: non cambia se lo sposti, ed e' quello che si scrive
+ * nell'ordine di oggi.
+ */
+function gruppiScheda(sc) {
+  const es = sc.esercizi || [];
+  const out = [];
+  let i = 0;
+  while (i < es.length) {
+    let j = i + 1;
+    while (j < es.length && es[j].superserie) j++;
+    const righe = [];
+    for (let x = i; x < j; x++) if (esercizio(es[x].ex)) righe.push(x);
+    if (righe.length) out.push({ id: i, righe });
+    i = j;
+  }
+  return out;
+}
+
+/**
+ * I gruppi nell'ordine in cui li fai **oggi**.
+ *
+ * Un gruppo che l'ordine non nomina resta dov'era, in coda: la scheda si puo'
+ * correggere mentre una guida e' in corso, e un ordine scritto ieri non deve
+ * far sparire un esercizio aggiunto stamattina.
+ */
+function gruppiInOrdine(sc, ordine) {
+  const g = gruppiScheda(sc);
+  if (!Array.isArray(ordine) || !ordine.length) return g;
+  const resta = new Map(g.map(x => [x.id, x]));
+  const out = [];
+  for (const id of ordine) {
+    const x = resta.get(id);
+    if (x) { out.push(x); resta.delete(id); }
+  }
+  for (const x of g) if (resta.has(x.id)) out.push(x);
+  return out;
+}
+
+function passiScheda(sc, ordine) {
   const et = etichetteScheda(sc.esercizi || []);
   const passi = [];
-  let i = 0;
-  while (i < (sc.esercizi || []).length) {
-    // il gruppo: questa riga piu' tutte quelle attaccate dopo di lei
-    let j = i + 1;
-    while (j < sc.esercizi.length && sc.esercizi[j].superserie) j++;
-    const gruppo = [];
-    for (let x = i; x < j; x++) if (esercizio(sc.esercizi[x].ex)) gruppo.push(x);
-    const giri = Math.max(1, ...gruppo.map(x => serieDiRiga(sc.esercizi[x])));
+  for (const gr of gruppiInOrdine(sc, ordine)) {
+    const giri = Math.max(1, ...gr.righe.map(x => serieDiRiga(sc.esercizi[x])));
     for (let g = 0; g < giri; g++) {
-      const dentro = gruppo.filter(x => g < serieDiRiga(sc.esercizi[x]));
+      const dentro = gr.righe.filter(x => g < serieDiRiga(sc.esercizi[x]));
       dentro.forEach((x, n) => {
         passi.push({
-          ei: x, si: g, riga: sc.esercizi[x], et: et[x],
+          ei: x, gr: gr.id, si: g, riga: sc.esercizi[x], et: et[x],
           // dentro una coppia il recupero non c'e': il timer parte sull'ultima
           recupero: n === dentro.length - 1,
           insieme: dentro.length > 1,
@@ -57,18 +94,47 @@ function passiScheda(sc) {
         });
       });
     }
-    i = j;
   }
-  void righe;
   return passi;
+}
+
+/**
+ * Sposta un gruppo **prima di quello di adesso**, solo per questa seduta.
+ *
+ * Il rack occupato non e' sempre un motivo per cambiare esercizio: quasi
+ * sempre e' un motivo per farne un altro **di oggi** e tornare dopo. La
+ * scheda non si tocca — vale domani com'e' scritta — e l'ordine vive in
+ * `s.guida.ordine`, che sparisce con la guida.
+ *
+ * La regola che tiene in piedi il conto dei passi: **non si sposta niente
+ * sopra a quello che hai gia' fatto.** I passi prima di `i` sono il registro
+ * di com'e' andata, e devono restare esattamente dove sono — quindi si
+ * spostano solo gruppi non ancora cominciati, e solo quando quello di adesso
+ * non e' cominciato. Se una serie l'hai gia' fatta, il posto giusto per
+ * quella riga e' dov'e'.
+ */
+function spostaGruppoQui(k, sc, gid) {
+  const s = P().sessioni[k], g = s?.guida;
+  if (!g || g.scheda !== sc.id) return false;
+  const passi = passiScheda(sc, g.ordine);
+  const idx = Math.max(0, Math.min(passi.length, g.i || 0));
+  const corr = passi[idx]?.gr;
+  if (corr == null || gid === corr) return false;
+  const iniziati = new Set(passi.slice(0, idx).map(p => p.gr));
+  if (iniziati.has(corr) || iniziati.has(gid)) return false;
+  const ord = gruppiInOrdine(sc, g.ordine).map(x => x.id).filter(x => x !== gid);
+  ord.splice(ord.indexOf(corr), 0, gid);
+  g.ordine = ord;
+  save();
+  return true;
 }
 
 /** A che punto sei: l'indice del passo, o passi.length se hai finito. */
 function passoCorrente(k, sc) {
   const s = P().sessioni[k];
-  const n = passiScheda(sc).length;
-  const i = s?.guida?.scheda === sc.id ? (s.guida.i || 0) : 0;
-  return Math.max(0, Math.min(n, i));
+  const g = s?.guida?.scheda === sc.id ? s.guida : null;
+  const n = passiScheda(sc, g?.ordine).length;
+  return Math.max(0, Math.min(n, g ? (g.i || 0) : 0));
 }
 
 /**
@@ -536,6 +602,121 @@ function sheetCambiaEsercizio(k, schedaId, exOrig, torna) {
   }, torna);
 }
 
+/**
+ * Avanza l'indice della guida **senza buttare via il resto**.
+ *
+ * `s.guida = { scheda, i }` riscriveva l'oggetto a ogni serie completata o
+ * saltata, e con lui sparivano la sostituzione dell'esercizio e l'ordine di
+ * oggi: una panca sostituita alla prima serie tornava a essere la panca alla
+ * seconda, in silenzio. Qui si muove l'indice e basta.
+ */
+function avanzaGuida(s, schedaId, i) {
+  s.guida ||= { scheda: schedaId, i: 0 };
+  s.guida.scheda = schedaId;
+  s.guida.i = Math.max(0, i);
+  // l'attesa appartiene al passo che l'ha fatta partire, non al prossimo
+  delete s.guida.attesa;
+}
+
+/**
+ * "Non posso farlo": le due risposte, in ordine di quanto costano.
+ *
+ * La prima non tocca niente — **fai prima un altro esercizio di oggi**, e
+ * quello occupato lo riprendi dopo: il programma resta quello che e' e non
+ * c'e' nessun dato da spiegare piu' avanti. La seconda cambia l'esercizio, e
+ * quindi cambia lo storico dei carichi: sta sotto perche' e' la piu' cara
+ * delle due, non perche' sia sbagliata.
+ */
+function sheetNonPosso(k, sc, passi, idx) {
+  const passo = passi[idx], riga = passo.riga;
+  const exId = exDiRiga(riga, k);
+  const sostituito = exId !== riga.ex;
+  const torna = () => sheetGuidata(k, sc.id);
+
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Solo per questa seduta'));
+  w.append(el('h2', 'sec', esc(esercizio(exId)?.nome || riga.ex)));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Il rack occupato, la macchina rotta, una spalla che oggi non ne vuole '
+    + 'sapere. La scheda non cambia in nessuno dei due casi: vale domani '
+    + 'com\'e\' scritta.'));
+
+  /* --- 1. un altro esercizio di oggi, e questo si riprende dopo --- */
+  const iniziati = new Set(passi.slice(0, idx).map(p => p.gr));
+  const dopo = [];
+  for (const p of passi.slice(idx))
+    if (p.gr !== passo.gr && !dopo.includes(p.gr)) dopo.push(p.gr);
+  const spostabili = dopo.filter(g => !iniziati.has(g));
+  const qui = !iniziati.has(passo.gr);
+
+  if (spostabili.length && qui) {
+    w.append(el('div', 'eyebrow', 'Fai prima un altro esercizio di oggi'));
+    for (const gid of spostabili) {
+      const righe = passi.filter(p => p.gr === gid);
+      const nomi = [...new Set(righe.map(p => esercizio(exDiRiga(p.riga, k))?.nome || p.riga.ex))];
+      const b = el('button', 'prod');
+      b.innerHTML = `<div class="grow"><div class="nm">${esc(nomi.join(' + '))}</div>
+        <div class="mt">${esc(righe[0].et?.gruppo || '')} \u00b7 ${righe.length} ${
+          righe.length === 1 ? 'serie' : 'serie'}</div></div>
+        <div class="kc">fai questo &rsaquo;</div>`;
+      b.onclick = () => {
+        if (!spostaGruppoQui(k, sc, gid)) { toast('Questo non si puo\' spostare'); return; }
+        toast(nomi[0] + ' adesso \u00b7 ' + (esercizio(exId)?.nome || '') + ' dopo');
+        torna();
+      };
+      w.append(b);
+    }
+    w.append(el('p', 'hint',
+      'L\'ordine vale solo per oggi, e quello che salti lo trovi subito dopo. '
+      + 'Il conto dei passi e le serie gia\' registrate non si muovono.'));
+  } else if (spostabili.length) {
+    /* Il limite, detto invece che nascosto: i passi prima di questo sono il
+       registro di com'e' andata, e spostare un gruppo gia' cominciato
+       vorrebbe dire spezzarlo a meta'. */
+    w.append(el('p', 'hint',
+      'Questo esercizio l\'hai gia\' cominciato, quindi l\'ordine non si tocca '
+      + 'piu\': le serie gia\' registrate devono restare dove sono. Puoi saltare '
+      + 'la serie, oppure sostituirlo qui sotto.'));
+  }
+
+  /* --- 2. sostituiscilo, e da li' in poi lo storico e' di un altro --- */
+  const eb = el('div', 'eyebrow', spostabili.length && qui ? 'Oppure' : 'Cosa puoi fare');
+  eb.style.marginTop = '16px';
+  w.append(eb);
+  const nav = (ic, t, d, fn) => {
+    const b = el('button', 'nav-r');
+    b.innerHTML = '<span class="ic"></span>'
+      + `<span class="body"><span class="t">${esc(t)}</span>`
+      + `<span class="d">${esc(d)}</span></span><span class="go">\u203a</span>`;
+    if (typeof icona === 'function') b.querySelector('.ic').append(icona(ic, { size: 19 }));
+    b.onclick = fn;
+    w.append(b);
+  };
+  nav('manubrio', 'Sostituisci l\'esercizio',
+    'Un altro che allena la stessa cosa, solo per oggi.',
+    () => sheetCambiaEsercizio(k, sc.id, riga.ex, torna));
+
+  if (sostituito) {
+    const rim = el('button', 'btn wide');
+    rim.style.marginTop = '10px';
+    rim.textContent = 'Rimetti ' + (esercizio(riga.ex)?.nome || 'quello della scheda');
+    rim.onclick = () => {
+      const g2 = P().sessioni[k]?.guida;
+      if (g2?.sost) { delete g2.sost[riga.ex]; save(); }
+      torna();
+    };
+    w.append(rim);
+  }
+
+  const ind = el('button', 'btn wide');
+  ind.style.marginTop = '8px';
+  ind.textContent = 'Lascia com\'e\'';
+  ind.onclick = torna;
+  w.append(ind);
+  sheet(w);
+}
+
 /* ------------------------------------------------------------- la schermata */
 function sheetGuidata(k, schedaId) {
   const p = P(), sc = scheda(schedaId);
@@ -552,15 +733,17 @@ function sheetGuidata(k, schedaId) {
       return sheetSceltaModo(k);
     s.serie = [];
   }
-  const passi = passiScheda(sc);
   if (!s.guida || s.guida.scheda !== sc.id) {
     s.scheda = sc.id; s.nome = sc.nome;
     // chi ha gia' scritto delle serie a mano oggi non deve riscriverle: la
     // guida scrive un record per passo, quindi quante ne ha gia' e' anche a
     // che punto e'. E' una stima, ma l'alternativa e' ricominciare da capo
-    s.guida = { scheda: sc.id, i: Math.min(s.serie.length, passi.length) };
+    s.guida = { scheda: sc.id, i: Math.min(s.serie.length, passiScheda(sc).length) };
     save();
   }
+  /* I passi vanno letti **nell'ordine di oggi**: e' la guida a tenerlo, e la
+     scheda resta quella che e'. */
+  const passi = passiScheda(sc, s.guida.ordine);
   const idx = passoCorrente(k, sc);
 
   /* Se c'e' un recupero in corso, la schermata e' quella: la serie dopo si
@@ -782,7 +965,11 @@ function sheetGuidata(k, schedaId) {
     }
     if (dr.length) rec.drop = dr;
     s.serie.push(rec);
-    s.guida = { scheda: sc.id, i: idx + 1 };
+    /* **Si avanza, non si riscrive.** Qui c'era `s.guida = { scheda, i }`, che
+       buttava via tutto il resto dello stato della guida: la sostituzione
+       dell'esercizio durava una serie sola, e la seconda tornava a quello
+       della scheda senza dire niente. Adesso si muove l'indice e basta. */
+    avanzaGuida(s, sc.id, idx + 1);
     s.scheda = sc.id; s.nome = sc.nome;
     scordaFatica();
     save();
@@ -801,54 +988,45 @@ function sheetGuidata(k, schedaId) {
   w.append(fatto);
 
   /* Il rack occupato, la macchina rotta, una spalla che oggi non ne vuole
-     sapere: l'unica strada era abbandonare la guida. Sta sotto i bottoni
-     principali perche' e' un'eccezione, non un passaggio della seduta. */
-  const camb = el('button', 'btn wide',
-    sostituito ? 'Cambia di nuovo esercizio' : 'Non posso farlo \u00b7 cambia esercizio');
-  camb.style.marginTop = '8px';
-  camb.onclick = () => sheetCambiaEsercizio(k, sc.id, riga.ex,
-    () => sheetGuidata(k, sc.id));
-  if (sostituito) {
-    const rim = el('button', 'btn wide');
-    rim.style.marginTop = '8px';
-    rim.textContent = 'Rimetti ' + (esercizio(riga.ex)?.nome || 'quello della scheda');
-    rim.onclick = () => {
-      const g2 = P().sessioni[k]?.guida;
-      if (g2?.sost) { delete g2.sost[riga.ex]; save(); }
-      sheetGuidata(k, sc.id);
-    };
-    w.append(rim);
-  }
-  w.append(camb);
+     sapere. Le risposte sono due — fare prima un altro esercizio di oggi,
+     oppure sostituirlo — e stanno tutte e due dietro questo bottone: sulla
+     carta della serie sarebbero due eccezioni in piu' da leggere ogni volta. */
+  const camb = el('button', 'btn', 'Non posso farlo');
+  camb.onclick = () => sheetNonPosso(k, sc, passi, idx);
 
-  const salta = el('button', 'btn wide', 'Salta questa serie');
-  salta.style.marginTop = '8px';
+  const salta = el('button', 'btn', 'Salta la serie');
   salta.onclick = () => {
-    s.guida = { scheda: sc.id, i: idx + 1 };
+    avanzaGuida(s, sc.id, idx + 1);
     save(); sheetGuidata(k, sc.id);
   };
-  w.append(salta);
 
+  /* Due righe da due invece di cinque bottoni larghi uguali: con cinque
+     nessuno e' piu' secondario, e quello che si tocca dieci volte per seduta
+     finiva in mezzo alle eccezioni. Sopra il primario, qui le eccezioni, e
+     sotto — piu' piccole — le due che non appartengono alla serie. */
+  const az = el('div', 'gd-azioni');
+  az.append(salta, camb);
+  w.append(az);
+
+  const az2 = el('div', 'gd-azioni min');
   if (idx > 0) {
-    const ind = el('button', 'btn wide', 'Torna alla serie prima');
-    ind.style.marginTop = '8px';
+    const ind = el('button', 'btn', '\u2039 Serie prima');
     ind.onclick = () => {
       // tornare indietro toglie l'ultima serie scritta: e' l'unico modo per
       // correggere un numero sbagliato senza uscire dalla guida
       if (s.serie.length) s.serie.pop();
-      s.guida = { scheda: sc.id, i: idx - 1 };
-      delete s.guida.attesa;
+      avanzaGuida(s, sc.id, idx - 1);
       scordaFatica();
       save(); fermaRecupero(); sheetGuidata(k, sc.id);
     };
-    w.append(ind);
+    az2.append(ind);
   }
-
-  const esci = el('button', 'btn wide', 'Metti in pausa e chiudi');
-  esci.style.marginTop = '8px';
+  const esci = el('button', 'btn', 'Pausa e chiudi');
   esci.onclick = () => { closeSheet(); route();
     toast('Le serie fatte sono salvate: riaprendo la scheda riprendi da qui'); };
-  w.append(esci);
+  az2.append(esci);
+  if (az2.children.length === 1) az2.classList.add('uno');
+  w.append(az2);
 
   if (s.serie.length) w.append(riepilogoGuida(k));
   w.append(el('p', 'hint', RIR_SPIEGA));

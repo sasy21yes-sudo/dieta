@@ -278,8 +278,11 @@ non un dettaglio.
   di target, con la matrice del piano che la corregge. Mai applicata da sola
 - **Giorni che non contano** — vacanza o influenza escono da revisione e costanza
 - **Fiamma della striscia** — i giorni di fila disegnati, non scritti
-- **Cardio** — corsa, bici, nuoto: a mano o col GPS, con la cartolina PNG da
-  condividere. Entra nel conto delle sedute e nella spesa energetica
+- **Cardio e sport** — corsa, bici, nuoto a mano o col GPS, con la cartolina
+  PNG da condividere; e gli altri sport (BJJ, boxe, calcio, arrampicata) a
+  minuti. Entrano nel conto delle sedute e nella spesa energetica
+- **Il mese degli allenamenti** — dal calendario in alto a destra di Gym:
+  quante sessioni, dove e' finito il tempo, e la griglia del mese
 - **Integrazione dinamica** — l elenco lo componi tu, con l aderenza per voce
 - **Dati** — cruscotto: 4 riquadri statistici, calendario della costanza e 14
   grafici (peso, calorie, proteine, ripartizione dei macro, fibre, passi, sonno,
@@ -634,6 +637,56 @@ L'elenco e' **lo stesso** nei due posti (`sheetScegliRicambio`), e non e' un
 caso: e' la stessa domanda fatta in due momenti della stessa seduta, e due
 elenchi ordinati diversamente darebbero due consigli diversi sullo stesso
 attrezzo occupato.
+
+### Il rack occupato non e' sempre un motivo per cambiare esercizio
+
+Segnalato cosi': *"durante lo step by step possiamo, al posto di cambiare
+esercizio, switchare con un esercizio della scheda? Ho A, B, B1, C: arrivo a B
+ma e' occupato, faccio C, e l'ordine diventa A C B B1"*.
+
+La sostituzione c'era gia' e risponde a **un'altra domanda** — *questo
+esercizio oggi non lo posso fare affatto* — e costa: da li' in poi le serie
+finiscono nello storico di un altro esercizio. Quando il rack e' soltanto
+occupato la risposta giusta e' piu' economica, e non tocca niente: **fai prima
+un altro esercizio di oggi**, e torna dopo. Il programma resta quello che e'.
+
+Quattro decisioni:
+
+1. **Si sposta il gruppo, non la riga.** Dentro una superserie A1 e A2 si
+   alternano: spostare solo A1 vorrebbe dire spezzare la coppia. `gruppiScheda()`
+   e' quell'unita', e l'`id` di un gruppo e' l'indice della sua prima riga —
+   non cambia quando lo sposti, e quindi si puo' scrivere nell'ordine.
+2. **L'ordine vive quanto la seduta**, in `s.guida.ordine`: la scheda vale
+   domani com'e' scritta, come per la sostituzione.
+3. **Niente si sposta sopra a quello che hai gia' fatto.** I passi prima
+   dell'indice sono il registro di com'e' andata, e devono restare dove sono:
+   si spostano solo gruppi non ancora cominciati, e solo quando quello di
+   adesso non e' cominciato. Misurato su A / B+B1 / C, con A finito: l'ordine
+   passa a `A:1 A:2 C:1 C:2 B:1 B1:1 B:2 B1:2`, i due passi gia' fatti restano
+   agli stessi indici, e B e B1 restano attaccati. A meta' di un esercizio il
+   foglio non offre niente da spostare **e dice perche'** — spezzare un gruppo
+   a meta' non e' rappresentabile, e fingere di poterlo fare sarebbe peggio.
+4. **Un ordine che nomina un gruppo che non c'e' piu'** — la scheda si puo'
+   correggere mentre una guida e' in corso — non fa sparire niente: quel
+   gruppo torna in coda.
+
+**E il difetto che e' saltato fuori scrivendola.** `s.guida = { scheda, i }`
+**sostituiva l'oggetto intero** a ogni serie completata o saltata, e con lui
+spariva `sost`: una panca sostituita alla prima serie tornava a essere la
+panca alla seconda, in silenzio, e le serie dopo finivano nello storico
+dell'esercizio sbagliato. Per vederlo bisogna sostituire **e poi** completare,
+ed e' il motivo per cui non lo aveva notato nessuno. Adesso c'e'
+`avanzaGuida()`, che muove l'indice e basta — e l'ordine, che vive nello
+stesso posto, sarebbe sparito allo stesso modo alla prima serie.
+
+**I bottoni erano sei**, tutti larghi uguali e uno sotto l'altro: completata,
+cambia esercizio, rimetti, salta, torna indietro, chiudi. Con sei bottoni
+identici nessuno e' piu' secondario, e quello che si tocca dieci volte per
+seduta stava in mezzo alle eccezioni. Adesso: **uno** pieno a tutta larghezza
+(la serie e' fatta), una riga da due per le eccezioni (salta / non posso
+farlo), e sotto, piu' quieta, la riga da due che non appartiene alla serie
+(torna indietro / pausa). "Rimetti quello della scheda" e' sceso dentro il
+foglio delle eccezioni, che e' l'unico posto da cui ci si arriva.
 
 ### Quanti scarichi li decidi mentre li fai
 
@@ -1085,6 +1138,69 @@ scrive, perche' e' esattamente il tipo di numero che si legge come un voto.
 Il moltiplicatore accanto (`1,62× il tuo solito`) e' invece un confronto con
 se stessi, ed e' l'unico dei quattro che non dipende da come stanno gli altri
 muscoli.
+
+### Non tutto l'allenamento e' fatto di serie
+
+Segnalato cosi': *"ho bisogno di aggiungere la possibilita' di fare altri
+sport: per esempio sessioni di BJJ"*. Chi si allena due sere a settimana in
+un dojo aveva un solo posto dove metterle — il riquadro **Cardio** — e quel
+posto porta il nome di un'altra cosa.
+
+La strada corta sarebbe stata un magazzino nuovo. Quella giusta e' estendere
+**quello che c'e' gia'**: tutto cio' che legge `cardioDi()` se ne accorge da
+solo, e sono quattro motori — `allenatoIl()` (e con lui la striscia dei
+giorni, i punteggi di costanza e il conteggio delle sedute della revisione),
+`kcalAllenamento()`, il riquadro di Gym, il riassunto del giorno. Un registro
+nuovo avrebbe voluto dire toccarli tutti e quattro, e dimenticarne uno.
+
+Otto tipi in piu' — BJJ e arti marziali, boxe, calcio, tennis, basket,
+arrampicata, yoga, "altro sport" — con un campo `gruppo` che divide le
+pastiglie in **Cardio** e **Sport**: quindici in fila sarebbero un muro, e chi
+cerca il BJJ sa gia' in quale dei due guardare.
+
+I **MET** vengono dal Compendium of Physical Activities e sono medie di
+popolazione, non misure su di te: la schermata lo scrive. Sulle arti marziali
+il Compendium ne ha **due** — 10,3 a ritmo pieno, 5,3 per la pratica lenta da
+principianti — e qui c'e' il primo, con accanto la nota che una lezione fatta
+soprattutto di tecnica vale circa la meta'. Resta vero quello che vale per
+tutte le altre: **queste calorie non si sommano al target**, quindi una stima
+generosa non sposta niente di quello che l'app giudica.
+
+Nel farlo, un difetto vecchio: il ripiego di `cardioTipo()` era
+`CARDIO_TIPI[6]`, cioe' "altro cardio" **per posizione**. Bastava aggiungere
+un tipo in mezzo perche' diventasse un altro — ed e' esattamente quello che
+questa modifica stava per fare.
+
+E la riga in **"Come registri?"**: quella schermata offriva due strade che
+parlano di schede e di carichi, e chi era andato a fare BJJ non si riconosceva
+in nessuna delle due.
+
+### Il mese degli allenamenti
+
+La striscia dei giorni risponde a *questa settimana*: tre settimane, e si apre
+su oggi. La domanda *"quante volte ci sono andato questo mese"* non ha un
+posto, e non e' la stessa domanda — quindi non e' la stessa schermata.
+
+Un'icona di calendario in alto a destra della carta, e dietro il mese a
+griglia. Tre decisioni:
+
+1. **I numeri non si ricalcolano.** Quante sessioni, quanti minuti e quante
+   calorie li sa gia' `kcalAllenamento()`, che e' l'unico posto in cui sta
+   scritto quanto dura una seduta di pesi quando non l'hai dichiarata. L'unica
+   aggiunta e' un campo `classe` su ogni riga — pesi, cardio, sport — perche'
+   il calendario possa distinguerli senza indovinarlo dal nome.
+2. **Pieno i pesi, vuoto il resto.** Il segno di una giornata e' la forma e
+   non solo il colore, come i due tratteggi dei grafici: qui serve davvero,
+   perche' i pallini stanno dentro un quadrato da nove pixel.
+3. **La media a settimana si fa sui giorni passati del mese**, o il mese in
+   corso sembrerebbe sempre in ritardo il giorno 3.
+
+Sotto la griglia, due grafici che rispondono alle due domande che nascono
+guardandola: **dove e' finito il tempo** (minuti per disciplina, a barre
+orizzontali — la forma giusta quando i nomi sono lunghi) e **i minuti al
+giorno** del mese. E l'icona riapre sempre **questo** mese: rimettere quello
+in cui eri finito scorrendo indietro sarebbe la risposta a una domanda di
+ieri.
 
 ### Cardio, e perché il GPS ha un asterisco
 
@@ -5687,6 +5803,29 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non far cambiare la scheda a una sostituzione fatta durante la seduta: il
   rack occupato di oggi non e' un cambio di programma. Dura quanto la seduta,
   e quello che resta e' la serie registrata
+- Non offrire solo la sostituzione quando un attrezzo e' occupato: cambiare
+  esercizio costa uno storico dei carichi, fare prima un altro esercizio di
+  oggi non costa niente. Prima la strada che non tocca il programma
+- Non spostare un gruppo gia' cominciato, e non spostare niente sopra ai passi
+  gia' fatti: quelli sono il registro di com'e' andata. E l'unita' che si
+  sposta e' il gruppo, o una superserie si spezza a meta'
+- Non riscrivere `s.guida` per far avanzare l'indice: `{ scheda, i }` buttava
+  via la sostituzione dell'esercizio a ogni serie, e la seconda serie tornava
+  in silenzio all'esercizio della scheda. Si passa da `avanzaGuida()`
+- Non lasciare sei bottoni larghi uguali uno sotto l'altro: con sei nessuno e'
+  piu' secondario, e quello che si tocca dieci volte per seduta finisce in
+  mezzo alle eccezioni. Uno pieno, le eccezioni in riga, il resto piu' quieto
+- Non inventare un magazzino nuovo per gli altri sport: `cardioDi()` lo
+  leggono gia' `allenatoIl()`, `kcalAllenamento()`, la striscia dei giorni e
+  la costanza. Si estende quello, e i quattro motori se ne accorgono da soli
+- Non far ricadere `cardioTipo()` su `CARDIO_TIPI[6]`: e' un ripiego **per
+  posizione**, e basta aggiungere un tipo in mezzo perche' diventi un altro
+- Non presentare un MET come una misura: sono medie di popolazione del
+  Compendium, e sulle arti marziali ce ne sono due che differiscono del
+  doppio. Si dichiara quale si sta usando
+- Non ricalcolare nel calendario quanto dura una seduta: lo sa gia'
+  `kcalAllenamento()`, ed e' l'unico posto in cui la stima dalle serie sta
+  scritta. Si aggiunge semmai un campo alle sue righe
 - Non lasciare che carico proposto, progressione e avviso sugli acciacchi
   guardino l'esercizio scritto in scheda quando quello che stai facendo e' un
   altro: sono i numeri di un esercizio diverso

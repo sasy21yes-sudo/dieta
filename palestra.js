@@ -264,7 +264,8 @@ function kcalAllenamento(k) {
     // durata dichiarata se c'e', altrimenti stimata dalle serie (tempo sotto
     // tensione piu' recupero): e' una stima, e la UI lo dice
     const min = sess?.durata || Math.min(150, Math.max(15, ser.length * M.minuti_per_serie));
-    righe.push({ tipo: 'Pesi', min, kcal: met(M.pesi, min), stimata: !sess?.durata });
+    righe.push({ tipo: 'Pesi', classe: 'pesi', min, kcal: met(M.pesi, min),
+                 stimata: !sess?.durata });
   }
 
   const sim = (S.hyrox?.sim || []).find(s => s.data === k && s.totale > 0);
@@ -274,19 +275,23 @@ function kcalAllenamento(k) {
     // la corsa si conta a chilometri, che e' piu' preciso dei MET
     const kcalCorsa = km * peso * M.corsa_kcal_per_kg_km;
     const minStaz = Math.max(0, min - (sim.corse || []).reduce((a, b) => a + (b || 0), 0) / 60);
-    righe.push({ tipo: 'Gara', min, kcal: kcalCorsa + met(M.simulazione, minStaz) });
+    righe.push({ tipo: 'Gara', classe: 'sport', min,
+                 kcal: kcalCorsa + met(M.simulazione, minStaz) });
   } else {
     const hs = S.hyrox?.sessioni?.[k];
     if (hs && hs.fatto) {
       const a = HX?.allenamenti.find(x => x.id === hs.id);
       const min = hs.durata || a?.durata || 45;
-      righe.push({ tipo: 'HYROX', min, kcal: met(M[a?.tipo] ?? M.capacita, min) });
+      righe.push({ tipo: 'HYROX', classe: 'sport', min, kcal: met(M[a?.tipo] ?? M.capacita, min) });
     }
   }
   // il cardio ha il suo conto — sulla corsa a chilometri, sul resto a MET —
   // e finisce nello stesso totale: e' sempre lavoro fatto
   if (typeof cardioDi === 'function') for (const c of cardioDi(k))
-    righe.push({ tipo: cardioTipo(c.tipo).n, min: Math.round((c.durata_s || 0) / 60),
+    righe.push({ tipo: cardioTipo(c.tipo).n,
+                 classe: typeof cardioSport === 'function' && cardioSport(c.tipo)
+                   ? 'sport' : 'cardio',
+                 min: Math.round((c.durata_s || 0) / 60),
                  kcal: c.kcal ?? kcalCardio(c) });
 
   return { tot: righe.reduce((a, r) => a + r.kcal, 0), righe };
@@ -802,6 +807,151 @@ function stripCalendario() {
   return box;
 }
 
+/* ================================================ il mese degli allenamenti */
+const meseDi = k => k.slice(0, 7);
+function giorniDelMese(m) {
+  const [a, me] = m.split('-').map(Number);
+  const n = new Date(a, me, 0).getDate();
+  const out = [];
+  for (let i = 1; i <= n; i++) out.push(m + '-' + String(i).padStart(2, '0'));
+  return out;
+}
+function meseSposta(m, d) {
+  const [a, me] = m.split('-').map(Number);
+  const x = new Date(a, me - 1 + d, 1);
+  return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0');
+}
+
+/**
+ * Quante volte ti sei allenato, e di cosa.
+ *
+ * I numeri **non** si ricalcolano qui: le sessioni di una giornata, i minuti
+ * e le calorie li sa gia' `kcalAllenamento()`, che e' l'unico posto in cui
+ * sta scritto quanto dura una seduta di pesi quando non l'hai dichiarato. Qui
+ * si conta e basta — due motori che contano la stessa cosa prima o poi danno
+ * due numeri diversi.
+ */
+function meseGym(m) {
+  const oggi = today();
+  const giorni = giorniDelMese(m).filter(k => k <= oggi);
+  const perTipo = new Map();
+  let sessioni = 0, min = 0, kcal = 0, attivi = 0;
+  const perGiorno = new Map();
+  for (const k of giorni) {
+    const righe = typeof kcalAllenamento === 'function' ? kcalAllenamento(k).righe : [];
+    if (righe.length) attivi++;
+    perGiorno.set(k, righe);
+    for (const r of righe) {
+      sessioni++; min += r.min || 0; kcal += r.kcal || 0;
+      perTipo.set(r.tipo, (perTipo.get(r.tipo) || 0) + (r.min || 0));
+    }
+  }
+  return { giorni, perGiorno, sessioni, attivi, min, kcal,
+           perTipo: [...perTipo].map(([nome, v]) => ({ nome, v }))
+             .sort((a, b) => b.v - a.v) };
+}
+
+/**
+ * Il mese, a griglia. La domanda e' *"quante volte ci sono andato"*, e a
+ * quella un calendario risponde a colpo d'occhio mentre un elenco no.
+ *
+ * I pallini dicono anche **cosa**: pieno i pesi, vuoto tutto il resto. La
+ * forma e non solo il colore, come per i due tratteggi dei grafici — e qui
+ * serve davvero, perche' i due segni stanno dentro un quadrato da nove pixel.
+ */
+function sheetMeseGym(mese) {
+  const oggi = today();
+  /* Senza argomento e' **questo** mese: l'icona in alto a destra vuol dire
+     "come sta andando adesso", e riaprirla sul mese in cui eri finito
+     scorrendo indietro sarebbe una risposta a una domanda di ieri. Le frecce
+     il mese se lo passano da sole. */
+  const m = mese || meseDi(oggi);
+  const dati = meseGym(m);
+  const w = el('div');
+
+  const cap = el('div', 'gmese-cap');
+  const giu = el('button', 'gmese-nav', '\u2039');
+  giu.setAttribute('aria-label', 'Il mese prima');
+  giu.onclick = () => sheetMeseGym(meseSposta(m, -1));
+  const su = el('button', 'gmese-nav', '\u203a');
+  const avanti = m < meseDi(oggi);
+  su.disabled = !avanti;
+  su.setAttribute('aria-label', 'Il mese dopo');
+  su.onclick = () => avanti && sheetMeseGym(meseSposta(m, 1));
+  const tit = el('div', 't');
+  tit.innerHTML = `<span class="eyebrow">Allenamenti</span>
+    <strong>${esc(MESI_L[+m.slice(5, 7) - 1])} ${m.slice(0, 4)}</strong>`;
+  cap.append(giu, tit, su);
+  w.append(cap);
+
+  /* Tre numeri, e il terzo e' quello che dice se il ritmo regge: la media a
+     settimana si fa sui giorni **passati** del mese, o il mese in corso
+     sembrerebbe sempre in ritardo. */
+  const sett = Math.max(1, dati.giorni.length / 7);
+  const n = el('div', 'an-conta tre');
+  n.innerHTML = `<div><b>${dati.sessioni}</b><span>${
+      dati.sessioni === 1 ? 'sessione' : 'sessioni'}</span></div>
+    <div><b>${nf(dati.min / 60, 1)}</b><span>ore</span></div>
+    <div><b>${nf(dati.sessioni / sett, 1)}</b><span>a settimana</span></div>`;
+  w.append(n);
+
+  /* --- la griglia --- */
+  const gr = el('div', 'gmese');
+  for (const d of ['L', 'M', 'M', 'G', 'V', 'S', 'D'])
+    gr.append(el('span', 'dow', d));
+  const tutti = giorniDelMese(m);
+  for (let i = 0; i < dayIdx(tutti[0]); i++) {
+    const v = el('i', 'gm-v');
+    v.style.visibility = 'hidden';
+    gr.append(v);
+  }
+  for (const k of tutti) {
+    const righe = dati.perGiorno.get(k) || [];
+    const futuro = k > oggi;
+    const b = el('button', 'gm-d' + (k === oggi ? ' oggi' : '') + (futuro ? ' futuro' : ''));
+    const punti = righe.slice(0, 3).map(r =>
+      `<i class="${r.classe === 'pesi' ? 'pieno' : 'vuoto'}"></i>`).join('');
+    b.innerHTML = `<span class="num">${+k.slice(8)}</span>`
+      + `<span class="pt">${punti}${righe.length > 3 ? '<em>+</em>' : ''}</span>`;
+    b.disabled = !righe.length;
+    b.setAttribute('aria-label', dataLunga(k) + ': '
+      + (righe.length ? righe.map(r => r.tipo).join(', ') : 'niente'));
+    b.title = b.getAttribute('aria-label');
+    if (righe.length) b.onclick = () => sheetRiassuntoGiorno(k);
+    gr.append(b);
+  }
+  w.append(gr);
+  w.append(el('div', 'gmese-leg',
+    '<i class="pieno"></i> pesi <i class="vuoto"></i> cardio e sport'));
+
+  if (!dati.sessioni) {
+    w.append(el('p', 'hint', 'Niente registrato in questo mese.'));
+  } else {
+    /* Dove e' finito il tempo: e' la domanda che nasce guardando la griglia,
+       e i minuti la reggono meglio delle calorie — quelle dipendono da un MET
+       che e' una media di popolazione. */
+    if (typeof chartHBars === 'function')
+      w.append(chartHBars({ titolo: 'Dove e\' finito il tempo',
+        sub: 'minuti per disciplina, in questo mese',
+        righe: dati.perTipo, unit: 'min',
+        note: 'I minuti di una seduta di pesi sono stimati dalle serie quando non '
+          + 'hai dichiarato la durata. Le calorie di tutto questo restano una '
+          + 'misura del lavoro fatto: non si sommano al target.' }));
+
+    if (typeof chartBars === 'function')
+      w.append(chartBars({ titolo: 'Minuti al giorno', days: dati.giorni,
+        vals: dati.giorni.map(k => (dati.perGiorno.get(k) || [])
+          .reduce((a, r) => a + (r.min || 0), 0)),
+        unit: 'min', serieNome: 'minuti', dec: 0 }));
+  }
+
+  const x = el('button', 'btn wide pri', 'Chiudi');
+  x.style.marginTop = '12px';
+  x.onclick = closeSheet;
+  w.append(x);
+  sheet(w);
+}
+
 /**
  * Il giorno, aperto: **un riassunto e basta.**
  *
@@ -824,7 +974,8 @@ function sheetRiassuntoGiorno(k) {
   const card = typeof cardioDi === 'function' ? cardioDi(k) : [];
   const w = el('div');
   w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : dataLunga(k)));
-  w.append(el('h2', 'sec', card.length ? 'Cardio' : 'Allenamento'));
+  w.append(el('h2', 'sec', card.length === 1
+    ? cardioTipo(card[0].tipo).n : 'Allenamento'));
   w.lastChild.style.marginTop = '0';
   const st = statoAllenamento(k);
   w.append(el('div', 'gcal-st ' + st, STATO_GYM[st]));
@@ -954,7 +1105,18 @@ function viewPalestra(v) {
   const oggi = sess?.serie?.length ? sess : null;
   const card2 = typeof cardioDi === 'function' ? cardioDi(k) : [];
   const testa = el('div', 'card');
-  testa.append(el('div', 'eyebrow', 'Allenamento'));
+  /* L'occhiello a sinistra e il calendario a destra: la striscia risponde a
+     "questa settimana", il calendario a "questo mese" — sono due domande
+     diverse, e la seconda non merita un riquadro in piu' nella griglia. */
+  const cap = el('div', 'gcal-cap');
+  cap.append(el('div', 'eyebrow', 'Allenamento'));
+  const bCal = el('button', 'gcal-ico');
+  bCal.setAttribute('aria-label', 'Il mese degli allenamenti');
+  bCal.title = 'Il mese degli allenamenti';
+  if (typeof icona === 'function') bCal.append(icona('calendario', { size: 19 }));
+  bCal.onclick = () => sheetMeseGym();
+  cap.append(bCal);
+  testa.append(cap);
   /* La striscia prende il posto dei due bottoni: ci si arriva toccando il
      giorno, e cosi' si apre anche un giorno che non e' oggi — cosa che prima
      non si poteva fare da nessuna parte. */
@@ -1036,7 +1198,7 @@ function viewPalestra(v) {
     ? sett.reduce((a, d) => a + cardioDi(d).length, 0) : 0;
   const kmCard = typeof cardioDi === 'function'
     ? sett.reduce((a, d) => a + cardioDi(d).reduce((x, c) => x + (c.distanza_m || 0), 0), 0) / 1000 : 0;
-  g.append(riquadroGym('cardio', 'Cardio',
+  g.append(riquadroGym('cardio', 'Cardio e sport',
     nCard ? `${nCard} questa settimana${kmCard ? ' · ' + nf(kmCard, 1) + ' km' : ''}`
           : 'niente questa settimana',
     () => { gymTab = 'cardio'; route(); }));
@@ -1830,6 +1992,22 @@ function sheetSceltaModo(k) {
       + 'e si continua dal modulo.'));
   }
 
+  /* **Non tutto l'allenamento e' fatto di serie.** Chi fa BJJ, boxe o
+     arrampicata arrivava qui e trovava due strade che parlano di schede e di
+     carichi: l'unico posto per la sua ora e mezza era il riquadro "Cardio",
+     cioe' un nome che quella cosa non ce l'ha. La riga sta in fondo perche'
+     da qui si registrano soprattutto i pesi, ma c'e'. */
+  const altro = () => {
+    const b = el('button', 'nav-r');
+    b.innerHTML = '<span class="ic"></span>'
+      + '<span class="body"><span class="t">Un altro sport</span>'
+      + '<span class="d">BJJ, boxe, corsa, nuoto: minuti e via.</span></span>'
+      + '<span class="go">\u203a</span>';
+    if (typeof icona === 'function') b.querySelector('.ic').append(icona('andamento', { size: 19 }));
+    b.onclick = () => { if (typeof sheetCardioManuale === 'function') sheetCardioManuale(k); };
+    return b;
+  };
+
   if (gia) {
     // dallo storico si arriva qui su una seduta di tre mesi fa, e "continua
     // quella di oggi" era la frase sbagliata: li' non si continua niente, si
@@ -1899,6 +2077,9 @@ function sheetSceltaModo(k) {
   b2.style.marginTop = '8px';
   b2.onclick = () => sheetLibero(k, true);
   w.append(b2);
+
+  w.append(el('div', 'eyebrow', 'Non sono pesi'));
+  w.append(altro());
 
   /* Una seduta registrata per sbaglio — il giorno sbagliato, due volte la
      stessa — restava li' per sempre, e non e' un dettaglio: entra nel volume
