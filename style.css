@@ -430,6 +430,26 @@ button.swapopt:active{background:var(--wash)}
 .gcal-oggi .d{font-size:12px;color:var(--ink-3);white-space:nowrap}
 .gcal-oggi .btn{flex:0 0 auto}
 
+/* ---- la scelta dell'allenamento, stile elenco dell'orologio ----
+   Le righe sono le `.nav-r` di sempre: stessa icona da 34 px, stesso raggio,
+   stessa tinta. Quello che cambia e' che qui si tocca per **cominciare**, e
+   allora il tocco si sente: la riga si abbassa di un soffio sotto il dito.
+   Solo transform, cioe' una cosa che il browser compone senza rifare il
+   layout — e con reduced-motion non si muove niente. */
+.act-l .nav-r{transition:transform .18s cubic-bezier(.2,.7,.3,1)}
+.act-l .nav-r:active{transform:scale(.985)}
+.act-l .eyebrow{margin-top:14px}
+.act-l .eyebrow:first-child{margin-top:6px}
+.act-tit{font-weight:600;font-size:15px;margin:14px 0 2px}
+/* L'icona grande in testa al foglio di una seduta: dice **cosa** stai
+   salvando prima del titolo, come la schermata di un allenamento. */
+.act-big{width:44px;height:44px;border-radius:14px;background:var(--pine-soft);
+  color:var(--pine);display:grid;place-items:center;margin:0 0 10px}
+@media (prefers-reduced-motion:reduce){
+  .act-l .nav-r{transition:none}
+  .act-l .nav-r:active{transform:none}
+}
+
 /* L'occhiello e il calendario, sulla stessa riga: la striscia risponde a
    "questa settimana", il calendario a "questo mese". */
 .gcal-cap{display:flex;align-items:center;justify-content:space-between;gap:8px}

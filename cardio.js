@@ -41,25 +41,25 @@
  * tutte le altre: servono a misurare il lavoro, non a mangiare di piu'.
  */
 const CARDIO_TIPI = [
-  { id: 'corsa', n: 'Corsa', met: 9.8, gps: true, passo: 'min', gruppo: 'cardio' },
-  { id: 'camminata', n: 'Camminata', met: 3.8, gps: true, passo: 'min', gruppo: 'cardio' },
-  { id: 'bici', n: 'Bici', met: 7.5, gps: true, passo: 'kmh', gruppo: 'cardio' },
-  { id: 'nuoto', n: 'Nuoto', met: 7.0, gps: false, passo: 'min', gruppo: 'cardio' },
-  { id: 'vogatore', n: 'Vogatore', met: 8.0, gps: false, passo: 'min', gruppo: 'cardio' },
-  { id: 'ellittica', n: 'Ellittica', met: 5.0, gps: false, passo: null, gruppo: 'cardio' },
-  { id: 'altro', n: 'Altro cardio', met: 6.0, gps: false, passo: null, gruppo: 'cardio' },
-  { id: 'bjj', n: 'BJJ / arti marziali', met: 10.3, gps: false, passo: null, gruppo: 'sport' },
-  { id: 'boxe', n: 'Boxe / kickboxing', met: 7.8, gps: false, passo: null, gruppo: 'sport' },
-  { id: 'calcio', n: 'Calcio', met: 7.0, gps: false, passo: null, gruppo: 'sport' },
-  { id: 'tennis', n: 'Tennis / padel', met: 7.3, gps: false, passo: null, gruppo: 'sport' },
-  { id: 'basket', n: 'Basket', met: 6.5, gps: false, passo: null, gruppo: 'sport' },
-  { id: 'arrampicata', n: 'Arrampicata', met: 8.0, gps: false, passo: null, gruppo: 'sport' },
-  { id: 'yoga', n: 'Yoga / mobilita\u0300', met: 2.5, gps: false, passo: null, gruppo: 'sport' },
-  { id: 'sport', n: 'Altro sport', met: 6.0, gps: false, passo: null, gruppo: 'sport' }
+  { id: 'corsa', n: 'Corsa', met: 9.8, gps: true, passo: 'min', gruppo: 'cardio', ic: 'corsa' },
+  { id: 'camminata', n: 'Camminata', met: 3.8, gps: true, passo: 'min', gruppo: 'cardio', ic: 'camminata' },
+  { id: 'bici', n: 'Bici', met: 7.5, gps: true, passo: 'kmh', gruppo: 'cardio', ic: 'bici' },
+  { id: 'nuoto', n: 'Nuoto', met: 7.0, gps: false, passo: 'min', gruppo: 'cardio', ic: 'onda' },
+  { id: 'vogatore', n: 'Vogatore', met: 8.0, gps: false, passo: 'min', gruppo: 'cardio', ic: 'remo' },
+  { id: 'ellittica', n: 'Ellittica', met: 5.0, gps: false, passo: null, gruppo: 'cardio', ic: 'ellittica' },
+  { id: 'altro', n: 'Altro cardio', met: 6.0, gps: false, passo: null, gruppo: 'cardio', ic: 'cuore' },
+  { id: 'bjj', n: 'BJJ / arti marziali', met: 10.3, gps: false, passo: null, gruppo: 'sport', ic: 'cintura' },
+  { id: 'boxe', n: 'Boxe / kickboxing', met: 7.8, gps: false, passo: null, gruppo: 'sport', ic: 'guanto' },
+  { id: 'calcio', n: 'Calcio', met: 7.0, gps: false, passo: null, gruppo: 'sport', ic: 'palla' },
+  { id: 'tennis', n: 'Tennis / padel', met: 7.3, gps: false, passo: null, gruppo: 'sport', ic: 'racchetta' },
+  { id: 'basket', n: 'Basket', met: 6.5, gps: false, passo: null, gruppo: 'sport', ic: 'basket' },
+  { id: 'arrampicata', n: 'Arrampicata', met: 8.0, gps: false, passo: null, gruppo: 'sport', ic: 'montagna' },
+  { id: 'yoga', n: 'Yoga / mobilita\u0300', met: 2.5, gps: false, passo: null, gruppo: 'sport', ic: 'loto' },
+  { id: 'sport', n: 'Altro sport', met: 6.0, gps: false, passo: null, gruppo: 'sport', ic: 'medaglia' }
 ];
 /* Il ripiego era `CARDIO_TIPI[6]`, cioe' "altro cardio" **per posizione**:
    bastava aggiungere un tipo in mezzo perche' diventasse un altro. */
-const CARDIO_ALTRO = { id: 'altro', n: 'Altro cardio', met: 6.0, gps: false, passo: null, gruppo: 'cardio' };
+const CARDIO_ALTRO = { id: 'altro', n: 'Altro cardio', met: 6.0, gps: false, passo: null, gruppo: 'cardio', ic: 'cuore' };
 const cardioTipo = id => CARDIO_TIPI.find(t => t.id === id) || CARDIO_ALTRO;
 /** Le sessioni di quel giorno che non sono cardio ma sport. */
 const cardioSport = id => cardioTipo(id).gruppo === 'sport';
@@ -347,7 +347,99 @@ async function condividiCartolina(rec) {
 
 /* =============================================================== interfaccia */
 
-/** La carta in Gym: cosa hai fatto oggi e i due modi di aggiungerne. */
+/**
+ * **Prima cosa hai fatto, poi come lo scrivi.**
+ *
+ * Questa schermata cominciava con due bottoni — *registra col GPS* e
+ * *scrivilo a mano* — cioe' chiedeva per prima cosa **il modo**. Ma il modo e'
+ * una conseguenza: il GPS ha senso sulla corsa e non sul BJJ, e chi arriva qui
+ * ha in testa lo sport, non la tecnologia. Segnalata cosi': *"appena atterro
+ * vedo registra col GPS o scrivilo a mano, non si capisce nulla"*.
+ *
+ * Adesso e' l'elenco degli allenamenti, come sull'orologio: si scorre, si
+ * sceglie, e **solo dove la domanda esiste** — corsa, camminata, bici — l'app
+ * chiede col GPS o a mano. Sugli altri non c'e' niente da chiedere: minuti e
+ * via.
+ */
+function listaAllenamenti(k) {
+  const box = el('div', 'act-l');
+  const righe = [];
+  for (const [g, lab] of [['cardio', 'Cardio'], ['sport', 'Sport']]) {
+    box.append(el('div', 'eyebrow', lab));
+    for (const t of CARDIO_TIPI.filter(x => (x.gruppo || 'cardio') === g)) {
+      const b = el('button', 'nav-r act-r');
+      b.innerHTML = '<span class="ic"></span>'
+        + `<span class="body"><span class="t">${esc(t.n)}</span>`
+        + `<span class="d">${t.gps ? 'col GPS, o i minuti a mano' : 'minuti e via'}</span></span>`
+        + '<span class="go">\u203a</span>';
+      if (typeof icona === 'function')
+        b.querySelector('.ic').append(icona(t.ic || 'cuore', { size: 19 }));
+      b.onclick = () => avviaAllenamento(k, t);
+      box.append(b);
+      righe.push(b);
+    }
+  }
+  /* L'entrata scaglionata una volta sola, quando l'elenco entra in vista: e'
+     lo stesso `entrata()` delle altre liste, e con `reduced-motion` non parte
+     affatto — le righe sono gia' tutte leggibili da ferme. */
+  if (typeof osserva === 'function' && typeof entrata === 'function')
+    osserva(box, () => entrata(righe, { passo: 22, dur: 340, su: 10 }));
+  return box;
+}
+
+/** Scelto lo sport, la domanda dopo esiste solo dove il GPS serve. */
+function avviaAllenamento(k, t) {
+  if (t.gps) return sheetComeRegistri(k, t);
+  sheetCardioManuale(k, t.id);
+}
+
+/** Il foglio della scelta, per chi ci arriva da "Come registri?" in Gym. */
+function sheetScegliSport(k) {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Non sono pesi'));
+  w.append(el('h2', 'sec', 'Cosa hai fatto?'));
+  w.lastChild.style.marginTop = '0';
+  w.append(listaAllenamenti(k));
+  const x = el('button', 'btn wide');
+  x.style.marginTop = '12px';
+  x.textContent = 'Annulla';
+  x.onclick = closeSheet;
+  w.append(x);
+  sheet(w);
+}
+
+/** Due modi, e la differenza la fa il telefono in mano oppure no. */
+function sheetComeRegistri(k, t) {
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Come la registri'));
+  w.append(el('h2', 'sec', esc(t.n)));
+  w.lastChild.style.marginTop = '0';
+
+  const gps = el('button', 'btn wide pri', 'Registra col GPS');
+  gps.onclick = () => sheetTraccia(t.id);
+  w.append(gps);
+  w.append(el('p', 'hint',
+    'Distanza, passo e il tracciato da condividere. Lo schermo deve restare '
+    + 'acceso: su iPhone una pagina web in secondo piano viene sospesa e il GPS '
+    + 'smette di arrivare.'));
+
+  const man = el('button', 'btn wide', 'Scrivi i minuti a mano');
+  man.style.marginTop = '4px';
+  man.onclick = () => sheetCardioManuale(k, t.id);
+  w.append(man);
+  w.append(el('p', 'hint',
+    'Durata e, se ti va, distanza. I conti vengono identici: il tracciato e\' '
+    + 'l\'unica cosa che manca.'));
+
+  const x = el('button', 'btn wide');
+  x.style.marginTop = '10px';
+  x.textContent = 'Annulla';
+  x.onclick = closeSheet;
+  w.append(x);
+  sheet(w);
+}
+
+/** La carta in Gym: cosa hai fatto oggi, e l'elenco per aggiungerne. */
 function cardCardio(k = today()) {
   const oggi = cardioDi(k);
   const c = el('div', 'card');
@@ -355,13 +447,6 @@ function cardCardio(k = today()) {
     `<strong>Cardio e sport</strong><span class="mono muted" style="font-size:11px">${
       oggi.length ? oggi.length + ' oggi' : 'niente oggi'}</span>`));
 
-  if (!oggi.length) {
-    c.append(el('div', 'muted',
-      'Corsa, bici, nuoto — e gli altri sport: BJJ, boxe, calcio, arrampicata. '
-      + 'Entrano nel conto delle sedute della settimana e nella spesa energetica '
-      + '— che resta una misura del lavoro fatto, non calorie da rimangiare: '
-      + 'quelle stanno gia\' dentro il dispendio stimato.'));
-  }
   for (const [i, r] of oggi.entries()) {
     const t = cardioTipo(r.tipo), an = andatura(r);
     const row = el('button', 'cd-r');
@@ -374,14 +459,12 @@ function cardCardio(k = today()) {
     c.append(row);
   }
 
-  const r1 = el('div', 'row');
-  r1.style.cssText = 'gap:8px;margin-top:10px';
-  const gps = el('button', 'btn pri grow', 'Registra col GPS');
-  gps.onclick = () => sheetTraccia();
-  const man = el('button', 'btn grow', 'Scrivilo a mano');
-  man.onclick = () => sheetCardioManuale(k);
-  r1.append(gps, man);
-  c.append(r1);
+  c.append(el('div', 'act-tit', oggi.length ? 'Aggiungine un\'altra' : 'Cosa hai fatto?'));
+  c.append(listaAllenamenti(k));
+  c.append(el('p', 'note',
+    'Tutto quello che registri qui entra nel conto delle sedute della settimana '
+    + 'e nella spesa energetica \u2014 che resta una misura del lavoro fatto, non '
+    + 'calorie da rimangiare: quelle stanno gia\' dentro il dispendio stimato.'));
   return c;
 }
 
@@ -428,67 +511,84 @@ function sheetCardioRec(k, i) {
 /** Registrazione a mano: due campi e via. */
 function sheetCardioManuale(k, tipo0) {
   let tipo = tipo0 && cardioTipo(tipo0).id === tipo0 ? tipo0 : 'corsa';
+  const scelto = cardioTipo(tipo);
   const w = el('div');
-  w.append(el('div', 'eyebrow', 'Senza GPS'));
-  w.append(el('h2', 'sec', 'Cosa hai fatto'));
+  w.append(el('div', 'eyebrow', tipo0 ? 'Salva la seduta' : 'Senza GPS'));
+  w.append(el('h2', 'sec', tipo0 ? esc(scelto.n) : 'Cosa hai fatto'));
   w.lastChild.style.marginTop = '0';
+  if (typeof icona === 'function' && tipo0) {
+    const t0 = el('div', 'act-big');
+    t0.append(icona(scelto.ic || 'cuore', { size: 26 }));
+    w.lastChild.before(t0);
+  }
 
-  /* Quindici pastiglie in fila sono un muro: due gruppi con un'intestazione
-     ciascuno si leggono, e chi cerca il BJJ sa gia' in quale dei due
-     guardare. La scelta pero' resta **una sola** fra tutti e due i gruppi. */
+  /* Le pastiglie restano solo per chi arriva qui **senza** aver scelto: chi
+     ha appena toccato "BJJ" nell'elenco si vedrebbe riproporre quindici
+     alternative fra cui quella che ha gia' scelto. */
   const tutte = [];
   const marca = () => tutte.forEach(b => b.setAttribute('aria-pressed', b.dataset.t === tipo));
-  for (const [g, lab] of [['cardio', 'Cardio'], ['sport', 'Sport']]) {
-    w.append(el('div', 'eyebrow', lab));
-    const seg = el('div', 'seg wrap');
-    for (const t of CARDIO_TIPI.filter(x => (x.gruppo || 'cardio') === g)) {
-      const b = el('button', null, t.n);
-      b.dataset.t = t.id;
-      b.onclick = () => { tipo = t.id; marca(); };
-      seg.append(b); tutte.push(b);
+  if (!tipo0) {
+    for (const [g, lab] of [['cardio', 'Cardio'], ['sport', 'Sport']]) {
+      w.append(el('div', 'eyebrow', lab));
+      const seg = el('div', 'seg wrap');
+      for (const t of CARDIO_TIPI.filter(x => (x.gruppo || 'cardio') === g)) {
+        const b = el('button', null, t.n);
+        b.dataset.t = t.id;
+        b.onclick = () => { tipo = t.id; marca(); };
+        seg.append(b); tutte.push(b);
+      }
+      w.append(seg);
     }
-    w.append(seg);
+    marca();
   }
-  marca();
 
+  /* La distanza si chiede dove esiste: su un'ora di BJJ e' una casella che
+     non si puo' riempire, e una casella vuota chiede comunque di decidere. */
+  const conKm = !tipo0 || scelto.gps || scelto.passo;
   const g = el('div');
-  g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px;margin-top:12px';
+  g.style.cssText = 'display:grid;grid-template-columns:' + (conKm ? '1fr 1fr' : '1fr')
+    + ';gap:0 10px;margin-top:12px';
   g.innerHTML = `<div class="field"><label>Minuti</label>
-      <input type="text" inputmode="numeric" id="cd-min" value="30"></div>
-    <div class="field"><label>Distanza <span class="muted">(km)</span></label>
-      <input type="text" inputmode="decimal" id="cd-km" placeholder="facoltativa"></div>`;
+      <input type="text" inputmode="numeric" id="cd-min" value="30"></div>`
+    + (conKm ? `<div class="field"><label>Distanza <span class="muted">(km)</span></label>
+      <input type="text" inputmode="decimal" id="cd-km" placeholder="facoltativa"></div>` : '');
   w.append(g);
 
-  const b = el('button', 'btn wide pri', 'Salva');
+  const b = el('button', 'btn wide pri', 'Salva la seduta');
   b.onclick = () => {
     const min = parseNum($('#cd-min').value);
     if (!(min > 0)) { toast('Servono i minuti'); return; }
-    const km = parseNum($('#cd-km').value) || 0;
+    const km = parseNum(($('#cd-km') || {}).value) || 0;
     salvaCardio(k, { id: uid(), tipo, durata_s: Math.round(min * 60),
       distanza_m: Math.round(km * 1000), punti: [],
       quando: new Date(k + 'T12:00:00').toISOString() });
     closeSheet(); route(); toast('Registrato');
   };
   w.append(b);
+  /* La nota dice quello che riguarda **questo** sport: la storia del costo
+     per chilometro sotto un'ora di yoga e' una riga da saltare. */
   w.append(el('p', 'note',
-    'La distanza e\' facoltativa ovunque tranne che sulla corsa, dove serve al '
-    + 'conto delle calorie: li\' si usa il costo per chilometro invece del MET, '
-    + 'perche\' cambia molto meno con l\'andatura. Gli altri sport si contano a '
-    + 'minuti, con i MET del Compendium of Physical Activities: sono medie di '
-    + 'popolazione per tipo di attivita\', non misure su di te. Sulle arti '
-    + 'marziali e\' il valore del ritmo pieno (10,3): una lezione fatta '
-    + 'soprattutto di tecnica ne vale circa la meta\'. E come tutte le calorie '
-    + 'bruciate non si sommano al target \u2014 servono a misurare il lavoro, '
-    + 'non a mangiare di piu\'.'));
+    (conKm
+      ? 'La distanza e\' facoltativa ovunque tranne che sulla corsa, dove serve '
+        + 'al conto delle calorie: li\' si usa il costo per chilometro invece del '
+        + 'MET, perche\' cambia molto meno con l\'andatura. '
+      : '')
+    + 'Le calorie escono dai MET del Compendium of Physical Activities: sono '
+    + 'medie di popolazione per tipo di attivita\', non misure su di te. '
+    + (tipo === 'bjj'
+      ? 'Sulle arti marziali e\' il valore del ritmo pieno (10,3): una lezione '
+        + 'fatta soprattutto di tecnica ne vale circa la meta\'. ' : '')
+    + 'E come tutte le calorie bruciate non si sommano al target \u2014 servono '
+    + 'a misurare il lavoro, non a mangiare di piu\'.'));
   sheet(w);
 }
 
 /* -------------------------------------------------------- la registrazione */
-function sheetTraccia() {
+function sheetTraccia(tipo0) {
   const tipiGps = CARDIO_TIPI.filter(t => t.gps);
-  let tipo = 'corsa';
+  let tipo = tipo0 && tipiGps.some(t => t.id === tipo0) ? tipo0 : 'corsa';
   const w = el('div');
-  w.append(el('div', 'eyebrow', 'Col GPS'));
+  w.append(el('div', 'eyebrow', tipo0 ? esc(cardioTipo(tipo).n) + ' \u00b7 col GPS' : 'Col GPS'));
   w.append(el('h2', 'sec', 'Registra il percorso'));
   w.lastChild.style.marginTop = '0';
 
@@ -500,15 +600,19 @@ function sheetTraccia() {
     + 'la registrazione si ferma li\'. Se non vuoi tenerlo in mano, scrivi durata '
     + 'e distanza a mano: i conti vengono identici.'));
 
-  const seg = el('div', 'seg');
-  for (const t of tipiGps) {
-    const b = el('button', null, t.n);
-    b.setAttribute('aria-pressed', t.id === tipo);
-    b.onclick = () => { tipo = t.id;
-      [...seg.children].forEach(x => x.setAttribute('aria-pressed', x === b)); };
-    seg.append(b);
+  /* Se lo sport l'hai gia' scelto nell'elenco, le tre pastiglie sono la
+     stessa domanda fatta due volte. */
+  if (!tipo0) {
+    const seg = el('div', 'seg');
+    for (const t of tipiGps) {
+      const b = el('button', null, t.n);
+      b.setAttribute('aria-pressed', t.id === tipo);
+      b.onclick = () => { tipo = t.id;
+        [...seg.children].forEach(x => x.setAttribute('aria-pressed', x === b)); };
+      seg.append(b);
+    }
+    w.append(seg);
   }
-  w.append(seg);
 
   const live = el('div', 'cd-live');
   live.hidden = true;

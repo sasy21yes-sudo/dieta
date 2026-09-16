@@ -2004,7 +2004,7 @@ function sheetSceltaModo(k) {
       + '<span class="d">BJJ, boxe, corsa, nuoto: minuti e via.</span></span>'
       + '<span class="go">\u203a</span>';
     if (typeof icona === 'function') b.querySelector('.ic').append(icona('andamento', { size: 19 }));
-    b.onclick = () => { if (typeof sheetCardioManuale === 'function') sheetCardioManuale(k); };
+    b.onclick = () => { if (typeof sheetScegliSport === 'function') sheetScegliSport(k); };
     return b;
   };
 

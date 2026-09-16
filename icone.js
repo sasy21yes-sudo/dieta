@@ -5,13 +5,13 @@
  * essere caricati da un CDN. Il motivo e' lo stesso per cui i tracciati del
  * corpo stanno in `data/corpo.json`: quest'app funziona offline e non ha un
  * build step, e una `<link>` a unpkg vorrebbe dire icone che spariscono in
- * palestra dove non prende. Sono trentadue disegni, non una dipendenza.
+ * palestra dove non prende. Sono quarantasette disegni, non una dipendenza.
  *
  * Copyright (c) 2013-2024 Cole Bemis e i contributori di Lucide.
  * Feather: MIT. Lucide: ISC. Entrambe permettono la copia con questa nota.
  *
  * Tutte condividono la stessa griglia 24×24 e lo stesso tratto da 2, che e'
- * quello che le fa sembrare una famiglia invece di trentadue disegni presi in giro
+ * quello che le fa sembrare una famiglia invece di quarantasette disegni presi in giro
  * — la stessa ragione per cui le icone di Gym sono disegnate a mano tutte con
  * sette tratti e lo stesso arrotondamento.
  */
@@ -105,6 +105,46 @@ const ICONE = {
      (Lucide "history"). Non le due frecce circolari, che sono "aggiorna". */
   copie: { d: ['M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8', 'M3 3v5h5',
                'M12 7v5l4 2'] },
+  /* ---- gli sport ----
+     Disegnate qui dentro come quelle di Gym: stessa griglia 24x24, stesso
+     tratto da 2, pochi segni netti. A venti pixel il dettaglio non si legge —
+     quello che si legge e' la silhouette, ed e' per questo che la bici sono
+     due cerchi e un telaio e non una bicicletta. */
+  corsa: { c: [[16, 4.5, 2]],
+           d: ['M12.5 8.5l-3 3.5.5 4 2 6', 'M9.5 12l-4 1.5-1 4',
+               'M12.5 8.5l4 1 2 3.5 3 .5'] },
+  camminata: { c: [[13, 4.5, 2]],
+               d: ['M11 8.5l-2 4.5 2 3 1 6', 'M11 16l-3 5.5',
+                   'M11 9.5l3.5 2 1 4'] },
+  bici: { c: [[5.5, 17, 3.5], [18.5, 17, 3.5]],
+          d: ['M5.5 17l4.5-8h4.5', 'M10 9l5 8', 'M12.5 6h3'] },
+  onda: { d: ['M2 15c2-2 4-2 6 0s4 2 6 0 4-2 6 0',
+              'M2 20c2-2 4-2 6 0s4 2 6 0 4-2 6 0',
+              'M10 10l4-2 3 2.5'], c: [[8, 6.5, 2]] },
+  remo: { d: ['M4 20l13-13', 'M16 4l4 4-2.5 2.5-4-4z', 'M3 17l4 4'] },
+  ellittica: { d: ['M7 3.5v9', 'M17 3.5v9',
+                   'M4.5 16.5a7.5 4 0 1 0 15 0 7.5 4 0 1 0-15 0',
+                   'M7 12.5l-2.5 4', 'M17 12.5l2.5 4'] },
+  cuore: { d: ['M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1 7.8 7.8 7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z'] },
+  cintura: { d: ['M2 9.5h20v5H2z', 'M9 9.5v5', 'M15 9.5v5', 'M12 9.5v5'] },
+  guanto: { d: ['M7 9a4 4 0 0 1 8 0v5a3 3 0 0 1-3 3H9a2 2 0 0 1-2-2z',
+                'M15 10.5h1.5a2 2 0 0 1 0 4H15', 'M8 20h7'] },
+  palla: { c: [[12, 12, 8.5]],
+           d: ['M12 6.5l3.6 2.6-1.4 4.3h-4.4L8.4 9.1z', 'M12 3.5v3',
+               'M19.9 9.3l-2.8 2', 'M16.7 19.1l-1.1-3.4',
+               'M7.3 19.1l1.1-3.4', 'M4.1 9.3l2.8 2'] },
+  basket: { c: [[12, 12, 8.5]],
+            d: ['M12 3.5v17', 'M4.2 9c4.8 1.8 10.8 1.8 15.6 0',
+                'M4.2 15c4.8-1.8 10.8-1.8 15.6 0'] },
+  racchetta: { d: ['M14.5 2.5a6 7 0 1 0 .1 0z', 'M11 15l-5.5 6.5',
+                   'M9.5 6.5c2 1 4 3 5 5'] },
+  montagna: { d: ['M2 20.5l6.5-11 4 6 3-4.5 6.5 9.5z', 'M8.5 9.5l4 6'] },
+  loto: { c: [[12, 5, 2]],
+          d: ['M12 9v4', 'M6 21c0-2.5 2.7-4.5 6-4.5s6 2 6 4.5',
+              'M12 13l-5 3', 'M12 13l5 3'] },
+  medaglia: { c: [[12, 15, 5.5]],
+              d: ['M8.5 10L6 2.5h12L15.5 10'] },
+
   /* "fammi vedere": l'occhio della guida, sopra il recupero. */
   occhio: { c: [[12, 12, 3]],
             d: ['M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'] }

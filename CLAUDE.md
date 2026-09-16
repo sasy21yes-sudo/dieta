@@ -1175,6 +1175,48 @@ E la riga in **"Come registri?"**: quella schermata offriva due strade che
 parlano di schede e di carichi, e chi era andato a fare BJJ non si riconosceva
 in nessuna delle due.
 
+### Prima cosa hai fatto, poi come lo scrivi
+
+Segnalato cosi': *"appena atterriamo vedo registra col GPS o scrivilo a mano.
+Boccio totalmente questa schermata perche' non si capisce nulla. Farei una
+scelta stile Fitness di Apple Watch, dove si scorre e si sceglie lo sport"*.
+Aveva ragione, e il motivo e' preciso: quella schermata chiedeva per prima
+cosa **il modo**, che e' una conseguenza. Il GPS ha senso sulla corsa e non
+sul BJJ, e chi apre quella pagina ha in testa lo sport, non la tecnologia.
+
+Adesso e' l'elenco degli allenamenti: si scorre, si sceglie, e la domanda
+dopo **esiste solo dove ha una risposta**. Corsa, camminata e bici chiedono
+*col GPS o a mano*; su tutto il resto non c'e' niente da chiedere e si apre
+direttamente "salva la seduta".
+
+Quattro conseguenze, tutte nella stessa direzione — **non chiedere due volte
+la stessa cosa**:
+
+- scelto lo sport dall'elenco, il foglio a mano **non ripropone le quindici
+  pastiglie** dei tipi: chi ha appena toccato "BJJ" si vedrebbe offrire fra le
+  alternative quella che ha gia' scelto. Il nome sta nel titolo, con la sua
+  icona;
+- lo stesso vale per il GPS: le tre pastiglie corsa/camminata/bici spariscono
+  quando lo sport arriva dall'elenco;
+- **la distanza si chiede dove esiste.** Su un'ora di BJJ e' una casella che
+  non si puo' riempire, e una casella vuota chiede comunque di decidere;
+- **la nota dice quello che riguarda quello sport.** La storia del costo per
+  chilometro della corsa, sotto un'ora di yoga, e' una riga da saltare.
+
+**Le icone sono quattordici disegni nuovi**, nella stessa griglia 24x24 e con
+lo stesso tratto da 2 di tutte le altre. A venti pixel il dettaglio non si
+legge: quello che si legge e' la silhouette, ed e' per questo che la bici sono
+due cerchi e un telaio. Una regola gia' scritta e' costata una correzione:
+ellittica e "altro cardio" erano finite tutte e due col cuore, cioe' **due
+disegni identici uno sotto l'altro** — che e' esattamente quello che questo
+file vieta da quando lo spuntino della mattina aveva l'icona del pranzo.
+
+**L'animazione e' una sola**, e ci sta perche' dice qualcosa: le righe
+entrano scaglionate quando l'elenco arriva in vista (`entrata()`, lo stesso
+delle altre liste), e sotto il dito la riga si abbassa di un soffio — solo
+`transform`, cioe' una cosa che il browser compone senza rifare il layout. Con
+`reduced-motion` non si muove niente e l'elenco e' identico da fermo.
+
 ### Il mese degli allenamenti
 
 La striscia dei giorni risponde a *questa settimana*: tre settimane, e si apre
@@ -5815,6 +5857,14 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
 - Non lasciare sei bottoni larghi uguali uno sotto l'altro: con sei nessuno e'
   piu' secondario, e quello che si tocca dieci volte per seduta finisce in
   mezzo alle eccezioni. Uno pieno, le eccezioni in riga, il resto piu' quieto
+- Non chiedere **come** prima di **cosa**: il modo e' una conseguenza dello
+  sport, e il GPS ha senso sulla corsa e non sul BJJ. Prima l'elenco, e la
+  domanda sul modo solo dove esiste una risposta
+- Non riproporre l'elenco dei tipi dentro il foglio quando lo sport e' gia'
+  stato scelto: e' la stessa domanda fatta due volte, e fra le alternative
+  c'e' anche quella scelta
+- Non chiedere la distanza dove non esiste: una casella vuota su un'ora di
+  BJJ chiede comunque di decidere qualcosa
 - Non inventare un magazzino nuovo per gli altri sport: `cardioDi()` lo
   leggono gia' `allenatoIl()`, `kcalAllenamento()`, la striscia dei giorni e
   la costanza. Si estende quello, e i quattro motori se ne accorgono da soli
