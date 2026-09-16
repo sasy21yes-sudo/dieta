@@ -989,6 +989,18 @@
   border-left:3px solid var(--pine-line);border-radius:0 9px 9px 0;
   padding:8px 10px;margin:8px 0}
 .gd-tec.ss{border-left-color:var(--amber)}
+
+/* Le azioni della guida. Erano cinque bottoni larghi uguali uno sotto
+   l'altro, e con cinque nessuno e' piu' secondario: quello che si tocca dieci
+   volte per seduta stava in mezzo alle eccezioni. Adesso uno solo e' pieno,
+   le eccezioni stanno in una riga da due, e le due che non appartengono alla
+   serie — tornare indietro, chiudere — in una riga piu' quieta sotto. */
+.gd-azioni{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.gd-azioni.uno{grid-template-columns:1fr}
+.gd-azioni .btn{width:100%;margin:0}
+.gd-azioni.min .btn{min-height:38px;padding:8px 10px;font-size:13px;
+  font-weight:500;color:var(--ink-2);background:transparent;border-color:transparent}
+.gd-azioni.min .btn:active{background:var(--wash)}
 /* "cosa devi preparare": la stessa carta della tecnica, ma sulla schermata
    del recupero — dove il testo e' centrato e questo va rimesso a sinistra,
    o una frase di tre righe centrata non si legge. L'ambra dice "guarda
