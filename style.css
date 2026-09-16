@@ -289,6 +289,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;
 .cmp-r>span:nth-child(n+2){white-space:nowrap}
 .cmp-r em{font-style:normal;color:var(--ink-3);font-size:11px;margin-left:1px}
 .cmp-r .good{color:var(--pine);font-weight:600}
+.cmp-r .fuori{color:var(--amber);font-weight:600}
 .cmp-r em.up{color:var(--alert);margin-left:6px}
 .cmp-r em.dn{color:var(--pine);margin-left:6px}
 button.cmp-r{width:100%;background:none;border:0;

@@ -44,22 +44,22 @@ const CARDIO_TIPI = [
   { id: 'corsa', n: 'Corsa', met: 9.8, gps: true, passo: 'min', gruppo: 'cardio', ic: 'corsa' },
   { id: 'camminata', n: 'Camminata', met: 3.8, gps: true, passo: 'min', gruppo: 'cardio', ic: 'camminata' },
   { id: 'bici', n: 'Bici', met: 7.5, gps: true, passo: 'kmh', gruppo: 'cardio', ic: 'bici' },
-  { id: 'nuoto', n: 'Nuoto', met: 7.0, gps: false, passo: 'min', gruppo: 'cardio', ic: 'onda' },
+  { id: 'nuoto', n: 'Nuoto', met: 7.0, gps: false, passo: 'min', gruppo: 'cardio', ic: 'nuoto' },
   { id: 'vogatore', n: 'Vogatore', met: 8.0, gps: false, passo: 'min', gruppo: 'cardio', ic: 'remo' },
-  { id: 'ellittica', n: 'Ellittica', met: 5.0, gps: false, passo: null, gruppo: 'cardio', ic: 'ellittica' },
-  { id: 'altro', n: 'Altro cardio', met: 6.0, gps: false, passo: null, gruppo: 'cardio', ic: 'cuore' },
-  { id: 'bjj', n: 'BJJ / arti marziali', met: 10.3, gps: false, passo: null, gruppo: 'sport', ic: 'cintura' },
-  { id: 'boxe', n: 'Boxe / kickboxing', met: 7.8, gps: false, passo: null, gruppo: 'sport', ic: 'guanto' },
-  { id: 'calcio', n: 'Calcio', met: 7.0, gps: false, passo: null, gruppo: 'sport', ic: 'palla' },
-  { id: 'tennis', n: 'Tennis / padel', met: 7.3, gps: false, passo: null, gruppo: 'sport', ic: 'racchetta' },
+  { id: 'ellittica', n: 'Ellittica', met: 5.0, gps: false, passo: null, gruppo: 'cardio', ic: 'macchina' },
+  { id: 'altro', n: 'Altro cardio', met: 6.0, gps: false, passo: null, gruppo: 'cardio', ic: 'battito' },
+  { id: 'bjj', n: 'BJJ / arti marziali', met: 10.3, gps: false, passo: null, gruppo: 'sport', ic: 'bjj' },
+  { id: 'boxe', n: 'Boxe / kickboxing', met: 7.8, gps: false, passo: null, gruppo: 'sport', ic: 'boxe' },
+  { id: 'calcio', n: 'Calcio', met: 7.0, gps: false, passo: null, gruppo: 'sport', ic: 'calcio' },
+  { id: 'tennis', n: 'Tennis / padel', met: 7.3, gps: false, passo: null, gruppo: 'sport', ic: 'tennis' },
   { id: 'basket', n: 'Basket', met: 6.5, gps: false, passo: null, gruppo: 'sport', ic: 'basket' },
   { id: 'arrampicata', n: 'Arrampicata', met: 8.0, gps: false, passo: null, gruppo: 'sport', ic: 'montagna' },
-  { id: 'yoga', n: 'Yoga / mobilita\u0300', met: 2.5, gps: false, passo: null, gruppo: 'sport', ic: 'loto' },
+  { id: 'yoga', n: 'Yoga / mobilita\u0300', met: 2.5, gps: false, passo: null, gruppo: 'sport', ic: 'yoga' },
   { id: 'sport', n: 'Altro sport', met: 6.0, gps: false, passo: null, gruppo: 'sport', ic: 'medaglia' }
 ];
 /* Il ripiego era `CARDIO_TIPI[6]`, cioe' "altro cardio" **per posizione**:
    bastava aggiungere un tipo in mezzo perche' diventasse un altro. */
-const CARDIO_ALTRO = { id: 'altro', n: 'Altro cardio', met: 6.0, gps: false, passo: null, gruppo: 'cardio', ic: 'cuore' };
+const CARDIO_ALTRO = { id: 'altro', n: 'Altro cardio', met: 6.0, gps: false, passo: null, gruppo: 'cardio', ic: 'battito' };
 const cardioTipo = id => CARDIO_TIPI.find(t => t.id === id) || CARDIO_ALTRO;
 /** Le sessioni di quel giorno che non sono cardio ma sport. */
 const cardioSport = id => cardioTipo(id).gruppo === 'sport';
@@ -361,6 +361,38 @@ async function condividiCartolina(rec) {
  * chiede col GPS o a mano. Sugli altri non c'e' niente da chiedere: minuti e
  * via.
  */
+/** L'ultima volta che quello sport e' stato registrato, fino a `k`. */
+function ultimoCardio(tipo, k = today()) {
+  const tutti = cardioTutti();
+  let best = null;
+  for (const g of Object.keys(tutti)) {
+    if (g > k) continue;                 // il futuro non e' "l'ultima volta"
+    if (best && g < best.k) continue;
+    for (const r of tutti[g] || []) if (r.tipo === tipo) best = { k: g, r };
+  }
+  return best;
+}
+
+/**
+ * La riga di uno sport dice **quando l'hai fatto l'ultima volta**.
+ *
+ * Sotto ogni nome c'era "minuti e via", dodici volte uguale: una riga che si
+ * ripete su tutto l'elenco non distingue niente e si impara a saltarla.
+ * L'ultima seduta invece e' il dato che si cerca aprendo questa pagina —
+ * *"quanto e' che non corro?"* — e su uno sport mai fatto non si scrive
+ * niente, perche' non c'e' niente da dire. La riga del GPS resta solo dove
+ * c'e' davvero una scelta da fare.
+ */
+function sottoAllenamento(t, k) {
+  const u = ultimoCardio(t.id, k);
+  if (!u) return t.gps ? 'col GPS, o i minuti a mano' : '';
+  const q = [u.k === k ? 'oggi' : `${+u.k.slice(8)} ${MESI_BR[+u.k.slice(5, 7) - 1]}`];
+  const min = Math.round((u.r.durata_s || 0) / 60);
+  if (min) q.push(min + '\u2032');
+  if (u.r.distanza_m) q.push(nf(u.r.distanza_m / 1000, 1) + ' km');
+  return q.join(' \u00b7 ');
+}
+
 function listaAllenamenti(k) {
   const box = el('div', 'act-l');
   const righe = [];
@@ -368,12 +400,13 @@ function listaAllenamenti(k) {
     box.append(el('div', 'eyebrow', lab));
     for (const t of CARDIO_TIPI.filter(x => (x.gruppo || 'cardio') === g)) {
       const b = el('button', 'nav-r act-r');
+      const sotto = sottoAllenamento(t, k);
       b.innerHTML = '<span class="ic"></span>'
         + `<span class="body"><span class="t">${esc(t.n)}</span>`
-        + `<span class="d">${t.gps ? 'col GPS, o i minuti a mano' : 'minuti e via'}</span></span>`
+        + (sotto ? `<span class="d">${esc(sotto)}</span>` : '') + '</span>'
         + '<span class="go">\u203a</span>';
       if (typeof icona === 'function')
-        b.querySelector('.ic').append(icona(t.ic || 'cuore', { size: 19 }));
+        b.querySelector('.ic').append(icona(t.ic || 'battito', { size: 19 }));
       b.onclick = () => avviaAllenamento(k, t);
       box.append(b);
       righe.push(b);
@@ -518,7 +551,7 @@ function sheetCardioManuale(k, tipo0) {
   w.lastChild.style.marginTop = '0';
   if (typeof icona === 'function' && tipo0) {
     const t0 = el('div', 'act-big');
-    t0.append(icona(scelto.ic || 'cuore', { size: 26 }));
+    t0.append(icona(scelto.ic || 'battito', { size: 26 }));
     w.lastChild.before(t0);
   }
 

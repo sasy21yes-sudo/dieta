@@ -1483,25 +1483,77 @@ function sezGymProgressi(v, k, st) {
 
 }
 
+/**
+ * Le sedute di cardio e sport, con la lingua dello storico dei pesi.
+ *
+ * Erano righe con davanti la data ISO — `2026-09-16 · 1:00:00` — cioe' un
+ * archivio, non uno storico: per sapere quando si e' corso l'ultima volta
+ * bisognava leggere una data scritta come la scrive un computer. Adesso e'
+ * la stessa figura delle sedute in sala: il blocco del giorno a sinistra fa
+ * da ancora mentre si scorre, i mesi separano i gruppi cosi' i buchi si
+ * vedono senza contarli, e la barra dice quali sono state lunghe **rispetto
+ * alle altre tue**. Due elenchi che rispondono alla stessa domanda devono
+ * avere la stessa forma.
+ */
 function sezGymCardio(v, k) {
   if (typeof cardCardio === 'function') v.append(cardCardio(k));
+
   /* tutte le sessioni, non solo quelle di oggi */
-  const giorni = Object.keys(cardioTutti()).filter(x => x <= k).sort().reverse().slice(0, 20);
-  if (!giorni.length) return;
-  const c = el('div', 'card');
-  c.append(el('h2', 'sec', 'Le ultime'));
-  c.lastChild.style.marginTop = '0';
-  for (const g of giorni) for (const [i, r] of cardioDi(g).entries()) {
-    const t = cardioTipo(r.tipo), an = andatura(r);
-    const row = el('button', 'prod');
-    row.innerHTML = `<div class="grow"><div class="nm">${esc(t.n)}${
-        r.punti?.length ? ' <span class="pill">tracciato</span>' : ''}</div>
-      <div class="mt">${g} · ${hms2(r.durata_s || 0)}${r.distanza_m
-        ? ' · ' + nf(r.distanza_m / 1000, 2) + ' km' : ''}${an ? ' · ' + an.v + ' ' + an.u : ''}</div></div>
-      <div class="kc">${nf(r.kcal ?? kcalCardio(r))}<br><span class="mt">kcal</span></div>`;
-    row.onclick = () => sheetCardioRec(g, i);
-    c.append(row);
+  const giorni = Object.keys(cardioTutti()).filter(x => x <= k).sort().reverse().slice(0, 40);
+  const righe = [];
+  for (const g of giorni)
+    for (const [i, r] of cardioDi(g).entries())
+      righe.push({ k: g, i, r, t: cardioTipo(r.tipo), kcal: r.kcal ?? kcalCardio(r) });
+  if (!righe.length) return;
+
+  const maxS = Math.max(1, ...righe.map(x => x.r.durata_s || 0));
+  const daQuando = addDays(k, -56);
+  const rec = righe.filter(x => x.k >= daQuando);
+  const ore = rec.reduce((a, x) => a + (x.r.durata_s || 0), 0) / 3600;
+  const kc = rec.reduce((a, x) => a + x.kcal, 0);
+
+  const c = el('div', 'cw');
+  c.append(el('h3', null, 'Le tue sedute di cardio e sport'));
+  c.append(el('div', 'sub',
+    'Le ultime, dalla piu\' recente. Tocca una seduta per vederla, '
+    + 'correggerla o farne la cartolina.'));
+  const n = el('div', 'an-conta tre');
+  n.innerHTML = `<div><b>${rec.length}</b><span>sedute in 8 settimane</span></div>
+    <div><b>${nf(ore, 1)}</b><span>ore</span></div>
+    <div><b>${nf(Math.round(kc))}</b><span>kcal</span></div>`;
+  c.append(n);
+
+  const nomiMesi = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu',
+                    'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  let ultimoMese = null;
+  for (const x of righe) {
+    const d = new Date(x.k);
+    const mese = d.getFullYear() + '-' + d.getMonth();
+    if (mese !== ultimoMese) {
+      ultimoMese = mese;
+      c.append(el('div', 'st-mese', `${nomiMesi[d.getMonth()]} ${d.getFullYear()}`));
+    }
+    const an = andatura(x.r);
+    const det = [hms2(x.r.durata_s || 0)];
+    if (x.r.distanza_m) det.push(nf(x.r.distanza_m / 1000, 2) + ' km');
+    if (an) det.push(an.v + ' ' + an.u);
+    const r = el('button', 'st-r');
+    r.innerHTML = `<span class="gg"><b>${String(d.getDate()).padStart(2, '0')}</b>
+        <em>${['do', 'lu', 'ma', 'me', 'gi', 've', 'sa'][d.getDay()]}</em></span>
+      <span class="grow"><span class="n">${esc(x.t.n)}${
+        x.r.punti?.length ? ' <span class="pill">tracciato</span>' : ''}</span>
+        <span class="m">${det.join(' \u00b7 ')}</span>
+        <span class="bar"><i style="width:${((x.r.durata_s || 0) / maxS * 100).toFixed(1)}%"></i></span></span>
+      <span class="t">${nf(x.kcal)}<em>kcal</em></span>
+      <span class="go">&rsaquo;</span>`;
+    r.onclick = () => sheetCardioRec(x.k, x.i);
+    c.append(r);
   }
+  c.append(el('p', 'note',
+    'La barra e\' la durata in scala fra le sedute qui sopra, non in '
+    + 'assoluto. Le calorie sono stimate dal MET del Compendium (dal costo '
+    + 'per chilometro sulla corsa) e restano una misura del lavoro fatto: '
+    + 'stanno gia\' dentro il dispendio, e non si sommano al target.'));
   v.append(c);
 }
 

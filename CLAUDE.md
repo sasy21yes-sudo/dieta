@@ -73,6 +73,8 @@ icone.js        le icone prese da Feather/Lucide, ricopiate dentro (vedi sotto)
 charts.js       toolkit SVG dei grafici + vista Dati
 revisione.js    revisione settimanale: diagnosi, leve, impegno, priorita'
 obiettivo.js    l'obiettivo (cut/ricomp/mantenimento/bulk) e il fisico a cui punti
+leve.js         le leve di un giorno del piano: come muovere un macro tenendo
+                gli altri a target, in porzioni e cambi di ricetta
 target.js       il target che si ricalibra sul dispendio + rampa fibre
 previsioni.js   proiezioni di misure, composizione e forza a 28 giorni
 cerca.js        selettore cercabile riusabile
@@ -283,6 +285,10 @@ non un dettaglio.
   minuti. Entrano nel conto delle sedute e nella spesa energetica
 - **Il mese degli allenamenti** — dal calendario in alto a destra di Gym:
   quante sessioni, dove e' finito il tempo, e la griglia del mese
+- **Le leve di un giorno** — in ogni giorno del piano: scegli quale macro
+  alzare o abbassare e l'app propone le porzioni da cambiare e le ricette da
+  sostituire, ordinate per quanto ti danno meno quanto allontanano gli altri
+  target. Si applicano con un tocco
 - **Integrazione dinamica** — l elenco lo componi tu, con l aderenza per voce
 - **Dati** — cruscotto: 4 riquadri statistici, calendario della costanza e 14
   grafici (peso, calorie, proteine, ripartizione dei macro, fibre, passi, sonno,
@@ -1203,19 +1209,143 @@ la stessa cosa**:
 - **la nota dice quello che riguarda quello sport.** La storia del costo per
   chilometro della corsa, sotto un'ora di yoga, e' una riga da saltare.
 
-**Le icone sono quattordici disegni nuovi**, nella stessa griglia 24x24 e con
-lo stesso tratto da 2 di tutte le altre. A venti pixel il dettaglio non si
-legge: quello che si legge e' la silhouette, ed e' per questo che la bici sono
-due cerchi e un telaio. Una regola gia' scritta e' costata una correzione:
-ellittica e "altro cardio" erano finite tutte e due col cuore, cioe' **due
-disegni identici uno sotto l'altro** — che e' esattamente quello che questo
-file vieta da quando lo spuntino della mattina aveva l'icona del pranzo.
+**Le icone vengono da Tabler, e prima erano disegnate a mano.** Segnalate
+cosi': *"le icone che hai messo sono buggate, prendile da internet"*. Erano
+quindici silhouette fatte con pochi tratti, e il difetto non era il singolo
+disegno: era che a venti pixel **non si riconoscevano**. Un elenco in cui
+l'icona non distingue la riga e' un elenco che si legge solo dal nome, cioe'
+un elenco in cui l'icona e' peso.
+
+[Tabler Icons](https://tabler.io/icons) (licenza MIT) ha una categoria Sport
+di settantasei voci ed e' l'unico catalogo libero che copre corsa, camminata,
+nuoto, karate, yoga e i palloni. Soprattutto ha **la stessa griglia 24x24, lo
+stesso tratto da 2 e gli stessi capi arrotondati** di Feather e Lucide: si
+ricopiano in `icone.js` accanto alle altre e restano una famiglia sola, senza
+un CDN e senza un build step — la stessa scelta gia' fatta per i tracciati del
+corpo.
+
+Lucide, provato per primo, **non ha nessun corridore**: niente corsa, niente
+tennis, niente basket, niente boxe. Tabler tre su quattro ce le ha, e la
+quarta e' una delle tre eccezioni da dichiarare:
+
+| | |
+|---|---|
+| **ellittica** | non esiste in nessun catalogo libero. Si usa `treadmill` — la macchina cardio della palestra, che dice il genere giusto di cosa e si distingue benissimo dal corridore di `corsa` |
+| **vogatore** | il kayak: il segno che si legge e' il remo |
+| **boxe** | il pugno chiuso, perche' un guantone non c'e' |
+
+La regola che aveva gia' fatto rifare un disegno resta valida e vale anche
+qui: **due icone identiche in due righe vicine** sono due righe che si
+assomigliano nel punto in cui dovrebbero distinguersi — e' successo con
+ellittica e "altro cardio" (tutte e due col cuore) come era successo allo
+spuntino della mattina con l'icona del pranzo.
+
+**E la riga dice quando l'hai fatto l'ultima volta.** Sotto ogni nome c'era
+"minuti e via", dodici volte uguale: una riga che si ripete su tutto l'elenco
+non distingue niente e si impara a saltarla. L'ultima seduta invece e' il dato
+che si cerca aprendo questa pagina — *"quanto e' che non corro?"* — e si
+scrive com'e' scritta ovunque: `11 set · 42′ · 8,2 km`, oppure `oggi`. Su uno
+sport mai fatto **non si scrive niente**, perche' non c'e' niente da dire; la
+riga *"col GPS, o i minuti a mano"* resta solo dove c'e' davvero una scelta da
+fare.
 
 **L'animazione e' una sola**, e ci sta perche' dice qualcosa: le righe
 entrano scaglionate quando l'elenco arriva in vista (`entrata()`, lo stesso
 delle altre liste), e sotto il dito la riga si abbassa di un soffio — solo
 `transform`, cioe' una cosa che il browser compone senza rifare il layout. Con
 `reduced-motion` non si muove niente e l'elenco e' identico da fermo.
+
+### Le sedute di cardio hanno la lingua dello storico
+
+Sotto l'elenco degli sport c'erano le ultime sessioni, e ognuna cominciava con
+**la data ISO**: `2026-09-16 · 1:00:00 · 24,50 km`. Cioe' un archivio, non uno
+storico — per sapere quando si e' corso l'ultima volta bisognava leggere una
+data scritta come la scrive un computer, e i buchi fra una seduta e l'altra si
+contavano a mano.
+
+E' la stessa domanda a cui risponde lo storico delle sedute in sala, quindi ha
+la stessa figura: il **blocco del giorno** a sinistra che fa da ancora mentre
+si scorre, i **mesi** che separano i gruppi, una **barra** in scala fra le
+sedute mostrate — qui la durata — e le calorie a destra. In testa i tre numeri
+delle ultime otto settimane: sedute, ore, calorie. Due elenchi che rispondono
+alla stessa domanda con due forme diverse sono due cose da imparare invece di
+una.
+
+### Le leve di un giorno: e allora cosa tocco?
+
+L'editor della settimana dice benissimo **com'e'** un giorno: le calorie, le
+tre quote, la pastiglia del verdetto, *"mancano 340 kcal al target"*. E poi si
+ferma li'. La riga che mancava e' quella dopo — **e allora cosa tocco?** — e
+senza di lei un giorno storto si aggiusta per tentativi: apri un pasto, cambi
+un peso, torni indietro a vedere il totale, ricominci. Con cinque pasti, sei
+ingredienti l'uno e ventiquattro ricette sono una decina di tocchi per ogni
+tentativo, e il totale lo vedi sempre **dopo** aver deciso.
+
+Ogni giorno ha quindi un secondo bottone accanto a "aggiungi un pasto":
+**Aggiusta i macro**, con i tre cursori di Tabler. Dentro si sceglie quale
+numero muovere e da che parte — piu' proteine, meno grassi, piu' calorie — e
+l'app propone le mosse concrete, ognuna con di quanto sposta quel macro, dove
+finisce il giorno e se il verdetto della giornata cambia. Due tipi di mossa, e
+sono i due modi in cui un giorno si aggiusta davvero:
+
+| | |
+|---|---|
+| **una porzione** | `olio EVO 10 → 5 g`, dentro quel pasto e quella ricetta. Passa da `codiceRicetta()`, cioe' dallo stesso codice `ric:` dei pesi per slot: la ricetta nel registro non si muove di un grammo |
+| **una ricetta** | `Burger vegetale nel panino → Pasta e fagioli`. Solo sui pasti fatti di una ricetta sola: su un `piu:` sostituire il blocco butterebbe via anche la parte che andava bene |
+
+**L'ordine e' quello che rende l'elenco un consiglio invece di un catalogo**, e
+risponde alla parte della richiesta che diceva *"cercando di mantenere i vari
+target"*: il punteggio e' il guadagno sul macro chiesto, in percentuale del
+suo target, **meno** quanto le altre tre voci si sono allontanate dai loro.
+Un macro che si avvicina non porta bonus — non e' quello che hai chiesto, e
+regalargli punti farebbe vincere mosse che non fanno quello che vuoi. Cosi'
+una mossa che alza le proteine sfondando i grassi finisce in fondo invece che
+in cima.
+
+Cinque decisioni, tutte trovate provandolo:
+
+1. **Quanto spostare non lo si inventa.** Se nella direzione chiesta manca
+   qualcosa per arrivare al target, la mossa punta **esattamente li'** — e' il
+   numero che l'editor gia' scrive sotto il giorno. Se invece sei gia' oltre e
+   chiedi lo stesso di aumentare (legittimo: il target e' una media
+   settimanale, non un tetto giornaliero) il passo e' il 6% del target, che
+   sulle calorie fa circa le centocinquanta kcal delle `leve` del file di
+   dominio.
+2. **Le porzioni non si amputano.** La prima versione proponeva
+   `olio EVO 10 → 0 g` e `latte soia 250 → 0 ml`: togliere un ingrediente e'
+   un'altra cosa, si fa dentro il pasto ed e' una modifica alla ricetta. Una
+   leva cambia una porzione, quindi il fondo e' **un quarto** e il tetto due
+   volte e mezza — lo stesso motivo per cui le sostituzioni di un pasto si
+   fermano a x1,6. E le quantita' sono arrotondate a scatti che si possono
+   pesare in cucina.
+3. **Niente mosse che non si sentono**: sotto i quattro grammi di proteine o
+   le quaranta calorie non e' una leva, e' rumore.
+4. **Niente la stessa cosa detta quattro volte.** Alla prova uscivano otto
+   righe fatte di due ricette per quattro pasti — *"metti la pizza a
+   colazione"*, *"metti la pizza a pranzo"*, *"metti la pizza allo
+   spuntino"*. Una ricetta entra **una volta**, nel pasto in cui rende di
+   piu', al massimo due mosse per pasto, e una ricetta che il giorno ha gia'
+   non si propone affatto: sarebbe un giorno che si ripete.
+5. **Il momento della giornata non esclude niente, ma si dice.** Mettere a
+   colazione quello che di solito sta a cena e' una scelta, e la riga porta la
+   pastiglia *"di solito a cena"* (`slotAbituale()`) invece di nasconderlo.
+   E' la stessa regola di `pastiEquivalenti()`.
+
+E la cosa detta chiaramente in fondo al foglio: **qui si cambia il piano**,
+cioe' tutte le settimane. Per aggiustare un giorno solo ci sono le porzioni
+dentro il pasto, nella scheda Oggi — che e' il diario, e il diario e' un'altra
+cosa dal modello.
+
+La voce e la direzione partono **gia' scelte** su quello che in quel giorno e'
+piu' lontano dal suo target: aprire il foglio e trovare quattro pastiglie
+spente vorrebbe dire far scegliere prima di aver detto cosa c'e' da scegliere.
+
+Misurato sul piano di esempio: 437 mosse su 56 combinazioni di giorno, macro e
+direzione, nessuna senza risposta; applicandone una, il giorno finisce
+**esattamente** dove la riga aveva scritto (2465 → 2503 kcal, 135 → 143 g di
+proteine) e il registro delle ricette non si muove. Con il piano vuoto non
+esce nessuna mossa e il foglio lo dice: senza ricette assegnate non c'e'
+niente da spostare.
 
 ### Il mese degli allenamenti
 
@@ -5865,6 +5995,33 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   c'e' anche quella scelta
 - Non chiedere la distanza dove non esiste: una casella vuota su un'ora di
   BJJ chiede comunque di decidere qualcosa
+- Non disegnare a mano quindici icone di sport: a venti pixel non si
+  riconoscono, e un elenco in cui l'icona non distingue la riga e' un elenco
+  in cui l'icona e' peso. Si prendono da Tabler (MIT), che ha la stessa
+  griglia e lo stesso tratto di Feather e Lucide, e si ricopiano dentro
+- Non cercare un corridore in Lucide: non c'e', come non ci sono tennis,
+  basket e boxe. E quando un catalogo non ha proprio quel gesto — l'ellittica
+  non esiste da nessuna parte — si sceglie il piu' vicino **e lo si dichiara**,
+  invece di riusare un'icona gia' data a un'altra riga
+- Non mettere sotto ogni riga di un elenco la stessa identica didascalia:
+  "minuti e via" dodici volte non distingue niente. Li' ci va l'ultima volta
+  che quello sport e' stato fatto, e su uno mai fatto non ci va niente
+- Non far cominciare le righe di uno storico con la data ISO: `2026-09-16` e'
+  come la scrive un computer. C'e' gia' la figura dello storico dei pesi —
+  blocco del giorno, mesi che separano, barra in scala fra le sedute mostrate
+- Non far finire una domanda sul piano in un vicolo cieco: l'editor diceva
+  benissimo *com'e'* un giorno e non rispondeva a *cosa tocco*. Le mosse sono
+  porzioni e cambi di ricetta, e si applicano con gli scrittori che ci sono
+  gia' (`codiceRicetta()`, il codice dello slot), senza toccare il modello
+- Non ordinare le mosse solo per quanto danno sul macro chiesto: una che alza
+  le proteine sfondando i grassi non e' una mossa buona. Il punteggio e' il
+  guadagno **meno** quanto le altre tre voci si allontanano dal loro target
+- Non proporre di portare a zero un ingrediente per far tornare un numero:
+  togliere e' una modifica alla ricetta e si fa dentro il pasto. Una leva
+  cambia una porzione — fondo a un quarto, tetto a due volte e mezza
+- Non proporre la stessa ricetta per quattro pasti diversi: sono quattro righe
+  che dicono la stessa cosa. Una ricetta entra una volta, nel pasto in cui
+  rende di piu', e quelle che il giorno ha gia' non entrano affatto
 - Non inventare un magazzino nuovo per gli altri sport: `cardioDi()` lo
   leggono gia' `allenatoIl()`, `kcalAllenamento()`, la striscia dei giorni e
   la costanza. Si estende quello, e i quattro motori se ne accorgono da soli

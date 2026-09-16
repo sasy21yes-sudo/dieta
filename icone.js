@@ -1,17 +1,20 @@
 /* Icone.
  *
- * I tracciati vengono da **Feather Icons** di Cole Bemis (licenza MIT) e dalla
- * sua continuazione **Lucide** (licenza ISC), riprodotti qui dentro invece di
- * essere caricati da un CDN. Il motivo e' lo stesso per cui i tracciati del
+ * I tracciati vengono da **Feather Icons** di Cole Bemis (licenza MIT), dalla
+ * sua continuazione **Lucide** (licenza ISC) e da **Tabler Icons** di Pawel
+ * Kuna (licenza MIT) per gli sport, riprodotti qui dentro invece di essere
+ * caricati da un CDN. Il motivo e' lo stesso per cui i tracciati del
  * corpo stanno in `data/corpo.json`: quest'app funziona offline e non ha un
  * build step, e una `<link>` a unpkg vorrebbe dire icone che spariscono in
- * palestra dove non prende. Sono quarantasette disegni, non una dipendenza.
+ * palestra dove non prende. Sono quarantotto disegni, non una dipendenza.
  *
  * Copyright (c) 2013-2024 Cole Bemis e i contributori di Lucide.
- * Feather: MIT. Lucide: ISC. Entrambe permettono la copia con questa nota.
+ * Copyright (c) 2020-2025 Pawel Kuna (Tabler Icons).
+ * Feather: MIT. Lucide: ISC. Tabler: MIT. Tutte e tre permettono la copia
+ * con questa nota.
  *
  * Tutte condividono la stessa griglia 24×24 e lo stesso tratto da 2, che e'
- * quello che le fa sembrare una famiglia invece di quarantasette disegni presi in giro
+ * quello che le fa sembrare una famiglia invece di quarantotto disegni presi in giro
  * — la stessa ragione per cui le icone di Gym sono disegnate a mano tutte con
  * sette tratti e lo stesso arrotondamento.
  */
@@ -106,44 +109,60 @@ const ICONE = {
   copie: { d: ['M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8', 'M3 3v5h5',
                'M12 7v5l4 2'] },
   /* ---- gli sport ----
-     Disegnate qui dentro come quelle di Gym: stessa griglia 24x24, stesso
-     tratto da 2, pochi segni netti. A venti pixel il dettaglio non si legge —
-     quello che si legge e' la silhouette, ed e' per questo che la bici sono
-     due cerchi e un telaio e non una bicicletta. */
-  corsa: { c: [[16, 4.5, 2]],
-           d: ['M12.5 8.5l-3 3.5.5 4 2 6', 'M9.5 12l-4 1.5-1 4',
-               'M12.5 8.5l4 1 2 3.5 3 .5'] },
-  camminata: { c: [[13, 4.5, 2]],
-               d: ['M11 8.5l-2 4.5 2 3 1 6', 'M11 16l-3 5.5',
-                   'M11 9.5l3.5 2 1 4'] },
-  bici: { c: [[5.5, 17, 3.5], [18.5, 17, 3.5]],
-          d: ['M5.5 17l4.5-8h4.5', 'M10 9l5 8', 'M12.5 6h3'] },
-  onda: { d: ['M2 15c2-2 4-2 6 0s4 2 6 0 4-2 6 0',
-              'M2 20c2-2 4-2 6 0s4 2 6 0 4-2 6 0',
-              'M10 10l4-2 3 2.5'], c: [[8, 6.5, 2]] },
-  remo: { d: ['M4 20l13-13', 'M16 4l4 4-2.5 2.5-4-4z', 'M3 17l4 4'] },
-  ellittica: { d: ['M7 3.5v9', 'M17 3.5v9',
-                   'M4.5 16.5a7.5 4 0 1 0 15 0 7.5 4 0 1 0-15 0',
-                   'M7 12.5l-2.5 4', 'M17 12.5l2.5 4'] },
-  cuore: { d: ['M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1 7.8 7.8 7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z'] },
-  cintura: { d: ['M2 9.5h20v5H2z', 'M9 9.5v5', 'M15 9.5v5', 'M12 9.5v5'] },
-  guanto: { d: ['M7 9a4 4 0 0 1 8 0v5a3 3 0 0 1-3 3H9a2 2 0 0 1-2-2z',
-                'M15 10.5h1.5a2 2 0 0 1 0 4H15', 'M8 20h7'] },
-  palla: { c: [[12, 12, 8.5]],
-           d: ['M12 6.5l3.6 2.6-1.4 4.3h-4.4L8.4 9.1z', 'M12 3.5v3',
-               'M19.9 9.3l-2.8 2', 'M16.7 19.1l-1.1-3.4',
-               'M7.3 19.1l1.1-3.4', 'M4.1 9.3l2.8 2'] },
-  basket: { c: [[12, 12, 8.5]],
-            d: ['M12 3.5v17', 'M4.2 9c4.8 1.8 10.8 1.8 15.6 0',
-                'M4.2 15c4.8-1.8 10.8-1.8 15.6 0'] },
-  racchetta: { d: ['M14.5 2.5a6 7 0 1 0 .1 0z', 'M11 15l-5.5 6.5',
-                   'M9.5 6.5c2 1 4 3 5 5'] },
-  montagna: { d: ['M2 20.5l6.5-11 4 6 3-4.5 6.5 9.5z', 'M8.5 9.5l4 6'] },
-  loto: { c: [[12, 5, 2]],
-          d: ['M12 9v4', 'M6 21c0-2.5 2.7-4.5 6-4.5s6 2 6 4.5',
-              'M12 13l-5 3', 'M12 13l5 3'] },
-  medaglia: { c: [[12, 15, 5.5]],
-              d: ['M8.5 10L6 2.5h12L15.5 10'] },
+     Presi da **Tabler Icons** (licenza MIT) e non piu' disegnati a mano:
+     stessa griglia 24x24, stesso tratto da 2 e stessi capi arrotondati delle
+     altre, quindi restano una famiglia sola. Quelli a mano erano quindici
+     silhouette che a venti pixel non si riconoscevano: in un elenco cosi' la
+     riga si finisce per leggerla solo dal nome, e allora l'icona e' peso.
+     Tre scelte, perche' Tabler non ha tutto:
+     - **ellittica** non esiste in nessun catalogo libero. `treadmill` e' la
+       macchina cardio della palestra, si distingue benissimo dal corridore
+       di `corsa`, e dice il genere giusto di cosa;
+     - **vogatore** prende il kayak: il remo e' il segno che si legge;
+     - **boxe** prende il pugno chiuso, perche' un guantone non c'e'. */
+  corsa: { d: ['M11.007 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0', 'M4 17l5 1l.75 -1.5',
+               'M15 21v-4l-4 -3l1 -6', 'M7 12v-3l5 -1l3 3l3 1'] },
+  camminata: { d: ['M12 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0', 'M7 21l3 -4',
+                   'M16 21l-2 -4l-3 -3l1 -6', 'M6 12l2 -3l4 -1l3 3l3 1'] },
+  bici: { d: ['M2 18a3 3 0 1 0 6 0a3 3 0 0 0 -6 0',
+              'M16 18a3 3 0 1 0 6 0a3 3 0 0 0 -6 0',
+              'M12 19v-4l-3 -3l5 -4l2 3h3',
+              'M13.007 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0'] },
+  nuoto: { d: ['M15 9a1 1 0 1 0 2 0a1 1 0 1 0 -2 0', 'M6 11l4 -2l3.5 3l-1.5 2',
+               'M3 16.75a2.4 2.4 0 0 0 1 .25a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 1 -.25'] },
+  remo: { d: ['M6.414 6.414a2 2 0 0 0 0 -2.828l-1.414 -1.414l-2.828 2.828l1.414 1.414a2 2 0 0 0 2.828 0',
+              'M17.586 17.586a2 2 0 0 0 0 2.828l1.414 1.414l2.828 -2.828l-1.414 -1.414a2 2 0 0 0 -2.828 0',
+              'M6.5 6.5l11 11',
+              'M22 2.5c-9.983 2.601 -17.627 7.952 -20 19.5c9.983 -2.601 17.627 -7.952 20 -19.5',
+              'M6.5 12.5l5 5', 'M12.5 6.5l5 5'] },
+  macchina: { d: ['M10 3a1 1 0 1 0 2 0a1 1 0 0 0 -2 0', 'M3 14l4 1l.5 -.5',
+                  'M12 18v-3l-3 -2.923l.75 -5.077', 'M6 10v-2l4 -1l2.5 2.5l2.5 .5',
+                  'M21 22a1 1 0 0 0 -1 -1h-16a1 1 0 0 0 -1 1', 'M18 21l1 -11l2 -1'] },
+  battito: { d: ['M3 12h4.5l1.5 -6l4 12l2 -9l1.5 3h4.5'] },
+  bjj: { d: ['M3 9l4.5 1l3 2.5', 'M13 21v-8l3 -5.5', 'M8 4.5l4 2l4 1l4 3.5l-2 3.5',
+             'M15.007 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0'] },
+  boxe: { d: ['M8 11v-3.5a1.5 1.5 0 0 1 3 0v2.5', 'M11 9.5v-3a1.5 1.5 0 0 1 3 0v3.5',
+              'M14 7.5a1.5 1.5 0 0 1 3 0v2.5',
+              'M17 9.5a1.5 1.5 0 0 1 3 0v4.5a6 6 0 0 1 -6 6h-2h.208a6 6 0 0 1 -5.012 -2.7l-.196 -.3c-.312 -.479 -1.407 -2.388 -3.286 -5.728a1.5 1.5 0 0 1 .536 -2.022a1.867 1.867 0 0 1 2.28 .28l1.47 1.47'] },
+  calcio: { d: ['M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0',
+                'M12 7l4.76 3.45l-1.76 5.55h-6l-1.76 -5.55l4.76 -3.45',
+                'M12 7v-4m3 13l2.5 3m-.74 -8.55l3.74 -1.45m-11.44 7.05l-2.56 2.95m.74 -8.55l-3.74 -1.45'] },
+  tennis: { d: ['M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0', 'M6 5.3a9 9 0 0 1 0 13.4',
+                'M18 5.3a9 9 0 0 0 0 13.4'] },
+  basket: { d: ['M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0', 'M5.65 5.65l12.7 12.7',
+                'M5.65 18.35l12.7 -12.7', 'M12 3a9 9 0 0 0 9 9', 'M3 12a9 9 0 0 1 9 9'] },
+  montagna: { d: ['M3 20h18l-6.921 -14.612a2.3 2.3 0 0 0 -4.158 0l-6.921 14.612',
+                  'M7.5 11l2 2.5l2.5 -2.5l2 3l2.5 -2'] },
+  yoga: { d: ['M4 20h4l1.5 -3', 'M17 20l-1 -5h-5l1 -7', 'M4 10l4 -1l4 -1l4 1.5l4 1.5',
+              'M10.007 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0'] },
+  medaglia: { d: ['M12 4v3m-4 -3v6m8 -6v6',
+                  'M12 18.5l-3 1.5l.5 -3.5l-2 -2l3 -.5l1.5 -3l1.5 3l3 .5l-2 2l.5 3.5l-3 -1.5'] },
+
+  /* i tre cursori: le leve dei macro di una giornata del piano
+     (Tabler "adjustments-horizontal"). */
+  leve: { d: ['M12 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0', 'M4 6l8 0', 'M16 6l4 0',
+              'M6 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0', 'M4 12l2 0', 'M10 12l10 0',
+              'M15 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0', 'M4 18l11 0', 'M19 18l1 0'] },
 
   /* "fammi vedere": l'occhio della guida, sopra il recupero. */
   occhio: { c: [[12, 12, 3]],

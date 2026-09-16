@@ -1595,11 +1595,24 @@ function sezSettimana(v) {
       arr.splice(to, 0, arr.splice(from, 1)[0]);
       save(); fondiPiano(); route();
     });
-    const add = el('button', 'btn wide');
-    add.style.marginTop = '10px';
-    add.textContent = '+ Aggiungi un pasto a ' + g.giorno.toLowerCase();
+    /* Due azioni, e sono due domande diverse: *cosa manca* (un pasto) e
+       *come lo sposto* (i macro). La seconda porta il suo nome accanto
+       all'icona — un disegno solo si dovrebbe imparare, e questo elenco lo
+       si scorre. */
+    const az = el('div', 'gg-az');
+    const add = el('button', 'btn grow');
+    add.textContent = '+ Aggiungi un pasto';
     add.onclick = () => nuovoSlot(gi);
-    c.append(add);
+    az.append(add);
+    if (typeof sheetLeve === 'function') {
+      const lv = el('button', 'btn b-leve');
+      lv.title = 'Come alzare o abbassare un macro tenendo gli altri a target';
+      if (typeof icona === 'function') lv.append(icona('leve', { size: 17 }));
+      lv.append(document.createTextNode('Aggiusta i macro'));
+      lv.onclick = () => sheetLeve(gi);
+      az.append(lv);
+    }
+    c.append(az);
     v.append(c);
   }
 
