@@ -1872,6 +1872,21 @@ function cardExtraEAggiungi(k, d, conPiano) {
   b1.onclick = () => sheetAggiungiAlPasto(k, null);
   az.append(b1);
 
+  /* Una ricetta intera: il panino mangiato fuori non e' un alimento, e
+     metterlo ingrediente per ingrediente erano sei giri dello stesso foglio.
+     Compare solo se di ricette ce n'e' almeno una. */
+  if (Object.keys(D.pasti || {}).length && typeof sheetAggiungiRicetta === 'function') {
+    const br = el('button', 'ex-b');
+    br.innerHTML = '<span class="ic"></span>'
+      + '<span class="grow"><span class="n">Aggiungi una ricetta</span>'
+      + '<span class="d">una delle tue, intera o in porzione</span></span>'
+      + '<span class="go">&rsaquo;</span>';
+    if (typeof icona === 'function')
+      br.querySelector('.ic').append(icona('cappello', { size: 18 }));
+    br.onclick = () => sheetAggiungiRicetta(k);
+    az.append(br);
+  }
+
   /* La foto sta **prima** di "scrivi i valori a mano", e non e' gusto: e' la
      strada piu' corta fra "ho il piatto davanti" e "e' registrato". Compare
      solo con l'assistente acceso, perche' senza di lui non c'e' nessuno che

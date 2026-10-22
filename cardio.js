@@ -385,8 +385,9 @@ function ultimoCardio(tipo, k = today()) {
  */
 function sottoAllenamento(t, k) {
   const u = ultimoCardio(t.id, k);
-  if (!u) return t.gps ? 'col GPS, o i minuti a mano' : '';
-  const q = [u.k === k ? 'oggi' : `${+u.k.slice(8)} ${MESI_BR[+u.k.slice(5, 7) - 1]}`];
+  // su un giorno passato il GPS non c'e', e "oggi" vuol dire oggi, non k
+  if (!u) return t.gps && k === today() ? 'col GPS, o i minuti a mano' : '';
+  const q = [u.k === today() ? 'oggi' : `${+u.k.slice(8)} ${MESI_BR[+u.k.slice(5, 7) - 1]}`];
   const min = Math.round((u.r.durata_s || 0) / 60);
   if (min) q.push(min + '\u2032');
   if (u.r.distanza_m) q.push(nf(u.r.distanza_m / 1000, 1) + ' km');
@@ -422,7 +423,8 @@ function listaAllenamenti(k) {
 
 /** Scelto lo sport, la domanda dopo esiste solo dove il GPS serve. */
 function avviaAllenamento(k, t) {
-  if (t.gps) return sheetComeRegistri(k, t);
+  // il GPS traccia adesso: su un giorno passato resta solo il modo a mano
+  if (t.gps && k === today()) return sheetComeRegistri(k, t);
   sheetCardioManuale(k, t.id);
 }
 

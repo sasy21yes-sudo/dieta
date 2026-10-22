@@ -769,21 +769,26 @@ function stripCalendario() {
     const k = addDays(da, i);
     const st = statoAllenamento(k);
     const id = schedaDelGiorno(k);
-    /* **Il giorno non e' un bottone se non c'e' niente da vedere.** Apre il
-       riassunto dell'allenamento, e un riassunto di una giornata vuota e' un
-       foglio che si apre per dire che non ha niente da dire. */
+    /* Un giorno con qualcosa dentro apre il riassunto. Un giorno **passato**
+       e vuoto apre invece la registrazione su quella data: l'allenamento
+       scritto a sera, o il giorno dopo, e' il caso normale, e prima l'unico
+       giorno su cui si poteva registrare era oggi. Il futuro resta spento —
+       non c'e' niente da vedere e niente da scrivere. */
     const apribile = typeof allenatoIl === 'function' && allenatoIl(k);
+    const registrabile = !apribile && k <= oggi;
     const b = el('button', 'gcal-d ' + st + (k === oggi ? ' oggi' : '')
-      + (apribile ? '' : ' muto'));
-    b.disabled = !apribile;
+      + (apribile || registrabile ? '' : ' muto'));
+    b.disabled = !apribile && !registrabile;
     b.innerHTML = `<span class="dow">${GG_INI[dayIdx(k)]}</span>
       <span class="num">${+k.slice(8)}</span>
       <span class="box">${st === 'fatta' || st === 'extra'
         ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6"/></svg>' : ''}</span>`;
     b.setAttribute('aria-label', `${dataLunga(k)}: ${STATO_GYM[st]}`
-      + (id ? ', ' + (scheda(id)?.nome || '') : ''));
+      + (id ? ', ' + (scheda(id)?.nome || '') : '')
+      + (registrabile ? ', tocca per registrare' : ''));
     b.title = b.getAttribute('aria-label');
     if (apribile) b.onclick = () => sheetRiassuntoGiorno(k);
+    else if (registrabile) b.onclick = () => sheetSeduta(k);
     if (k === oggi) qui = b;
     sc.append(b);
   }
@@ -908,16 +913,20 @@ function sheetMeseGym(mese) {
   for (const k of tutti) {
     const righe = dati.perGiorno.get(k) || [];
     const futuro = k > oggi;
-    const b = el('button', 'gm-d' + (k === oggi ? ' oggi' : '') + (futuro ? ' futuro' : ''));
+    const b = el('button', 'gm-d' + (k === oggi ? ' oggi' : '') + (futuro ? ' futuro' : '')
+      + (!futuro && !righe.length ? ' nulla' : ''));
     const punti = righe.slice(0, 3).map(r =>
       `<i class="${r.classe === 'pesi' ? 'pieno' : 'vuoto'}"></i>`).join('');
     b.innerHTML = `<span class="num">${+k.slice(8)}</span>`
       + `<span class="pt">${punti}${righe.length > 3 ? '<em>+</em>' : ''}</span>`;
-    b.disabled = !righe.length;
+    // come nella striscia: pieno si guarda, passato e vuoto si registra
+    b.disabled = futuro;
     b.setAttribute('aria-label', dataLunga(k) + ': '
-      + (righe.length ? righe.map(r => r.tipo).join(', ') : 'niente'));
+      + (righe.length ? righe.map(r => r.tipo).join(', ')
+        : futuro ? 'niente' : 'niente, tocca per registrare'));
     b.title = b.getAttribute('aria-label');
     if (righe.length) b.onclick = () => sheetRiassuntoGiorno(k);
+    else if (!futuro) b.onclick = () => sheetSeduta(k);
     gr.append(b);
   }
   w.append(gr);
@@ -988,6 +997,14 @@ function sheetRiassuntoGiorno(k) {
     w.append(r);
   } else {
     w.append(el('p', 'muted', 'Niente registrato in questo giorno.'));
+  }
+  /* Un giorno con una corsa puo' avere avuto anche i pesi, o un secondo
+     sport: da qui si aggiunge su questa data, non su oggi. */
+  if (k <= today()) {
+    const agg = el('button', 'btn wide pri', 'Aggiungi un allenamento');
+    agg.style.marginTop = '12px';
+    agg.onclick = () => sheetSeduta(k);
+    w.append(agg);
   }
   const ind = el('button', 'btn wide', 'Chiudi');
   ind.style.marginTop = '12px';
@@ -2019,7 +2036,7 @@ function sheetSeduta(k) {
 function sheetSceltaModo(k) {
   const p = P(), gia = p.sessioni[k]?.serie?.length || 0;
   const w = el('div');
-  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
+  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : dataLunga(k)));
   w.append(el('h2', 'sec', 'Come registri?'));
   w.lastChild.style.marginTop = '0';
 
@@ -2250,7 +2267,7 @@ function sheetDaScheda(k, schedaId, sostPre) {
   };
 
   const w = el('div');
-  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
+  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : dataLunga(k)));
   w.append(el('h2', 'sec', esc(sc.nome)));
   w.lastChild.style.marginTop = '0';
   w.append(el('p', 'muted', gia
@@ -2260,8 +2277,10 @@ function sheetDaScheda(k, schedaId, sostPre) {
 
   /* Questo modulo va bene per registrare a fine seduta o per correggere. Ma
      mentre ti alleni non serve un modulo con quaranta caselle: serve sapere
-     cosa fare adesso. Da qui si passa alla guida serie per serie. */
-  if (typeof sheetGuidata === 'function') {
+     cosa fare adesso. Da qui si passa alla guida serie per serie.
+     Su un giorno passato no: quella seduta e' gia' finita, e una guida con
+     il recupero che parte da solo cronometrerebbe un lavoro fatto ieri. */
+  if (typeof sheetGuidata === 'function' && k >= today()) {
     const gd = el('button', 'btn wide pri', 'Guidami serie per serie');
     gd.onclick = () => sheetGuidata(k, sc.id);
     w.append(gd);
@@ -2553,7 +2572,7 @@ function sheetLibero(k, crea = false) {
   if (!p.sessioni[k]) return sheetSceltaModo(k);
   const s = p.sessioni[k];
   const w = el('div');
-  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
+  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : dataLunga(k)));
   w.append(el('h2', 'sec', 'Seduta libera'));
   w.lastChild.style.marginTop = '0';
   w.append(el('div', 'field',

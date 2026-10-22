@@ -785,35 +785,12 @@ function sheetAggiungiAlPasto(k, code) {
 
   /* --- dove finisce --- */
   if (!code && slots.length) {
-    const fd = el('div', 'field', '<label>Dove</label>');
-    const seg = el('div', 'seg chips');
-    const voci = slots.map(x => [x.codice,
-      `${x.slot}${x.ora ? ' ' + x.ora : ''}`]).concat([[null, 'Fuori piano']]);
     // il pasto piu' vicino all'ora di adesso e' quasi sempre quello giusto:
     // chi registra qualcosa lo fa mentre lo sta mangiando
-    const ora = new Date().getHours() * 60 + new Date().getMinutes();
-    let best = null, dist = 1e9;
-    for (const x of slots) {
-      const m = typeof oraMinuti === 'function' ? oraMinuti(x.ora) : null;
-      if (m == null) continue;
-      const dd = Math.abs(m - ora);
-      if (dd < dist) { dist = dd; best = x.codice; }
-    }
-    dest.code = k === today() ? best : null;
-    const dipingi = () => [...seg.children].forEach(b =>
-      b.setAttribute('aria-pressed', String(b.dataset.c || '') === String(dest.code || '')));
-    for (const [c, lab] of voci) {
-      const b = el('button', null, lab);
-      b.dataset.c = c || '';
-      b.onclick = () => { dest.code = c; dipingi(); };
-      seg.append(b);
-    }
-    fd.append(seg);
-    fd.append(el('div', 'hint',
+    dest.code = k === today() ? pastoPiuVicino(slots) : null;
+    w.append(campoDove(slots, dest,
       'Dentro una ricetta conta nel totale di quella ricetta; nel fuori piano resta '
       + 'una voce a se\'. Parte gia\' scelto quello piu\' vicino a adesso.'));
-    w.append(fd);
-    dipingi();
   }
 
   const ok = el('button', 'btn wide pri', 'Aggiungi');
@@ -844,6 +821,171 @@ function sheetAggiungiAlPasto(k, code) {
   const ann = el('button', 'btn wide', 'Annulla');
   ann.style.marginTop = '8px';
   ann.onclick = () => { if (code) sheetPorzioni(k, code); else { closeSheet(); route(); } };
+  w.append(ann);
+  sheet(w);
+}
+
+/** Il pasto del giorno con l'ora piu' vicina a adesso, o null. */
+function pastoPiuVicino(slots) {
+  const ora = new Date().getHours() * 60 + new Date().getMinutes();
+  let best = null, dist = 1e9;
+  for (const x of slots) {
+    const m = typeof oraMinuti === 'function' ? oraMinuti(x.ora) : null;
+    if (m == null) continue;
+    const dd = Math.abs(m - ora);
+    if (dd < dist) { dist = dd; best = chiaveP(x); }
+  }
+  return best;
+}
+
+/**
+ * Le pastiglie del "dove": i pasti del giorno e il fuori piano.
+ * Una sola, per l'alimento e per la ricetta: sono la stessa domanda, e due
+ * copie prima o poi metterebbero le voci in due ordini diversi.
+ */
+function campoDove(slots, dest, hint) {
+  const fd = el('div', 'field', '<label>Dove</label>');
+  const seg = el('div', 'seg chips');
+  /* La chiave e' il **pasto** (`chiaveP`), non la ricetta: gli strati del
+     diario sono indicizzati li'. Con `x.codice` un alimento messo "dentro la
+     colazione" finiva sotto `C1`, che il pasto `g0-0` non legge — e spariva
+     dal conto senza che nessuno lo avesse tolto. */
+  const voci = slots.map(x => [chiaveP(x),
+    `${x.slot}${x.ora ? ' ' + x.ora : ''}`]).concat([[null, 'Fuori piano']]);
+  const dipingi = () => [...seg.children].forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.c || '') === String(dest.code || '')));
+  for (const [c, lab] of voci) {
+    const b = el('button', null, lab);
+    b.dataset.c = c || '';
+    b.onclick = () => { dest.code = c; dipingi(); };
+    seg.append(b);
+  }
+  fd.append(seg);
+  fd.append(el('div', 'hint', hint));
+  dipingi();
+  return fd;
+}
+
+/**
+ * Una ricetta intera nella giornata, non un alimento alla volta.
+ *
+ * Il caso e' il panino mangiato fuori — una ricetta che hai composto o
+ * importato — in un giorno che il piano non prevedeva. Prima l'unica strada
+ * era aggiungerne gli ingredienti uno per uno, o riscriverne i macro a mano.
+ *
+ * Due destinazioni, come per l'alimento, ma con il default **opposto**: una
+ * ricetta intera e' quasi sempre un pasto a se', quindi parte sul fuori piano,
+ * dove resta una voce col suo nome. Dentro un pasto entra ingrediente per
+ * ingrediente nello strato degli aggiunti, cosi' il totale di quel pasto dice
+ * la verita' e un prodotto collegato dopo corregge anche questi.
+ *
+ * Chi invece quella ricetta l'ha mangiata **al posto** del pasto previsto ha
+ * gia' la sua strada, "Sostituisci l'intero pasto", e la nota lo dice.
+ */
+function sheetAggiungiRicetta(k) {
+  const slots = usaPiano()
+    ? slotsGiorno(k).filter(x => ricettaGiorno(chiaveP(x), k)) : [];
+  const dest = { code: null };
+  const st = { id: null, f: 1 };
+
+  const w = el('div');
+  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
+  w.append(el('h2', 'sec', 'Aggiungi una ricetta'));
+  w.lastChild.style.marginTop = '0';
+  w.append(el('p', 'muted',
+    'Una delle tue ricette, intera o in porzione. Vale <strong>solo per questo '
+    + 'giorno</strong>: il piano non cambia.'));
+
+  const opz = Object.entries(D.pasti || {})
+    .map(([id, pa]) => {
+      const m = macroRicetta(pa);
+      return { v: id, lab: pa.nome || id,
+        sub: `${nf(m.kcal)} kcal · ${nf(m.p, 0)}P ${nf(m.c, 0)}C ${nf(m.g, 0)}G` };
+    })
+    .sort((a, b) => a.lab.localeCompare(b.lab));
+  if (!opz.length) {
+    w.append(el('p', 'muted',
+      'Non hai ancora ricette. Si compongono in Piano, passo "Le tue ricette", '
+      + 'oppure arrivano da un file di scambio.'));
+    const x = el('button', 'btn wide', 'Chiudi');
+    x.onclick = closeSheet;
+    w.append(x);
+    return sheet(w);
+  }
+
+  const anteprima = el('div', 'read');
+  const macroScelta = () => {
+    const pa = st.id ? pasto(st.id) : null;
+    if (!pa) return null;
+    const m = macroRicetta(pa), out = {};
+    for (const x of ['kcal', 'p', 'c', 'g', 'fibre'])
+      out[x] = Math.round((m[x] || 0) * st.f * 10) / 10;
+    return out;
+  };
+  const stima = () => {
+    const m = macroScelta();
+    anteprima.innerHTML = m
+      ? `<span><b>+${nf(m.kcal)} kcal</b></span><span>+${nf(m.p, 1)} P</span>`
+        + `<span>+${nf(m.c, 1)} C</span><span>+${nf(m.g, 1)} G</span>`
+      : '';
+  };
+
+  const f = el('div', 'field', '<label>Quale</label>');
+  f.append(selettoreCercabile(opz, null, v => { st.id = v; stima(); }, 'Cerca una ricetta…'));
+  w.append(f);
+
+  /* La porzione a pastiglie, come la scala del pasto: mezzo panino si dice
+     con un tocco, e "0,5" in un campo numerico non lo scrive nessuno. */
+  const fp = el('div', 'field', '<label>Quanto</label>');
+  const seg = el('div', 'seg chips');
+  const porz = [[0.5, 'mezza'], [1, 'intera'], [1.5, '×1,5'], [2, '×2']];
+  const dip = () => [...seg.children].forEach(b =>
+    b.setAttribute('aria-pressed', String(+b.dataset.f === st.f)));
+  for (const [v, lab] of porz) {
+    const b = el('button', null, lab);
+    b.dataset.f = v;
+    b.onclick = () => { st.f = v; dip(); stima(); };
+    seg.append(b);
+  }
+  fp.append(seg);
+  w.append(fp);
+  dip();
+  w.append(anteprima);
+
+  if (slots.length) w.append(campoDove(slots, dest,
+    'Nel fuori piano resta una voce col nome della ricetta. Dentro un pasto ne '
+    + 'entrano gli ingredienti, e contano quando quel pasto e\' spuntato. Se l\'hai '
+    + 'mangiata <strong>al posto</strong> di un pasto, aprilo e usa "Sostituisci '
+    + 'l\'intero pasto".'));
+
+  const ok = el('button', 'btn wide pri', 'Aggiungi');
+  ok.onclick = () => {
+    const pa = st.id ? pasto(st.id) : null;
+    if (!pa) { toast('Scegli prima una ricetta'); return; }
+    const nome = pa.nome || st.id;
+    // una ricetta scritta a macro non ha ingredienti da mettere in un pasto:
+    // resta una voce a se', che e' l'unico modo di contarla
+    if (dest.code && pa.ingredienti?.length) {
+      // gli ingredienti, riscalati: e' lo strato che il pasto sa gia' contare
+      for (const i of (pa.ingredienti || []))
+        aggiungiAlPasto(dest.code, k, i.alimento,
+          Math.round((i.qta || 0) * st.f * 10) / 10);
+      closeSheet(); route();
+      toast(nome + ' in ' + (pasto(pastoDelGiorno(dest.code, k))?.nome || 'quel pasto'));
+    } else {
+      const m = macroScelta();
+      day(k).extra.push({
+        nome: st.f === 1 ? nome
+          : `${nome} (${porz.find(([v]) => v === st.f)?.[1] || '×' + st.f})`,
+        kcal: Math.round(m.kcal), p: m.p, c: m.c, g: m.g, fibre: m.fibre,
+        ricetta: st.id });
+      save(); closeSheet(); route(); toast(nome + ' registrata');
+    }
+  };
+  w.append(ok);
+  const ann = el('button', 'btn wide', 'Annulla');
+  ann.style.marginTop = '8px';
+  ann.onclick = () => { closeSheet(); route(); };
   w.append(ann);
   sheet(w);
 }

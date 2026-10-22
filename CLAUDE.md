@@ -285,6 +285,10 @@ non un dettaglio.
   minuti. Entrano nel conto delle sedute e nella spesa energetica
 - **Il mese degli allenamenti** — dal calendario in alto a destra di Gym:
   quante sessioni, dove e' finito il tempo, e la griglia del mese
+- **Allenamenti nei giorni passati** — un giorno vuoto della striscia o del
+  mese si tocca e registra su quella data
+- **Una ricetta intera nella giornata** — in fondo a Oggi, in porzione, nel
+  fuori piano o dentro un pasto
 - **Le leve di un giorno** — in ogni giorno del piano: scegli quale macro
   alzare o abbassare e l'app propone le porzioni da cambiare e le ricette da
   sostituire, ordinate per quanto ti danno meno quanto allontanano gli altri
@@ -948,6 +952,21 @@ apre per dire che non ha niente da dire e' un tocco sprecato — e quello che
 mostra e' il **resoconto della seduta** che esiste gia': volume, dove e' finito
 il lavoro, i massimali mai visti prima. Rifarne uno qui vorrebbe dire
 mantenere due versioni degli stessi conti.
+
+**Un giorno passato e vuoto si tocca per registrare.** Segnalato cosi':
+*"aggiungi la possibilita' di aggiungere allenamenti ai giorni precedenti
+tramite il calendario"*. Il bottone in basso registrava solo su oggi, e
+l'allenamento scritto la sera dopo — il caso normale — non aveva un posto.
+Toccare un giorno vuoto non apre un riassunto che non ha niente da dire: apre
+"Come registri?" **su quella data**, nella striscia e nella griglia del mese.
+Il futuro resta spento, perche' li' non c'e' niente da vedere ne' da
+scrivere. Da un giorno che ha gia' qualcosa si aggiunge dal riassunto
+("Aggiungi un allenamento") o dal resoconto ("Aggiungi cardio o sport").
+
+Su un giorno passato due cose cambiano, e tutte e due per la stessa ragione —
+quella seduta e' gia' finita: niente **guida serie per serie**, che
+cronometrerebbe un recupero di ieri, e niente **GPS**, che traccia adesso.
+La corsa di ieri va dritta ai minuti a mano.
 
 Registrare e' **un bottone solo, in basso a destra** della striscia. In fondo
 davvero: messo fra la scheda di oggi e cosa hai gia' registrato spezzava in due
@@ -3918,6 +3937,45 @@ prodotto, forse cento grammi, forse zero calorie" vorrebbe dire inventare due
 numeri per risparmiare un tocco. Resta dov'e' accolto da un modulo: in
 "aggiungi un alimento" dentro il piano.
 
+### Una ricetta intera nella giornata
+
+Il panino mangiato fuori e' una ricetta — composta, o arrivata da un file di
+scambio — e per metterlo in un giorno c'erano solo due strade sbagliate:
+aggiungerne gli ingredienti uno per uno, sei giri dello stesso foglio, o
+riscriverne i macro a mano. `sheetAggiungiRicetta()` e' la riga **"Aggiungi
+una ricetta"** sotto "Aggiungi un alimento", e compare solo se di ricette ce
+n'e' almeno una.
+
+Cosa, quanto e dove, come per l'alimento, con due differenze:
+
+- **la porzione e' a pastiglie** — mezza, intera, ×1,5, ×2 — come la scala
+  del pasto: "0,5" in un campo non lo scrive nessuno;
+- **il default e' il fuori piano**, non il pasto piu' vicino all'ora: una
+  ricetta intera e' quasi sempre un pasto a se', e li' resta una voce col suo
+  nome (piu' `ricetta: id`). Dentro un pasto entra **ingrediente per
+  ingrediente** nello strato degli aggiunti, cosi' il totale del pasto dice la
+  verita' e un prodotto collegato dopo corregge anche quelli. Una ricetta
+  scritta solo a macro non ha ingredienti, e resta comunque una voce a se'.
+
+Chi l'ha mangiata **al posto** di un pasto ha gia' la sua strada,
+"Sostituisci l'intero pasto", e la nota del foglio lo dice: aggiungere e
+sostituire sono due fatti diversi.
+
+**Il difetto trovato provandola.** Le pastiglie del "dove" passavano
+`x.codice` — la **ricetta**, `C1` — invece di `chiaveP(x)` — il **pasto**,
+`g4-0`. Gli strati del diario sono indicizzati sul pasto da quando le mandorle
+delle 11 e quelle delle 16:30 condividevano la spunta, e questo foglio era
+rimasto indietro: un alimento messo "dentro la colazione" dalla scorciatoia di
+Oggi finiva sotto una chiave che la colazione non legge, e **spariva dal
+conto**. Spuntando quella chiave per sbaglio nasceva perfino un pasto
+fantasma "Registrato". Adesso le pastiglie sono una funzione sola,
+`campoDove()`, per l'alimento e per la ricetta. Misurato: aggiungendo gli
+spiedini dentro la colazione spuntata il giorno sale di 302 kcal, cioe'
+esattamente gli spiedini, e nessun pasto in piu'.
+
+Gli aggiunti gia' scritti sotto il codice della ricetta **non** sono stati
+migrati: restano dove sono, invisibili come prima.
+
 ### Le icone del momento della giornata
 
 Una lista di cinque pasti sono cinque righe uguali, e il primo modo in cui si
@@ -5518,8 +5576,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   ogni sette giorni non lo fa nessuno. Si assegna al giorno della settimana,
   e si fa dove si decide di seguire la scheda — sono la stessa decisione
 - Non trasformare un giorno del calendario in un pannello di comando: toccando
-  un giorno passato si vuole sapere com'e' andata, non decidere. E un giorno
-  vuoto non si apre affatto
+  un giorno passato si vuole sapere com'e' andata, non decidere. Un giorno
+  passato e **vuoto** invece apre la registrazione su quella data, e il
+  futuro non si apre affatto
+- Non offrire la guida serie per serie o il GPS su un giorno passato: quella
+  seduta e' finita, e cronometrarla non ha senso
 - Non riscrivere il riassunto di una seduta dentro il calendario:
   `sheetResoconto()` c'e' gia', e due versioni degli stessi conti prima o poi
   dicono due cose diverse

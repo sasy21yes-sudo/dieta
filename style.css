@@ -475,6 +475,8 @@ button.swapopt:active{background:var(--wash)}
   align-items:center;justify-content:center;gap:3px;cursor:pointer}
 .gm-d .num{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
 .gm-d:disabled{opacity:.45;cursor:default}
+/* passato e vuoto: si tocca per registrare, ma resta piu' quieto di un giorno pieno */
+.gm-d.nulla:not(.oggi){opacity:.6}
 .gm-d.futuro{border-style:dashed;opacity:.3}
 .gm-d.oggi{border-color:var(--pine);box-shadow:0 0 0 1px var(--pine) inset}
 .gm-d .pt{display:flex;gap:2px;align-items:center;min-height:7px}

@@ -1274,6 +1274,14 @@ function sheetResoconto(k) {
   mod.onclick = () => sheetLibero(k);
   w.append(mod);
 
+  // i pesi e una corsa nello stesso giorno: si aggiunge su QUESTA data
+  if (typeof sheetScegliSport === 'function') {
+    const sp = el('button', 'btn wide', 'Aggiungi cardio o sport a questo giorno');
+    sp.style.marginTop = '8px';
+    sp.onclick = () => sheetScegliSport(k);
+    w.append(sp);
+  }
+
   const ch = el('button', 'btn wide', 'Chiudi');
   ch.style.marginTop = '8px';
   ch.onclick = () => { closeSheet(); route(); };
