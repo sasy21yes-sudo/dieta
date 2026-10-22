@@ -6196,6 +6196,11 @@ doppia progressione, moltiplicatore sulle porzioni). Restano:
   volta sola, numerate
 - Non leggere `passi[i].t` senza controllare che il passo esista: i passi del
   piano non sono sempre gli stessi sei, e col piano alimentare spento sono due
+- Non pubblicare un commit senza alzare `V` in `sw.js` (`dieta-v118` →
+  `dieta-v119`): la versione che l'app dichiara e' il nome della cache del
+  worker, e se `sw.js` non cambia di un byte il telefono non reinstalla
+  niente. "Versione" continua a dire il numero vecchio e a rispondere che non
+  c'e' niente di nuovo. Un numero per commit, nello stesso commit
 - Non usare `window.print()` per fare un PDF su iOS: dentro una PWA aggiunta
   alla Home la finestra di stampa a volte non si apre, e i margini li decide il
   browser. Il file si genera, e cosi' si sa cosa contiene
