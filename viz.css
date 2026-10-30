@@ -2308,3 +2308,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .seg.scorre{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .seg.scorre::-webkit-scrollbar{display:none}
 .seg.scorre button{flex:none;padding:0 14px}
+
+/* l'azione che non si annulla: rossa nel testo, non nel fondo — si legge
+   senza gridare, come "Elimina" nelle liste di iOS */
+.btn.danger{color:var(--alert)}

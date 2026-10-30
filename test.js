@@ -190,6 +190,40 @@ function casiScarico() {
     sc.dati && !sc.serve, `serve=${sc.serve} filata=${sc.filata}`);
 }
 
+/** Dal calendario un allenamento si aggiunge, si corregge e si toglie. */
+function casiCalendario() {
+  const ieri = addDays(today(), -1), l_altro = addDays(today(), -2);
+  const conferma = window.confirm;
+  window.confirm = () => true;
+  try {
+    stato({ palestra: { cardio: { [ieri]: [{ id: 'c1', tipo: 'camminata', durata_s: 1800 }] },
+      sessioni: { [ieri]: { serie: [{ ex: 'panca-piana', kg: 60, reps: 8, rir: 2 }] } } } });
+
+    sheetRiassuntoGiorno(ieri);
+    verifica('il resoconto di un giorno con pesi mostra anche il cardio, e si tocca',
+      !!document.querySelector('#sheet-body .gd-cardio'));
+    verifica('il resoconto ha "Elimina la seduta"',
+      [...document.querySelectorAll('#sheet-body button')].some(b => /Elimina la seduta/.test(b.textContent)));
+
+    sheetCardioModifica(ieri, 0);
+    document.querySelector('#sheet-body #cm-min').value = '45';
+    document.querySelector('#sheet-body #cm-k').value = l_altro;
+    document.querySelector('#sheet-body [data-t="corsa"]').click();
+    [...document.querySelectorAll('#sheet-body button')].find(b => b.textContent === 'Salva').click();
+    const spostata = cardioDi(l_altro)[0];
+    verifica('una sessione si corregge e si sposta di giorno',
+      !cardioDi(ieri).length && spostata?.durata_s === 2700 && spostata?.tipo === 'corsa',
+      JSON.stringify(spostata));
+    verifica('le calorie si ricalcolano sul tipo nuovo', spostata?.kcal === kcalCardio(spostata));
+
+    eliminaSeduta(ieri);
+    verifica('una seduta di pesi si elimina', !P().sessioni[ieri]);
+  } finally {
+    window.confirm = conferma;
+    if (typeof closeSheet === 'function') closeSheet();
+  }
+}
+
 /** Le schermate nuove si disegnano anche senza niente dentro, e senza parole rotte. */
 function casiVuoto() {
   for (const base of ['vuoto', 'esempio']) {
@@ -201,6 +235,12 @@ function casiVuoto() {
     verifica(`piano ${base} senza dati: niente NaN, undefined o null a schermo`,
       !/NaN|undefined|\bnull\b/.test(t), (t.match(/.{30}(NaN|undefined|\bnull\b).{10}/) || [''])[0]);
   }
+  // la revisione disegna davvero i suoi pallini (non solo l'animazione)
+  stato({ log: mangia(pesate(-0.3, 40), 2300), settings: cut });
+  const vr = document.createElement('div');
+  viewRevisione(vr);
+  verifica('il manubrio della revisione ha i pallini disegnati',
+    vr.querySelectorAll('svg circle').length >= 4, vr.querySelectorAll('svg circle').length + ' cerchi');
   stato({ settings: { pianoBase: 'esempio' } });
   verifica('senza pesate il mese chiede pesate, non inventa un verdetto', giudizioMese().stato === 'dati');
 }
@@ -210,7 +250,7 @@ function casiVuoto() {
   const out = document.getElementById('esito');
   try {
     await caricaApp();
-    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiVuoto]) {
+    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiCalendario, casiVuoto]) {
       try { f(); } catch (e) { verifica(f.name + ' non deve lanciare', false, e.message); }
     }
   } catch (e) {

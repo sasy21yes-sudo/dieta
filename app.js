@@ -2569,7 +2569,7 @@ function viewDiario(v) {
     const f = el('div', 'field',
       `<label>${lab}${unit ? ` <span class="muted">(${unit})</span>` : ''}</label>
        <input type="text" inputmode="decimal" id="f-${id}"
-              value="${d[id] ?? ''}">${hint ? `<div class="hint">${hint}</div>` : ''}`);
+              value="${d[id] == null ? '' : Math.round(d[id] * 100) / 100}">${hint ? `<div class="hint">${hint}</div>` : ''}`);
     f.querySelector('input').oninput = e => set(id, parseNum(e.target.value));
     return f;
   };
@@ -2601,10 +2601,6 @@ function viewDiario(v) {
   bg.textContent = pezzi.length ? 'Apri Gym' : 'Registra una seduta';
   bg.onclick = () => { apri('#/palestra'); };
   ca.append(bg);
-  ca.append(el('p', 'note',
-    'Non c\'e\' piu\' niente da spuntare: la giornata conta come allenamento se '
-    + 'ci sono serie, cardio o una seduta HYROX registrata. Era una domanda a cui '
-    + 'l\'app sapeva gia\' rispondere.'));
   v.append(ca);
 
   /* Passi e sonno non hanno piu' un riquadro loro: erano due campi dentro una

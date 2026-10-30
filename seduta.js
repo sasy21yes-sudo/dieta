@@ -1274,6 +1274,26 @@ function sheetResoconto(k) {
   mod.onclick = () => sheetLibero(k);
   w.append(mod);
 
+  /* Il cardio dello stesso giorno: dal calendario un giorno con pesi apre
+     questo resoconto, e una corsa fatta la stessa sera non si vedeva piu' —
+     quindi non si poteva ne' correggere ne' togliere. */
+  const cd = typeof cardioDi === 'function' ? cardioDi(k) : [];
+  if (cd.length) {
+    const cc = el('div', 'card');
+    cc.append(el('h2', 'sec', 'Anche quel giorno'));
+    cc.lastChild.style.marginTop = '0';
+    cd.forEach((x, i) => {
+      const r = el('button', 'cmp-r tap gd-cardio');
+      r.innerHTML = `<span>${esc(cardioTipo(x.tipo).n)}</span>`
+        + `<span class="mono">${hms2(x.durata_s || 0)}</span>`
+        + `<span class="mono muted">${x.distanza_m ? nf(x.distanza_m / 1000, 2) + ' km' : ''}</span>`
+        + '<span class="muted">›</span>';
+      r.onclick = () => sheetCardioRec(k, i, () => sheetResoconto(k));
+      cc.append(r);
+    });
+    w.append(cc);
+  }
+
   // i pesi e una corsa nello stesso giorno: si aggiunge su QUESTA data
   if (typeof sheetScegliSport === 'function') {
     const sp = el('button', 'btn wide', 'Aggiungi cardio o sport a questo giorno');
@@ -1286,5 +1306,14 @@ function sheetResoconto(k) {
   ch.style.marginTop = '8px';
   ch.onclick = () => { closeSheet(); route(); };
   w.append(ch);
+
+  // in fondo e staccato: e' l'unica azione che non si annulla
+  if (typeof eliminaSeduta === 'function') {
+    const del = el('button', 'btn wide danger', 'Elimina la seduta');
+    del.style.marginTop = '18px';
+    del.onclick = () => eliminaSeduta(k);
+    w.append(del);
+    w.append(el('p', 'note', 'Toglie le serie di palestra di quel giorno, non il cardio.'));
+  }
   sheet(w);
 }

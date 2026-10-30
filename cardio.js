@@ -503,13 +503,86 @@ function cardCardio(k = today()) {
   return c;
 }
 
+/**
+ * Correggere una sessione: tipo, minuti, distanza e giorno.
+ * Il giorno si sposta perche' l'errore piu' comune e' proprio quello — la
+ * corsa di ieri segnata stamattina — e una sessione sul giorno sbagliato
+ * sporca la striscia, la costanza e il conto delle sedute della revisione.
+ * Le calorie si ricalcolano con la stessa regola del salvataggio.
+ */
+function sheetCardioModifica(k, i, dopo = null) {
+  const r = cardioDi(k)[i];
+  if (!r) return;
+  let tipo = r.tipo;
+  const w = el('div');
+  w.append(el('div', 'eyebrow', 'Modifica la sessione'));
+  w.append(el('h2', 'sec', esc(cardioTipo(tipo).n)));
+  w.lastChild.style.marginTop = '0';
+
+  const tutte = [];
+  const marca = () => {
+    tutte.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === tipo)));
+    w.querySelector('h2').textContent = cardioTipo(tipo).n;
+  };
+  for (const [g, lab] of [['cardio', 'Cardio'], ['sport', 'Sport']]) {
+    w.append(el('div', 'eyebrow', lab));
+    const seg = el('div', 'seg wrap');
+    for (const t of CARDIO_TIPI.filter(x => (x.gruppo || 'cardio') === g)) {
+      const b = el('button', null, t.n);
+      b.dataset.t = t.id;
+      b.onclick = () => { tipo = t.id; marca(); };
+      seg.append(b); tutte.push(b);
+    }
+    w.append(seg);
+  }
+
+  const g = el('div');
+  g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px;margin-top:12px';
+  g.innerHTML = `<div class="field"><label>Minuti</label>
+      <input type="text" inputmode="decimal" id="cm-min" value="${Math.round((r.durata_s || 0) / 6) / 10}"></div>
+    <div class="field"><label>Distanza <span class="muted">(km)</span></label>
+      <input type="text" inputmode="decimal" id="cm-km" value="${r.distanza_m ? Math.round(r.distanza_m / 10) / 100 : ''}"
+        placeholder="facoltativa"></div>
+    <div class="field" style="grid-column:1/-1"><label>Giorno</label>
+      <input type="date" id="cm-k" value="${k}" max="${today()}"></div>`;
+  w.append(g);
+  marca();
+
+  const ok = el('button', 'btn wide pri', 'Salva');
+  ok.onclick = () => {
+    const min = parseNum($('#cm-min').value);
+    if (!(min > 0)) { toast('Servono i minuti'); return; }
+    const km = parseNum($('#cm-km').value) || 0;
+    const k2 = $('#cm-k').value || k;
+    if (k2 > today()) { toast('Il giorno non puo\' essere nel futuro'); return; }
+    const nuovo = { ...r, tipo, durata_s: Math.round(min * 60), distanza_m: Math.round(km * 1000) };
+    nuovo.kcal = kcalCardio(nuovo);
+    const L = cardioTutti();
+    L[k].splice(i, 1);
+    if (!L[k].length) delete L[k];
+    (L[k2] ||= []).push(nuovo);
+    save(); closeSheet(); route();
+    toast(k2 === k ? 'Sessione corretta' : 'Sessione spostata');
+  };
+  w.append(ok);
+  const ann = el('button', 'btn wide', 'Annulla');
+  ann.style.marginTop = '8px';
+  ann.onclick = () => sheetCardioRec(k, i, dopo);
+  w.append(ann);
+  if (r.punti?.length) w.append(el('p', 'note',
+    'Il tracciato GPS resta quello registrato: cambiando minuti e distanza cambiano '
+    + 'i conti, non il disegno della cartolina.'));
+  sheet(w);
+}
+
 /** Il foglio di una sessione salvata: numeri, tracciato, e la cartolina. */
-function sheetCardioRec(k, i) {
+function sheetCardioRec(k, i, dopo = null) {
   const r = cardioDi(k)[i];
   if (!r) return;
   const t = cardioTipo(r.tipo), an = andatura(r);
   const w = el('div');
-  w.append(el('div', 'eyebrow', esc(k)));
+  w.append(el('div', 'eyebrow', k === today() ? 'Oggi'
+    : esc(typeof dataLunga === 'function' ? dataLunga(k) : k)));
   w.append(el('h2', 'sec', esc(t.n)));
   w.lastChild.style.marginTop = '0';
 
@@ -527,15 +600,30 @@ function sheetCardioRec(k, i) {
   sh.onclick = () => condividiCartolina(r);
   w.append(sh);
 
-  const del = el('button', 'btn wide', 'Elimina');
+  /* Si corregge, non solo si butta: una sessione segnata male — trenta
+     minuti invece di novanta, la corsa salvata come camminata, il giorno
+     sbagliato — si riapre e si sistema. */
+  const mod = el('button', 'btn wide', 'Modifica');
+  mod.style.marginTop = '8px';
+  mod.onclick = () => sheetCardioModifica(k, i, dopo);
+  w.append(mod);
+
+  const del = el('button', 'btn wide danger', 'Elimina');
   del.style.marginTop = '8px';
   del.onclick = () => {
     if (!confirm('Eliminare questa sessione?')) return;
     cardioTutti()[k].splice(i, 1);
     if (!cardioTutti()[k].length) delete cardioTutti()[k];
     save(); closeSheet(); route();
+    toast('Sessione eliminata');
   };
   w.append(del);
+  if (dopo) {
+    const ind = el('button', 'btn wide', 'Indietro');
+    ind.style.marginTop = '8px';
+    ind.onclick = dopo;
+    w.append(ind);
+  }
 
   w.append(el('p', 'note',
     'L\'immagine e\' 1080×1350 e si genera qui sul telefono: non passa da nessun '

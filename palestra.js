@@ -988,13 +988,20 @@ function sheetRiassuntoGiorno(k) {
   w.lastChild.style.marginTop = '0';
   const st = statoAllenamento(k);
   w.append(el('div', 'gcal-st ' + st, STATO_GYM[st]));
-  if (card.length) for (const c of card) {
-    const r = el('div', 'cmp-r');
-    r.innerHTML = `<span>${esc(cardioTipo(c.tipo).n)}</span>`
-      + `<span class="mono">${hms2(c.durata_s || 0)}</span>`
-      + `<span class="mono muted">${c.distanza_m ? nf(c.distanza_m / 1000, 2) + ' km' : ''}</span>`
-      + '<span></span>';
-    w.append(r);
+  /* Le righe si toccano: dentro c'e' la sessione, con "Modifica" ed
+     "Elimina". Prima erano righe di sola lettura, e dal calendario un
+     allenamento si poteva aggiungere ma non correggere ne' togliere. */
+  if (card.length) {
+    card.forEach((c, i) => {
+      const r = el('button', 'cmp-r tap');
+      r.innerHTML = `<span>${esc(cardioTipo(c.tipo).n)}</span>`
+        + `<span class="mono">${hms2(c.durata_s || 0)}</span>`
+        + `<span class="mono muted">${c.distanza_m ? nf(c.distanza_m / 1000, 2) + ' km' : ''}</span>`
+        + '<span class="muted">›</span>';
+      r.onclick = () => sheetCardioRec(k, i, () => sheetRiassuntoGiorno(k));
+      w.append(r);
+    });
+    w.append(el('p', 'hint', 'Tocca una sessione per correggerla o eliminarla.'));
   } else {
     w.append(el('p', 'muted', 'Niente registrato in questo giorno.'));
   }
@@ -2164,19 +2171,31 @@ function sheetSceltaModo(k) {
     const del = el('button', 'btn wide');
     del.style.marginTop = '14px';
     del.textContent = 'Elimina la seduta di questo giorno';
-    del.onclick = () => {
-      if (!confirm(`Eliminare le ${gia} serie registrate il ${k}? Non si puo' annullare.`)) return;
-      delete P().sessioni[k];
-      scordaFatica();
-      save(); closeSheet(); route();
-      toast('Seduta eliminata');
-    };
+    del.onclick = () => eliminaSeduta(k);
     w.append(del);
     w.append(el('p', 'note',
       'Toglie solo le serie di palestra di quel giorno. Il cardio si elimina dalla '
       + 'sua scheda, e il resto del diario non viene toccato.'));
   }
   sheet(w);
+}
+
+/**
+ * Elimina le serie di palestra di un giorno, dopo averlo chiesto.
+ * Sta in una funzione sola perche' ci si arriva da due porte — "Come
+ * registri?" e il resoconto che si apre dal calendario — e dal calendario
+ * mancava: una seduta si poteva aggiungere a un giorno passato ma non togliere.
+ */
+function eliminaSeduta(k) {
+  const n = P().sessioni[k]?.serie?.length || 0;
+  if (!n) return false;
+  const quando = k === today() ? 'oggi' : (typeof dataLunga === 'function' ? dataLunga(k) : k);
+  if (!confirm(`Eliminare le ${n} serie registrate ${k === today() ? '' : 'di '}${quando}? Non si puo' annullare.`)) return false;
+  delete P().sessioni[k];
+  scordaFatica();
+  save(); closeSheet(); route();
+  toast('Seduta eliminata');
+  return true;
 }
 
 /** "50x6, 40x5" -> gli scarichi di uno stripping. */
