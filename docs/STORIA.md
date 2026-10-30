@@ -1,0 +1,6306 @@
+> **Cos'e' questo file.** Fino a ottobre 2026 era il CLAUDE.md del progetto:
+> 6.200 righe che raccontano ogni scelta con il difetto che l'ha fatta nascere.
+> Le regole sono state estratte nel CLAUDE.md nuovo, corto; qui resta il
+> perche', cercabile per titolo di sezione. Le sezioni piu' recenti stanno in
+> fondo.
+
+# Dieta — PWA per il piano di ricomposizione
+
+App web installabile su iPhone **senza App Store**, tramite "Aggiungi alla schermata Home".
+Nessun build step, nessuna dipendenza, nessun backend. Vanilla JS + un service worker.
+
+---
+
+## Come si mette sul telefono
+
+L'app ha bisogno di **HTTPS** (il service worker non parte da `file://` né da HTTP semplice).
+
+1. Crea un repo GitHub e carica questa cartella
+2. Settings → Pages → Deploy from branch → `main` / root
+3. Sull'iPhone apri l'URL **in Safari** (non Chrome: solo Safari può installare)
+4. Condividi → **Aggiungi alla schermata Home**
+5. Apri l'app dall'icona, non dal browser
+
+Per lo sviluppo locale: `py -m http.server 8000` e apri `localhost:8000`.
+Su Windows l'interprete si chiama `py` (o `python`): `python3` è l'alias del Microsoft
+Store e risponde con un invito a installare, non con Python. Su macOS e Linux resta
+`python3`. Il service worker parte anche da `localhost`, che è contesto sicuro: per
+provare l'offline sul computer non serve HTTPS.
+Da un altro dispositivo sulla stessa rete serve HTTPS: usa `ngrok http 8000`.
+
+---
+
+## Vincoli iOS reali (leggere prima di promettere funzionalità)
+
+Questi non sono limiti dell'implementazione: sono limiti di Safari. Vanno progettati intorno, non aggirati.
+
+| Cosa | Stato su iOS |
+|---|---|
+| Aggiunta alla Home, schermo intero, icona propria | Funziona |
+| Funzionamento offline (service worker) | Funziona |
+| `localStorage` / IndexedDB persistenti | Funziona, ma vedi sotto |
+| **Notifiche locali programmate** | **Non esistono.** La Notification Triggers API non è implementata in Safari |
+| Web Push | Solo da iOS 16.4+, **solo** se l'app è stata aggiunta alla Home, e **richiede un server** con chiavi VAPID e uno scheduler |
+| Esecuzione in background | Non esiste |
+
+### Conseguenza sulle notifiche
+
+Una PWA **non può svegliarsi da sola** per ricordarti lo spuntino delle 16:30.
+La soluzione implementata evita del tutto il problema: l'app **genera un file `.ics`**
+con tutti gli eventi ricorrenti (5 pasti, 5 integratori, pesata mattutina,
+revisione domenicale), ognuno con il suo `VALARM`. L'utente lo apre una volta,
+il Calendario iOS lo importa e da lì in poi le notifiche sono **native, affidabili
+e senza server**.
+
+Se in futuro servisse il push vero (es. messaggi dinamici tipo "ti mancano 40 g di
+proteine"), serve un backend: Cloudflare Worker + Cron Trigger + `web-push` con VAPID.
+È un'aggiunta, non una riscrittura: l'app resta funzionante senza.
+
+### Conseguenza sulla persistenza
+
+Le web app aggiunte alla Home non subiscono il limite dei 7 giorni di ITP, ma i dati
+**possono comunque sparire** se l'utente svuota i dati di Safari o reinstalla.
+Per questo l'esportazione del backup JSON non è un extra: è parte del contratto.
+Ricordarlo all'utente ogni ~20 giorni di log.
+
+---
+
+## Struttura
+
+```
+index.html      guscio: topbar, <main>, tab bar (5 voci), sheet modale
+style.css       design system (variabili CSS, tema chiaro/scuro automatico)
+viz.css         tavolozza dei grafici + componenti di Dati, Prodotti, Foto
+app.js          stato, router, viste principali, motori. Caricato PER ULTIMO:
+                costruisce ROUTES e chiama init(), quindi le viste degli altri
+                file devono gia' esistere
+anim.js         toolkit di animazione (vedi sotto). Caricato PRIMA di charts.js
+icone.js        le icone prese da Feather/Lucide, ricopiate dentro (vedi sotto)
+charts.js       toolkit SVG dei grafici + vista Dati
+revisione.js    revisione settimanale: diagnosi, leve, impegno, priorita'
+obiettivo.js    l'obiettivo (cut/ricomp/mantenimento/bulk) e il fisico a cui punti
+leve.js         le leve di un giorno del piano: come muovere un macro tenendo
+                gli altri a target, in porzioni e cambi di ricetta
+target.js       il target che si ricalibra sul dispendio + rampa fibre
+previsioni.js   proiezioni di misure, composizione e forza a 28 giorni
+cerca.js        selettore cercabile riusabile
+spesa.js        la lista della spesa e la dispensa (vedi sotto)
+peso.js         pesate anomale e ciclo mestruale: cio' che sporca la bilancia
+timer.js        timer di recupero fra le serie
+seduta.js       la seduta guidata, il recupero ad anello, il resoconto di una seduta
+carico.js       scarico automatico + dolori e infortuni
+cardio.js       corsa e simili, tracciato GPS, cartolina PNG da condividere
+salute.js       import di passi e sonno da un Comando iOS
+scambio.js      esporta/importa un pezzo solo: la dieta, le schede, o tutti e due
+copie.js        le copie automatiche del backup in IndexedDB, ogni tre giorni
+pdf.js          generatore di PDF scritto a mano (font di base, WinAnsi)
+statistiche.js  i conti del resoconto: registro, settimana, pasti, fuori piano
+confronto.js    due alimenti a confronto: a parita' di peso, calorie, proteine
+ai.js           la classe per le chiamate all'AI: compone la domanda e valida
+                la risposta. Non configurata, e finche' non lo e' si ferma
+assistente.js   la nuvoletta e il foglio: il periodo, le tre domande da un
+                tocco, il campo libero. E' l'unico posto da cui si chiede
+sfide.js        sfide giornaliere, punteggi di costanza, traguardi, menu
+giorno.js       porzioni per singolo giorno + scheda di dettaglio della giornata
+piano.js        profili multipli + editor del piano (target, alimenti, pasti, settimana)
+palestra.js     registro sedute, mappa muscolare, forma-fatica, progressione,
+                catalogo esercizi da internet
+prodotti.js     prodotti reali, codici a barre, ricerca alimenti su Open Food
+                Facts, override degli alimenti
+foto.js         foto dei progressi (IndexedDB) + guide di inquadratura +
+                timelapse + confronto a cursore
+camera.js       la fotocamera a schermo intero: una schermata, due mestieri
+                (i progressi col timer, il piatto con la cornice)
+sw.js           cache offline; rete-prima su tutto, cache come riserva
+manifest.json   PWA
+data/dieta.json IL DOMINIO alimentare — vedi sotto
+data/palestra.json catalogo esercizi, gruppi muscolari, modello forma-fatica
+data/sfide.json 38 sfide giornaliere + 23 traguardi
+data/corpo.json tracciati anatomici della mappa muscolare (MIT, vedi sotto)
+data/fisici.json 11 fisici di riferimento — dichiarazioni di stampa, non misure
+icons/          180 (apple-touch), 192, 512, maskable
+```
+
+### `data/dieta.json` è un ESEMPIO, non il default
+
+Il file contiene nome, età, peso e misure di una persona reale. **Chi installa
+l'app non deve ritrovarsi quei dati addosso.** Al primo avvio un gate in
+`route()` porta a `viewBenvenuto` e blocca tutto il resto finché non si sceglie:
+
+- **vuoto** — profilo azzerato, nessun pasto, settimana senza assegnazioni,
+  misure senza valori di partenza; i target si calcolano da Mifflin-St Jeor
+  appena si inserisce il profilo. Il database dei 44 alimenti resta, perché
+  sono valori nutrizionali generici e non dati di nessuno
+- **esempio** — carica il piano completo, con l'avviso esplicito che contiene i
+  dati di un'altra persona
+
+`S.settings.pianoBase` tiene la scelta, e `fondiPiano()` la rispetta. Si può
+cambiare idea dal passo "Piano di partenza".
+
+Conseguenza da non dimenticare: con il piano vuoto `D.pasti[s.codice]` è
+`undefined` per ogni slot. Ogni punto che legge un pasto dalla settimana deve
+reggerlo — Oggi, la spesa e l'analisi lo fanno.
+
+### I moduli si spengono
+
+Non tutti vogliono la stessa app. C'è chi si costruisce il piano settimanale e
+ci si attiene, e c'è chi vuole solo scrivere cosa ha mangiato oggi e vedere se
+torna con i target. HYROX allo stesso modo interessa a pochi.
+
+`S.settings.moduli = { piano, hyrox }`, con gli interruttori in `cardModuli()`
+— al primo avvio e nel passo "Chi sei". **Spegnere non cancella niente:**
+i dati restano dove sono e riaccendendo tornano tutti. Sparisce solo
+l'interfaccia, e con essa i conti che ne dipendono.
+
+Con `piano` spento: niente slot dei pasti su Oggi, niente "Da assegnare",
+la tab **Spesa si nasconde** (`route()` la toglie: la lista nasce dalla somma
+dei pasti assegnati, e senza pasti non c'è niente da sommare), i cinque passi
+del piano diventano due, e il `.ics` non genera più i promemoria dei pasti.
+Le barre macro reggono da sole perché `dayTarget()` ripiega già su `D.target`
+quando il giorno non ha totali, e `consumed()` somma solo gli `extra`.
+
+Con `hyrox` spento: via il riquadro d'ingresso in Gym; la rotta `#/hyrox`
+resta raggiungibile da un vecchio segnalibro e mostra come riaccenderla.
+
+**La migrazione dei backup vecchi** sta in `modulliDaStato()`, chiamata da
+`normalize()` — quindi vale sia all'avvio sia dopo un import. Un file senza
+`moduli` non è ambiguo: `piano: true`, perché è come si comportava l'app prima;
+`hyrox` acceso **solo se ci sono dati veri dentro** (gara, record, simulazioni,
+sedute, checklist), perché accenderlo a tutti riproporrebbe a tutti una sezione
+che quasi nessuno usa. In nessuno dei due casi si perde un dato: al massimo una
+voce di menu, che torna con un tocco.
+
+Effetto collaterale utile: senza HYROX nessuno dichiara più quante sedute a
+settimana fa, e la revisione settimanale non può più usare quel numero come
+metro. `seduteAbituali()` prende la **mediana delle ultime otto settimane** —
+confrontarti con un 4 tirato fuori dal nulla direbbe "sotto" a chi si allena
+tre volte per scelta, che è un giudizio e non una misura.
+
+### Profili e piano personalizzato
+
+`data/dieta.json` è la fonte di verità **di base**, e non va mai modificata dal
+codice. Quello che l'utente crea si sovrappone come strato in `S.piano`:
+alimenti aggiunti o corretti, pasti composti, target propri, settimana
+riorganizzata. `fondiPiano()` produce `D` = base + strato, e va richiamata dopo
+ogni modifica al piano.
+
+Ogni profilo ha la sua chiave di `localStorage` (`dieta.v1:<id>`), quindi diario,
+piano, prodotti, palestra e foto restano separati. L'indice dei profili sta in
+`dieta.profili`. Cambiare profilo ricarica la pagina: stato e piano devono
+cambiare insieme.
+
+**Attenzione:** il target giornaliero (`D.target`) e le barre della scheda Oggi
+sono due cose diverse. Le barre vengono dalla somma dei pasti assegnati alla
+settimana; `D.target` alimenta analisi, cruscotto, consigli e previsione. La
+scheda Target avvisa quando i due divergono di oltre l'8%.
+
+### `data/dieta.json` è la fonte di verità
+
+**Non ricalcolare i valori nutrizionali nel codice e non inventarli.**
+Sono stati costruiti e verificati a monte. Il file contiene:
+
+| Chiave | Contenuto |
+|---|---|
+| `target` | Medie giornaliere da centrare: 2482 kcal, 135 g P, 287 C, 82 G, 38 fibre |
+| `alimenti` | 44 voci per 100 g/ml + `categoria` + `fonte` |
+| `pasti` | 24 pasti con ingredienti pesati e macro precalcolati |
+| `settimana` | 7 giorni × slot × codice pasto × ora |
+| `sostituzioni_consigliate` | Swap curati a mano |
+| `leve` | Come muovere ±150 kcal |
+| `integratori` | B12, creatina, D3, omega-3, selenio con dose e cadenza |
+| `misure` | Punti corporei, con `base` di partenza e `target` |
+| `regole_calorie` | Matrice decisionale peso × vita × carichi → azione |
+| `modello` | Costanti del motore di previsione: 7700 kcal/kg, LAF, rumore, derive |
+| `target_fisico` | Il fisico di riferimento — misure, % grasso, massa magra, rapporti |
+
+Il campo **`fonte`** vale `verificato` (letto in etichetta), `stima` (media di categoria,
+da sostituire con i dati del prodotto reale) o `tabella`. La UI deve mostrare
+"valore stimato" dove `fonte === 'stima'`: è una questione di onestà verso l'utente,
+non un dettaglio.
+
+---
+
+## Funzionalità già implementate
+
+- **Moduli accendibili** — piano alimentare e Road to HYROX si spengono dal
+  passo "Chi sei". Spegnere non cancella: nasconde
+- **Revisione settimanale** — diagnosi pesata della settimana chiusa, grafico a
+  manubrio contro la precedente, cosa non ha funzionato, come si sistema e la
+  sola cosa da cambiare. Si propone da sola la domenica e il lunedi
+- **Il periodo si sceglie** — la settimana chiusa resta il default, ma revisione
+  e cruscotto accettano due date qualsiasi. Il confronto e' sempre con il
+  periodo di **pari lunghezza** subito prima
+- **Resoconto in PDF** — la revisione piu' otto sezioni di dati su A4, generato
+  sul telefono senza librerie e senza server. Da dare a chi l'app non ce l'ha
+- **Controllo della versione** — quale versione stai usando, se ce n'e' una
+  nuova, e un bottone per ricaricare. Su iPhone non c'era nessun altro modo
+- **Seduta guidata** — un esercizio alla volta, il carico gia' scritto da
+  quello che hai appena fatto, le ripetizioni fatte a portata di pollice, e il
+  recupero ad anello che prende il posto della carta e diventa rosso se lo
+  superi; le superserie si fanno alternate come in sala. Chiudendo per sbaglio
+  si riprende da dove si era
+- **Resoconto di una seduta** — cosa e' stata quella giornata, con i motori di
+  Gym che ci sono gia': volume, dove e' finito il lavoro, massimali mai visti
+  prima, recupero vero, e il confronto con le sedute confrontabili
+- **Timer di recupero**, **scarico automatico**, **dolori e infortuni** in Gym
+- **Dispensa** — quello che hai in casa si sottrae dalla lista della spesa
+- **Cerca un esercizio su internet** — catalogo pubblico di 873 esercizi con
+  i gruppi muscolari gia assegnati, scaricato una volta e poi offline
+- **Cerca un alimento su internet** — Open Food Facts per nome, con il
+  controllo che i macro tornino con le calorie dichiarate
+- **Scala il pasto** — moltiplicatore da ×0,5 a ×2 su tutti gli ingredienti
+- **Fotocamera a schermo intero** — anteprima piena, comandi sopra, cerchio
+  bianco in fondo. Per i progressi ha il timer e le guide; per il piatto la
+  cornice e "inquadra bene il piatto". Con <input capture> non si poteva
+- **Guide di inquadratura** — griglia, sagoma, e il fantasma dello scatto
+  precedente in trasparenza: e quello che rende confrontabili due foto
+- **Misure guidate** — una alla volta, con dove passare il metro disegnato sulla
+  sagoma e il controllo dei valori fuori scala
+- **Come si esegue** — due fotogrammi per esercizio dal catalogo pubblico
+- **Confronto foto a cursore** — prima e dopo sovrapposte, con la riga che si
+  trascina
+- **Passi e sonno da un Comando iOS**, senza scriverli a mano
+- **Oggi** — giorno navigabile, il conto del giorno su un anello (mangiato,
+  quanto resta, bruciate — che non si somma) con sotto le tre barre dei macro,
+  e si tocca per aprire il dettaglio della giornata; pasti spuntabili con i
+  macro di ognuno, registrazione pasti fuori piano senza tono colpevolizzante
+- **Sostituzioni** — motore che, dato un alimento e una quantità, riscala per far
+  combaciare il macro dominante (proteine se danno >20% delle calorie, altrimenti
+  calorie) e ordina per distanza sui quattro macro **e per affinità di nome**.
+  Si **applicano**, solo per quel giorno, e si può anche scegliere a mano
+  qualunque alimento: vedi "La sostituzione si applica"
+- **Diario** — acqua a bicchieri e Coca Zero a lattine, passi, sonno, fame,
+  energia, aderenza, sintomi gastrointestinali, checklist integratori.
+  L'allenamento non si dichiara: si legge da quello che hai registrato
+- **Corpo** — il peso del giorno grande al centro, con i due bottoni da 100 g;
+  composizione stimata contro il fisico di riferimento; figura SVG
+  **parametrica** (le larghezze vengono dalle circonferenze registrate, la sagoma
+  target si sovrappone tratteggiata); tabelle ora/target/manca; grafico peso con
+  media mobile a 7 giorni e previsione tratteggiata
+- **Previsione** — motore adattivo del dispendio (vedi sotto)
+- **Quanto manca in tempo** — un intervallo, non una data, e si rifiuta quando
+  il ritmo non e distinguibile da zero
+- **Dove stai andando** — proiezioni a 28 giorni con banda su misure, grasso e
+  massa magra, forza. Mai una data di arrivo: la forbice e il target dentro o fuori
+- **Target ricalibrato** — il dispendio misurato dal filtro diventa una proposta
+  di target, con la matrice del piano che la corregge. Mai applicata da sola
+- **Giorni che non contano** — vacanza o influenza escono da revisione e costanza
+- **Fiamma della striscia** — i giorni di fila disegnati, non scritti
+- **Cardio e sport** — corsa, bici, nuoto a mano o col GPS, con la cartolina
+  PNG da condividere; e gli altri sport (BJJ, boxe, calcio, arrampicata) a
+  minuti. Entrano nel conto delle sedute e nella spesa energetica
+- **Il mese degli allenamenti** — dal calendario in alto a destra di Gym:
+  quante sessioni, dove e' finito il tempo, e la griglia del mese
+- **Allenamenti nei giorni passati** — un giorno vuoto della striscia o del
+  mese si tocca e registra su quella data
+- **Una ricetta intera nella giornata** — in fondo a Oggi, in porzione, nel
+  fuori piano o dentro un pasto
+- **Le leve di un giorno** — in ogni giorno del piano: scegli quale macro
+  alzare o abbassare e l'app propone le porzioni da cambiare e le ricette da
+  sostituire, ordinate per quanto ti danno meno quanto allontanano gli altri
+  target. Si applicano con un tocco
+- **Integrazione dinamica** — l elenco lo componi tu, con l aderenza per voce
+- **Dati** — cruscotto: 4 riquadri statistici, calendario della costanza e 14
+  grafici (peso, calorie, proteine, ripartizione dei macro, fibre, passi, sonno,
+  acqua, Coca Zero, fame/energia, misure, composizione, dispendio stimato,
+  errore delle previsioni), con selettore di periodo 7/30/90/180 giorni
+- **Prodotti** — registro dei prodotti reali con i valori letti in etichetta;
+  lettura del codice a barre dove il browser la supporta, con ricerca opzionale
+  su Open Food Facts. Collegando un prodotto a un alimento del piano, i suoi
+  valori **sostituiscono la stima ovunque**: pasti, sostituzioni, analisi,
+  previsione. Un prodotto che non e' collegato a niente compare comunque
+  nell'elenco del pasto fuori piano (`mangiabili()`), mentre uno gia' collegato
+  no: sarebbe la stessa cosa due volte, una col nome del piano e una col suo
+- **Foto** — uno scatto al giorno per posa (fronte/lato/schiena), confronto
+  primo/ultimo e timelapse sfogliabile. Stanno in IndexedDB, compresse a 1280 px
+- **Palestra** (scheda "Gym") — registro delle sedute, mappa muscolare fronte e
+  schiena su tre modi (volume, stanchi, in crescita), modello forma-fatica di
+  Banister per muscolo, massimale stimato con Epley corretto col RIR, proiezione
+  della forza per regressione lineare, doppia progressione, volume settimanale a
+  barre orizzontali
+- **Piano** — percorso guidato in cinque passi (chi sei, quanto mangiare, cosa,
+  come lo combini, quando), ognuno con stato e spiegazione del perché; profili
+  multipli e editor: dati personali, target giornalieri,
+  alimenti, composizione dei pasti con macro calcolati dagli ingredienti,
+  assegnazione dei pasti alla settimana
+- **Sfide e traguardi** — una sfida al giorno scelta in modo deterministico
+  sulla data (non si ricarica finché non esce quella comoda), con punti e giorni
+  di fila; 23 traguardi che si sbloccano da soli sui dati già registrati
+- **Costanza** — quattro punteggi su anelli: nutrizione, allenamento, sfide,
+  generale. L'allenamento si misura sulle sedute a settimana dichiarate, non su
+  tutti i giorni: riposare quando serve non abbassa il punteggio
+- **Porzioni per giorno** — `S.log[k].porzioni[codice][alimento]` sovrascrive la
+  quantità del piano solo per quel giorno; `mealMGiorno()` la applica
+- **Consiglio del giorno** — su Oggi. Preferisce sempre un consiglio che nasce
+  dai dati dell'utente a uno generico; ruota in modo deterministico sulla data
+- **Analisi** — motore a regole "cosa sto sbagliando" (vedi sotto)
+- **Spesa** — fabbisogno settimanale aggregato per categoria, con spunta
+- **Impostazioni** — generatore `.ics`, export/import backup JSON
+- **Copie automatiche** — ogni tre giorni lo stesso backup finisce in
+  IndexedDB, sul telefono; dopo una cancellazione il benvenuto la propone
+- **Passa il piano, non l'archivio** — export/import del solo piano alimentare,
+  delle sole schede di palestra, o di tutti e due. Il file si carica **sopra** a
+  quello che hai, non al posto: sui nomi che esistono gia' si sceglie. Sta in
+  Impostazioni, in Piano e dentro le schede in Gym — nei tre punti in cui viene
+  in mente
+
+### Calorie bruciate: il punto in cui quasi tutte le app sbagliano
+
+`kcalAllenamento(k)` stima la spesa di una giornata da palestra e HYROX insieme
+(MET dal Compendium, in `data/palestra.json`; la corsa a 1,036 kcal/kg/km).
+
+**Questo numero non va MAI sommato al target né sottratto dall'introito.** Il
+dispendio del filtro di Kalman nasce dal bilancio fra quanto si mangia e come
+cambia il peso: contiene già tutto il movimento, allenamenti compresi. Sommarlo
+di nuovo sarebbe contarlo due volte. Serve a misurare il carico di lavoro nel
+tempo, non a mangiare di più — e la UI deve continuare a dirlo.
+
+### "Forma e fatica" non diceva cosa stava misurando
+
+Erano tre curve — forma, fatica, prontezza — in unita' dichiaratamente
+arbitrarie, senza soglia e senza unita' di misura. Alla domanda "cosa sta
+misurando?" il grafico non rispondeva, e tre linee che non rispondono si
+guardano una volta e poi si saltano. Peggio: la curva messa **in evidenza**
+era la prontezza, che per costruzione e' sempre positiva per chi si allena
+(τ 42 contro 7) — cioe' la sola che non poteva dire di no.
+
+Il numero che decide qualcosa e' uno: **quanta fatica hai addosso rispetto a
+quella che porti di solito su quel muscolo**. 100 e' una giornata come le
+altre tue. Un asse, un'unita', un riferimento — e il riferimento sei tu.
+
+Sopra il grafico una riga in italiano dice lo stato di adesso, perche' la
+risposta non deve costringere a leggere un grafico.
+
+Perche' non una soglia fissa: vedi "Il metro del recupero sei tu" piu' sotto.
+E' l'errore che questo file segnalava da sempre e che il codice faceva lo
+stesso.
+
+Dettaglio di lingua che vale anche altrove: una riga di riferimento non e'
+sempre un "target". Su una soglia da **non** superare chiamarla target direbbe
+che ci vuoi arrivare, quindi `tTarget` le da' il nome giusto — qui "pronto
+sotto" — nella legenda, sulla piastrina e nella riga di riepilogo.
+
+### I carichi non si dichiarano più
+
+`caricoTrend()` li calcola dalle schede invece di chiederli. Il massimale
+stimato (Epley col RIR) è già la variabile che mette d'accordo "meno ripetizioni
+ma più peso" e "stesso peso ma più ripetizioni". Si prende la pendenza per ogni
+esercizio con ≥3 sedute in 8 settimane, la si normalizza sul valore corrente
+(+2,5 kg su 60 non è come su 200) e si usa la **mediana** fra esercizi, che un
+singolo record fortunato non sposta. Il selettore manuale resta solo come
+ripiego quando i dati non bastano.
+
+### Schede e tecniche
+
+Una scheda fissa **esercizi, serie e range di ripetizioni**; il carico si
+aggiorna a ogni uso. Supporta superserie (`superserie: true` = attaccato al
+precedente, etichette A1/A2) e tecniche: stripping, rest-pause, piramidale.
+Gli scarichi di uno stripping si scrivono come `50x6, 40x5` e contano **mezza
+serie ciascuno** nel volume e nello stimolo — sono lavoro vero ma più corto.
+
+Due regole di interfaccia imparate a caro prezzo:
+- toccare una riga la **apre**, non la cancella
+- l'editor di una riga torna alla scheda, non chiude tutto: `closeSheet()` lì
+  faceva sparire il lavoro in corso
+- il punto d'ingresso mostra **sempre** la scelta scheda/libera, anche se ci
+  sono già serie registrate quel giorno
+
+### Le tecniche hanno un numero, non solo un nome
+
+`tecnica` diceva "stripping" e si fermava li': quante ripetizioni per ogni
+scarico te le ricordavi tu. Uguale il piramidale — "il carico sale e le
+ripetizioni scendono", ma quali? — e il rest-pause, che non diceva quante
+ripartenze. Il risultato e' che la scheda descriveva **il genere** di lavoro e
+non il lavoro.
+
+Tre campi nuovi sulla riga, tutti facoltativi:
+
+| Campo | Cosa dice |
+|---|---|
+| `strip: [6, 4]` | gli scarichi di uno stripping, in ripetizioni. "Stripping 3x8-6-4" = `serie 3, reps 8, strip [6,4]` |
+| `piram: [12, 10, 8]` | le ripetizioni serie per serie. Quante serie sono lo dice la lunghezza |
+| `rpMini: 2` | quante ripartenze in un rest-pause |
+
+### Il recupero si dichiara, e a due livelli
+
+`recupeoConsigliato()` calcolava il recupero da attrezzo e ripetizioni e non
+si poteva contraddire: erano valori di uso comune spacciati per decisione.
+Ora sono tre livelli, e vince il primo che c'e':
+
+| | |
+|---|---|
+| `riga.recupero` | quello di **questo** esercizio |
+| `sc.recupero` | quello della **scheda**, per non ripeterlo otto volte |
+| il calcolo | piu' l'esercizio muove carico e articolazioni, piu' tempo serve; sotto le 6 ripetizioni si lavora sul sistema nervoso |
+
+Il terzo resta un valore di pratica comune, **non una misura**, ed e'
+esattamente il motivo per cui i primi due esistono: il recupero giusto lo sa
+chi si allena. `recupeoFonte()` dice da quale dei tre viene il numero, cosi'
+l'interfaccia puo' scriverlo invece di farlo indovinare.
+
+Si sceglie a **pastiglie** (Auto, 30″, 45″, 1′, 1′30″, 2′, 3′, 4′) e non con
+un campo numerico: nessuno scrive "105 secondi", e la tastiera aperta con le
+mani sudate e' il modo piu' lento di dire un minuto e mezzo.
+
+E la seduta guidata **lo annuncia prima della serie**, non dopo: quanto
+durera' il recupero e' meta' della decisione su come fare la serie che stai
+per cominciare.
+
+**Nessuna scheda gia' scritta cambia significato.** Una riga senza `strip`
+vale uno scarico senza bersaglio, che e' come si comportava prima; una senza
+`piram` usa il range. Le funzioni che leggono questi campi — `serieDiRiga`,
+`repsBersaglio`, `bersaglioTesto`, `scarichiDiRiga`, `usaRestPause` — sono
+l'unico posto in cui i campi si guardano, quindi una riga vecchia e una nuova
+si comportano uguale ovunque.
+
+Il piramidale si porta dietro una scelta di modello: `serie`, `reps` e
+`repsMax` **restano sincronizzati** sull'elenco (numero di gradini, minimo e
+massimo). Cosi' la doppia progressione, il monitoraggio della scheda e il
+volume continuano a leggere i campi di sempre senza sapere che esiste un
+piramidale.
+
+**E un range con gli estremi uguali non e' un range:** 3×8, non 3×8–8. Lo dice
+`rangeTesto()`, e il campo "Rip a" si puo' lasciare vuoto. Non e' cosmesi —
+"da 8 a 8" fa pensare a un errore di compilazione, e chi lo vede prova a
+correggerlo.
+
+### La seduta si fa un passo alla volta
+
+`sheetDaScheda` mette tutte le serie della scheda in una schermata sola. Va
+benissimo a fine seduta o per correggere, ed e' esattamente la cosa sbagliata
+da avere in mano **mentre** ti alleni: fra una serie e l'altra non serve
+vedere quaranta caselle, serve sapere cosa fare adesso.
+
+`seduta.js` e' una carta sola: l'esercizio, la serie, il bersaglio, tre numeri
+e un bottone. Toccato quello, la serie e' scritta **nel registro** — non in un
+buffer — e parte il recupero. Se l'app si chiude a meta' seduta quello che hai
+fatto e' gia' salvato: `s.guida` ricorda solo a che punto eri.
+
+Tre cose che il modulo non sapeva fare:
+
+1. **le superserie si fanno alternate.** Il modulo chiedeva tutte le serie di
+   A1 e poi tutte quelle di A2, che e' l'ordine in cui si *scrivono*, non
+   quello in cui si *fanno*. `passiScheda()` produce A1-1, A2-1, recupero,
+   A1-2, A2-2: dentro la coppia il timer non parte, parte sull'ultima del giro
+2. **il bersaglio e' quello della serie**, non il range generico: in un
+   piramidale 12-10-8 la seconda serie chiede 10, e lo scrive
+3. **ogni scarico ha la sua casella**, con le ripetizioni che la scheda si
+   aspetta gia' nel segnaposto
+
+**Il carico se lo ricorda.** Il campo kg arriva pieno, e in ordine di quanto
+e' vicino alla verita': la **serie di prima di oggi**, poi la stessa serie
+dell'ultima volta, poi l'ultima di quella volta, poi il peso di partenza della
+scheda. Il primo caso e' quello normale — se hai appena fatto 60 kg, la serie
+dopo si fa con 60 finche' non decidi altrimenti — ed era esattamente il lavoro
+che l'app faceva fare a mano ogni volta. La riga sotto il titolo dice **da
+dove viene** il numero, invece di lasciarlo indovinare.
+
+**Le ripetizioni sono quelle fatte, e sono obbligatorie.** Il campo nasce
+vuoto col bersaglio nel segnaposto, e "Serie completata" si rifiuta senza un
+numero. Prima il bersaglio faceva da ripiego, il che voleva dire scrivere nel
+registro **quello che la scheda chiedeva invece di quello che e' successo** —
+proprio il numero da cui escono massimale stimato, doppia progressione e
+verdetto sulla scheda. Se la serie non l'hai fatta c'e' "Salta questa serie".
+
+Il kg invece arriva gia' scritto, e non e' un'incoerenza: quello e' il peso
+che hai messo sul bilanciere, lo sai prima di cominciare ed e' quasi sempre
+lo stesso della volta prima. Le ripetizioni sono l'unica cosa che la serie ti
+dice **dopo**.
+
+Accanto al campo ci sono le pastiglie da bersaglio−3 a bersaglio+3: fra una
+serie e l'altra un numero fra 5 e 15 si tocca, non si digita.
+
+**Il timer diventa rosso quando lo superi.** Quello lanciato da un bottone
+resta un promemoria e dopo venti secondi se ne va; quello di una seduta
+guidata (`tieni`) no — li' il tempo oltre il recupero e' un dato, e se fra due
+serie sono passati quattro minuti invece di due quella e' un'altra seduta. La
+barra resta, conta all'insu' col segno piu' e diventa rossa.
+
+E sale **sopra il foglio**: durante una seduta guidata lo sheet e' sempre
+aperto, e la barra vive a `z-index 19`, cioe' sotto. Un timer che nessuno vede
+non e' un timer.
+
+Tre difetti trovati provandolo, non leggendolo:
+
+- **`+30` a tempo scaduto non faceva niente.** Sommare trenta secondi a un
+  recupero finito da un minuto e mezzo e' aritmeticamente corretto e
+  visivamente nullo: il numero non si muoveva, e un bottone che non muove
+  niente sembra rotto. Chi lo tocca in quel momento chiede trenta secondi
+  **da adesso**, quindi il recupero riparte. E `−30` a tempo scaduto non ha
+  niente da accorciare: e' spento, invece di non fare nulla in silenzio
+- **la chiusura automatica dei venti secondi uccideva il timer successivo.**
+  Il `setTimeout` non sapeva a quale recupero apparteneva: uno partito dieci
+  secondi dopo si vedeva chiudere la barra dal promemoria di quello prima.
+  Ora il timeout porta il `t0` a cui si riferisce
+- **oltre un'ora, due regole diverse per lo stesso stato**: la barra viva
+  continuava a contare (`+64:40`) mentre `recRiprendi()` si rifiutava di
+  ripristinarla. Ora la soglia e' una sola (`REC_OLTRE_MAX`), e oltre quella
+  la barra si chiude da sola: piu' di un'ora non e' un recupero, e' una barra
+  dimenticata accesa
+
+E l'ultima serie della seduta **non fa partire niente**: non c'e' una serie
+dopo da aspettare, e una barra che conta sulla schermata di fine chiede di
+stare fermi per un lavoro che non arrivera'.
+
+"Torna alla serie prima" **toglie l'ultima serie scritta**. Non e' un effetto
+collaterale: e' l'unico modo di correggere un numero sbagliato senza uscire
+dalla guida, e la riga di riepilogo in fondo — quello che hai gia' messo
+dentro — esiste perche' non ci si debba fidare a memoria.
+
+### "Correggi qualcosa a mano" cancellava la seduta
+
+A fine seduta guidata c'e' un bottone che porta al modulo della scheda, ed e'
+la cosa giusta da avere li': una serie segnata male si ripara meglio vedendole
+tutte insieme. Solo che il modulo si apriva **con i numeri della settimana
+scorsa**, e salvando li scriveva sopra al lavoro appena fatto.
+
+La causa e' una funzione che faceva esattamente il suo mestiere nel posto
+sbagliato. `ultimoUso(ex, k)` **esclude `k` apposta**, perche' nasce per
+rispondere a *"l'ultima volta quanto avevi fatto?"* — la domanda giusta quando
+apri una scheda per cominciare. Ma dopo una seduta guidata la domanda e'
+un'altra, ed e' *"cosa ho appena registrato?"*. Il modulo pescava dalla prima e
+`s.serie = serie` sostituisce l'intera giornata: correggere una serie ne
+cancellava altre venti. Con quella scheda mai usata prima, il modulo si apriva
+**vuoto** e salvando spariva tutto — che e' il caso in cui ci si accorge del
+problema.
+
+Adesso le caselle mostrano **quello che hai registrato oggi**, e il modulo lo
+dice in testa. Tre dettagli che sarebbero passati inosservati:
+
+- **le serie di oggi si consumano con un cursore per esercizio**, non con
+  l'indice della riga: una scheda puo' avere lo stesso esercizio su due righe,
+  e leggere tutte e due dalla stessa posizione le farebbe apparire duplicate;
+- **il recupero vero non sta nel modulo** ma e' un dato registrato dalla guida
+  (`rec_s`), e da li' escono la durata della seduta e il recupero medio del
+  resoconto. Correggere un carico non deve buttarlo via: si ricopia dalla
+  serie originale;
+- **svuotare tutte le caselle e salvare chiede conferma**, perche' su una
+  giornata che conteneva gia' del lavoro quella e' una cancellazione, non un
+  salvataggio.
+
+### Gli esercizi che si fanno un lato per volta
+
+Un curl alternato, un affondo, una row a un braccio: la serie la fai **due
+volte**, una per parte, e il carico e' quello di **un** lato. Scritto
+`3 × 8–10, 20 kg` dice meta' della verita'.
+
+Ora c'e' `lato` sull'esercizio, e dove si scrivono le serie o i chili compare
+un `×2` piccolo e in tinta — un'annotazione sul numero, non una pastiglia.
+Nella scheda, nel modulo, nell'elenco degli esercizi e nella carta della guida.
+
+Due decisioni:
+
+- **e' una dichiarazione, non un indovinello.** Il nome non basta: "Affondi" si
+  fanno per lato e non lo dicono, "Alzate laterali" hanno "laterali" nel nome e
+  si fanno insieme. C'e' un interruttore nell'editor dell'esercizio, e il
+  catalogo di base parte con i tre in cui la cosa e' fuori discussione;
+- **e' un'etichetta, non un conto.** Tonnellaggio, volume per muscolo e
+  forma-fatica non cambiano, e la nota lo dice. Raddoppiarli adesso vorrebbe
+  dire riscrivere all'indietro tutte le sedute gia' registrate — per una
+  questione di scrittura.
+
+### Sali o resti? La guida lo dice prima della prima serie
+
+`prossimoPasso()` la risposta ce l'aveva **gia'**: e' la doppia progressione,
+il motore che dice di caricare solo quando tutte le serie toccano il tetto del
+range con RIR ≤ 2. Ma nella guida usciva come una riga grigia in mezzo alle
+altre, e per giunta un periodo intero da leggere sotto un bilanciere.
+
+Adesso e' quello che e' — **una decisione, tre parole e un numero**: sopra il
+verdetto (`Sali a 62,5 kg` in verde, con `+2,5` a destra), sotto il perche',
+e in fondo cosa hai fatto l'ultima volta, che e' l'unica cosa che permette di
+non fidarsi ciecamente. Tre righe.
+
+Sta **solo sulla prima serie** dell'esercizio, ed e' voluto: la decisione sul
+carico si prende li'. Dalla seconda in poi il campo arriva gia' pieno con
+quello che hai appena sollevato, e ripetere "sali a 62,5" mentre sei a 60 e a
+meta' esercizio sarebbe un consiglio fuori tempo. E quando quell'esercizio non
+l'hai mai fatto la carta non c'e': non c'e' niente da dire.
+
+**La carta e' toccabile, e questo risolve una contraddizione.** Diceva "sali a
+62,5" mentre il campo due centimetri sotto era precompilato con 60 — e ha
+ragione il campo: quel numero e' il peso che avevi sul bilanciere, non un
+consiglio. Invece di far vincere uno dei due, un tocco sulla carta mette il
+nuovo carico nel campo. Il campo continua a non mentire da solo, e il
+consiglio si applica senza scriverlo a mano.
+
+### Oggi quell'esercizio non si puo' fare
+
+Il rack occupato, la macchina rotta, una spalla che oggi non ne vuole sapere:
+succede di continuo, e l'unica strada era **abbandonare la guida** e registrare
+a mano sotto un nome sbagliato. Adesso l'esercizio si sostituisce, e nei due
+posti in cui serve — la guida passo per passo e il modulo da scheda.
+
+Tre regole:
+
+1. **La scheda non si tocca.** Vale anche domani com'e' scritta: la
+   sostituzione dura quanto la seduta. Nella guida sta in `s.guida.sost` e
+   sparisce con lei; nel modulo vive quanto il foglio. Quello che resta e' la
+   **serie registrata**, che porta gia' l'esercizio nuovo — ed e' il dato vero,
+   quello che finisce nello storico dei carichi e nella mappa muscolare.
+2. **Primi quelli che allenano la stessa cosa.** Con un attrezzo occupato la
+   domanda non e' "cosa mi somiglia di nome" ma "cosa mi allena la stessa
+   cosa": l'elenco pesa i muscoli primari in comune il doppio dei secondari, e
+   in cima ne mette quattro. Sulla panca piana propone panca con manubri,
+   panca inclinata, croci ai cavi e piegamenti.
+3. **Il carico e la progressione seguono l'esercizio di oggi.** `caricoProposto`,
+   `fonteCarico`, `cartaCarico` e l'avviso sugli acciacchi guardano tutti
+   `exDiRiga()`: proporre i chili della panca a chi ha appena messo le
+   parallele sarebbe il numero di un altro esercizio, e il "sali a 62,5" della
+   panca non c'entra niente con quello che stai per fare.
+
+L'elenco e' **lo stesso** nei due posti (`sheetScegliRicambio`), e non e' un
+caso: e' la stessa domanda fatta in due momenti della stessa seduta, e due
+elenchi ordinati diversamente darebbero due consigli diversi sullo stesso
+attrezzo occupato.
+
+### Il rack occupato non e' sempre un motivo per cambiare esercizio
+
+Segnalato cosi': *"durante lo step by step possiamo, al posto di cambiare
+esercizio, switchare con un esercizio della scheda? Ho A, B, B1, C: arrivo a B
+ma e' occupato, faccio C, e l'ordine diventa A C B B1"*.
+
+La sostituzione c'era gia' e risponde a **un'altra domanda** — *questo
+esercizio oggi non lo posso fare affatto* — e costa: da li' in poi le serie
+finiscono nello storico di un altro esercizio. Quando il rack e' soltanto
+occupato la risposta giusta e' piu' economica, e non tocca niente: **fai prima
+un altro esercizio di oggi**, e torna dopo. Il programma resta quello che e'.
+
+Quattro decisioni:
+
+1. **Si sposta il gruppo, non la riga.** Dentro una superserie A1 e A2 si
+   alternano: spostare solo A1 vorrebbe dire spezzare la coppia. `gruppiScheda()`
+   e' quell'unita', e l'`id` di un gruppo e' l'indice della sua prima riga —
+   non cambia quando lo sposti, e quindi si puo' scrivere nell'ordine.
+2. **L'ordine vive quanto la seduta**, in `s.guida.ordine`: la scheda vale
+   domani com'e' scritta, come per la sostituzione.
+3. **Niente si sposta sopra a quello che hai gia' fatto.** I passi prima
+   dell'indice sono il registro di com'e' andata, e devono restare dove sono:
+   si spostano solo gruppi non ancora cominciati, e solo quando quello di
+   adesso non e' cominciato. Misurato su A / B+B1 / C, con A finito: l'ordine
+   passa a `A:1 A:2 C:1 C:2 B:1 B1:1 B:2 B1:2`, i due passi gia' fatti restano
+   agli stessi indici, e B e B1 restano attaccati. A meta' di un esercizio il
+   foglio non offre niente da spostare **e dice perche'** — spezzare un gruppo
+   a meta' non e' rappresentabile, e fingere di poterlo fare sarebbe peggio.
+4. **Un ordine che nomina un gruppo che non c'e' piu'** — la scheda si puo'
+   correggere mentre una guida e' in corso — non fa sparire niente: quel
+   gruppo torna in coda.
+
+**E il difetto che e' saltato fuori scrivendola.** `s.guida = { scheda, i }`
+**sostituiva l'oggetto intero** a ogni serie completata o saltata, e con lui
+spariva `sost`: una panca sostituita alla prima serie tornava a essere la
+panca alla seconda, in silenzio, e le serie dopo finivano nello storico
+dell'esercizio sbagliato. Per vederlo bisogna sostituire **e poi** completare,
+ed e' il motivo per cui non lo aveva notato nessuno. Adesso c'e'
+`avanzaGuida()`, che muove l'indice e basta — e l'ordine, che vive nello
+stesso posto, sarebbe sparito allo stesso modo alla prima serie.
+
+**I bottoni erano sei**, tutti larghi uguali e uno sotto l'altro: completata,
+cambia esercizio, rimetti, salta, torna indietro, chiudi. Con sei bottoni
+identici nessuno e' piu' secondario, e quello che si tocca dieci volte per
+seduta stava in mezzo alle eccezioni. Adesso: **uno** pieno a tutta larghezza
+(la serie e' fatta), una riga da due per le eccezioni (salta / non posso
+farlo), e sotto, piu' quieta, la riga da due che non appartiene alla serie
+(torna indietro / pausa). "Rimetti quello della scheda" e' sceso dentro il
+foglio delle eccezioni, che e' l'unico posto da cui ci si arriva.
+
+### Quanti scarichi li decidi mentre li fai
+
+Le caselle di uno stripping erano esattamente quante ne dichiarava la scheda,
+e uno stripping non funziona cosi': quante volte scarichi dipende da come ti
+senti quel giorno e da quanto ti resta. Chi ne faceva tre su una riga che ne
+prevedeva due **non aveva dove scrivere il terzo**, e quel lavoro spariva dal
+volume.
+
+La scheda resta il bersaglio — i segnaposto dicono ancora quello che chiedeva
+— ma sotto le caselle c'e' "+ un altro scarico".
+
+### Un esercizio del catalogo si corregge
+
+`catalogo()` era `base.concat(tuoi)` ed `esercizio(id)` restituisce il primo
+che trova: una voce tua con lo stesso id di una di base restava **invisibile
+per sempre**. Conseguenza pratica: i 59 del catalogo non si potevano toccare.
+Se per te la panca inclinata lavora piu' le spalle che il petto — dipende da
+come la fai — non c'era modo di dirlo, e la mappa muscolare continuava a
+colorare quello che diceva il file.
+
+Adesso i tuoi **vincono sull'id**, e questa e' la parte che conta: sovrascrivere
+per id invece di creare un doppione e' l'unica strada che non spezza niente,
+perche' lo storico dei carichi, il volume settimanale e la forma-fatica sono
+indicizzati sull'id — un id nuovo li dividerebbe in due. "Rimetti quello del
+catalogo" toglie la tua versione e fa riemergere quella di base, che non e'
+mai stata cancellata.
+
+Nello stesso giro, **"Come si esegue" compariva solo se l'esercizio era gia'
+collegato** ai fotogrammi del catalogo pubblico — e da Gym > Esercizi non ci si
+arrivava mai, perche' il collegamento si fa proprio da li'. Adesso il bottone
+c'e' sempre e dice quale dei due casi e'. E la riga dell'elenco apre sempre la
+scheda dell'esercizio, che da li' porta a correggerlo e a vederne l'esecuzione:
+prima si andava in due posti diversi a seconda che l'esercizio fosse tuo o del
+catalogo, cioe' una cosa che chi tocca la riga non ha modo di sapere.
+
+### Il recupero e' la schermata, non una barra sopra
+
+Prima il recupero era una barra che compariva sopra il foglio **mentre la
+carta della serie dopo era gia' li'**. Sbagliato per come funziona una seduta:
+fra due serie non c'e' niente da fare tranne aspettare, e mettere davanti i
+campi della serie successiva significa chiedere di compilarli adesso, cioe'
+prima di averla fatta.
+
+Ora il recupero **prende il posto** della carta: un anello che si svuota,
+quanto manca al centro, `−30″` e `+30″` sotto, e in fondo l'unica cosa che
+serve sapere mentre aspetti — cosa arriva dopo. Scaduto non sparisce: diventa
+rosso e conta all'insu'.
+
+Lo stato resta dov'era (`dieta.rec` in localStorage, via `avviaRecupero`),
+quindi sopravvive a un ricaricamento e **la barra torna a fare il suo mestiere
+appena esci dal foglio**: `recDisegna()` la nasconde finche' l'anello e' sullo
+schermo. Due timer dello stesso recupero sono un timer di troppo.
+
+**E il recupero vero si registra.** Uscendo dall'anello, i secondi passati
+davvero finiscono su `rec_s` della serie **appena fatta** — non di quella che
+arriva: il recupero appartiene alla serie che lo ha reso necessario. Sopra
+l'ora non si scrive niente, che non e' un recupero ma il telefono lasciato
+aperto sul tavolo. Da li' escono la durata della seduta e il recupero medio
+del resoconto.
+
+### Durante il recupero: l'occhio, e a che punto sei
+
+Il recupero e' l'unico momento della seduta in cui non c'e' niente da fare
+tranne aspettare, ed e' esattamente li' che viene la domanda: **quanto ne
+manca?** La guida sapeva rispondere e non lo diceva — mostrava la serie di
+adesso e quella dopo, e per vedere il resto bisognava uscire dalla guida,
+cioe' perdere il posto.
+
+Un occhio in alto a destra dell'anello apre l'elenco. **Tre stati e tre pesi
+diversi**: quello che hai fatto spuntato in verde, con i chili che hai
+davvero sollevato; **quello di adesso in rilievo** — bordo verde e un'ombra
+vera, perche' in un elenco di sei righe il colore lo si cerca e l'ombra si
+vede; e quello che manca spento. In fondo, "Chiudi e torna al recupero".
+
+Quattro decisioni:
+
+1. **Una riga per esercizio, non per serie.** Dodici passi diventano quattro
+   righe, e *"a che punto sono"* e' una domanda sugli esercizi. Le serie
+   stanno dentro la riga, come `1/2 serie`.
+2. **Gli stati sono quattro, non tre**, e il quarto salta fuori dalle
+   **superserie**: dentro una coppia A1/A2 si alternano, quindi mentre tocca
+   ad A2 la riga di A1 ha gia' delle serie fatte e non e' ne' finita ne' da
+   fare. Con tre stati finiva fra quelle "da fare", spenta al 62% — cioe'
+   l'app diceva che non l'avevi cominciata mentre ci stavi dentro.
+3. **I chili si prendono con un cursore per esercizio**, non con l'indice
+   della riga: la stessa panca puo' comparire su due righe, e leggerle tutte e
+   due dalla stessa posizione le farebbe apparire duplicate. E' la stessa
+   regola gia' pagata sul modulo da scheda. Il conto `fatte/totale` viene
+   invece dai **passi**, che sono l'unica cosa che non mente: una serie
+   saltata fa avanzare il passo e non scrive niente nel registro.
+4. **Il recupero continua, e si vede.** L'anello sparisce dallo schermo, e
+   `recDisegna()` — che nasconde la barra in basso finche' l'anello e' li' —
+   la rimette. Mentre guardi l'elenco il conto e' in cima, con i suoi
+   −30/+30: non e' un effetto collaterale, e' il motivo per cui quella regola
+   guarda l'anello e non il foglio.
+
+E "Chiudi" **torna da `sheetGuidata()`**, non ricostruendo la schermata a
+mano: e' lei che sa se il recupero e' ancora vivo o se nel frattempo e'
+scaduto.
+
+**E il recupero dice cosa devi preparare.** Le carte della tecnica esistevano
+gia', ma stavano **dentro la serie**: descrivono *come si fa*, e si leggono
+con il bilanciere in mano. Uno stripping annunciato li' e' un'informazione
+arrivata tardi — i dischi leggeri sono dall'altra parte della sala e fra uno
+scarico e l'altro non c'e' recupero per andarli a prendere. La domanda vera
+non e' "come si fa" ma **"cosa mi serve"**, e ha una risposta utile solo
+finche' c'e' tempo per procurarselo: il recupero.
+
+`preparaPasso()` restituisce un **elenco** e non una carta sola, perche' due
+cose possono valere insieme — una superserie di stripping chiede due
+postazioni *e* i carichi pronti — e l'ordine non e' casuale: prima la
+postazione, poi il carico. Se la seconda panca non e' libera, i dischi pronti
+non servono a niente.
+
+| Cosa arriva | Cosa si dice |
+|---|---|
+| **superserie** | *due postazioni*: questa e X si fanno attaccate, tieni libere tutte e due o la seconda la trovi occupata a meta' giro |
+| **stripping** | *N scarichi*: prepara adesso i carichi piu' leggeri e tienili a portata di mano |
+| **rest-pause** | ×N: il carico non cambia, **resta al posto tuo** — cioe' non c'e' niente da preparare, e dirlo evita di alzarsi |
+| **piramidale** | il carico sale a ogni gradino: metti il disco adesso, non quando ti alzi |
+
+Quello che **non** fa e' dire quanti chili mettere sugli scarichi: la scheda
+tiene le ripetizioni (`strip: [6, 4]`), non i pesi, e quelli si decidono
+mentre si scarica. Inventarli qui sarebbe un numero che non ha scelto
+nessuno.
+
+Su una serie normale non compare niente: un avviso che c'e' sempre e' un
+avviso che si impara a saltare. E nell'elenco dell'occhio la stessa cosa sta
+in **una parola** attaccata al bersaglio (`\u00b7 stripping`), perche' li' non
+c'e' spazio per la frase e la frase l'hai gia' letta sul recupero.
+
+### Una guida lasciata a meta' riprende da dove era
+
+Chiudere il foglio per sbaglio — o perche' e' suonato il telefono — non e' una
+decisione: e' un incidente. Passare di nuovo da "come registri?" costringeva a
+ritrovare la scheda giusta in un elenco stando sotto un bilanciere.
+
+`sheetSeduta()` guarda `s.guida`: se c'e' una seduta guidata in corso su una
+scheda che esiste ancora, ci torna dentro e basta. Il modo di uscirne resta
+scritto — "abbandona la guida e registra a mano" — e non cancella niente: le
+serie fatte restano, si continua dal modulo.
+
+Ma **"a meta'" vuol dire che qualcosa e' stato fatto.** Aprendo una scheda e
+richiudendola subito restava una guida a zero serie, e da li' in poi "registra
+pesi" portava dentro quella scheda ogni volta, proponendo di riprendere una
+seduta che non era mai cominciata. Una guida senza nemmeno una serie non e' un
+lavoro interrotto: e' un tocco, e si cancella invece di trascinarsela dietro.
+
+### Uno stripping vale uguale ovunque
+
+Uno stripping non e' una serie e non e' due: e' una serie piu' N code fatte a
+cedimento senza recupero. La convenzione — mezza serie per scarico, e tutti i
+chili perche' quelli sono stati sollevati davvero — era **copiata a mano in
+cinque posti e mancava in altri tre**: il tonnellaggio per seduta, quello del
+resoconto in PDF e il conteggio delle serie delle statistiche ignoravano gli
+scarichi. La stessa seduta valeva di piu' o di meno a seconda della schermata
+che la guardava.
+
+Ora sono tre funzioni sole — `serieEquivalenti()`, `tonnellaggioSerie()`,
+`ripetizioniSerie()` — e le chiamano tutti: mappa muscolare, forma-fatica,
+scarico automatico, grafici, statistiche, resoconto. Conseguenza da non
+correggere per errore: **il numero di serie puo' avere la mezza** (12,5 serie
+e' un numero giusto), e va formattato di conseguenza.
+
+### Il resoconto di una seduta
+
+Lo storico era un elenco di date: guardarlo era aprire un archivio, non capire
+com'e' andata. `resocontoSeduta(k)` risponde alla domanda vera, e **non
+inventa un numero suo** — chiede a quelli che ci sono gia':
+
+| Motore | Cosa gli chiede |
+|---|---|
+| `serieEquivalenti` / `tonnellaggioSerie` | quanto vale la seduta, scarichi compresi |
+| `volumeMuscoli` | dove e' finito il lavoro |
+| `e1rm` / `e1rmPerSeduta` | se qualcosa non era mai stato fatto prima |
+| `formaFatica` | su che gambe ci sei arrivato — letta **il giorno prima**, perche' dopo la seduta la fatica e' quella della seduta |
+| `rec_s` | quanto hai recuperato davvero, e quindi quanto e' durata |
+
+Tre regole che lo tengono onesto:
+
+1. **Non e' un voto.** Il titolo e' un fatto — "due massimali stimati mai
+   visti prima", "piu' leggera del solito", "in linea con le ultime" — e la
+   riga sotto dice su cosa si basa. Una seduta piu' leggera non e' un errore:
+   una scarica serve, e la carta lo scrive.
+2. **Il confronto e' con le sedute confrontabili**: quelle fatte con la stessa
+   scheda se ce ne sono almeno due, tutte le altre altrimenti. Mettere una
+   giornata di gambe contro la media di tutto direbbe soltanto che le gambe
+   pesano piu' delle braccia. E il denominatore e' dichiarato: quante sedute,
+   e con che media.
+3. **Corto di proposito.** Un titolo, quattro numeri, poche righe. Il
+   dettaglio sta gia' in mappa muscolare, volume e progressi, e ripeterlo qui
+   vorrebbe dire mantenere due versioni degli stessi conti.
+
+Il metro della prontezza e' lo stesso di `statoMuscoli()` — la fatica di quel
+giorno divisa quella che quel muscolo porta di solito — e non e' un caso: due
+schermate che usano metri diversi direbbero due cose diverse dello stesso
+muscolo lo stesso giorno.
+
+Dallo storico una seduta si apre sul resoconto, e da li' si tocca una serie
+per correggerla: chi guarda una seduta di tre settimane fa vuole prima
+ricordarsela.
+
+### Il piano HYROX è tarato sull'atleta
+
+`capacitaFisica()` legge forza gambe e forza di tirata dai massimali stimati
+della palestra (rapporto sul peso corporeo), il motore aerobico dai minuti di
+corsa registrati, e la tendenza dei carichi. Il generatore del programma
+aggiunge forza dove le gambe sono deboli, corsa dove il motore non regge, e
+sceglie solo fra gli allenamenti che l'attrezzatura dichiarata permette. La
+sezione dice sempre **perché** ha scelto così.
+
+Le soglie sono rapporti di uso comune, non misure: dicono "molto sotto / in
+linea / sopra", non danno un voto — e la UI deve continuare a dirlo.
+
+Il piano è un **calendario giorno per giorno da oggi alla gara**
+(`pianoFinoAllaGara()`): ogni riga è una data con la sua seduta o il riposo,
+raggruppata per settimana con la fase. Si sceglie quante sedute a settimana si
+reggono (2–6) e i giorni si distribuiscono di conseguenza; l'ultima settimana è
+scarico, la vigilia è riposo, l'ultimo giorno è la gara.
+
+HYROX ha **tre sezioni**, non sei: il conto alla rovescia sta sempre in testa,
+il piano dice cosa fare, le stazioni dicono a che punto sei e da lì parte la
+simulazione. Tutto il resto era navigazione in più.
+
+### La settimana di allenamento si vede
+
+La carta d'ingresso di Gym aveva due bottoni — "Registra pesi" e "Cardio" — e
+rispondeva a una domanda sola: *cosa faccio adesso*. Ma un programma e' una
+**settimana** — giorno 1 spinta, giorno 2 tirata, giovedi' riposo — e quella
+settimana non si vedeva da nessuna parte: le schede stavano in un elenco senza
+giorni, e per sapere se lunedi' ci si era allenati bisognava aprire lo storico.
+
+Al loro posto una striscia di giorni che scorre. Risponde a tre domande
+insieme — **cosa tocca oggi**, **cosa ho fatto**, **cosa ho saltato** — e i
+due bottoni spariscono perche' ci si arriva toccando il giorno. Che e' anche
+il modo di aprire un giorno **che non e' oggi**: prima non si poteva da
+nessuna parte.
+
+**Tre settimane, non un mese**: due dietro e una avanti, aperta su oggi. Un
+mese intero costringe a scorrere per trovare il giorno in cui si e' quasi
+sempre; due settimane dietro sono tutto quello che serve per sapere se questa
+e' andata come la scorsa; avanti bastano sette giorni, perche' il programma si
+ripete e l'ottavo mostrerebbe lo stesso.
+
+**Un giorno non e' un pannello di comando.** La prima versione apriva, per
+ogni giorno della striscia, un foglio con dentro comincia, registra, cardio e
+l'assegnazione della scheda: toccando un giorno qualunque si chiedeva di
+**decidere**, mentre quello che si vuole guardando indietro e' *com'e'
+andata*. Adesso un giorno si apre **solo se c'e' qualcosa da vedere** — il
+bottone e' `disabled` quando la giornata e' vuota, perche' un riassunto che si
+apre per dire che non ha niente da dire e' un tocco sprecato — e quello che
+mostra e' il **resoconto della seduta** che esiste gia': volume, dove e' finito
+il lavoro, i massimali mai visti prima. Rifarne uno qui vorrebbe dire
+mantenere due versioni degli stessi conti.
+
+**Un giorno passato e vuoto si tocca per registrare.** Segnalato cosi':
+*"aggiungi la possibilita' di aggiungere allenamenti ai giorni precedenti
+tramite il calendario"*. Il bottone in basso registrava solo su oggi, e
+l'allenamento scritto la sera dopo — il caso normale — non aveva un posto.
+Toccare un giorno vuoto non apre un riassunto che non ha niente da dire: apre
+"Come registri?" **su quella data**, nella striscia e nella griglia del mese.
+Il futuro resta spento, perche' li' non c'e' niente da vedere ne' da
+scrivere. Da un giorno che ha gia' qualcosa si aggiunge dal riassunto
+("Aggiungi un allenamento") o dal resoconto ("Aggiungi cardio o sport").
+
+Su un giorno passato due cose cambiano, e tutte e due per la stessa ragione —
+quella seduta e' gia' finita: niente **guida serie per serie**, che
+cronometrerebbe un recupero di ieri, e niente **GPS**, che traccia adesso.
+La corsa di ieri va dritta ai minuti a mano.
+
+Registrare e' **un bottone solo, in basso a destra** della striscia. In fondo
+davvero: messo fra la scheda di oggi e cosa hai gia' registrato spezzava in due
+righe che si leggono insieme.
+
+**L'assegnazione sta dentro "Segui questa scheda".** Seguire una scheda e dire
+quando la fai sono la stessa decisione detta due volte — *"questa e' la mia
+giornata di spinta, la faccio il lunedi'"* — e tenerle separate, una nel foglio
+della scheda e una nel calendario, voleva dire farla due volte e poterle far
+dire cose diverse. Il foglio ha le sette pastiglie dei giorni, e un giorno
+tiene **una** scheda sola: assegnarne una a un giorno gia' preso la
+sostituisce, e la nota lo scrive invece di farlo scoprire dopo. Smettere di
+seguirla la toglie anche dal calendario.
+
+**"Sporadica" non e' un ripiego**: una scheda si puo' seguire senza un giorno
+fisso — l'app la monitora lo stesso — e senza quella voce l'unico modo di dirlo
+sarebbe non seguirla, che e' un'altra cosa.
+
+Un livello solo, quindi: il **giorno della settimana**. Lo strato per data —
+l'eccezione di questa settimana — c'era ed e' stato tolto insieme al pannello:
+li' si dice **quando la fai**, non quando la sposti, e un giorno senza scheda
+e' riposo senza bisogno di dichiararlo.
+
+**Lo stato di un giorno passato si legge su quello che e' stato registrato**,
+non sul programma di adesso. Senza, smettendo di seguire una scheda tutte le
+sedute fatte con lei passavano da verdi a **oro** — da "fatta" ad "allenamento
+extra" — e riassegnando quel giorno tornavano verdi. Misurato: il dato non si
+perdeva mai (la seduta, le serie, la scheda con cui l'avevi fatta restano tutte
+li'), ma **come si vedeva** dipendeva dal programma di oggi. E' la stessa cosa
+gia' vietata per i pasti e per il target, dalla terza porta.
+
+La seduta si porta quindi dietro `previsto`, timbrato nei **due punti in cui
+una serie viene registrata davvero** — la guida e il salvataggio del modulo,
+gli stessi in cui la seduta nasce. Non e' un doppione di `s.scheda`: si puo'
+fare la giornata di spinta registrandola a mano, e allora la scheda non c'e'
+ma il programma di quel giorno si'. Le sedute gia' registrate le timbra
+`pinnaPassato()` una volta sola, con il programma di adesso — l'unico che c'e'
+— e da li' in poi quel giorno non si muove piu'.
+
+**Gli stati sono cinque, non tre.** Ai tre chiesti se ne aggiungono due che
+cadono da soli e che senza un segno loro mentirebbero:
+
+| | |
+|---|---|
+| **riposo** | anello quasi invisibile: c'e', e non chiede niente |
+| **da fare** | anello grigio pieno |
+| **saltata** | anello **tratteggiato**: era in programma ed e' passata. Grigia come domani direbbe che c'e' ancora tempo |
+| **fatta** | disco verde con la spunta |
+| **extra** | disco **oro**: allenamento che non era in programma |
+
+L'oro non riusa l'ambra, che in quest'app vuol dire "fuori target": un
+allenamento in piu' non e' un altro tipo di errore. E il metallo si fa con due
+fermate e un colpo di luce — un colore piatto sembra senape.
+
+**Il luccichio si vede una volta sola**, quando la striscia entra in vista.
+L'unica animazione infinita di quest'app e' la fiamma della striscia, e ci sta
+perche' il riempimento porta un dato: uno scintillio perpetuo su un pallino
+sarebbe decorazione, e a batteria. Con `reduced-motion` sparisce e l'oro resta
+oro — il colore e' il dato, il moto no.
+
+Nota di collisione, costata una prova: `.cal` e `.cal-d` erano **gia'** il
+calendario della costanza in `viz.css`, che carica dopo `style.css` e quindi
+vince. La striscia usciva come una griglia da sette colonne con i pallini
+sovrapposti. Le classi qui sono `gcal-*`, e la lezione e' che in un solo foglio
+globale un nome corto e' gia' preso da qualcuno.
+
+### Gym è un ingresso, non una colonna
+
+Erano dodici carte una sotto l'altra — mappa, prontezza, volume, forma-fatica,
+progressione, tonnellaggio, schede, storico. Tutto utile e tutto sempre in
+mezzo: per registrare una serie si scorreva mezzo schermo, per rivedere il
+volume l'altro mezzo.
+
+Ora: **cosa fai oggi** in cima, **gli avvisi che non possono aspettare** subito
+sotto (scarico consigliato, dolori in corso), e il resto in **riquadri con
+icona e stato** — `gymTab`, lo stesso schema dei cinque passi del Piano, che
+già funziona. La pagina passa da una colonna lunghissima a ~800 px.
+
+La regola per decidere cosa sta fuori e cosa dentro: **in cima ci va quello che
+cambia oggi e chiede un'azione.** Tutto quello che si guarda ogni tanto è una
+sezione. Gli avvisi non sono sezioni: sono eccezioni, e spariscono da sole.
+
+Le otto icone sono disegnate in `iconaGym()` — sette tratti l'una, non vale una
+libreria. Stesso riquadro 24×24, stesso spessore, stesso arrotondamento: è
+quello che le fa sembrare una famiglia invece di otto disegni. La prima
+versione della mappa era una sagoma piena e a 23 px diventava una macchia:
+pochi tratti netti si leggono, il dettaglio no.
+
+Il contenuto delle sezioni è quello di prima **parola per parola**: è cambiato
+dove sta, non cosa dice. Spostare e riscrivere insieme è il modo migliore di
+introdurre un bug senza accorgersene.
+
+### La seduta di oggi non arrivava nella mappa
+
+Segnalato cosi': *"come mai l'addome non viene registrato nella sessione che
+ho aggiunto oggi"*. Riprodotto, e non c'entrava l'addome: **mancava tutta la
+seduta**, su tutti i muscoli.
+
+`statoMuscoli()` — che alimenta la mappa, il volume settimanale e il
+riquadro Cardio — leggeva `windowDays(k, 7)`, che e' `lastDays(ieri(k), 7)`:
+sette giorni che finiscono **ieri**. E' la finestra giusta per i periodi
+**chiusi** (la revisione, l'analisi, il target ricalibrato), dove il fatto
+che il tratto sia finito e' il punto. In palestra la domanda e' un'altra —
+*cosa ho fatto e cosa posso fare adesso* — e una seduta registrata dieci
+minuti fa deve contarsi.
+
+**Il segno che era un difetto e non una scelta**: dentro la stessa carta
+convivevano due finestre. Il volume si fermava a ieri, la fatica di Banister
+arrivava a oggi. I tre modi della mappa — quanto lo alleno, quanto e' stanco,
+quanto sta crescendo — rispondevano quindi su **due periodi diversi**, e la
+lettura al tocco li mette uno accanto all'altro.
+
+Misurato sulla stessa seduta registrata oggi: il resoconto diceva
+*"Addome 8,0 · Bicipiti 7,5"*, la mappa e il volume settimanale dicevano
+**zero su tutti e tredici i gruppi**, e `seriePesateSettimana()` — il carico
+acuto da cui esce lo scarico consigliato — pure. Dopo: 8,0 · 7,5 · 4,5 · 4,5
+· 3,0 · 3,0 e 33,0 serie pesate.
+
+`settimanaGym(k)` e' quella finestra, ed e' una funzione a se' apposta:
+`windowDays()` resta com'e', perche' spostarla avrebbe portato dentro oggi
+anche la settimana della revisione — verificato che non si e' mossa
+(28 ago › 3 set). Le dieci settimane del confronto acuto/cronico si spostano
+tutte insieme, quindi il rapporto resta confrontabile con se stesso.
+
+E il sottotitolo della mappa diceva *"la settimana appena chiusa"*: era vero,
+ed era il problema. Adesso dice quello che conta.
+
+### La mappa muscolare è anatomica
+
+Prima era la figura parametrica con sopra dodici ellissi. Diceva *dove*, ma
+un'ellisse sul petto non è un petto, e non si capiva mai se una zona era accesa
+perché l'avevi allenata o perché la macchia era grande.
+
+I tracciati ora vengono da
+[react-native-body-highlighter](https://github.com/HichamELBSI/react-native-body-highlighter)
+di ELABBASSI Hicham, **licenza MIT**, estratti in `data/corpo.json` con la nota
+di licenza dentro il file. Quattro viste: maschile e femminile, fronte e retro —
+e si sceglie dal profilo, perché mostrare a una donna una silhouette maschile è
+il dettaglio che fa sembrare l'app scritta per qualcun altro.
+
+Quello che è **nostro** è la mappatura: i 19 slug della sorgente ricondotti ai
+13 muscoli del modello. `adductors`, `tibialis`, collo, mani, piedi e ginocchia
+restano **sagoma neutra** — esistono nel disegno ma non fra i gruppi che l'app
+conta, e colorarli vorrebbe dire inventarsi un dato. Stessa scelta già fatta
+con free-exercise-db.
+
+**La scala del colore era schiacciata**, e per due motivi che si sommavano.
+
+Il primo: quattro gradini secchi, `ceil(v * 4)`. Il primo gradino teneva un
+quarto del mondo — tutto fra il 2% e il 25% usciva **dello stesso identico
+colore**, quindi un gruppo con due serie e uno con cinque erano pixel per
+pixel uguali. Ed e' proprio li' che sta quasi tutto quello che si vede in una
+settimana normale.
+
+Il secondo: il volume si normalizzava su una **costante** (22 serie), mentre
+fatica e forma erano gia' relative al massimo della settimana. Se il gruppo
+piu' allenato ne fa otto, la mappa usava un terzo della tavolozza e sembrava
+spenta.
+
+Ora: `nVolume` si normalizza sul gruppo piu' caricato della settimana, con un
+pavimento al minimo consigliato (o una settimana da due serie in tutto si
+dipingerebbe come una piena); e `intensita()` produce una scala **continua**,
+interpolando in oklab fra il colore della superficie e i quattro toni della
+tavolozza sequenziale. Cinque stazioni invece di quattro gradini, e il fondo
+che parte da `--wash` — cosi' "quasi niente" torna a somigliare a quasi
+niente, invece di uscire verde pieno.
+
+La gamma e' 0,65: la radice quadrata piena allungava troppo e portava anche i
+gruppi da due serie a meta' tavolozza. Misurato in luminosita' oklab, sullo
+stesso dato: 10% e 13% del massimo passano da ΔL 0,009 a ΔL 0,034, e l'intero
+arco da 0,19 a 0,27.
+
+Due dettagli: `color-mix` non c'e' su Safari sotto la 16.2, e li' si ripiega
+sull'opacita' su una tinta sola — peggio, ma non rotto; e l'intensita' sta in
+`fill-opacity`, non in `opacity`, perche' l'animazione d'ingresso anima
+`opacity` e altrimenti si porterebbe via il dato mentre entra.
+
+La legenda disegna **la scala vera** — la stessa rampa a cinque campioni — e
+non quattro colori che sulla mappa non esistono piu'. E la nota dice che il
+colore e' relativo alla settimana, non una quota assoluta: per i riferimenti
+c'e' il volume settimanale sotto.
+
+**La lettura al tocco dice tutti e tre i numeri**, non solo quello del modo
+acceso: sono le tre domande che i tre bottoni pongono — quanto lo alleno,
+quanto e' stanco, quanto sta crescendo — e toccando un muscolo le si vuole
+sapere insieme. Prima usciva una frase generica ("nella norma") senza dire a
+cosa si riferisse. Quello del modo acceso e' in tinta, cosi' il numero e il
+colore che hai davanti restano legati.
+
+Le tre percentuali seguono la stessa regola del colore: **ognuna e' rispetto
+al gruppo che guida quella classifica**, non una quota assoluta. "Stanchezza
+100%" vuol dire "il piu' stanco di oggi", non "distrutto" — e la nota lo
+scrive, perche' e' esattamente il tipo di numero che si legge come un voto.
+Il moltiplicatore accanto (`1,62× il tuo solito`) e' invece un confronto con
+se stessi, ed e' l'unico dei quattro che non dipende da come stanno gli altri
+muscoli.
+
+### Non tutto l'allenamento e' fatto di serie
+
+Segnalato cosi': *"ho bisogno di aggiungere la possibilita' di fare altri
+sport: per esempio sessioni di BJJ"*. Chi si allena due sere a settimana in
+un dojo aveva un solo posto dove metterle — il riquadro **Cardio** — e quel
+posto porta il nome di un'altra cosa.
+
+La strada corta sarebbe stata un magazzino nuovo. Quella giusta e' estendere
+**quello che c'e' gia'**: tutto cio' che legge `cardioDi()` se ne accorge da
+solo, e sono quattro motori — `allenatoIl()` (e con lui la striscia dei
+giorni, i punteggi di costanza e il conteggio delle sedute della revisione),
+`kcalAllenamento()`, il riquadro di Gym, il riassunto del giorno. Un registro
+nuovo avrebbe voluto dire toccarli tutti e quattro, e dimenticarne uno.
+
+Otto tipi in piu' — BJJ e arti marziali, boxe, calcio, tennis, basket,
+arrampicata, yoga, "altro sport" — con un campo `gruppo` che divide le
+pastiglie in **Cardio** e **Sport**: quindici in fila sarebbero un muro, e chi
+cerca il BJJ sa gia' in quale dei due guardare.
+
+I **MET** vengono dal Compendium of Physical Activities e sono medie di
+popolazione, non misure su di te: la schermata lo scrive. Sulle arti marziali
+il Compendium ne ha **due** — 10,3 a ritmo pieno, 5,3 per la pratica lenta da
+principianti — e qui c'e' il primo, con accanto la nota che una lezione fatta
+soprattutto di tecnica vale circa la meta'. Resta vero quello che vale per
+tutte le altre: **queste calorie non si sommano al target**, quindi una stima
+generosa non sposta niente di quello che l'app giudica.
+
+Nel farlo, un difetto vecchio: il ripiego di `cardioTipo()` era
+`CARDIO_TIPI[6]`, cioe' "altro cardio" **per posizione**. Bastava aggiungere
+un tipo in mezzo perche' diventasse un altro — ed e' esattamente quello che
+questa modifica stava per fare.
+
+E la riga in **"Come registri?"**: quella schermata offriva due strade che
+parlano di schede e di carichi, e chi era andato a fare BJJ non si riconosceva
+in nessuna delle due.
+
+### Prima cosa hai fatto, poi come lo scrivi
+
+Segnalato cosi': *"appena atterriamo vedo registra col GPS o scrivilo a mano.
+Boccio totalmente questa schermata perche' non si capisce nulla. Farei una
+scelta stile Fitness di Apple Watch, dove si scorre e si sceglie lo sport"*.
+Aveva ragione, e il motivo e' preciso: quella schermata chiedeva per prima
+cosa **il modo**, che e' una conseguenza. Il GPS ha senso sulla corsa e non
+sul BJJ, e chi apre quella pagina ha in testa lo sport, non la tecnologia.
+
+Adesso e' l'elenco degli allenamenti: si scorre, si sceglie, e la domanda
+dopo **esiste solo dove ha una risposta**. Corsa, camminata e bici chiedono
+*col GPS o a mano*; su tutto il resto non c'e' niente da chiedere e si apre
+direttamente "salva la seduta".
+
+Quattro conseguenze, tutte nella stessa direzione — **non chiedere due volte
+la stessa cosa**:
+
+- scelto lo sport dall'elenco, il foglio a mano **non ripropone le quindici
+  pastiglie** dei tipi: chi ha appena toccato "BJJ" si vedrebbe offrire fra le
+  alternative quella che ha gia' scelto. Il nome sta nel titolo, con la sua
+  icona;
+- lo stesso vale per il GPS: le tre pastiglie corsa/camminata/bici spariscono
+  quando lo sport arriva dall'elenco;
+- **la distanza si chiede dove esiste.** Su un'ora di BJJ e' una casella che
+  non si puo' riempire, e una casella vuota chiede comunque di decidere;
+- **la nota dice quello che riguarda quello sport.** La storia del costo per
+  chilometro della corsa, sotto un'ora di yoga, e' una riga da saltare.
+
+**Le icone vengono da Tabler, e prima erano disegnate a mano.** Segnalate
+cosi': *"le icone che hai messo sono buggate, prendile da internet"*. Erano
+quindici silhouette fatte con pochi tratti, e il difetto non era il singolo
+disegno: era che a venti pixel **non si riconoscevano**. Un elenco in cui
+l'icona non distingue la riga e' un elenco che si legge solo dal nome, cioe'
+un elenco in cui l'icona e' peso.
+
+[Tabler Icons](https://tabler.io/icons) (licenza MIT) ha una categoria Sport
+di settantasei voci ed e' l'unico catalogo libero che copre corsa, camminata,
+nuoto, karate, yoga e i palloni. Soprattutto ha **la stessa griglia 24x24, lo
+stesso tratto da 2 e gli stessi capi arrotondati** di Feather e Lucide: si
+ricopiano in `icone.js` accanto alle altre e restano una famiglia sola, senza
+un CDN e senza un build step — la stessa scelta gia' fatta per i tracciati del
+corpo.
+
+Lucide, provato per primo, **non ha nessun corridore**: niente corsa, niente
+tennis, niente basket, niente boxe. Tabler tre su quattro ce le ha, e la
+quarta e' una delle tre eccezioni da dichiarare:
+
+| | |
+|---|---|
+| **ellittica** | non esiste in nessun catalogo libero. Si usa `treadmill` — la macchina cardio della palestra, che dice il genere giusto di cosa e si distingue benissimo dal corridore di `corsa` |
+| **vogatore** | il kayak: il segno che si legge e' il remo |
+| **boxe** | il pugno chiuso, perche' un guantone non c'e' |
+
+La regola che aveva gia' fatto rifare un disegno resta valida e vale anche
+qui: **due icone identiche in due righe vicine** sono due righe che si
+assomigliano nel punto in cui dovrebbero distinguersi — e' successo con
+ellittica e "altro cardio" (tutte e due col cuore) come era successo allo
+spuntino della mattina con l'icona del pranzo.
+
+**E la riga dice quando l'hai fatto l'ultima volta.** Sotto ogni nome c'era
+"minuti e via", dodici volte uguale: una riga che si ripete su tutto l'elenco
+non distingue niente e si impara a saltarla. L'ultima seduta invece e' il dato
+che si cerca aprendo questa pagina — *"quanto e' che non corro?"* — e si
+scrive com'e' scritta ovunque: `11 set · 42′ · 8,2 km`, oppure `oggi`. Su uno
+sport mai fatto **non si scrive niente**, perche' non c'e' niente da dire; la
+riga *"col GPS, o i minuti a mano"* resta solo dove c'e' davvero una scelta da
+fare.
+
+**L'animazione e' una sola**, e ci sta perche' dice qualcosa: le righe
+entrano scaglionate quando l'elenco arriva in vista (`entrata()`, lo stesso
+delle altre liste), e sotto il dito la riga si abbassa di un soffio — solo
+`transform`, cioe' una cosa che il browser compone senza rifare il layout. Con
+`reduced-motion` non si muove niente e l'elenco e' identico da fermo.
+
+### Le sedute di cardio hanno la lingua dello storico
+
+Sotto l'elenco degli sport c'erano le ultime sessioni, e ognuna cominciava con
+**la data ISO**: `2026-09-16 · 1:00:00 · 24,50 km`. Cioe' un archivio, non uno
+storico — per sapere quando si e' corso l'ultima volta bisognava leggere una
+data scritta come la scrive un computer, e i buchi fra una seduta e l'altra si
+contavano a mano.
+
+E' la stessa domanda a cui risponde lo storico delle sedute in sala, quindi ha
+la stessa figura: il **blocco del giorno** a sinistra che fa da ancora mentre
+si scorre, i **mesi** che separano i gruppi, una **barra** in scala fra le
+sedute mostrate — qui la durata — e le calorie a destra. In testa i tre numeri
+delle ultime otto settimane: sedute, ore, calorie. Due elenchi che rispondono
+alla stessa domanda con due forme diverse sono due cose da imparare invece di
+una.
+
+### Le leve di un giorno: e allora cosa tocco?
+
+L'editor della settimana dice benissimo **com'e'** un giorno: le calorie, le
+tre quote, la pastiglia del verdetto, *"mancano 340 kcal al target"*. E poi si
+ferma li'. La riga che mancava e' quella dopo — **e allora cosa tocco?** — e
+senza di lei un giorno storto si aggiusta per tentativi: apri un pasto, cambi
+un peso, torni indietro a vedere il totale, ricominci. Con cinque pasti, sei
+ingredienti l'uno e ventiquattro ricette sono una decina di tocchi per ogni
+tentativo, e il totale lo vedi sempre **dopo** aver deciso.
+
+Ogni giorno ha quindi un secondo bottone accanto a "aggiungi un pasto":
+**Aggiusta i macro**, con i tre cursori di Tabler. Dentro si sceglie quale
+numero muovere e da che parte — piu' proteine, meno grassi, piu' calorie — e
+l'app propone le mosse concrete, ognuna con di quanto sposta quel macro, dove
+finisce il giorno e se il verdetto della giornata cambia. Due tipi di mossa, e
+sono i due modi in cui un giorno si aggiusta davvero:
+
+| | |
+|---|---|
+| **una porzione** | `olio EVO 10 → 5 g`, dentro quel pasto e quella ricetta. Passa da `codiceRicetta()`, cioe' dallo stesso codice `ric:` dei pesi per slot: la ricetta nel registro non si muove di un grammo |
+| **una ricetta** | `Burger vegetale nel panino → Pasta e fagioli`. Solo sui pasti fatti di una ricetta sola: su un `piu:` sostituire il blocco butterebbe via anche la parte che andava bene |
+
+**L'ordine e' quello che rende l'elenco un consiglio invece di un catalogo**, e
+risponde alla parte della richiesta che diceva *"cercando di mantenere i vari
+target"*: il punteggio e' il guadagno sul macro chiesto, in percentuale del
+suo target, **meno** quanto le altre tre voci si sono allontanate dai loro.
+Un macro che si avvicina non porta bonus — non e' quello che hai chiesto, e
+regalargli punti farebbe vincere mosse che non fanno quello che vuoi. Cosi'
+una mossa che alza le proteine sfondando i grassi finisce in fondo invece che
+in cima.
+
+Cinque decisioni, tutte trovate provandolo:
+
+1. **Quanto spostare non lo si inventa.** Se nella direzione chiesta manca
+   qualcosa per arrivare al target, la mossa punta **esattamente li'** — e' il
+   numero che l'editor gia' scrive sotto il giorno. Se invece sei gia' oltre e
+   chiedi lo stesso di aumentare (legittimo: il target e' una media
+   settimanale, non un tetto giornaliero) il passo e' il 6% del target, che
+   sulle calorie fa circa le centocinquanta kcal delle `leve` del file di
+   dominio.
+2. **Le porzioni non si amputano.** La prima versione proponeva
+   `olio EVO 10 → 0 g` e `latte soia 250 → 0 ml`: togliere un ingrediente e'
+   un'altra cosa, si fa dentro il pasto ed e' una modifica alla ricetta. Una
+   leva cambia una porzione, quindi il fondo e' **un quarto** e il tetto due
+   volte e mezza — lo stesso motivo per cui le sostituzioni di un pasto si
+   fermano a x1,6. E le quantita' sono arrotondate a scatti che si possono
+   pesare in cucina.
+3. **Niente mosse che non si sentono**: sotto i quattro grammi di proteine o
+   le quaranta calorie non e' una leva, e' rumore.
+4. **Niente la stessa cosa detta quattro volte.** Alla prova uscivano otto
+   righe fatte di due ricette per quattro pasti — *"metti la pizza a
+   colazione"*, *"metti la pizza a pranzo"*, *"metti la pizza allo
+   spuntino"*. Una ricetta entra **una volta**, nel pasto in cui rende di
+   piu', al massimo due mosse per pasto, e una ricetta che il giorno ha gia'
+   non si propone affatto: sarebbe un giorno che si ripete.
+5. **Il momento della giornata non esclude niente, ma si dice.** Mettere a
+   colazione quello che di solito sta a cena e' una scelta, e la riga porta la
+   pastiglia *"di solito a cena"* (`slotAbituale()`) invece di nasconderlo.
+   E' la stessa regola di `pastiEquivalenti()`.
+
+E la cosa detta chiaramente in fondo al foglio: **qui si cambia il piano**,
+cioe' tutte le settimane. Per aggiustare un giorno solo ci sono le porzioni
+dentro il pasto, nella scheda Oggi — che e' il diario, e il diario e' un'altra
+cosa dal modello.
+
+La voce e la direzione partono **gia' scelte** su quello che in quel giorno e'
+piu' lontano dal suo target: aprire il foglio e trovare quattro pastiglie
+spente vorrebbe dire far scegliere prima di aver detto cosa c'e' da scegliere.
+
+Misurato sul piano di esempio: 437 mosse su 56 combinazioni di giorno, macro e
+direzione, nessuna senza risposta; applicandone una, il giorno finisce
+**esattamente** dove la riga aveva scritto (2465 → 2503 kcal, 135 → 143 g di
+proteine) e il registro delle ricette non si muove. Con il piano vuoto non
+esce nessuna mossa e il foglio lo dice: senza ricette assegnate non c'e'
+niente da spostare.
+
+### Il mese degli allenamenti
+
+La striscia dei giorni risponde a *questa settimana*: tre settimane, e si apre
+su oggi. La domanda *"quante volte ci sono andato questo mese"* non ha un
+posto, e non e' la stessa domanda — quindi non e' la stessa schermata.
+
+Un'icona di calendario in alto a destra della carta, e dietro il mese a
+griglia. Tre decisioni:
+
+1. **I numeri non si ricalcolano.** Quante sessioni, quanti minuti e quante
+   calorie li sa gia' `kcalAllenamento()`, che e' l'unico posto in cui sta
+   scritto quanto dura una seduta di pesi quando non l'hai dichiarata. L'unica
+   aggiunta e' un campo `classe` su ogni riga — pesi, cardio, sport — perche'
+   il calendario possa distinguerli senza indovinarlo dal nome.
+2. **Pieno i pesi, vuoto il resto.** Il segno di una giornata e' la forma e
+   non solo il colore, come i due tratteggi dei grafici: qui serve davvero,
+   perche' i pallini stanno dentro un quadrato da nove pixel.
+3. **La media a settimana si fa sui giorni passati del mese**, o il mese in
+   corso sembrerebbe sempre in ritardo il giorno 3.
+
+Sotto la griglia, due grafici che rispondono alle due domande che nascono
+guardandola: **dove e' finito il tempo** (minuti per disciplina, a barre
+orizzontali — la forma giusta quando i nomi sono lunghi) e **i minuti al
+giorno** del mese. E l'icona riapre sempre **questo** mese: rimettere quello
+in cui eri finito scorrendo indietro sarebbe la risposta a una domanda di
+ieri.
+
+### Cardio, e perché il GPS ha un asterisco
+
+**Su iPhone una pagina web non può registrare un percorso con lo schermo
+spento.** Appena l'app va in secondo piano iOS la sospende e il GPS smette di
+arrivare. Non è un limite dell'implementazione: le app che lo fanno sono native
+e chiedono un permesso "sempre" che al web non esiste. `cardio.js` tiene acceso
+lo schermo con la Wake Lock API e **lo dice prima di partire**, invece di far
+scoprire a fine corsa che mancano otto chilometri. Chi non vuole tenere il
+telefono in mano registra a mano: i conti vengono identici.
+
+Due filtri sui punti, o la distanza si gonfia: si scartano le letture con
+`accuracy > 35 m` e gli spostamenti sotto i 2 m (rumore del ricevitore, non
+movimento). Le calorie della corsa usano il costo per chilometro
+(`corsa_kcal_per_kg_km`) e non il MET, che sull'andatura sbaglia molto di più.
+
+**La cartolina** è un canvas 1080×1350 generato sul telefono — la posizione non
+esce dall'app. Niente mappa di sfondo: i tile OSM *mandano* CORS (verificato, si
+potrebbero disegnare senza sporcare il canvas), ma la loro usage policy chiede
+di non appoggiarsi al server pubblico per traffico applicativo, e da un browser
+non si può nemmeno mandare uno User-Agent che identifichi l'app. Il tracciato si
+proietta in equirettangolare **corretta sulla latitudine** — senza il coseno un
+percorso a Milano si schiaccerebbe di un terzo — e si scala con lo stesso fattore
+sui due assi, altrimenti un fuori-e-torna dritto diventerebbe un cerchio.
+
+### L'integrazione è tua
+
+Era una lista fissa in `data/dieta.json`: cinque voci uguali per chiunque, non
+togliibili. Ma l'integrazione è la parte più personale del piano, e una lista
+che non si tocca la si smette di guardare.
+
+Ora `S.piano.integratori` è uno strato come `alimenti` e `pasti`: modifiche,
+aggiunte, e rimozioni marcate `tolto` invece che cancellate — se cambi idea la
+voce di base è ancora lì. Con il piano vuoto non si eredita niente: quelle
+cinque voci sono le scelte di un'altra persona, come i pasti.
+
+La checklist mostra **solo quello che tocca oggi** — la B12 settimanale in mezzo
+agli altri sei giorni era una riga da ignorare, e a furia di ignorarla si
+ignorano anche le altre. **Ma quel filtro va applicato solo ai giornalieri**, ed
+è un errore già fatto una volta: applicato anche ai settimanali, la B12 spariva
+sei giorni su sette e chi se la dimenticava il lunedì non poteva più segnarla
+da nessuna parte. Una B12 presa di martedì è comunque presa.
+
+I settimanali stanno quindi in un blocco **"questa settimana"** con lo stato
+della settimana, non del giorno: se è già stata presa la riga dice quando ed è
+chiusa, se no resta lì finché non la segni, in qualunque giorno — e si segna sul
+giorno in cui l'hai presa davvero, non su quello previsto. Anche l'aderenza dei
+settimanali si conta **a settimane**: contare i giorni darebbe 4 su 30 anche a
+chi non ne ha saltata nemmeno una.
+
+Ogni voce porta la sua **aderenza a 30 giorni** — serve a vedere quale salti
+davvero, che di solito non è quella che credi. Il generatore `.ics` legge `D.integratori`, quindi cambiare
+la lista cambia anche i promemoria del calendario.
+
+Il limite, detto nella UI: l'app non misura il sangue e non conosce la tua
+storia. Tiene l'elenco che le dai, ricorda quando tocca, e mostra cosa salti.
+Cosa prendere si decide altrove.
+
+### Il motore della palestra
+
+- **Massimale stimato**: Epley su (ripetizioni + RIR). Sommare il RIR è ciò che
+  rende confrontabili serie fatte con sforzo diverso. Sopra le 12 ripetizioni
+  Epley sovrastima, e la UI lo dice
+- **Forma–fatica (Banister)**: ogni seduta lascia due tracce che decadono a
+  velocità diverse — fatica τ≈7 giorni, forma τ≈42. L'impulso NON è il
+  tonnellaggio (un leg press e un'alzata laterale non sono confrontabili in
+  chili) ma le serie pesate per coinvolgimento del muscolo e per vicinanza al
+  cedimento. **Quello che si mostra è il rapporto, non le tre curve** — vedi
+  sotto
+- **Proiezione della forza**: regressione lineare, non Kalman. Qui le
+  osservazioni sono poche e distanti e il segnale è molto più grande del
+  rumore: una retta con banda e R² dice quanto serve senza fingere precisione
+- **Doppia progressione**: si sale di carico solo quando TUTTE le serie toccano
+  il tetto del range con RIR ≤ 2
+
+Le costanti stanno in `data/palestra.json` e sono valori tipici di letteratura,
+**non calibrati sull'utente**: la UI deve continuare a dirlo.
+
+### I grafici
+
+Le due righe di riferimento — target e media — hanno due token loro,
+`--rif` e `--media`, e non sono serie: sono annotazioni. Devono restare
+distinguibili l una dall altra E dalla serie in tutti e tre gli ambiti (chiaro,
+scuro, .hx). Passate dal validatore della skill dataviz a coppie complete.
+
+Passandolo e saltato fuori un problema che c era gia: al buio il grigio del
+target (#6E7B87) contro la serie (#4FA88F) dava **ΔE 13,0 a vista normale**,
+sotto la soglia di 15 — due righe che si confondono anche a chi vede tutti i
+colori. #B9C4CC porta la coppia peggiore a 17,0 normale e 12,5 in protanopia.
+Nessuno lo aveva notato a occhio in mesi: e il motivo per cui il colore si
+calcola invece di sceglierlo.
+
+Le etichette delle due righe stavano sempre a destra, e a destra c e l ultimo
+dato: sui grafici a barre finivano regolarmente sopra le barre. Ora si guarda
+da che parte i dati sono piu lontani da quella riga e l etichetta va li, dove
+c e aria; sotto ci resta comunque una piastrina del colore del fondo, perche
+dove i dati riempiono tutto il riquadro un lato libero non esiste.
+
+E quando target e media quasi coincidono — proprio il caso in cui fa piacere
+vederlo — le due etichette finivano una sopra l altra: con target 2482 e media
+2488 usciva "tmegaea". Ora la piu bassa va sotto la sua riga.
+
+**Lo stesso identico problema c'era sulle etichette delle serie**, e li' era
+peggio: erano disegnate tutte all'ultimo punto della propria curva, e due
+curve che finiscono vicine — che e' la norma, perche' e' proprio quando si
+toccano che si guarda il grafico — stampavano due parole una sopra l'altra.
+Su "forma e fatica" ne uscivano tre piu' la riga della media dentro venti
+pixel: nero. Su "Misure", sei.
+
+`etichetteSerie()` fa la cosa che si fa sempre in questi casi: parte dalla
+posizione voluta, ordina, e spinge via chi si sovrappone tenendo undici pixel
+di margine, poi rientra dentro il riquadro se e' sfondato in basso. In piu'
+**si scansa le piastrine gia' occupate** dalle righe di riferimento, che sono
+disegnate prima — e per farlo `righeRiferimento()` ora restituisce i suoi
+rettangoli invece di non restituire niente.
+
+La tavolozza in `viz.css` **non e' stata scelta a occhio**: e' passata dal
+validatore della skill dataviz su tutti i controlli, in entrambi i temi —
+banda di luminosita', soglia di croma, separazione per daltonismo su tutte le
+coppie, soglia a vista normale, contrasto sulla superficie. Se la si cambia, va
+rivalidata.
+
+Regole che il toolkit applica e che non vanno violate:
+
+- **Un asse solo.** Mai due scale y sullo stesso grafico: l'allineamento fra le
+  due e' arbitrario e inventa correlazioni che nei dati non ci sono
+- **Tre categorici al massimo**, e solo dove le serie SONO il soggetto (macro,
+  composizione). Tutto il resto e' a serie singola e usa `--pine`
+- **Piu' serie con una sola che conta** -> evidenza (una in accento, le altre
+  grigie) piu' etichetta diritta, non tre colori
+- **La media e anche una riga sul grafico**, accanto a quella del target:
+  blu (`--media`) contro il grigio (`--rif`), e due tratteggi diversi — corto e
+  lungo — perche l identita non deve mai stare solo nel colore. I due token
+  sono passati dal validatore della skill dataviz a coppie complete, nei tre
+  ambiti (chiaro, scuro, .hx)
+- **Sotto ogni grafico la stessa riga**: ultimo valore, media del periodo,
+  target, scarto. La media si ferma a IERI — la giornata in corso non e finita
+  e la tira giu ogni mattina. La funzione e una sola (`riepilogo()`): quando
+  ognuno se la costruiva, chi diceva il target e chi no e nessuno la media
+- **Legenda su tutti**, anche con una serie sola: senza, il verde pieno e il
+  tratteggio grigio sono due cose che il lettore deve indovinare
+- **Valori di scala tondi** via `niceTicks()`: dividere l'intervallo in parti
+  uguali produce due etichette "2" per numeri diversi
+- **La lettura e' al tocco**, non al passaggio del mouse: su un telefono non
+  esiste. La riga `.read` sotto il grafico e' il tooltip
+- Un grafico senza dati **dice che mancano i dati**, non disegna una scatola vuota
+
+### Il grafico delle misure non c'e' piu'
+
+Segnalato come "buggato", ed era vero: una serie con **una sola rilevazione**
+non veniva disegnata affatto, ma restava in legenda. Con le misure prese ogni
+quattordici giorni e la finestra a sette il grafico usciva **vuoto con sette
+voci sotto**; con una sola rilevazione in tutto, lo stesso a trenta giorni.
+
+Sistemarlo pero' ha fatto vedere il problema vero, che non era un difetto ma la
+**forma**. Sei circonferenze su un asse solo restano sei righe quasi
+orizzontali a quote diverse: si vede l'ordine — il torace sta sopra la vita,
+che sta sopra il collo — e non il **movimento**, che e' l'unica cosa che
+interessa e vale mezzo centimetro al mese. Ogni tentativo di renderlo leggibile
+aggiungeva un pezzo: prima il target che mancava, poi sei colori con una
+tavolozza da rivalidare fuori dalla regola dei tre categorici, poi la media da
+togliere perche' diventava la settima riga. Quando un disegno ha bisogno di tre
+puntelli per dire una cosa che altrove e' gia' detta meglio, il puntello giusto
+e' toglierlo.
+
+Le misure hanno **due case migliori**, e le avevano gia': la tabella
+ora/target/manca in **Corpo**, con la sagoma disegnata sulle circonferenze
+vere, e le proiezioni a 28 giorni con la banda in **Dove stai andando**, che
+sul movimento rispondono con un intervallo invece che con una pendenza. Un
+terzo posto che dice peggio la stessa cosa e' un posto in meno da guardare, non
+uno in piu'.
+
+**Cosa resta della riparazione**: un punto solo adesso si disegna come pallino
+invece di sparire. Il difetto stava in `chartEmphasis()`, non nel grafico delle
+misure, e vale per qualunque serie che si registri ogni tanto — verificato su
+"Fame ed energia" con una serie ridotta a un punto: un pallino, e la legenda
+che dice il vero.
+
+**Cosa se n'e' andato con lui**: i tre colori categorici in piu' (`--c4/5/6`),
+il colore per serie e l'opzione per togliere la media. Erano l'impalcatura di
+quel grafico e basta, e un'opzione che non usa nessuno e' un pezzo che marcisce.
+
+### Il motore di previsione
+
+Un filtro di Kalman a una dimensione sul dispendio energetico. Non è un accessorio
+del grafico: è ciò che rende le previsioni sempre più precise mentre l'utente logga.
+
+1. **A priori** — Mifflin-St Jeor dal profilo × `modello.laf`. È la stima peggiore,
+   quella con cui si parte quando non c'è ancora storia
+2. **Osservazione** — su ogni finestra di 14 giorni con copertura ≥60%:
+   `TDEE = introito medio − (Δ peso di tendenza × 7700) / giorni`
+3. **Aggiornamento** — il guadagno di Kalman pesa osservazione e stima corrente in
+   base alla loro incertezza. L'errore dell'osservazione scende con la lunghezza
+   della finestra (`σ·√(2/7)/span`), quindi finestre lunghe spostano di più
+4. **Adattamento** — se le ultime tre innovazioni hanno tutte lo stesso segno il
+   modello è rimasto indietro rispetto alla realtà, e il rumore di processo viene
+   quadruplicato perché recuperi in fretta. È letteralmente il "se l'obiettivo non
+   viene raggiunto cambia l'indice di calcolo"
+5. **Registro** — ogni giorno deposita una previsione a 7 e 14 giorni in `S.model.prev`.
+   Quando la data arriva la confronta col peso reale e ne ricava errore medio,
+   copertura della banda e deriva sistematica. È la pagella del motore, mostrata in app
+
+Il **rumore giornaliero** (σ dei residui attorno alla media mobile) è stimato sui dati
+dell'utente, non preso da una costante: serve sia per la banda di confidenza sia per
+dire quanto è larga la forbice della pesata di domani.
+
+**Perché non c'è una data di arrivo.** La richiesta iniziale era "domani mi aspetto di
+aver perso 1 kg". Un kg di grasso è 7700 kcal: in un giorno non esiste, e la
+fluttuazione giornaliera (±1 kg di acqua e contenuto intestinale) è cinque volte più
+grande di qualsiasi segnale reale. Il motore quindi prevede la **linea di tendenza**
+su orizzonti di 7 e 28 giorni con banda al 95%, e mostra separatamente la forbice della
+bilancia di domani per far vedere perché il numero del mattino non va letto. Nessuna
+proiezione a data fissa: sarebbe un conto alla rovescia, che questo file vieta.
+
+### La previsione si legge, non si decifra
+
+Segnalato con tre parole: *"la parte delle previsioni e' incomprensibile"*. Ed
+era vero, e non perche' i numeri fossero sbagliati. La carta apriva con
+`Dispendio stimato 2159 kcal/die ±120 · ricalibrato 3 volte`, proseguiva con
+una tabella intestata **`Tendenza · Banda · Δ`** e chiudeva con quattro righe
+di `09-02 → 69,41  reale 69,60  +0,19`. Sono tutti numeri veri, ed e' **un
+cruscotto da motore**: chi apre Corpo non chiede come funziona il filtro,
+chiede *dove sta andando*.
+
+L'ordine adesso e' quello della domanda:
+
+1. **la risposta, in italiano** — *"Stai scendendo di 0,32 kg a settimana"* — e
+   sotto le tre colonne che la reggono: oggi, fra una settimana, fra un mese;
+2. **quanto vale la pesata di domani**, che e' la cosa che fa sbagliare
+   lettura ogni mattina;
+3. **da dove escono quei numeri** — il dispendio misurato e la pagella del
+   motore — in fondo e **dietro un tocco**, perche' e' come lo sa, non cosa
+   dice. Il `<summary>` porta gia' il numero del dispendio, cosi' chi lo
+   cercava lo trova senza aprire.
+
+Le parole al posto delle sigle: `Δ` diventa quanto cambieresti, "banda"
+diventa un `±` spiegato una volta sotto le tre colonne, e la pagella smette di
+essere una griglia di numeri nudi — *"ha sbagliato in media 0,23 kg, e 88 volte
+su 100 il peso vero e' caduto dentro la forbice che aveva dichiarato"*, con la
+tabella sotto e un'intestazione (`quando · diceva · era · scarto`) che prima
+non c'era.
+
+**E il verdetto si rifiuta.** Sotto i cinquanta grammi a settimana non si
+scrive una direzione: e' dentro il rumore della bilancia, e *"stai scendendo di
+0,02 kg a settimana"* e' una direzione inventata. Li' si scrive che il peso sta
+fermo. E' la stessa regola di `tempoAlTarget()`, che non da' un numero quando
+l'intervallo del ritmo contiene lo zero.
+
+Una cosa in piu' che prima era una nota a pie' di pagina e adesso e' un
+riquadro suo: **il piano e' un'intenzione, quello che mangi e' un fatto.**
+Quando le due cose non coincidono il ritmo vero e' l'altro, e la carta lo dice
+con il numero — *"nelle ultime due settimane hai mangiato 2 210 kcal invece di
+2 482: con quel ritmo il peso starebbe fermo"*.
+
+### Chi non e' seguito da nessuno non sa da che numero partire
+
+**E' il caso normale, e l'app lo trattava come se non esistesse.** Chi ha un
+nutrizionista i suoi numeri ce li ha gia': glieli ha dati una persona che l'ha
+visto, e nessuna formula qui dentro ne sa di piu' — la carta glielo dice come
+prima cosa e non insiste. Ma chi apre l'app senza nessuno alle spalle si
+trovava davanti una casella "Calorie" da riempire, e nient'altro.
+
+Quello che c'era rispondeva a meta' della domanda e sempre troppo tardi:
+`targetNeutro()` calcolava Mifflin-St Jeor per il livello di attivita' senza
+mai chiedere **per fare cosa**, e `cardTarget()` — che il numero lo corregge
+benissimo — si rifiuta di parlare finche' non ci sono due settimane di
+registro. Cioe' nell'unico momento in cui la domanda si pone davvero, non
+c'era niente.
+
+`obiettivo.js` fa tre passaggi, in quest'ordine:
+
+1. **L'obiettivo** — perdere grasso, ricomporsi, mantenere, crescere. La
+   ricomposizione e' una voce a se' e non un sinonimo di mantenimento: le
+   calorie sono le stesse, ma le proteine no e il metro con cui si giudica la
+   riuscita nemmeno (li' la bilancia non deve muoversi, ed e' il punto).
+2. **Il ritmo, in percentuale del peso a settimana.** Non in chili fissi:
+   mezzo chilo a 55 kg e mezzo chilo a 100 kg sono due deficit completamente
+   diversi, e un elenco di ritmi in kg dice la cosa giusta a una persona sola.
+3. **I macro, dall'obiettivo e non solo dalle calorie.** Le proteine salgono in
+   deficit — 2,2 g/kg contro 1,8 in mantenimento — perche' e' li' che la massa
+   magra e' a rischio.
+
+**Due pavimenti, e vince il piu' alto:** il metabolismo a riposo per 1,1, che
+c'era gia', e il **25% sotto il dispendio**, che questo file prescriveva da
+tempo senza che nessuno lo applicasse. E un ritmo che il pavimento taglia si
+vede **barrato prima di sceglierlo**: un bottone che promette −0,7 kg a
+settimana e consegna le calorie di −0,35 e' un bottone che mente.
+
+Come tutto il resto: la proposta si accetta, non si applica da sola. E c'e' un
+secondo bottone, **"tieni solo l'obiettivo, non i target"**, per chi i numeri
+li ha da qualcun altro: l'app sa cosa stai cercando di fare senza toccare
+quello che segui.
+
+### Il piano regge? Giorno per giorno, non in media
+
+**L'app giudicava sempre in relativo, e questo era un buco di struttura.** Ogni
+regola confronta con `D.target`, e `D.target` e' una variabile che decide
+l'utente: esisteva quindi un modo per far tacere l'app su qualunque cosa —
+abbassare il target. Misurato: registrando 1200 kcal contro un target di 2482
+l'app produce otto segnalazioni, quattro rosse; **portando il target a 1200 ne
+spariscono due** (calorie e proteine) e la barra scrive *"in linea col
+target"*. Un'app che smette di protestare proprio quando la situazione
+peggiora e' peggio di una che non protesta mai, perche' il silenzio sembra un
+via libera.
+
+E il controllo che c'era guardava la **media della settimana**, che nasconde
+esattamente il caso che conta: sei giorni a 2800 e uno a 600 fanno 2482 di
+media, cioe' "coerente col target". Il giorno da 600 non lo vedeva nessuno.
+
+`controlloPiano()` guarda i **sette giorni uno per uno** e risponde a tre
+domande diverse:
+
+| | |
+|---|---|
+| **il pavimento** | assoluto rispetto alle tue scelte, relativo al tuo corpo. E' l'unico che non si zittisce abbassando il target |
+| **lo scarto dal target** | oltre il 10% su un singolo giorno: le barre di Oggi seguono i pasti, non il target, e in quei giorni direbbero "in linea" quando non lo sei |
+| **la direzione** | un piano sotto il dispendio mentre vuoi crescere non e' sbagliato di poco: va dall'altra parte |
+
+**Il pavimento non e' una costante tipo "mai sotto le 1200".** Quella sarebbe
+la classica soglia inventata che questo progetto vieta ovunque: 1500 kcal per
+un uomo di cento chili sono fame nera, per una persona di cinquanta sedentaria
+sono quasi mantenimento. E' `max(BMR x 1,1, dispendio x 0,75)` — il metro sei
+tu, come per la prontezza muscolare — e la carta scrive tutti e due i numeri
+invece di consegnare una soglia calata dall'alto.
+
+**La direzione si misura sul dispendio, non sul target**, cosi' vale anche per
+chi ha scelto "tieni solo l'obiettivo, non i target": l'obiettivo *e'* una
+posizione rispetto a quello che spendi.
+
+**Le calorie di ogni giorno si leggono, non si toccano.** Le barre dicono
+*quale* giorno e' storto; il numero sotto dice *di quanto*, e senza quello
+bisognava toccare ogni barra per saperlo — su una schermata che si legge
+scorrendo, quel tocco non lo fa nessuno. La media porta il colore del suo
+verdetto e lo scarto percentuale, perche' e' il numero che riassume la
+settimana e lasciarlo grigio accanto a sette barre colorate vorrebbe dire
+nascondere proprio la conclusione. E la carta sta **in cima al piano**, non
+solo dentro il passo della settimana: chi apre il piano vuole sapere prima di
+tutto se quello che ha costruito regge.
+
+**E le calorie non bastano: conta anche come sono divise.** Un giorno in
+linea sul totale puo' avere una struttura completamente storta — 77 g di
+grassi e 301 di carboidrati fanno lo stesso numero di 100 e 250, ma non sono
+la stessa giornata. E i grammi da soli non si confrontano fra giorni di
+dimensione diversa: 77 g di grassi su 2400 kcal e 77 su 3200 sono due cose
+diverse, e la **percentuale** e' l'unica forma in cui quel confronto si legge.
+
+Quindi le barre della striscia sono **impilate per macro**: l'altezza dice
+quante calorie, il riempimento come sono divise, e una figura sola risponde
+alle due domande insieme. Il verdetto sul giorno si e' spostato sul bordo
+della barra, sul numero sotto e sulla sigla — se lo portasse il riempimento
+non ci sarebbe piu' posto per i macro. Sotto, la **media della settimana** con
+le tre quote, i grammi e il segno del target su ciascuna. E ogni giorno
+dell'editor porta la sua barra con `22% P · 49% C · 28% G`.
+
+Le tinte sono **le stesse** di "Da dove vengono le calorie": le stesse tre
+cose con due codici colore a due schermate di distanza sarebbero due cose
+diverse.
+
+Un dettaglio del calcolo: le quote si fanno sulle **calorie ricostruite dai
+macro** (4/4/9) e non sul totale dichiarato. Fra i due c'e' quasi sempre uno
+scarto di qualche decina di kcal — gli alimenti reali si discostano dai valori
+di tabella, ed e' scritto anche nel passo del target — e usando il totale le
+tre quote non sommerebbero mai a cento.
+
+**E il verdetto sta sul giorno, non in cima alla pagina.** Era la prima
+versione, ed era il posto sbagliato: un giorno da 600 kcal nasce **mentre lo
+componi**, e una carta di riepilogo in testa la vedi quando risali — cioe'
+dopo, quando non stai piu' guardando quel giorno. Adesso ogni giorno
+dell'editor porta la sua pastiglia (`in linea`, `+28%`, `sotto il minimo`), un
+filo di colore sul bordo sinistro che si vede scorrendo, e una riga che dice
+**quanto manca**: *"Mancano 1847 kcal al target di 2482"*. Chi sta componendo
+un giorno ha bisogno del numero da coprire, non di un giudizio.
+
+**La striscia si vede sempre**, anche a piano perfetto. Prima la carta
+spariva del tutto quando non c'era niente da segnalare, e finche' era solo un
+allarme aveva senso; da quando porta le calorie di ogni giorno e come sono
+divise no, perche' quella e' la cosa che si viene a guardare — e nasconderla
+proprio quando il piano e' a posto vuol dire non poterlo mai vedere fatto
+bene. Restano condizionati gli **avvisi**, che sono eccezioni.
+
+In cima resta solo quello che e' **settimanale** — quale giorno, e la direzione
+contro l'obiettivo, che non ha una casa su un singolo giorno — e sparisce del
+tutto quando va tutto bene, perche' le sette pastiglie lo dicono gia'.
+
+**Anche il foglio in cui scegli la ricetta lo dice**, ed e' il momento piu'
+vicino alla decisione: sotto ogni ricetta c'e' a quanto arriverebbe *quel*
+giorno scegliendola. Ma con una regola che e' costata una prova per essere
+trovata: **la pastiglia compare solo se quella scelta cambia lo stato del
+giorno.** Senza, su un giorno con un pasto solo uscivano **ventidue "sotto il
+minimo" identici** — veri per tutte e quindi inutili per sceglierne una, e il
+modo migliore di insegnare a ignorare le etichette rosse. Misurato: su
+mercoledi a 635 kcal le pastiglie passano da 22 a **zero**, e su un lunedi gia'
+in linea restano le **15 su 24** che porterebbero il giorno fuori target. Il
+numero invece resta sempre: quello dice dove vai.
+
+Due dettagli che sarebbero passati inosservati:
+
+- **un giorno vuoto non e' un giorno povero.** E' un giorno a cui non hai
+  ancora assegnato niente, e trattarlo da allarme darebbe sette righe rosse a
+  chiunque cominci da zero. Sta nella striscia in grigio e fuori da tutti i
+  conti, media compresa;
+- **il vecchio avviso offriva la strada sbagliata.** Diceva *"oppure riporta il
+  target a <media del piano>"*: con una media sotto il pavimento quello e' un
+  invito ad adeguare il metro alla fame. Adesso quella meta' della frase
+  sparisce quando il numero e' sotto il pavimento, e al suo posto c'e' scritto
+  che la strada sono i pasti.
+
+**Chi ha un medico** ha un interruttore, dentro l'avviso stesso: una dieta
+ipocalorica sotto controllo esiste, e chi te l'ha data ti ha visto. L'avviso
+non sparisce — diventa una nota, e il pavimento calcolato resta scritto,
+perche' e' un'informazione vera in tutti e due i casi. Farlo sparire del tutto
+sarebbe stata la scappatoia piu' comoda per zittire l'app, cioe' esattamente
+il comportamento che questa carta esiste per impedire.
+
+### Senza target non si giudica niente
+
+Con `D.target.kcal` a zero — il primo avvio, finche' il profilo non c'e' — le
+regole dell'analisi dividono per zero, e chi registrava 1200 kcal si vedeva
+scrivere **"Mangi piu' del piano"**. Letteralmente falso, ed e' la peggiore
+delle risposte possibili: non un dato mancante, ma un verdetto inventato al
+contrario. Nessuna matrice lo prendeva, perche' a schermo non compariva ne'
+`NaN` ne' `Infinity` — solo una frase sbagliata.
+
+Ora `analyse()` si ferma e lo dice, e la carta della settimana in Sintesi non
+disegna otto barre contro un target che non esiste: dice che manca il metro e
+porta dove si imposta.
+
+### Gli idoli sono dichiarazioni, e vanno riportati sulla tua altezza
+
+`target_fisico` era **una persona sola, uguale per tutti**, scritta in
+`data/dieta.json` — e arrivava da `...DBASE` anche a chi cominciava da zero,
+cioe' esattamente la cosa che questo file vieta per il nome, l'eta' e le
+misure di partenza. Con il piano vuoto adesso non c'e' nessuno finche' non lo
+scegli, e la colonna "Manca" resta vuota invece di misurarti contro qualcuno
+che non hai scelto.
+
+`data/fisici.json` ne tiene **undici**, sette uomini e quattro donne, e ogni
+riga porta le sue avvertenze. Quattro regole li tengono onesti:
+
+1. **Sono dichiarazioni, non misure.** Interviste, schede promozionali,
+   articoli: nessuno ha mai messo il metro addosso a Brad Pitt. `fonte` vale
+   `dichiarazione` su tutti, e la UI lo scrive dove i numeri si vedono.
+2. **Si riportano sulla tua altezza.** E' la parte che rende la cosa una
+   proporzione invece di un poster: i centimetri di qualcuno alto 1,90 non
+   dicono niente a chi e' alto 1,60. Le circonferenze scalano con l'altezza,
+   **la massa magra con il suo quadrato** — che e' la definizione dell'FFMI —
+   ed e' anche il motivo per cui il peso finale puo' venire molto diverso da
+   quello dichiarato senza che nessuno abbia sbagliato i conti.
+3. **L'FFMI dice se e' roba che un corpo costruisce da solo.** Massa magra
+   diviso il quadrato dell'altezza, normalizzata a 1,80 m. Sopra 25 (uomini) o
+   22 (donne) si esce da quello che si raggiunge senza aiuti: il riferimento
+   viene dallo studio di Kouri del 1995 su atleti prima e dopo l'era degli
+   steroidi, ed e' **pratica comune, non una legge** — come le costanti di
+   Banister. Non blocca niente: dice. Misurato su un profilo di 1,80 m,
+   Chris Hemsworth esce a 25,2 ed e' marcato *oltre il limite naturale*,
+   Brad Pitt a 18,6 ed e' marcato *raggiungibile*.
+4. **Nessuna previsione di quanto ci vuole.** E' la regola di sempre: una data
+   qui sarebbe una scadenza da mancare, e su un obiettivo che richiede anni
+   sarebbe anche falsa. La scheda lo scrive, e rimanda a "Dove stai andando",
+   che sul tempo risponde come intervallo e si rifiuta quando i dati non
+   bastano.
+
+E il **numero citato non e' sempre quello operativo**: il 5-6% di grasso che
+gira su Fight Club e' condizione da giorno di riprese, non uno stato in cui si
+vive. Dove la differenza esiste il file tiene tutti e due (`bf_pct` e
+`bf_pct_citato`) e la scheda spiega perche' ne usa uno.
+
+Si puo' anche **non averne nessuno**, ed e' un bottone esplicito: restano i
+tuoi numeri e come si muovono, che e' l'unico confronto davvero tuo.
+
+### Il target che si ricalibra
+
+Per molto tempo l'app ha avuto **due metà che non si parlavano**. Da una parte un
+filtro di Kalman che dopo qualche settimana sa quanto consumi meglio di
+qualsiasi formula; dall'altra `D.target.kcal`, un numero messo a mano una volta
+e mai più toccato. Quella conoscenza finiva in un grafico e moriva lì.
+
+`target.js` chiude l'anello, con tre regole:
+
+1. **Non si applica da sola.** Cambiare di nascosto il metro con cui l'app
+   giudica le giornate significa che un giorno "buono" diventa "storto" senza
+   che tu abbia fatto niente di diverso. La proposta si accetta, e la conferma
+   mostra il confronto macro per macro.
+2. **La correzione viene dalla matrice**, non da un'opinione nuova.
+   `regole_calorie` è già la decisione del piano su peso × vita × carichi e
+   l'analisi la applica già: qui si aggiunge solo il bottone che la esegue.
+3. **Niente deficit da fame.** Pavimento a BMR × 1,1, e la UI dice qual è.
+
+Le proteine **non scalano** con le calorie: restano ancorate al peso corporeo
+(`p_per_kg`), perché sono la variabile che protegge la massa magra. Grassi al
+25%, carboidrati a residuo.
+
+E come tutto il resto: si sceglie un **ritmo**, non una scadenza.
+
+**Rampa fibre** (stessa file): il piano ne prevede 38 g e chi arriva da
+un'alimentazione normale sta a 15–20. Il salto in un colpo non è pericoloso ma
+produce una settimana di gonfiore che fa mollare un piano che funzionava. Cinque
+grammi a settimana, e la carta nomina anche l'acqua — le fibre senza acqua
+peggiorano le cose invece di migliorarle.
+
+### La revisione chiude il cerchio
+
+`data/dieta.json` conteneva `leve` — quattro mosse concrete da ±150 kcal scritte
+a mano da chi ha costruito il piano — e **non le leggeva nessuno** dalla prima
+versione. Erano esattamente la risposta alla domanda che la revisione lasciava
+aperta. Ora `levaPerPriorita()` le propone, scegliendo per segno, e **solo** sulle
+priorità caloriche: infilare una leva da 150 kcal sotto "dormi troppo poco"
+sarebbe un consiglio a caso.
+
+Poi l'**impegno**: la priorità della settimana si può prendere come impegno, e
+domenica prossima `esitoImpegno()` guarda se quella voce è ancora fra gli errori.
+Non chiede "ce l'hai fatta?" — a quella domanda si può rispondere di sì senza che
+sia vero. Guarda i numeri, e distingue tre casi: sparito, ancora primo (la mossa
+era troppo grande), ancora presente ma meno grave.
+
+### Giorni che non contano
+
+Vacanza, influenza, trasferta. Una settimana d'ospedale giudicata col metro di
+una normale non misura niente: dice che è andata male, cosa che sapevi.
+`S.settings.pause` **non cancella niente** — i dati restano e si vedono ovunque —
+ma `costanze()` e `metricheSettimana()` saltano quei giorni, e il denominatore
+scende con loro (dividere per 28 invece che per 21 misurerebbe che ti sei
+ammalato, non la tua costanza).
+
+Con una cautela: se una settimana è interamente in pausa non si filtra a zero,
+si lascia com'è. Altrimenti la revisione direbbe "nessun dato" quando i dati ci
+sono, sono solo da non giudicare.
+
+### Quanto manca, in tempo
+
+Per molto tempo qui non c'è stato niente del genere, e la regola era netta:
+niente date di arrivo. La ragione non era filosofica, era **aritmetica** — il
+tempo è distanza ÷ ritmo, e quando il ritmo si avvicina a zero l'errore
+relativo esplode.
+
+Fatto il conto propagando la banda che il motore già calcola (su 9 cm di vita
+da togliere, orizzonte 28 giorni, banda ±0,3):
+
+| Ritmo su 28 gg | Punto | Intervallo vero al 95% |
+|---|---|---|
+| −1,4 | 80 giorni | 66–102 giorni — **usabile** |
+| −0,6 | 6 mesi | 4 mesi – 1 anno |
+| −0,25 | 15 mesi | 7 mesi – **mai** |
+| quasi fermo | 3 anni | 9 mesi – **mai** |
+
+Quindi non un contatore, ma `tempoAlTarget()`, che sa in quale dei cinque casi
+si trova: **ci sei** (la differenza è già dentro la forbice), **stretto**,
+**largo** (con l'avvertenza che il numero da tenere è quello alto),
+**incerto** — l'intervallo del ritmo contiene lo zero, quindi "non ci arrivi" è
+dentro le possibilità e non si scrive nessun numero — e **lontano**, quando ti
+stai muovendo dall'altra parte.
+
+Tre cose lo distinguono da un conto alla rovescia, e sono quelle che lo rendono
+onesto: è un **intervallo**, si **ricalcola** ogni volta sul ritmo di adesso —
+verificato: rallentando da −1,4 a −0,8 il numero *sale* da 148–229 a 229–504
+giorni — e **si rifiuta** invece di inventare.
+
+Sta sotto il grafico della misura scelta in *Dove stai andando*. Non c'è sul
+peso, perché il peso in quest'app **non ha un target**: quello è ancora un
+obiettivo a scadenza, e resta fuori.
+
+### Le altre proiezioni
+
+`previsioni.js` estende alle misure, alla composizione e alla forza la regola
+che governa già il peso: **si proietta la tendenza a un orizzonte fisso con una
+banda, mai una data di arrivo.** "Il target lo raggiungi il 14 marzo" è un conto
+alla rovescia travestito da previsione — presuppone che il ritmo di oggi valga
+per mesi, cosa che non succede mai. Quello che si può dire è: fra 28 giorni sarai
+in questo intervallo, e il target ci sta dentro **oppure no**.
+
+Qui non c'è un filtro di Kalman ma una **retta ai minimi quadrati**, per lo
+stesso motivo per cui la proiezione della forza in palestra la usa: le
+osservazioni sono poche e distanti, e il segnale è più grande del rumore. R² è
+sempre mostrato — una retta si tira anche dentro una nuvola che non dice niente.
+
+Due dettagli imparati alla prova, entrambi contro la **falsa precisione**:
+
+- la banda ha un **pavimento** — 0,5 cm sulle misure (la risoluzione vera di un
+  metro da sarto), 2,5 kg sulla forza (il disco più piccolo). Qualche punto
+  quasi allineato fa collassare i residui a zero, e un "±0,0 cm" sarebbe una
+  precisione che nessuno possiede;
+- una serie **piatta** (stesso valore ogni volta) dà R² = 0 per costruzione,
+  perché non c'è varianza da spiegare. Mostrarlo come "la retta non spiega
+  niente" direbbe il contrario di quello che è successo: si scrive "ferma", e si
+  fa notare che capita anche riscrivendo il valore della volta prima invece di
+  rimisurare.
+
+La composizione proiettata è una stima costruita su **altre due stime** — peso
+previsto e vita prevista — dentro una formula che già sbaglia di 3–4 punti. Non
+è un motivo per non mostrarla, è un motivo per ripetere ogni volta che serve a
+vedere la direzione (grasso giù, massa magra che tiene) e non il numero.
+
+### Il motore di analisi
+
+Non è un elenco di consigli generici: applica la matrice decisionale del piano.
+
+1. Se ci sono <3 giorni loggati su 7, **dice che non ci sono dati** e si ferma.
+   Non produce conclusioni dal rumore
+2. Confronta contro il target le medie effettive (dai pasti spuntati, non da
+   quanto dichiarato) di **tutti e cinque** i valori: calorie, proteine,
+   carboidrati, grassi, fibre — vedi "Tutti i macro, non solo due" 
+3. Calcola la media mobile del peso a 7 giorni e la confronta con quella di 7 giorni
+   prima, incrocia con il trend della vita e con i carichi dichiarati, e cerca la
+   riga corrispondente in `regole_calorie`
+4. Richiede almeno 8 pesate su 14 giorni prima di dire qualcosa sul peso
+5. Controlla idratazione, sonno, Coca Zero (caffeina → sonno), passi, aderenza
+6. Se ci sono ≥2 giorni con sintomi gastrointestinali su 7, segnala il glutine di
+   frumento negli straccetti e nelle fette veg
+7. Verifica che la B12 sia stata presa
+8. Verifica che i pasti principali superino i 25 g di proteine
+
+**Regola di prodotto da non violare:** l'app non deve mai suggerire di saltare pasti,
+digiunare o compensare uno sgarro. Il bilancio è settimanale. Il tono resta descrittivo,
+mai moralizzante — è un requisito esplicito dell'utente.
+
+---
+
+### Le animazioni
+
+`anim.js` sta su tre regole, in quest'ordine:
+
+1. **`prefers-reduced-motion` prima di tutto.** Circa una persona su tre naviga
+   con le animazioni ridotte. Quando è attivo non si anima: si salta allo stato
+   finale, che deve essere sempre leggibile da solo. Nel CSS la durata si azzera
+   a `.01ms` e non a `0`, altrimenti certi browser non emettono più gli eventi
+   di fine transizione
+2. **Si anima solo ciò che entra in vista, e una volta sola** (`osserva()`, con
+   `unobserve` immediato). Animare venti grafici al caricamento fa scattare il
+   telefono e non fa vedere niente
+3. **Solo `opacity`, `transform` e `stroke-dashoffset`**: sono le proprietà che
+   il browser compone sulla GPU. Animare `width` o `top` ricalcola il layout a
+   ogni fotogramma
+
+**La fiamma della striscia** è l'unica animazione infinita di tutta l'app, e ci
+sta perché non è decorazione: il riempimento interno viene dal numero di giorni
+(sei stadi, non un continuo — a occhio la differenza fra 14 e 15 giorni non si
+vede comunque). Lo sfarfallio muove solo `transform` e con `reduced-motion`
+sparisce: la fiamma resta piena allo stesso modo, perché è il **riempimento** a
+portare il dato, non il moto.
+
+Le altre piccolezze seguono la stessa regola — animare solo dove il movimento
+*dice* qualcosa: la spunta della sfida che si disegna (l'hai fatta tu, non era
+già così), le barre macro che crescono da sinistra con `scaleX` e non con
+`width`, il rimbalzo sul tick del pasto che conferma il tocco prima che la
+pagina si ridisegni, i coriandoli su una sfida completata e su un impegno
+mantenuto.
+
+Il pezzo forte è `disegnaPath()`: si misura la lunghezza vera del tracciato,
+la si usa come trattino e si fa scorrere l'offset — la tecnica classica, l'unica
+che funziona senza librerie. L'offset **non** si scrive inline: la keyframe parte
+da `len` con `fill: 'backwards'`, così a riposo la linea è intera.
+
+### La revisione settimanale
+
+La settimana è l'unità giusta: il giorno è rumore, il mese arriva tardi per
+correggere. `revisione.js` confronta i sette giorni chiusi con i sette prima e
+risponde a tre domande in quest'ordine: **cosa non ha funzionato**, **come si
+sistema**, **quale una cosa cambiare**.
+
+`diagnosiSettimana()` non elenca: **pesa**. Registro 100, proteine 92, sonno 88,
+sedute 80, calorie 76/70, acqua 58, fibre 52, passi 44. Ordinare per gravità e
+non per evidenza è tutta la differenza fra un elenco e un consiglio. La priorità
+è **una sola** — cambiarne cinque insieme rende impossibile capire cosa ha
+funzionato.
+
+**E si legge al tocco**, come tutti gli altri grafici. Il manubrio dice
+benissimo la direzione e nasconde il numero: si vede che le proteine sono
+salite, non che sono passate da 118 a 131 g. Toccando una riga i numeri esatti
+— adesso, prima, differenza, target, percentuale — finiscono nella riga
+`.read` sotto, e una fascia dice quale riga stai leggendo. La zona da toccare
+e' **tutta la riga e non il pallino**: un cerchio da quattro pixel su un
+telefono non lo prende nessuno, mentre la riga e' un bersaglio alto ventidue.
+E i rettangoli invisibili vanno aggiunti dopo i disegni, o coprirebbero i
+tocchi delle righe gia' fatte.
+
+Il grafico è a **manubrio**, non a pendenza. La pendenza sembrava la forma ovvia
+e alla prova non reggeva: otto metriche quasi tutte vicine al target si
+accalcavano in una banda alta trenta pixel e le etichette si sovrapponevano per
+forza. Il manubrio dà a ogni voce una riga di altezza fissa — collisione
+impossibile — e mette il movimento in orizzontale. Un asse solo: la percentuale
+del proprio target, l'unico metro che tiene sulla stessa figura i passi e i litri.
+
+### Il metro del recupero sei tu
+
+Questo file scriveva da tempo che *"non si confronta la fatica di Banister con
+una soglia assoluta: con tau_forma 42 e tau_fatica 7 la prontezza di chi si
+allena e' sempre positiva, per costruzione"*. E poi il codice faceva
+esattamente quello: `pronto` era `fatica < forma * 0.55`, e con quelle due
+costanti il rapporto di regime sta intorno a 7/42 — cioe' **sempre** sotto
+qualunque soglia ragionevole. Misurato sul caso piu' ovvio possibile: il
+giorno dopo una seduta pesante di petto l'app scriveva "nessun gruppo e' in
+debito di recupero, pronti: petto".
+
+Il confronto giusto e' con se stessi. Ma **non sul rapporto fatica/forma**, ed
+e' l'errore in cui si cade subito dopo: quel rapporto ha un transitorio
+lunghissimo, perche' la forma ci mette 42 giorni a riempirsi e nelle prime
+settimane il rapporto vale 0,9 contro lo 0,2 di regime. Provato: con otto
+settimane di storia la mediana usciva 0,302 mentre il ciclo settimanale vero
+oscillava fra 0,15 e 0,31, e il giorno dopo una seduta pesante risultava
+*sotto* la norma.
+
+`caricoRelativo()` guarda quindi la **fatica** e basta, contro la fatica che
+quel muscolo porta di solito:
+
+- tau 7 vuol dire che si assesta in tre settimane invece che in tre mesi;
+- ha il senso giusto — "quanto sono pesto rispetto al mio normale";
+- resta autocalibrante: chi si allena tanto ha una fatica abituale alta e non
+  risulta perennemente distrutto per questo;
+- la finestra e' di **sei settimane**, cosi' segue i cambi di volume invece di
+  confrontarti con quello che facevi a marzo, ed e' la **mediana**, perche' i
+  picchi del giorno dopo sono proprio quello che non deve entrare nel metro
+  con cui li si misura.
+
+Sotto le tre settimane di storia su quel muscolo non si dice niente — `pronto`
+vale `null`, che non e' `false` — e chi legge quel campo deve distinguere i
+tre casi. Sullo stesso seme di prova: petto, spalle e tricipiti allenati ieri
+escono a 1,62× il loro solito, dorsali e bicipiti a 0,75×, gambe a 1,00×.
+
+Il metro e' uno per tutta la sezione: mappa muscolare, carta "cosa allenare
+oggi", grafico del carico, resoconto della seduta e pastiglie delle schede.
+
+### "Ci sta" o "meglio domani": la scheda, oggi
+
+La domanda arriva nel momento in cui si apre **registra pesi** con tre schede
+davanti. La mappa muscolare sapeva benissimo che i pettorali erano ancora
+carichi, ma quell'informazione stava due schermate piu' in la' e nessuno la
+andava a prendere con le mani sulla panca.
+
+`prontezzaScheda()` fa una media pesata, e **il peso conta**: una scheda che
+mette dodici serie sui pettorali e due sui polpacci non e' "meta' petto e
+meta' polpacci". Ogni gruppo entra per quanto quella scheda lo carica davvero
+— serie della riga per coinvolgimento dell'esercizio, cioe' lo stesso peso che
+usano gia' la mappa e il volume settimanale.
+
+Quattro casi, e le parole sono scelte: **"sconsigliata" sarebbe un giudizio su
+una scheda, e la scheda non ha fatto niente di male.** Quello che e' carico e'
+il corpo, e per oggi:
+
+| | |
+|---|---|
+| sotto 0,9× | ci sta |
+| 0,9–1,25× | nella norma |
+| 1,25–1,7× | gruppi carichi |
+| oltre 1,7× | meglio domani |
+
+Sotto la pastiglia c'e' **il perche'** — quali gruppi, e quanta parte del
+lavoro di quella scheda rappresentano — perche' un'etichetta senza il motivo
+e' una cosa che si impara a ignorare. E quando ce n'e' una chiaramente piu'
+fresca delle altre viene marcata, che e' l'unico consiglio vero: non "non
+allenarti", ma "oggi ti conviene questa".
+
+Senza abbastanza storico non compare niente e la nota lo dice, invece di
+inventare un verdetto.
+
+### Lo storico non e' un archivio
+
+Era un elenco di date con accanto due numeri: per sapere com'era andata una
+settimana bisognava aprire le sedute una per una. Ora ha la lingua della
+Sintesi — titolo, sottotitolo, i numeri grossi del periodo, poi le righe — e
+ogni riga porta quello che serve a scorrerlo:
+
+- il **blocco del giorno** a sinistra fa da ancora verticale: scorrendo si
+  legge la data prima del nome. Le sigle sono di due lettere (`ma`, `me`) e
+  non di tre, perche' "mar" sotto un'intestazione "set 2026" qualcuno lo
+  legge come marzo;
+- una **barra sotto il nome** con il tonnellaggio in scala **fra le sedute
+  mostrate**: dice quali sono state grosse rispetto alle altre tue, e la nota
+  lo scrive perche' non e' una scala assoluta;
+- i mesi separano i gruppi, cosi' i vuoti si vedono senza contarli.
+
+In testa tre numeri sulle ultime otto settimane — sedute, serie, tonnellate —
+che sono la risposta alla domanda che si fa aprendo lo storico: *quanto ho
+fatto ultimamente*.
+
+### Una serie si corregge, non solo si butta
+
+Nello storico toccare una serie **la cancellava**, dopo una conferma. E' la
+stessa regola gia' imparata a caro prezzo sulle righe di scheda — *toccare una
+riga la apre* — che qui era rimasta com'era.
+
+Il punto non e' l'ergonomia: e' che nello storico una serie sbagliata quasi
+mai e' di troppo. E' **segnata male** — il carico rimasto quello della volta
+prima, dieci ripetizioni invece di otto scritte a memoria a fine seduta,
+l'esercizio preso dalla riga sopra nell'elenco — e l'unica uscita era buttarla
+e riscriverla da capo. Sono numeri che finiscono dentro il massimale stimato,
+la doppia progressione, il volume per muscolo e il verdetto sulla scheda:
+lasciarli sbagliati sporca tutto quello che ne esce.
+
+`sheetSerie(k, i)` apre la serie: carico, ripetizioni, RIR, gli scarichi uno
+per uno, e **l'esercizio**, che si puo' cambiare — e' l'errore piu' frequente
+di tutti ed e' l'unico che nessun'altra schermata sa riparare. Si lavora su
+una copia, cosi' "Annulla" non lascia niente; "Elimina questa serie" e'
+rimasta, dentro, dove uno la cerca dopo aver aperto.
+
+Tre conseguenze che sarebbero passate inosservate:
+
+- **`scordaFatica()`** — la forma-fatica e' memorizzata per muscolo e dopo
+  qualunque modifica risponderebbe coi numeri di prima. Era scritto a mano in
+  tre punti e mancava nel quarto, cioe' proprio nella cancellazione dalla
+  seduta libera. Ora e' una funzione sola;
+- **togliendo l'ultima serie la seduta sparisce**, e chi tornava indietro da
+  quella cancellazione trovava un oggetto che non esiste piu'. `sheetLibero()`
+  in quel caso torna alla schermata di scelta;
+- **le sedute vuote non sono sedute.** Aprire la schermata "come registri?"
+  creava la giornata anche se poi non ci si scriveva niente, e nello storico
+  compariva una riga "Seduta · 0 serie". Quella e' la traccia di un tocco, non
+  di un allenamento: lo storico e il conteggio la saltano — e adesso non nasce
+  piu' (vedi sotto).
+
+E il bottone in testa non dice piu' "Continua quella di oggi" su una seduta di
+tre mesi fa: li' non si continua niente, si apre e si corregge.
+
+### Aprire non registra
+
+`sheetSeduta()` cominciava con `p.sessioni[k] ||= { nome: '', serie: [] }`:
+la giornata di palestra **nasceva nel momento in cui si guardava** la
+schermata di scelta. Bastava toccare "Registra pesi", cambiare idea e
+chiudere per lasciarsi dietro una seduta a zero serie.
+
+Da li' in poi due cose sbagliate insieme, che e' anche il motivo per cui era
+difficile da riconoscere:
+
+1. la carta di Gym decideva l'etichetta del bottone sull'**esistenza** della
+   seduta, non sulle serie: scriveva **"Continua la seduta"** e sotto
+   "Seduta — 0 serie, 0 kg" a chi non aveva ancora fatto niente;
+2. e quel bottone **non continuava niente** — non poteva, non c'era nulla da
+   continuare: riportava alla schermata di scelta, cioe' esattamente dove si
+   era gia'. Da fuori sembrava che non funzionasse, ed era una descrizione
+   giusta.
+
+La seduta ora la creano i **due punti in cui una serie viene scritta
+davvero**: la guida (che gia' lo faceva) e il salvataggio del modulo da
+scheda. La schermata di scelta non tocca il registro, e per simmetria, chi la
+apre su una giornata rimasta vuota se la vede cancellare.
+
+Due conseguenze da non correggere per errore:
+
+- **la seduta libera ha bisogno di dire che sta cominciando.** Ci si entra in
+  due modi opposti: scegliendola dalla schermata di scelta — e li' la
+  giornata nasce — oppure tornandoci dopo aver cancellato una serie, e se era
+  l'ultima la seduta e' sparita apposta. Ricrearla in quel caso rimetterebbe
+  dentro proprio quello che si e' appena tolto, quindi il primo caso lo
+  dichiara (`sheetLibero(k, true)`) e il secondo torna alla scelta.
+- **le sedute vuote gia' in giro si buttano all'avvio.** Chi ha usato l'app
+  finora se le ritrova nel registro, e non sono innocue: entrano nel
+  conteggio delle sedute della revisione. `normalize()` le toglie una volta
+  sola — e togliere una seduta senza serie non perde nessun dato, perche' un
+  dato dentro non c'e'.
+
+### Una seduta si elimina
+
+Registrata il giorno sbagliato, o due volte la stessa, restava li' per sempre:
+si potevano togliere le serie una a una, ma la seduta vuota rimaneva. E non e'
+una questione di ordine — una seduta finta entra nel volume settimanale, nella
+forma-fatica, nel monitoraggio della scheda e nel conteggio delle sedute della
+revisione. Un dato falso che non si puo' togliere sporca tutti i motori che lo
+leggono, e le decisioni che ne escono: lo scarico consigliato, il verdetto
+sulla scheda, la diagnosi della settimana.
+
+Il bottone sta nel punto d'ingresso della giornata (`sheetSceltaModo`), cioe'
+dove ci si accorge dell'errore, e compare **solo se quel giorno ha delle
+serie**. Chiede conferma dicendo quante ne sta buttando, e svuota `_ffCache`
+perche' la forma-fatica e' memorizzata per muscolo e altrimenti risponderebbe
+con i numeri di prima. Tocca solo la palestra: il cardio ha la sua scheda e il
+resto del diario non si muove — e la nota lo dice, perche' "elimina la seduta"
+letto in fretta sembra piu' largo di quello che e'.
+
+### L'acqua si aggiunge a bicchieri
+
+Era un campo numerico in litri dentro la griglia del diario, e chiedeva la cosa
+sbagliata due volte. Primo: nessuno beve "0,25 L", si beve un bicchiere.
+Secondo, e piu' importante: l'acqua e' l'unica voce del diario che si registra
+**otto volte al giorno** e non una — e ogni volta erano tastiera, cancella 1,2,
+scrivi 1,4. A quel prezzo si finisce per stimare la sera, che e' come non
+registrarla.
+
+Quattro recipienti, perche' quattro sono quelli che uno ha in casa: bicchiere
+200 ml, tazza 250, bottiglietta 500, bottiglia 1,5 L. Sono **capienze
+convenzionali, non misure**, e la carta lo scrive — un bicchiere da tavola sta
+fra i 200 e i 250 ml, e chi ha una borraccia da 750 usa "scrivi tu", che e'
+rimasto e vale come totale.
+
+Il livello sta in `d.acqua` in litri, come prima: tutto quello che gia' legge
+l'acqua — analisi, cruscotto, statistiche, PDF — non si e' accorto di niente.
+Accanto, `d.sorsi` e' l'elenco dei millilitri aggiunti, e **non e' ridondante**:
+serve a togliere l'ultimo esattamente com'era. Senza, "annulla" dovrebbe
+chiedere a chi ha toccato per sbaglio quanto valeva il tocco. Scrivendo il
+totale a mano l'elenco si azzera, perche' da quel momento il numero l'ha deciso
+l'utente e i sorsi di prima non lo compongono piu'.
+
+La bottiglia si riempie fino alla quota del target, ed e' disegnata **prima**
+di qualunque animazione: se l'IntersectionObserver non scatta il livello e'
+comunque giusto. E' la stessa regola della fiamma della striscia — il dato sta
+nel riempimento, il movimento e' solo il modo in cui ci si arriva.
+
+**La Coca Zero e' finita nella stessa carta**, che percio' si chiama "cosa
+bevi". Non e' un accorpamento per far posto: e' la stessa cosa dell'acqua —
+si conta a lattine, si aggiunge nel momento in cui la si apre, e un campo di
+testo chiedeva di ricordarsi a sera quante ne erano passate. Sopra le tre
+lattine la carta nomina la caffeina, perche' quello e' il primo posto dove
+guardare quando il sonno e' corto, ed e' un collegamento che l'analisi fa gia'.
+
+### Il diario chiede solo quello che sa solo lui
+
+"Ogni giorno" era una carta con cinque voci — peso, acqua, Coca Zero, passi,
+sonno — piu' l'interruttore dell'allenamento. Tre non ci appartenevano piu':
+
+| Voce | Dove e' andata, e perche' |
+|---|---|
+| **Peso** | In Corpo, grande e al centro. E' il numero che si scrive per primo ogni mattina e quello attorno a cui girano tendenza, dispendio, previsione e composizione: viveva in una casella grande come quella delle lattine |
+| **Acqua e Coca Zero** | Nella carta "cosa bevi", un tocco alla volta. Sono le due voci che si registrano molte volte al giorno, e un campo numerico le fa stimare a sera |
+| **Allenamento** | Non si dichiara: si deduce |
+
+Restano **passi e sonno**, cioe' i due numeri che si scrivono davvero una
+volta al giorno e che nessun'altra parte dell'app conosce — e nemmeno loro
+hanno piu' un riquadro: due campi dentro una carta con un titolo sopra erano
+piu' cornice che contenuto. Stanno in cima a **"Com'e' andata"**, la carta che
+gia' chiede com'e' andata la giornata: il sonno di stanotte e' esattamente il
+primo pezzo di quella risposta.
+
+`allenatoIl(k)` e' la regola sola: la giornata conta come allenamento se ci
+sono serie in palestra, del cardio o una seduta HYROX registrata. Non e' una
+funzione nuova — quel conto lo facevano gia' **quattro motori** (costanza,
+revisione, statistiche, resoconto), ognuno con la sua copia, e quattro copie di
+una regola prima o poi diventano quattro regole. L'interruttore chiedeva una
+cosa a cui l'app sapeva gia' rispondere, e le due risposte potevano
+contraddirsi: quale valeva, allora?
+
+Il flag `allenamento` dei registri vecchi **continua a valere**. Chi ha spuntato
+"sì" senza registrare le serie ha dichiarato un allenamento, e cancellarlo dai
+conti a posteriori vorrebbe dire riscrivere la storia di chi ha usato l'app
+com'era.
+
+La riga resta in Diario ma **in lettura**: dice cosa c'e' registrato quel
+giorno e porta in Gym. Toglierla del tutto avrebbe fatto pensare che
+l'allenamento non contasse piu'.
+
+### "Giorni registrati" ne contava di piu' e di meno insieme
+
+Tre errori, e i primi due tiravano in direzioni opposte.
+
+**Guardare una data la creava.** `day(k)` crea la giornata se non c'e', ed e'
+chiamata anche in lettura da mezza app: aprire Oggi su una data, scorrere il
+diario, guardare la scheda di un giorno. `S.log` si riempiva quindi di
+**scatole vuote** solo navigando, e ogni contatore faceva
+`Object.keys(S.log).length`. Misurato: scorrendo cinque giorni di un anno fa,
+"giorni registrati" passava da 41 a 46. Chi si guarda indietro si vedeva
+accreditare giornate che non ha registrato.
+
+**E `loggedDays()` ne perdeva di vere.** Esisteva gia' — commentata *"giorni
+con qualcosa dentro davvero"* — ma elencava a mano peso, pasti e misure, e
+soprattutto **non la usava nessuno** tranne la striscia dei giorni di fila.
+Cosi' una giornata con acqua, passi, sonno, fame ed energia non contava, e
+nemmeno una in cui avevi registrato una pizza da 900 kcal fuori piano — che
+`consumed()` conta eccome.
+
+Adesso il criterio e' uno solo, `giornoPieno()`, ed e' **generico di
+proposito**: qualunque campo con un contenuto conta. Un campo nuovo aggiunto
+in futuro conta da solo, senza che nessuno debba ricordarsi di metterlo in un
+elenco — che e' precisamente il modo in cui questo bug era nato. Ci passano il
+profilo, il menu, l'anteprima dell'import e la soglia dei tre giorni
+dell'analisi.
+
+Le scatole vuote **si buttano all'avvio**, in `normalize()`, dove nessuno ci
+sta scrivendo dentro. Durante la sessione continuano a nascere — evitarlo
+vorrebbe dire separare lettura e scrittura in duecento punti — ma non vengono
+piu' contate da nessuna parte.
+
+**Il terzo errore era una parola.** La revisione aveva una riga *"Giorni
+registrati"* che contava le **pesate**: chi registrava tutto tranne il peso si
+vedeva dare zero su sette e il primo posto fra gli errori della settimana. Il
+criterio pero' e' giusto — la pesata e' quella che alimenta il filtro di
+Kalman, ed e' il motivo per cui quella riga pesa 100 nella diagnosi — e infatti
+il testo diceva gia' "Troppi giorni senza pesata". A mentire era solo
+l'etichetta, ed e' quella che e' cambiata.
+
+Nello stesso giro `dayScore()`, che disegna il calendario della costanza,
+ignorava il fuori piano: una giornata registrata solo come "ho mangiato una
+pizza" usciva bianca. Adesso conta i pasti spuntati **oppure** gli extra, lo
+stesso criterio del punteggio di nutrizione.
+
+### Una spunta tolta deve sparire, non diventare `false`
+
+Togliendo la spunta a un pasto il codice faceva `d.pasti[chiave] = false`
+invece di cancellare la chiave. Sembra la stessa cosa e non lo e': mezza app
+conta i pasti di una giornata con `Object.keys(d.pasti).length`, e una chiave
+a `false` la fa risultare come un pasto registrato.
+
+Il risultato e' una giornata che risultava **piena e vuota nello stesso
+momento**: `consumed()` diceva giustamente zero, ma la giornata entrava fra i
+"giorni registrati", nel punteggio di nutrizione della costanza, nel
+calendario e nel conteggio del resoconto. Misurato su sette giornate in cui
+non era stato registrato niente ma le caselle erano state toccate e rimesse a
+posto: **"giorni registrati" passava da 36 a 40**.
+
+Tre mosse, e servono tutte e tre:
+
+1. **alla radice**: togliendo la spunta la chiave si cancella;
+2. **in lettura**: chi conta i pasti guarda i *valori* veri
+   (`Object.values(...).some(Boolean)`), non le chiavi — `dayScore()`,
+   `costanze()`, `statRegistro()`. Cosi' i resoconti sono giusti gia' prima
+   del prossimo avvio, sui dati sporchi che ci sono adesso;
+3. **all'avvio**: `normalize()` butta le chiavi a `false` gia' scritte.
+
+`giornoPieno()` non e' stato toccato ed e' voluto: e' generico apposta —
+qualunque campo con un contenuto conta — e irrigidirlo per un caso
+particolare vorrebbe dire ricominciare l'elenco a mano che quel controllo
+esiste per evitare. Li' la cura e' la pulizia all'avvio.
+
+**Cosa invece funzionava.** Il resoconto e il PDF sono stati ripercorsi voce
+per voce sulla stessa settimana — registro, ripartizione, distribuzione
+settimanale, pasti uno per uno, fuori piano, peso, allenamento — e leggono i
+dati giusti: con tre pasti su cinque spuntati per sette giorni il PDF esce di
+quattro pagine con "Cena 0/7" dove la cena non era stata spuntata, e nessun
+`NaN` o `undefined` fra le 248 stringhe di testo del file.
+
+### La chiave del diario e' il pasto, non la ricetta
+
+Tutti gli strati del giorno — spunta, sostituzioni, porzioni, alimenti
+aggiunti, ricetta congelata — sono indicizzati con una chiave sola, e per
+tutta la vita dell'app quella chiave e' stata **il codice della ricetta**.
+Funziona finche' una ricetta compare una volta sola nella giornata, e si
+rompe nel caso piu' banale che esista: **le stesse mandorle allo spuntino
+delle 11 e a quello delle 16:30.**
+
+I due pasti condividevano tutto. Spuntandone uno si spuntava anche l'altro;
+sostituendo la ricetta in uno la si sostituiva in tutti e due; le porzioni
+cambiate a colazione ricomparivano al pomeriggio. Segnalato con uno
+screenshot che lo mostra su due righe della stessa giornata, ed e' il tipo di
+difetto che si vede solo usando l'app: leggendo il codice, `d.pasti[s.codice]`
+sembra ragionevole.
+
+La chiave giusta e' il **pasto**: il posto nella giornata, che non cambia ne'
+quando cambi la ricetta ne' quando lo sposti. Ogni voce della settimana ha
+quindi un `id`, e `chiaveP()` e' l'unico modo di ricavarlo.
+
+Tre decisioni dentro:
+
+- **da dove nasce l'id.** `g<giorno>-<posizione>` per il piano di base, che e'
+  un file statico e quindi ha posizioni stabili; appena l'utente tocca la
+  settimana lo strato in `S.piano` viene riscritto **con gli id dentro**, e da
+  quel momento sono suoi e non si muovono piu'. Un pasto aggiunto a mano nasce
+  con un id vero (`p<uid>`), perche' quello puo' essere spostato subito.
+- **l'ordine per orario si applica dopo.** L'id nasce dalla posizione nel
+  file, quindi assegnarlo dopo `ordinaSlotOrari()` lo farebbe dipendere da un
+  ordinamento che cambia quando cambi un'ora.
+- **i registri vecchi si riportano, e senza spostare i numeri.** Una ricetta
+  che compariva in due pasti aveva **una chiave sola condivisa** — ma quello
+  che si vedeva, e che i totali di quel giorno hanno registrato, e' che
+  **erano spuntati tutti e due**. La migrazione copia percio' il valore su
+  ogni pasto che usava quella ricetta: verificato, `consumed()` di quel giorno
+  fa lo stesso identico numero di prima. E i valori composti si duplicano
+  **per copia**, non per riferimento: altrimenti correggere le porzioni di uno
+  cambierebbe anche l'altro, cioe' il bug rientrerebbe dalla porta della
+  migrazione.
+
+### Il piano e' un modello, il diario e' un fatto
+
+E per molto tempo la seconda meta' non era vera. `consumed(k)` rileggeva la
+ricetta **dal piano di adesso** a ogni conto, e `S.log[k].pasti[code]` era un
+semplice `true`. Conseguenza: correggere una ricetta oggi — o riassegnare uno
+slot della settimana — **riscriveva mesi di storico**. Una pasta portata da
+749 a 900 kcal spostava all'indietro tutte le giornate in cui era stata
+spuntata, e con loro il bilancio energetico da cui il filtro di Kalman stima
+il dispendio: cambiare una ricetta cambiava il *metabolismo misurato*.
+
+Peggio ancora con la settimana: la spunta e' indicizzata sul **codice della
+ricetta**, quindi riassegnando la cena del mercoledi la spunta vecchia restava
+orfana e il pasto **spariva** da `consumed()` e dalla scheda Oggi. Un pasto
+registrato che scompare dal registro senza che nessuno lo abbia tolto.
+
+**Si congela al momento della spunta**, e solo quel pasto: e' l'istante in cui
+una riga smette di essere *"quello che dovrei mangiare"* e diventa *"quello
+che ho mangiato"*. `S.log[k].fatti[code]` tiene nome, slot, ora e l'elenco
+degli ingredienti com'erano. Ticchi la colazione e la colazione si fissa; se
+piu' tardi correggi la ricetta del pranzo, il pranzo di oggi — che non hai
+ancora spuntato — segue la versione nuova, che e' giusto. Togliendo la spunta
+la copia se ne va con lei.
+
+Tre conseguenze che tengono in piedi il resto:
+
+- **`slotsGiorno(k)`** unisce gli slot del piano con quelli spuntati che il
+  piano non ha piu', cosi' un pasto registrato non sparisce mai. Ci passano
+  Oggi, `consumed()`, la scheda della giornata e il resoconto in PDF;
+- **`ricettaGiorno(code, k)`** e' l'accessore unico: copia congelata se c'e',
+  ricetta del piano altrimenti. Non serve solo ai conti — la scheda dice
+  *"cosa e' cambiato rispetto al piano"*, e su un giorno congelato quel
+  confronto va fatto con la ricetta di allora, o basta correggere il piano
+  perche' una giornata mai toccata dichiari "modificato +150 kcal";
+- **gli strati del giorno non si duplicano.** Porzioni, sostituzioni e
+  aggiunti stanno gia' nel diario e continuano ad applicarsi *sopra* la copia
+  congelata. Congelare i macro finali invece degli ingredienti avrebbe voluto
+  dire ricalcolare la copia a ogni modifica di uno strato — e dimenticarne uno
+  e' esattamente l'errore gia' fatto una volta con `mealMGiorno()`.
+
+**Cosa NON si congela, ed e' una scelta:** i valori nutrizionali degli
+alimenti. Collegare un prodotto reale a un alimento *deve* correggere i conti
+ovunque — e' una funzione dichiarata, non un effetto collaterale — e li' la
+stima di prima era il numero sbagliato, non un fatto storico.
+
+**I registri vecchi continuano a valere.** Una spunta `true` senza copia legge
+la ricetta di adesso, cioe' si comporta come si comportava l'app prima: per
+quelle giornate la versione di allora non esiste piu', e inventarla sarebbe
+peggio che leggerne una approssimata.
+
+### Il doppio tocco non deve ingrandire la pagina
+
+Su iOS un doppio tocco su una pagina web zooma. In un'app dove si spuntano
+pasti, si tocca "+100 g" due volte di fila e si segnano serie fra una
+ripetizione e l'altra, quel gesto capita per sbaglio in continuazione.
+
+`touch-action: manipulation` toglie **solo** il doppio-tocco-per-zoomare, e
+come effetto secondario elimina il ritardo di 300 ms che Safari aspettava per
+capire se il secondo tocco stava arrivando: i bottoni rispondono subito.
+
+Quello che **non** si fa e' `user-scalable=no` nel viewport, che sarebbe la
+strada corta: quello toglie anche il pizzico, cioe' l'unico modo che ha chi ci
+vede poco di leggere una riga piccola. iOS peraltro lo ignora dalla 10 in poi,
+proprio per questo. E gli elementi che dichiarano `touch-action:none` per
+conto loro — la maniglia di trascinamento, il cursore del confronto fra due
+foto — restano come sono, perche' quella regola e' piu' specifica.
+
+### In avanti si guarda, non si scrive
+
+In Oggi la freccia in avanti non aveva un fondo: si poteva arrivare al 2027 e
+spuntare la colazione di un giovedi' che non e' mai esistito. Quel giorno
+sarebbe poi arrivato **con le caselle gia' segnate**, e il registro avrebbe
+detto una cosa che non e' successa.
+
+La risposta pero' non e' bloccare: *cosa mangio domani* e' una domanda
+legittima, e il piano esiste anche per rispondere a quella. Quindi in avanti
+si va, ma **in sola lettura** — spunta disattivata, niente sostituzioni,
+niente porzioni, niente fuori piano, e una carta in testa che dice che quella
+giornata non e' ancora arrivata.
+
+Il limite e' **sette giorni**, e non per prudenza: il piano e' settimanale,
+quindi l'ottavo giorno mostra esattamente quello che mostrava il primo. Oltre
+si scorrerebbe la stessa settimana all'infinito credendo di vedere altro.
+
+Il Diario resta invece bloccato a oggi, e la differenza non e' un'incoerenza:
+il Diario **e'** il registro, e per il futuro non ha niente da far vedere.
+
+### La bioimpedenza batte la formula, ma non per sempre
+
+Il grasso corporeo usciva da una sola strada: la formula della Marina su vita,
+collo e altezza, con i suoi tre o quattro punti di errore dichiarati in ogni
+schermata. Ma chi passa in farmacia e sale su un impedenziometro **una misura
+ce l'ha**, e l'app non aveva un posto dove metterla.
+
+Adesso ce l'ha (`S.log[k].bia`), con tre decisioni:
+
+1. **Vale trenta giorni.** Una BIA e' un punto nel tempo: la vita si rimisura
+   ogni settimana e segue il corpo, una bioimpedenza di due mesi fa descrive
+   quello di due mesi fa. Dopo `BIA_GG` torna a valere la formula, e la carta
+   lo scrive invece di continuare a mostrare un numero vecchio come se fosse
+   di oggi.
+2. **Si prende la percentuale, non i chili.** Lo strumento stampa anche massa
+   magra, muscolo e acqua, e la tentazione era di usare la magra dichiarata —
+   e' quello che misura. Ma allora la massa grassa diventa *peso di oggi meno
+   magra della farmacia*, cioe' la differenza fra due bilance diverse in due
+   momenti diversi: misurato sul caso reale, 21,3% dichiarato con 54,2 kg di
+   magra su una pesata di 69,8 dava una grassa di 15,6 kg, che e' il **22,4%**
+   — la stessa tabella avrebbe scritto due percentuali diverse. La divisione
+   si fa sempre `peso di oggi x percentuale`; gli altri numeri restano nel
+   registro, dove servono a confrontare due BIA fra loro.
+3. **Il grafico della composizione la usa** nei giorni in cui c'e': sono gli
+   unici in cui quella serie ha una misura invece di una stima, e coprirli con
+   la formula butterebbe via il dato migliore.
+
+`fonte` vale `'bia'` o `'formula'` e la carta lo dice sempre. Non e' una nota a
+pie' di pagina: fra le due la differenza puo' essere piu' grande del
+cambiamento che stai guardando.
+
+### La composizione e' come si divide il peso
+
+La carta si chiamava "Composizione" e la prima riga era **Peso** — lo stesso
+numero che sta grande in cima alla stessa schermata, due carte sopra. Sotto,
+altre due righe che composizione non sono: vita su altezza e torace su vita
+sono **proporzioni**, e sono scese nella carta delle misure, sotto le
+circonferenze da cui escono.
+
+Quello che resta e' quello che la parola promette: come si divide il peso.
+Quattro righe — peso, grasso, magra, grassa — e sopra **due barre sulla stessa
+scala**, ora e target. La cosa che conta di una ricomposizione e' che il totale
+puo' restare fermo mentre le due parti si scambiano, e quattro numeri
+incolonnati non lo fanno vedere.
+
+**Il peso e' tornato**, ed e' giusto cosi': non e' un doppione della carta in
+cima ma **il totale di cui le altre due righe sono le parti**, e una divisione
+senza il totale costringe a sommarla a mente. Il doppione vero — quello che se
+n'e' andato — erano i rapporti fra circonferenze, che composizione non sono.
+
+### Le colonne di una tabella non si allineano da sole
+
+Sotto ORA, TARGET e MANCA i numeri cadevano ognuno per conto suo, e non era
+un caso isolato: e' la stessa classe `.cmp` usata da **dodici tabelle** —
+Corpo, misure, previsioni, obiettivo, bioimpedenza, cruscotto, target,
+giorno.
+
+La causa: `grid-template-columns: 1fr auto auto auto`. `auto` vuol dire "larga
+quanto il suo contenuto", e l'intestazione e ogni riga sono **griglie
+separate**: ognuna si dimensionava sui propri caratteri. "69,8" finiva sotto
+la parola ORA solo per coincidenza, e una riga con "-11,3 %" spingeva la sua
+colonna piu' in la' di tutte le altre. Il `min-width: 54px` che c'era metteva
+un pavimento, non un allineamento — e per giunta solo sulle righe e non
+sull'intestazione, che restava percio' piu' stretta di tutto il resto.
+
+Con tracce esplicite (`1fr 58px 58px 64px`) le quattro colonne cadono nello
+stesso punto in ogni tabella dell'app. Verificato misurando il bordo destro di
+ogni cella contro quello della sua intestazione: **zero righe disallineate**
+su tutte e dodici.
+
+### Un grafico del peso senza asse dice solo "sale"
+
+Il grafico del peso era l'unico dell'app disegnato a mano fuori dal toolkit, e
+si portava dietro la conseguenza: **nessuna griglia e nessun numero sull'asse**.
+Una curva senza scala dice la direzione e nasconde l'ampiezza — e siccome la
+scala si adatta ai dati, mezzo chilo e tre chili disegnano esattamente la
+stessa curva.
+
+Adesso ha la sua spalla a sinistra, quattro righe di griglia e i chili, con la
+stessa `niceTicks()` di tutti gli altri: valori tondi, o l'intervallo diviso in
+parti uguali stampa due volte "69" per due numeri diversi. E sotto, una riga
+dice da dove a dove arriva l'asse, perche' una scala che si adatta va letta
+prima della pendenza.
+
+### I contatori contavano un'altra cosa
+
+Sopra "La settimana in un colpo d'occhio" c'erano due numeri grossi: **cose a
+posto** e **da sistemare**. Contavano i messaggi di `analyse()` — che compaiono
+in fondo alla pagina — mentre la carta che intestavano ne mostra otto altre, le
+medie contro i target. Usciva "1 cose a posto / 2 da sistemare" sopra otto
+barre: tre numeri che non tornavano con niente di visibile, e per giunta
+"1 cose".
+
+Adesso contano **le otto voci di quella carta**, in tre stati: in linea, fuori
+target, senza dato. Il terzo non e' un riempitivo — e' la ragione per cui la
+somma non fa otto, ed e' anche la prima cosa da sistemare, perche' una media
+che non esiste non e' una media buona.
+
+Nello stesso giro i colori delle barre: erano tre — verde dentro, ambra sopra,
+**grigio sotto**. Ma il grigio in quest'app e' il colore di "non c'e' dato"
+(`--ink-3` e' anche il testo spento), quindi una media dell'acqua mezzo litro
+sotto il target si leggeva come una riga disattivata invece che come uno
+scarto. Il commento sopra la funzione diceva gia' la regola giusta — *il colore
+dice soltanto se sei dentro o fuori* — e il codice ne usava tre: adesso sono
+due, e da che parte sei lo dice la riga di testo che c'era gia'.
+
+### Il peso e' in Corpo, grande
+
+Stava terzo in una griglia di campi di testo. Ora e' la prima carta di Corpo,
+al posto della testata del target: numero grande al centro, `−` e `+` ai lati.
+
+Il passo e' **100 g**, che e' la risoluzione vera di una bilancia da casa:
+sotto quella cifra non c'e' informazione, c'e' il bicchiere d'acqua bevuto
+prima. Su una giornata ancora senza pesata il primo tocco **non incrementa
+niente**: appoggia il numero sulla tendenza a 7 giorni, che e' il valore piu'
+vicino al vero che l'app conosce, e da li' si aggiusta — inventare un
+incremento su un numero che non c'e' vorrebbe dire registrare una pesata che
+nessuno ha fatto.
+
+Toccando il numero si scrive per esteso, e li' **si sceglie anche il giorno**:
+il diario ha la sua navigazione, Corpo no, e una pesata segnata sulla data
+sbagliata resta dentro la tendenza per due settimane. Un dato che non si puo'
+correggere e' un dato falso permanente. Nel campo non ci va `nf()` (formatta
+69,4 col separatore e rileggerlo da' un altro numero) ma nemmeno il valore
+grezzo: una pesata importata puo' arrivare con dodici decimali, e un campo che
+dice `69,58359734839807` chiede di correggere una precisione che non esiste.
+
+La carta del target che stava in cima non e' stata sostituita da niente: i suoi
+numeri erano gia' tutti nella sagoma tratteggiata e nella colonna "Target"
+della tabella. La nota sulla loro provenienza — **stimati, non rilevati** — e'
+scesa sotto la figura, che e' dove la sagoma di riferimento si vede.
+
+### Timer, scarico, acciacchi
+
+- **Timer di recupero** (`timer.js`) — sopravvive ai cambi di schermata perché
+  sta in `localStorage`, e calcola il residuo da un timestamp invece di contare
+  i tick. Il bip suona solo con l'app in primo piano, e la UI lo dice
+- **Scarico** (`carico.js`) — tre segnali indipendenti e ne servono due: carico
+  acuto contro cronico sopra 1,35, forza ferma o in calo su ≥2 esercizi,
+  ≥6 settimane di fila senza una più leggera. `traiettoriaFatica()` fa in una
+  passata quello che `formaFatica()` rifarebbe da capo quaranta volte per muscolo
+- **Acciacchi** — li dichiara l'utente. Livello 2 toglie gli esercizi dove il
+  muscolo è primario, livello 3 anche quelli dove è secondario. L'avviso compare
+  dentro la scheda, dove stai per farli
+
+### Il peso, ripulito
+
+`peso.js` toglie dalla **tendenza** (non dal diario) due cose che non sono grasso:
+
+- **Pesate anomale**, riconosciute con mediana e MAD. Misurato: un 76,4 battuto
+  in mezzo a sessanta giorni intorno ai 69 spostava la tendenza di un chilo, che
+  dentro il bilancio energetico diventava **566 kcal al giorno** di dispendio
+  inventato. Soglia minima 1,2 kg — l'oscillazione giornaliera è reale — e
+  l'ultima parola resta all'utente
+- **Ciclo mestruale**, solo sui profili femminili. In luteale la ritenzione vale
+  fino a due chili. Non si prova a sottrarla — quanta sia non lo sappiamo — si
+  allarga l'incertezza dell'osservazione sulle finestre che cambiano fase: su
+  ventotto giorni ne tocca quattro e lascia stare le altre ventiquattro
+
+### Una lista della spesa non si legge, si cammina
+
+Era un elenco per categoria del file di dominio — legumi, cereali, verdura —
+con una spunta e un peso: l'ordine con cui i dati stanno **scritti**, non
+l'ordine in cui uno attraversa il negozio. E la dispensa era un foglio con
+dentro tutti i quarantaquattro alimenti del piano e un campo numerico per
+ciascuno: un modulo, e infatti restava vuoto.
+
+Guardando cosa fanno le app che questo mestiere lo fanno da anni — AnyList,
+Bring!, Apple Promemoria, Out of Milk — quattro cose ricorrono e valgono la
+pena di essere prese:
+
+| Da dove | Cosa |
+|---|---|
+| **AnyList** | l'ordine delle corsie si sistema **una volta** e la lista diventa il percorso |
+| **Apple Promemoria** (dalla iOS 13) | quello che prendi **scende in fondo**: davanti resta solo quello che manca |
+| chiunque | una **barra di completamento**, l'unica cosa che su una lista lunga dice "ci siamo quasi" |
+| **Bring!** | un **colore per corsia**, cosi' scorrendo si riconosce la sezione prima di leggerla |
+
+Due cose invece le facciamo meglio, e sono quelle che nessuna di quelle app
+puo' fare perche' non sa cosa mangi:
+
+1. **le quantita' non le scrivi tu.** Escono dalla somma delle ricette
+   assegnate ai sette giorni — che e' il motivo per cui la pagina esiste;
+2. **la dispensa chiude il cerchio.** "Ne ho gia'" sta sulla riga della spesa,
+   dove la domanda nasce — davanti allo scaffale, o davanti alla lista prima
+   di uscire — e non dentro un modulo da compilare a freddo. E a fine spesa
+   quello che hai preso **entra in dispensa con un tocco**, cosi' la lista
+   della settimana dopo lo sottrae.
+
+Su quest'ultima il file di progetto e' sempre stato netto — *"un inventario
+che non torna e' peggio di nessun inventario"* — e resta valido: la dispensa
+**non** si scala da sola mentre spunti le ricette. Ma "ho comprato queste
+cose" e' un fatto che dichiari tu, non una deduzione, e quella meta' del
+cerchio si poteva chiudere senza tradire la regola.
+
+Dettagli che non sono cosmetici:
+
+- l'ordine delle corsie sta in `S.settings.corsie` e **regge i cambi di
+  piano**: le categorie nuove finiscono in fondo, quelle sparite si ignorano
+  invece di lasciare buchi;
+- il colore di una corsia **si calcola dal nome** invece di stare in una
+  tabella: una categoria nuova nel piano ha subito la sua tinta, e nessuno
+  deve ricordarsi di aggiungerla da qualche parte;
+- l'app conosce **un negozio solo**, e la nota lo dichiara invece di far
+  scoprire il limite a chi ne frequenta due;
+- la dispensa dice **per quanto ti basta** — "copre 2,4 settimane", "copre 4
+  giorni su 7" — che e' un conto che nessuna app di inventario fa, perche'
+  per farlo bisogna sapere cosa mangi.
+
+### Cercare un alimento su internet
+
+Il bottone sta in **Piano → Cosa mangi → Aggiungi un alimento**, e interroga
+Open Food Facts. Tutto il dialogo con quell'archivio — codice a barre e ricerca
+per nome — sta in `prodotti.js`: è l'unico punto da cui esce una richiesta di rete.
+
+**L'endpoint non è intercambiabile**, e la scelta va rispettata:
+
+| Endpoint | Verdetto |
+|---|---|
+| `/api/v2/search` | accetta `search_terms` ma non ordina davvero: cercando "fagioli borlotti" torna un formaggio marocchino su 4,7 milioni di risultati |
+| `search.openfoodfacts.org` | il motore nuovo, cerca benissimo, ma **non manda `Access-Control-Allow-Origin`**: dal browser la risposta è inagibile |
+| `/cgi/search.pl` | cerca bene, manda `ACAO: *`, e il preflight con `X-User-Agent` passa e resta in cache venti giorni. **L'unico dei tre utilizzabile** |
+
+`X-User-Agent` perché il `User-Agent` vero il browser non lo lascia impostare, e
+Open Food Facts chiede alle app di identificarsi. La ricerca parte solo su
+richiesta esplicita, mai a ogni tasto: l'archivio chiede di stare sotto le dieci
+ricerche al minuto e un autocomplete le brucerebbe in cinque secondi.
+
+**`coerenza()` è la parte che conta.** I valori li inseriscono le persone e
+sbagliano: nei test un petto di pollo dichiarava 30 kcal con 20 g di proteine.
+Si ricalcolano le calorie dai macro (4/4/9, più 2 per le fibre, che in etichetta
+UE stanno fuori dai carboidrati) e si confronta: sotto il 15% è normale, sopra
+il 30% qualcuno ha sbagliato a digitare. Quelli incoerenti restano visibili ma
+con l'etichetta "non torna" e ordinati in fondo — non si nascondono, si segnalano.
+
+Un alimento importato da lì nasce `fonte: "stima"`, non `verificato`: un archivio
+collaborativo non è l'etichetta sulla confezione. Diventa `verificato` solo se
+l'utente tocca "li ho controllati sulla confezione".
+
+### Cercare un esercizio su internet
+
+Il bottone sta in **Gym → I tuoi esercizi**. La fonte è
+[free-exercise-db](https://github.com/yuhonas/free-exercise-db) (Unlicense,
+pubblico dominio), un JSON statico su jsDelivr. Il client sta in `palestra.js`,
+accanto all'editor che riempie, come quello di Open Food Facts sta in `prodotti.js`.
+
+**Perché un file statico e non una API.** Provate tutte e tre prima di scegliere:
+
+| Fonte | Verdetto |
+|---|---|
+| wger.de | API REST vera, muscoli strutturati, pure l'italiano. Ma `/exercise/search/` oggi risponde 404 (l'hanno tolto) e `?search=` viene ignorato: torna comunque tutti e 862. Senza ricerca lato server resta scaricare l'intero catalogo, che con descrizioni, immagini e traduzioni pesa **5,5 MB** |
+| ExerciseDB, API Ninjas | Vogliono una chiave. Qui non c'è un server dove nasconderla, e una chiave nel codice della pagina è una chiave regalata |
+| free-exercise-db | 873 esercizi, `ACAO: *`, **168 KB compressi**. Nessuna API da farsi deprecare sotto i piedi |
+
+E soprattutto ha i due campi che servono a *questa* app: i muscoli primari e
+secondari, che alimentano mappa muscolare, volume, forma-fatica e il filtro
+degli acciacchi; e `mechanic` (compound/isolation), da cui esce il `tipo` e
+quindi il recupero consigliato. **wger il secondo non ce l'ha.**
+
+Si scarica una volta, si buttano istruzioni e immagini (il 90% del peso:
+da 1 MB a 89 KB) e si tiene in `localStorage` sotto `dieta.exdb`. Da lì in poi
+la ricerca è locale — filtra mentre scrivi, e funziona offline.
+
+**I due gruppi senza casa.** La fonte ha 17 muscoli, il modello di questa app
+ne ha 13: `adductors` e `neck` non hanno corrispondenza. Non vanno infilati a
+forza dentro glutei o trapezi — sporcherebbero la mappa e il conteggio del
+volume, che sono la ragione per cui i muscoli esistono qui dentro. Si segnala
+e si fa scegliere; il salvataggio pretende già almeno un primario, quindi non
+si può salvare un esercizio che non colora niente.
+
+Serie e incrementi **non sono nella fonte**: escono da attrezzo e `mechanic`
+(multi 6–10, isolamento 10–15; bilanciere +2,5, manubri +2, macchina +5),
+in linea con i valori già in `data/palestra.json`. Sono valori di partenza,
+e la UI lo dice.
+
+Nel farlo è saltato fuori un bug vecchio: gli esercizi tuoi nascevano con
+`tipo: 'mio'`, che nessuna parte del codice sa leggere — `recupeoConsigliato()`
+li trattava perciò **sempre da isolamento**, 75 secondi anche su uno stacco.
+Ora l'editor ha il selettore multi/isolamento e il tipo si salva davvero.
+
+### L'autoscatto, e perché serviva
+
+Le foto dei progressi si fanno **da soli**, in casa. Con `<input capture>` si
+finisce nella fotocamera di sistema: il timer c'è, ma va trovato, e a ogni
+scatto si ripassa da lì. Quindi la fotocamera è nostra — `getUserMedia` per
+l'anteprima, conto alla rovescia, fotogramma su canvas, poi la stessa
+`comprimi()` di prima. Il file picker resta per la galleria e come riserva.
+
+Tre dettagli che su iPhone non sono facoltativi:
+
+- **`playsinline`** (attributo *e* proprietà), o Safari apre il video a schermo
+  intero e l'anteprima sparisce dietro il player
+- le tracce vanno **fermate a mano** alla chiusura, o la spia della fotocamera
+  resta accesa
+- l'anteprima frontale si specchia in CSS perché è così che ci si aspetta di
+  vedersi, ma **lo scatto si salva non specchiato**: due foto a mesi di distanza
+  devono essere confrontabili, e un ribaltamento in mezzo rovinerebbe il
+  confronto a cursore
+
+Il conto alla rovescia riusa `recBip()` di `timer.js`, e come quello suona solo
+con l'app in primo piano — la UI lo dice.
+
+### La fotocamera e' una schermata, non un riquadro dentro un foglio
+
+Per un po' la fotocamera e' vissuta **dentro un foglio**: un riquadro 3:4
+alto meta' schermo, e sotto i bottoni, le pastiglie delle guide, il cursore
+della trasparenza e tre paragrafi di spiegazione. Funzionava, e chiedeva la
+cosa sbagliata: **quando si inquadra si guarda l'immagine**, e un'anteprima
+grande come un francobollo in mezzo a un modulo non si guarda. Con il piatto
+davanti era anche peggio — li' la domanda e' "ci sta tutto dentro?", e a
+quella risponde solo l'immagine grande.
+
+Adesso e' quella che tutti sanno gia' usare, perche' non c'e' niente da
+imparare: **l'anteprima e' lo schermo**, i comandi ci stanno sopra, e in
+fondo c'e' il cerchio bianco. Le opzioni non spariscono: stanno dietro le
+pastiglie in alto e si aprono in una riga sola, come il timer e il flash
+della fotocamera di sistema.
+
+**Una schermata, due mestieri**, e cambia solo quello che deve cambiare:
+
+| | `progressi` (Chi sei › Foto) | `piatto` (l'assistente) |
+|---|---|---|
+| perche' | ti fotografi da solo, in casa | hai il piatto davanti |
+| timer | **serve**: devi tornare al tuo posto | no: il telefono ce l'hai in mano |
+| guida | ultimo scatto, sagoma, griglia | la **cornice** del piatto |
+| fotocamera | quasi sempre la frontale | quasi sempre la posteriore |
+| la riga sotto | *Mettiti in posa* | *Inquadra bene il piatto* |
+
+Quattro decisioni che non sono cosmetiche:
+
+1. **Si salva quello che si vede.** L'anteprima e' `object-fit: cover`, quindi
+   ai lati (o sopra e sotto) del fotogramma c'e' sempre una parte che sullo
+   schermo non c'e'. Salvarla vuol dire consegnare una foto **diversa da
+   quella che si e' inquadrata** — e su una foto dei progressi, dove il punto
+   e' che due scatti siano confrontabili, sarebbe proprio il difetto che le
+   guide esistono per evitare. `camfRitaglio()` rifa' il conto che fa il CSS,
+   ed e' una funzione a se' perche' e' l'unica riga di calcolo del file e
+   l'unica che si puo' provare senza una fotocamera. Misurato su tre
+   proporzioni: il ritaglio ha sempre la stessa proporzione del riquadro, e
+   il centro resta al centro.
+2. **La cornice del piatto sono quattro angoli, non un rettangolo chiuso.** Un
+   bordo intero invita a far combaciare il piatto col bordo, e non e' quello
+   che serve: serve che il piatto ci stia **dentro** tutto. Ed e' disegnata in
+   CSS e non in SVG, perche' deve restare **quadrata** a qualunque proporzione
+   di schermo — con `preserveAspectRatio: none` gli angoli si allungavano in
+   verticale su un telefono stretto e alto, e quattro angoli di forma diversa
+   non sembrano piu' una cornice.
+3. **Il pannello delle opzioni si apre in alto, mai in fondo.** In fondo c'e'
+   il cerchio bianco: un pannello che lo spinge piu' in giu' lo sposta da
+   sotto il pollice proprio mentre si sta per scattare. E si apre dove sta la
+   riga d'aiuto, che intanto sparisce — due testi bianchi sovrapposti non si
+   leggono ne' l'uno ne' l'altro.
+4. **Un permesso negato non e' un vicolo cieco.** Il cerchio e il bottone per
+   girare si spengono, ma la galleria resta viva, e il motivo vero — il
+   permesso, oppure un indirizzo non sicuro — si scrive invece di lasciarlo
+   indovinare.
+
+Restano le regole di prima, che non sono cambiate perche' e' cambiata la
+schermata: la frontale **si vede specchiata e si salva dritta**; il conto alla
+rovescia si conta sui secondi veri e non sui tick, perche' iOS strozza
+`setInterval`; e i tre bip finali si sentono solo con l'app in primo piano.
+
+E `camfChiudi()` sta attaccato a `hashchange` e `pagehide`: **una spia della
+fotocamera che resta accesa e' la cosa peggiore che questa schermata possa
+lasciarsi dietro.**
+
+### "Quando apro la fotocamera e' zoomata"
+
+Segnalato cosi', ed era vero — solo che non era uno zoom: era un **ritaglio**,
+e ne arrivavano due, uno sopra l'altro.
+
+Il primo lo faceva il CSS. L'anteprima era larga quanto lo schermo e alta
+altrettanto, con `object-fit: cover`: un fotogramma 3:4 dentro un riquadro
+alto e stretto perde i fianchi. Misurato su un telefono da 390x844, con la
+barra dei comandi in fondo: **il 19% della larghezza fuori dai bordi**,
+cioe' un ingrandimento di 1,24x che nessuno ha chiesto. Su uno schermo piu'
+lungo peggiora ancora.
+
+Il secondo lo faceva il **driver**, e questo era il piu' insidioso: la
+richiesta diceva `width 1280, height 1706`, cioe' anche **che forma**. Una
+fotocamera che quella proporzione non ce l'ha nativa la ottiene ritagliando
+il sensore prima ancora di consegnare il fotogramma — e quel taglio si
+sommava all'altro. Adesso si chiede solo **quanto grande** (`width: 1440`):
+la forma la decide il dispositivo.
+
+E il riquadro si adatta a lei. `camfProporzione()` lo dimensiona sul
+fotogramma che sta arrivando — il piu' grande che ci sta **tutto** dentro il
+palco — quindi `cover` non ha piu' niente da tagliare e quello che si vede e'
+l'inquadratura intera. Il nero sopra e sotto non e' spazio sprecato: e'
+esattamente quello che fa la fotocamera di sistema, ed e' dove stanno i
+comandi.
+
+Tre dettagli che non sono cosmetici:
+
+- **la misura si scrive in pixel, non con `aspect-ratio`.** Con la larghezza
+  fissa al 100% quella proprieta' rispetta la forma finche' l'altezza ci sta e
+  la schiaccia quando non ci sta — cioe' proprio nel caso che deve reggere,
+  uno schermo basso o un fotogramma molto verticale. `min()` fra i due fattori
+  e' il conto giusto, ed e' due righe;
+- **si rimisura girando la fotocamera e ruotando il telefono**: la frontale e
+  la posteriore non danno lo stesso fotogramma, e un `resize` cambia il palco
+  sotto il riquadro;
+- **`camfRitaglio()` resta dov'era.** Adesso non taglia quasi mai niente, ma e'
+  lui che tiene la promessa di sempre — si salva quello che si vede — nel caso
+  in cui il palco costringa comunque a un ritaglio.
+
+Nota sull'attrezzatura, non sul codice: in questo headless **il fotogramma non
+arriva mai** (`videoWidth` resta 0 anche con `--use-fake-device-for-media-stream`)
+e i rettangoli non si aggiornano piu' dopo il primo calcolo di layout. La forma
+si prova percio' sul conto e sui valori scritti (`style.width`), non sui
+`getBoundingClientRect()`: 1080x1440 dentro un palco 492x1643 da' 492x656,
+1440x1080 da' 492x369, 1080x1920 da' 492x875 — tutti dentro il palco, tutti
+con la proporzione della sorgente.
+
+### Le guide di inquadratura
+
+Il problema delle foto dei progressi non è la qualità dello scatto: è che fra
+una e l'altra cambia la distanza, l'altezza del telefono e l'angolo. Il
+confronto a cursore lo rende impietoso — se l'inquadratura balla sembra
+cambiato il corpo quando è cambiato il fotografo.
+
+Tre guide sopra l'anteprima, in ordine di quanto servono:
+
+1. **Fantasma** — l'ultimo scatto di quella posa in trasparenza. È quello che
+   conta: ti allinei alla foto di prima e l'inquadratura torna identica senza
+   ricordare niente. È quello che fanno le app dedicate all'allineamento, ed è
+   il default
+2. **Sagoma** — la silhouette di `data/corpo.json`, per il primo scatto quando
+   un fantasma non c'è ancora. Sulla posa **di lato** la nota avvisa che quella
+   figura è di fronte: una sagoma laterale non esiste nella sorgente, e far
+   combaciare una posa di profilo con una figura frontale sarebbe peggio che
+   niente
+3. **Griglia** — i terzi, più due tacche dove far cadere testa e piedi: la
+   distanza dal telefono è ciò che cambia di più
+
+L'opacità è regolabile perché su una foto scura il fantasma sparisce e su una
+chiara copre l'anteprima.
+
+### Prendere le misure
+
+Il problema delle circonferenze non è scrivere il numero: è prenderlo **sempre
+nello stesso punto**. Due centimetri di scarto fra una volta e l'altra sono più
+grandi di qualunque cambiamento reale in un mese, e il grafico diventa rumore.
+
+Perciò `sheetMisura()` mette prima **come** si misura e **dove**, e solo dopo il
+campo. Le istruzioni stanno in `data/dieta.json` (`come`, `min`, `max` su ogni
+voce di `misure`): sono contenuto di dominio come i 44 alimenti, non copy della
+UI. `figuraPunto()` disegna una sagoma neutra con il metro tratteggiato alla
+quota giusta — le coordinate `x`/`y` erano già nel file e non le usava nessuno.
+
+`seq` fa il giro completo di tutte e sei senza tornare al menu ogni volta, con
+±0,5 cm a portata di pollice. Un valore fuori dall'intervallo plausibile non
+viene rifiutato — magari è vero — ma viene detto, perché una misura sbagliata
+resta nei grafici per mesi e sposta anche la stima del grasso.
+
+### "Il video dell'esecuzione" — cosa esiste davvero
+
+**Non esiste una fonte di video usabile.** Verificato prima di rinunciarci:
+wger ha 78 video su 862 esercizi (il 9%), e sono `.MOV` da 34–60 MB l'uno.
+Sessanta megabyte per guardare come si fa uno stacco, su rete dati, non è una
+funzionalità. Le librerie a pagamento vogliono una chiave, e non c'è un server
+dove nasconderla.
+
+Quello che c'è, e per **tutti e 873** gli esercizi, sono due fotogrammi —
+partenza e arrivo, ~70 KB l'uno — dallo stesso `free-exercise-db` del catalogo.
+Alternati ogni 900 ms fanno vedere il movimento. Non è un video, e la UI **non
+lo chiama così**: lo dice, e offre un link a YouTube che apre fuori dall'app.
+
+Il collegamento esercizio → fotogrammi sta in `S.palestra.esec` e si fa una
+volta. Gli esercizi del catalogo di base hanno nomi italiani: indovinare
+l'accoppiamento a tentativi produrrebbe l'esecuzione **sbagliata**, che è peggio
+di nessuna esecuzione. Chi importa dal catalogo online se lo porta dietro da
+solo (`exdbId`).
+
+### Le medie arrivano a oggi
+
+Per un periodo le medie si sono fermate a ieri, per una ragione vera: la
+giornata in corso e' a meta' e infilarla nella media la tira giu' ogni mattina.
+
+Il prezzo era pero' piu' alto del problema. La media non corrispondeva ai dati
+disegnati sul grafico sopra di lei, e su sette giorni escluderne uno cambia il
+numero di un settimo senza che si veda perche'. Una media bassa al mattino e'
+un fastidio; una media che non si puo' verificare contando le barre e' un
+numero di cui non ci si fida.
+
+Vale per `mediaPeriodo()` (che alimenta sia la riga di riepilogo sia la linea
+disegnata), per il riquadro delle calorie medie e per `costanze()`. Se si
+cambia idea vanno cambiati **tutti e tre**: una pagina che conta fino a ieri e
+una che conta fino a oggi danno due numeri diversi per lo stesso periodo, e non
+si capisce perche'.
+
+Restano fermi i concetti che si chiamano per nome "chiusi" — la settimana
+chiusa della revisione, le medie degli ultimi sette giorni chiusi in Analisi —
+perche' li' il fatto che il periodo sia finito e' il punto.
+
+### Il periodo di riferimento
+
+La settimana resta l'unita' su cui la revisione e' costruita, e resta il
+default: il giorno da solo e' rumore, il mese arriva tardi per correggere. Ma
+il ritmo settimanale non copre tutto — le due settimane di ferie, il mese fra
+due visite, i dieci giorni di uno scarico sono periodi veri, e tagliarli a
+fette di sette li spezza a meta'.
+
+`revPeriodoAttivo()` restituisce sempre un oggetto con la stessa forma —
+`giorni`, `prima`, `da`, `a`, `n` — e tutto il motore lavora su quello:
+`revMetriche(per)`, `revDiagnosi(per)`, `revVerdetto(diag)`. Le funzioni non
+prendono piu' una data e non sanno se stanno guardando una settimana.
+
+Tre conseguenze che non sono dettagli:
+
+1. **Il confronto e' con il periodo di pari lunghezza subito prima.** Mettere
+   venti giorni contro i sette precedenti direbbe che hai camminato tre volte
+   tanto: vero, e senza alcun significato.
+2. **Le soglie che erano su sette si scalano.** L'obiettivo di sedute e' per
+   settimana e si moltiplica per `n/7`; la soglia del registro e' meta' dei
+   giorni, non tre. Lasciarle fisse avrebbe detto "sotto" a ogni periodo corto
+   e "sopra" a ogni periodo lungo.
+3. **L'impegno resta settimanale** e sparisce sui periodi scelti a mano: e' un
+   patto che si chiude di domenica, e su "dal 3 al 19" non c'e' niente a cui
+   agganciarlo. Stessa cosa per `revisioneLetta`, che continua a valere solo
+   per la settimana — chiudere un periodo scelto a mano non deve zittire la
+   revisione di domenica.
+
+Nel cruscotto la stessa scelta e' `datiFine` accanto a `datiRange`: sposta la
+**fine** del periodo, e con lei si spostano anche i riquadri di testa —
+tendenza del peso, composizione, costanza. Muovere i grafici e lasciare i
+riquadri su "adesso" darebbe una pagina che parla di due momenti diversi.
+
+Dettaglio di lingua, non di codice: le preposizioni articolate stanno nel
+periodo (`confronto`, `su`, `primaNome`). "Rispetto a la settimana prima" e'
+il genere di sbavatura che fa sembrare l'app tradotta da un'altra.
+
+### Una quota non dice quanto, un numero non dice come
+
+"Da dove vengono le calorie" e' disegnato **in percentuale** — e' il suo
+mestiere, dice com'e' fatta la giornata — ma la riga della media sotto
+riportava i valori grezzi in kcal. Due letture diverse nella stessa carta, e
+nessuna delle due completa: la quota non dice quanto e' grande la giornata, il
+numero non dice com'e' divisa. Due giornate con la stessa torta possono essere
+una a 180 g di carboidrati e l'altra a 320.
+
+Adesso la riga porta tutti e due: `Carboidrati 1120 kcal 48%`.
+
+Nel farlo e' saltato fuori un errore di denominatore che c'era da sempre: le
+serie riportano **zero** nei giorni senza dati, e la media di ogni fascia si
+faceva su tutto il periodo mentre il totale si mediava solo sui giorni pieni.
+Su venti giorni registrati in novanta le tre quote sommavano **70%** invece di
+100, e le medie in kcal erano piu' basse del vero di tutto il rapporto fra i
+due denominatori — 364 kcal di proteine invece di 520. Adesso numeratore e
+denominatore guardano gli stessi giorni.
+
+### Tutti i macro, non solo due
+
+Per molto tempo l'app contava bene le calorie e le proteine, teneva d'occhio le
+fibre, e di carboidrati e grassi diceva solo la fetta nella torta della
+ripartizione. Il pasto su Oggi mostrava "635 kcal / 23 P" e basta; la revisione
+li ignorava; l'analisi non aveva una sola regola su di loro.
+
+Il caso che lo rende evidente si vede a colpo d'occhio nel cruscotto: calorie
+2500 su un target di 2482, proteine 132 su 135, fibre 35 su 38 — tutto in
+linea — e sotto **carboidrati a −77 g e grassi a +34 g**. Il totale tornava
+perche' i due errori si compensavano, e nessuna schermata lo diceva.
+
+Quindi ora carboidrati e grassi sono voci di prima classe: barre su Oggi,
+grafico a barre proprio nel cruscotto (accanto alla ripartizione, che dice come
+sono divise le calorie ma non quanti grammi sono — due giorni con la stessa
+torta possono essere uno a 180 g di carboidrati e l'altro a 320), righe nella
+tabella e nel manubrio del resoconto, regole nell'analisi e nella diagnosi
+settimanale.
+
+Due dettagli che non sono cosmetici:
+
+- **`verso: 'target'`, non `'su'`.** Per le proteine "di piu'" e' quasi sempre
+  meglio; per carboidrati e grassi no, e conta lo scarto in tutte e due le
+  direzioni. Nove calorie al grammo di grasso comprimono i carboidrati senza
+  che il totale si muova.
+- **Il pavimento dei grassi** (`pavimentoGrassi()`): 0,6 g per kg di peso, il
+  bordo basso dell'intervallo prudenziale di letteratura. Sotto quella quota il
+  grasso smette di essere una voce del bilancio — e' il substrato degli ormoni
+  steroidei e il veicolo delle vitamine liposolubili — e infatti nella diagnosi
+  pesa 84, piu' delle calorie. Sopra il pavimento torna una voce come le altre
+  e scende a 54. Come tutte le costanti di letteratura di quest'app **non e'
+  una misura sull'utente, e la UI lo dice**.
+
+`macroRiga()` scrive i quattro numeri in un posto solo. E' nata perche' la
+stessa riga stava per comparire in cinque punti diversi, e cinque copie
+diventano prima o poi cinque ordini diversi degli stessi valori. E' compatta di
+proposito — `23P 81C 22G 9,4fib` sta in novanta pixel, la stessa riga con i
+puntini in mezzo ne prendeva centocinquanta, cioe' meta' della larghezza di un
+telefono per quattro numeri.
+
+Con dieci voci in lista il manubrio della revisione non poteva piu' fermarsi al
+135%: 116 g di grassi su un target di 82 fanno 141%, e chi stava oltre il bordo
+ci si appoggiava, indistinguibile da chi stava esattamente li'. Ora l'asse
+cresce coi dati fino al 220%, oltre quello taglia **e lo scrive**.
+
+### Il profilo ha una porta
+
+In cima a ogni schermata c'era l'icona della **fotocamera**, che portava dritta
+alle foto dei progressi: un pezzo solo dell'app promosso al posto piu' visibile
+che esista, mentre "chi sono, quale profilo sto usando, come mi vedo cambiare"
+non aveva nessuna porta. Ora quel posto e' del profilo, e le foto stanno dentro
+— dove uno le cerca quando pensa a se stesso, non in cima a ogni pagina.
+
+E il primo passo del piano ha cambiato ordine, che non e' gusto:
+
+1. **Le tue foto**, ma solo a profilo gia' compilato: e' l'unica parte della
+   schermata che parla di te e non dei tuoi dati. Al primo avvio sarebbe una
+   scatola vuota davanti a un modulo da riempire, quindi non c'e'.
+2. **I tuoi dati** — nome, eta', altezza, peso, sesso.
+3. **Cosa ti serve**, gli interruttori dei moduli, **per ultimi**.
+
+Prima i moduli venivano per primi: si apriva il primo passo del piano e la
+prima domanda era quali parti dell'app spegnere, cioe' una scelta che si puo'
+fare solo dopo aver capito cosa fanno.
+
+La carta delle foto non e' un doppione della scheda Foto: li' si scatta e si
+confronta, qui si vede se il filo c'e' ancora. Il numero che conta non e' quante
+foto hai ma **da quanto non ne fai una**, ed e' quello che mostra.
+
+### La scheda si segue, e a un certo punto si cambia
+
+Una scheda non e' un elenco di esercizi: e' un esperimento con una durata. La
+domanda a cui l'app non sapeva rispondere non era "cosa faccio oggi" — a quella
+rispondeva gia' — ma **"questa roba sta ancora funzionando, e quando la
+cambio"**.
+
+Una scheda si marca come **seguita** (`S.palestra.schedaAttiva`, una sola per
+volta) e da li' in poi `monitoraggioScheda()` guarda **solo le sedute fatte con
+quella** — l'aggancio c'era gia', ogni seduta salva `s.scheda`.
+
+Per ogni esercizio si confrontano **le prime due sedute con le ultime due**, non
+la prima con l'ultima: una giornata storta — dormito male, allenato di corsa —
+sposterebbe il verdetto da sola. Sotto le tre sedute non si dice niente, che e'
+la stessa regola delle proiezioni: con due punti la retta passa esatta e non
+significa nulla. "Fermo" e' entro l'1,5%, sotto quella soglia e' rumore di
+arrotondamento del RIR.
+
+**Se ne seguono piu' di una, ed e' il caso normale.** All'inizio la scheda
+seguita era una sola, e la frase "se ne segui un'altra, questa smette"
+descriveva un programma fatto di una seduta. Ma quasi nessuno si allena cosi':
+una scheda per giorno — Giorno 1 spinta, Giorno 2 tirata — e' il modo in cui le
+schede si scrivono davvero, e con una sola seguita l'app monitorava meta' del
+lavoro e chiamava "il programma" quella meta'.
+
+`S.palestra.schedeAttive` e' quindi un elenco (`schedaAttiva` dei backup vecchi
+ci entra da sola: un programma di una scheda non e' ambiguo). E il livello a cui
+si guarda una cosa non e' lo stesso per tutte:
+
+- **la progressione di un esercizio si legge dentro la sua scheda.** La panca
+  del Giorno 1 e quella del Giorno 2 sono due serie di dati diverse — carichi
+  diversi, giorni diversi, stato di freschezza diverso — e mescolarle in un
+  elenco solo fa sembrare doppioni due righe che non lo sono;
+- **il verdetto "quando lo cambio" si calcola sull'unione**, perche' un
+  programma si cambia intero. Una giornata sola che si e' fermata si sistema
+  dentro, senza buttare le altre.
+
+Le barre restano in scala **fra tutte le schede**, cosi' le giornate si
+confrontano fra loro: e' l'unico modo di vedere che il Giorno 2 non sale
+mentre il Giorno 1 tira.
+
+E `pochiDati` diventa "nessuna delle schede seguite ha tre sedute": un Giorno 2
+fatto una volta sola non deve tenere in ostaggio il verdetto su tutto il resto.
+
+**Quando cambiarla** sono tre segnali indipendenti e ne servono due — stessa
+regola dello scarico automatico, e per lo stesso motivo: uno solo si accende
+anche per caso.
+
+| Segnale | Quando si accende |
+|---|---|
+| Il tempo | oltre 8 settimane sullo stesso programma |
+| La progressione | meta' o piu' degli esercizi con dati sufficienti non e' salito |
+| Il tetto | la maggioranza degli esercizi chiede solo di caricare: la doppia progressione e' arrivata in fondo |
+
+Le otto settimane sono **un intervallo di pratica comune, non una misura**, e la
+UI lo dice — come le costanti di Banister e le soglie di HYROX. E c'e' una
+ragione per cambiare scheda che l'app non conosce e non prova a indovinare: che
+sia diventata noiosa. Anche quello e' scritto.
+
+### Cinque tab, e tre porte diventate una
+
+Le tab erano sette e il menu dieci voci, ma il numero non era il problema: il
+problema era che alla domanda **"come sta andando"** rispondevano tre schermate
+diverse, e bisognava sceglierne una prima di sapere cosa ci fosse dentro.
+
+Si sovrapponevano davvero, non per impressione:
+
+- la **costanza** era calcolata e mostrata due volte — un anello in Analisi e
+  una carta intera in Dati, lo stesso numero a due dita di distanza;
+- le **otto metriche contro il target** erano barre in Analisi e riga di
+  riepilogo sotto ogni grafico in Dati;
+- **due motori a regole** (`analyse()` e `revDiagnosi()`) giravano sugli stessi
+  dati producendo elenchi simili.
+
+Ora c'e' **Andamento**, una tab con tre viste in ordine di quanto sono
+impegnative: **Sintesi** (cosa non torna adesso), **Grafici** (i numeri giorno
+per giorno), **Revisione** (il giudizio su un periodo, e la sola cosa da
+cambiare). I due motori restano due, e la differenza e' il tempo: la sintesi
+guarda gli ultimi sette giorni chiusi e basta, la revisione un periodo scelto,
+con il confronto.
+
+`#/dati`, `#/analisi` e `#/revisione` **restano indirizzi validi** e aprono
+Andamento sulla vista giusta: ci puntano parecchi link dentro l'app, e
+riscriverli tutti per un cambio di navigazione e' il modo piu' sicuro di
+romperne uno.
+
+Intorno, la stessa regola applicata alle altre superfici:
+
+| Prima | Dopo |
+|---|---|
+| 7 tab | **5**: Oggi, Diario, Corpo, Gym, Andamento |
+| Spesa in tab bar | nel menu, prima voce, solo col piano acceso: e' una lista che si guarda una volta a settimana |
+| tendina del ⋯ con 3 voci | via: il ⋯ apre le impostazioni e basta |
+| ⋯ con Foto, Piano, Alimenti | via: stanno nel profilo, che e' dove uno le cerca |
+
+Le due superfici superstiti hanno una divisione netta: **l'icona della persona
+e' "tu"** (foto, chi sei, il piano, quello che mangi, i profili), **il ⋯ e'
+"l'app e i dati"** (spesa, promemoria, backup, versione).
+
+Quello che **non** e' stato unito: Diario e Oggi. Sembrano vicine — sono la
+stessa giornata — ma Oggi e' "cosa mangio adesso" e Diario e' "cosa registro
+sulla giornata": trecento righe di campi che dentro Oggi diventerebbero una
+pagina senza fondo.
+
+### La tab bar ha le icone
+
+Cinque parole in maiuscoletto, tutte lunghe uguali, tutte dello stesso grigio:
+per trovare "Corpo" bisognava **leggere**, ogni volta. Una barra di
+navigazione si usa col pollice senza guardarla, e quello che la rende
+riconoscibile a colpo d'occhio e' la forma, non il testo.
+
+Icona sopra, nome sotto. Le cinque stanno in `icone.js` con tutte le altre —
+stessa griglia 24×24, stesso tratto da 2, stesso arrotondamento: e' quello che
+le fa sembrare una famiglia invece di cinque disegni presi in giro. Il piatto
+con le posate era gia' li' (e' l'icona degli slot senza nome) e va a Oggi
+senza inventarne un'altra; il libro e' il Diario, la persona e' Corpo, il
+manubrio e' Gym, la curva che sale e' Andamento.
+
+**Il nome resta, e non e' ridondanza.** Cinque disegni senza parole
+costringono a impararli, e "Andamento" non ha un'icona ovvia: un grafico che
+sale puo' voler dire i dati, i progressi o le previsioni. Verificato che a
+**320 px** — il telefono piu' stretto in giro — le cinque voci stanno in
+64 px l'una e nessuna etichetta viene tagliata.
+
+Due dettagli:
+
+- **le icone si mettono una volta sola.** `route()` gira a ogni cambio di
+  schermata, e rifare cinque SVG ogni volta sarebbe lavoro buttato. Si guarda
+  se ci sono gia';
+- **il testo sta nell'HTML, non nel codice.** Se `icone.js` non ci fosse la
+  barra resterebbe quella di prima invece di svuotarsi.
+
+Resta il filo verde sopra la voce attiva: il colore da solo non basta a dire
+dove sei, ed e' la stessa ragione per cui i due tratteggi dei grafici sono
+diversi e non solo di due colori.
+
+**Lo stesso vale per il menu del profilo**, che erano sei righe di testo tutte
+uguali: chi ci torna per la decima volta le rilegge tutte e sei per trovare
+quella giusta. Adesso ognuna ha il suo quadratino a sinistra — persona,
+fotocamera, bersaglio, calendario, cappello da cuoco, elenco — ed e' **lo
+stesso quadratino da 34 px** delle liste di Oggi e dei prodotti: stessa
+taglia, stesso raggio, stessa tinta. Due misure diverse per la stessa cosa in
+due fogli si vedono, ed e' il motivo per cui `.nav-r .ic` copia `.ex-b .ic`
+invece di inventarsi una sua misura.
+
+### Il menu del ⋯ era un muro di testo
+
+Segnalato cosi': *"il menu che si apre e' pieno di informazioni"*. Erano dieci
+bottoni larghi quanto lo schermo, ognuno seguito da un paragrafo di tre o
+quattro righe — perche' esiste il file `.ics`, perche' nessuna pagina web puo'
+leggere Salute, cosa succede se svuoti Safari. Sono tutte cose vere e vale la
+pena averle scritte; tutte insieme pero' fanno **un muro di testo davanti a un
+elenco di dieci voci**, e un elenco che va letto tutto per trovarne una non e'
+un elenco, e' una pagina. Il foglio era alto oltre 1200 px.
+
+Tre mosse:
+
+1. **la forma delle liste dell'app** — icona, nome, una riga, chevron: la
+   stessa `.nav-r` del menu del profilo, con lo stesso quadratino da 34 px di
+   Oggi e dei prodotti. Dieci righe alte 69 px invece di dieci blocchi alti
+   centoventi;
+2. **una riga sola per voce, e dice cosa fa, non perche' esiste.** Il perche'
+   non si perde: sta gia' dentro la schermata che si apre, che e' il momento
+   in cui serve. Chi tocca *"Passi e sonno dal telefono"* trova li' la
+   spiegazione del Comando; chi non la tocca non aveva bisogno di leggerla;
+3. **tre gruppi** — la spesa, i tuoi dati, l'app — perche' dieci voci in fila
+   si scorrono e basta.
+
+Quello che **non** e' diventato una riga di descrizione, ed e' voluto: la data
+dell'ultimo backup e la versione in uso. Sono **stato**, non spiegazione — la
+prima e' la sola cosa che dice se quella voce ti riguarda oggi — e stanno a
+destra, dove si leggono scorrendo senza aprire niente.
+
+Una cosa e' rimasta dov'era ed e' un guadagno: *"Le foto, a parte"* sta
+**accanto** a "Esporta il backup", e il suo sottotitolo e' *"nel backup non ci
+sono"*. Prima quell'informazione viveva in fondo al foglio dell'import, cioe'
+dopo — e chi esporta e chiude non ci arrivava mai.
+
+### La topbar ha un centro, e due lati con un mestiere
+
+Il titolo stava a sinistra e le due icone tutte e due a destra, appiccicate:
+un lato pieno e uno vuoto, e due bottoni che fanno cose lontanissime
+— "tu" e "l'app" — a tre millimetri l'uno dall'altro, cioe' alla distanza a
+cui il pollice sbaglia.
+
+Adesso: **tre puntini a sinistra, titolo al centro, profilo a destra.** Il
+titolo dice dove sei e sta dove si guarda per saperlo; le due porte stanno
+agli angoli opposti, che e' anche il modo di dire che non sono la stessa cosa.
+
+Non e' un flex con `space-between`: con quello il titolo si mette al centro
+**dello spazio che avanza**, che non e' il centro dello schermo, e basta un
+bottone piu' largo dell'altro per vederlo storto. Sono tre colonne di griglia
+con le due laterali larghe uguali — misurato, lo scarto fra il centro del
+titolo e il centro della barra e' di 0,0 px — e il titolo lungo taglia con i
+puntini invece di spingere via le icone.
+
+### Una voce deve arrivare dove dice
+
+`location.hash = '#/piano'` scritto quando sei **gia'** su `#/piano` non emette
+`hashchange`: il router non ridisegna, il foglio si chiude, e sullo schermo
+resta esattamente quello che c'era. Da fuori e' un bottone rotto.
+
+Succedeva a meta' delle voci: "Il piano" dal piano, "Lista della spesa" dalla
+spesa, "Corpo" da Corpo. Alcune chiamate se lo cavavano chiamando `route()`
+subito dopo, altre no, e quale delle due dipendeva da chi aveva scritto la
+riga.
+
+`apri(hash)` e' l'unico modo di cambiare pagina: se l'indirizzo e' diverso lo
+scrive, se e' lo stesso chiede il disegno. **Ventisette navigazioni** in dodici
+file passano da li'. Restano fuori due casi, e per un motivo: l'avvio (`if
+(!location.hash)`, dove il router parte comunque dopo) e l'indirizzo con la
+query dell'import da Salute, che rieseguito rifarebbe l'importazione.
+
+### Il profilo nomina cinque schermate
+
+Le voci erano quattro e due erano etichette, non destinazioni: **"Il piano"**
+apriva l'elenco dei passi — da cui sceglierne ancora uno — e **"Quello che
+mangi"** poteva voler dire gli alimenti, le ricette, o cosa c'e' su Oggi.
+
+Ora sono sei, nell'ordine in cui un piano si costruisce e in cui ci si
+torna: **Chi sei**, **Foto dei progressi**, **Quanto mangiare**, **Piano
+settimanale**, **Ricette**, **Lista ingredienti**. Ognuna nomina una schermata
+sola e ci arriva in un tocco, invece di lasciare a meta' strada.
+
+**"Quanto mangiare" e' il target**, ed e' l'unica delle sei che non dipende dal
+piano alimentare: resta anche a modulo spento, perche' il target e' il metro
+con cui l'app giudica ogni giornata registrata — le barre di Oggi, l'analisi,
+il cruscotto, la previsione — e ci si torna spesso, da qualunque schermata.
+Finora ci si arrivava solo passando dall'elenco dei passi, cioe' scegliendo due
+volte.
+
+Le tre che dipendono dal piano alimentare spariscono quando il modulo e'
+spento: portare a un passo che in quella configurazione non esiste vuol dire
+consegnare una pagina con la navigazione avanti e indietro fuori posto.
+
+### Confrontare due alimenti
+
+"Quale dei due conviene" sembra una domanda semplice e non lo e', per un motivo
+solo: **dipende da cosa tieni fermo**. A parita' di peso vince sempre il piu'
+denso; a parita' di calorie chi ci mette dentro piu' proteine; a parita' di
+proteine chi costa meno calorie. Sono tre risposte diverse alla stessa domanda
+e sono tutte e tre vere, quindi la schermata le mette tutte e tre, dicendo ogni
+volta quale vincolo sta tenendo fermo.
+
+Nessun punteggio e nessun "meglio": questa app non da' voti al cibo, e fuori
+dal contesto in cui lo mangi un alimento non e' migliore di un altro.
+
+Sotto ai tre confronti stanno i rapporti che **non dipendono dalla porzione** —
+densita' calorica, proteine per 100 kcal, fibre per 100 kcal, quota di calorie
+per macro — che sono quelli che dicono di che tipo di alimento si tratta. E in
+fondo, sempre, **da dove vengono i numeri**: fra una stima e un'etichetta la
+differenza puo' essere piu' grande di quella che stai confrontando. Se i macro
+non tornano con le calorie dichiarate (oltre il 30%, la stessa soglia di
+`coerenza()`) il confronto lo scrive.
+
+Due dettagli del motore:
+
+- `confEquivalente()` torna **null** quando il vincolo non esiste: quanti
+  grammi di olio pareggiano le proteine del tofu non ha risposta, e dividere
+  per zero per produrne una sarebbe peggio del silenzio;
+- oltre i 1500 g il pareggio si segna come **fuori scala**: un chilo di
+  insalata per pareggiare le proteine di cento grammi di tofu e' un conto
+  giusto e una risposta inutile.
+
+### Un elenco solo: gli alimenti
+
+C'erano due schermate per la stessa domanda, e non si capiva quale fosse quale.
+
+- **"Cosa mangi"**, nel piano: gli alimenti, cioe' i nomi che le ricette usano.
+- **"I tuoi prodotti"**, dal menu: i prodotti reali col codice a barre, da
+  collegare a un alimento per sostituirne i valori stimati.
+
+Due bottoni "aggiungi", due ricerche su Open Food Facts, due lettori di codici
+a barre. La differenza fra un "alimento" e un "prodotto" era chiara solo a chi
+aveva scritto il codice.
+
+Sotto restano due cose diverse, e devono restarlo: **un alimento e' un nome
+dentro una ricetta, un prodotto e' una scatola con un'etichetta**, ed e' proprio
+questa distinzione che permette a un prodotto di correggere i valori di un
+alimento in tutti i conti. Ma per chi usa l'app la domanda e' una sola — *le
+cose che mangio, e quanto fanno* — e adesso la risposta e' una schermata sola,
+`elencoAlimenti()`, renderizzata sia dal passo del piano sia dalla voce di menu.
+Non due che si somigliano: la stessa.
+
+Il passo si chiama **"Lista ingredienti"** — prima "Cosa mangi", che era una
+domanda e non il nome di un elenco, e per giunta rispondeva alla stessa
+domanda della scheda Oggi.
+
+Quello che ogni riga dice non e' a quale registro interno appartiene, ma **da
+dove viene il suo numero**: `etichetta` se e' stato letto sulla confezione,
+`stima` se e' una media di categoria, `tuo` se l'hai aggiunto, `fuori piano` se
+e' un prodotto che nessuna ricetta sa ancora usare. Con i filtri sopra, perche'
+"quali sono ancora stimati" e' la domanda che porta a migliorare i dati.
+
+Tre dettagli che non sono cosmetici:
+
+- l'elenco mostra i valori **effettivi** (`alimento(nome)`, non
+  `D.alimenti[nome]`): se un prodotto sostituisce quell'alimento la riga deve
+  mostrare i numeri che l'app usa davvero, o direbbe "etichetta" scrivendo
+  accanto la stima;
+- un prodotto **collegato non compare due volte**: i suoi valori arrivano gia'
+  dalla riga dell'alimento;
+- aprendo un alimento sostituito da un prodotto, la scheda lo **dice** — senza,
+  quei numeri sembrano usciti dal nulla, e chi prova a correggerli a mano non
+  capisce perche' tornano quelli di prima.
+
+### Il nome conta quanto i macro
+
+Il motore ordinava solo per distanza sui macro, dentro la stessa categoria. Su
+un caso frequentissimo sbagliava sempre: chi ha in dispensa **"latte di soia" e
+"latte di soia proteico"** vuole spessissimo il secondo — ed era esattamente
+quello che veniva scartato, perché i macro sono diversi *apposta* e la distanza
+lo mandava in fondo, o fuori del tutto se stava in un'altra categoria.
+
+`affinitaNome()` aggiunge il secondo criterio: **un nome contenuto nell'altro
+vale 1** (è la stessa cosa in un'altra versione), altrimenti si contano le
+parole in comune sul totale, tolte quelle che non distinguono niente ("di",
+"al", "con"). Poi due effetti:
+
+- l'affinità **accorcia la distanza fino a metà** — non l'annulla, perché una
+  variante con macro molto diversi resta una scelta e non un'equivalenza, e
+  infatti la riga continua a mostrare lo scarto sui quattro macro;
+- **fuori categoria si entra solo da parenti stretti** (metà delle parole in
+  comune), o l'elenco diventa un catalogo e smette di essere un consiglio.
+  Misurato: "latte soia cioccolato" e "latte di soia proteico" condividono due
+  parole su quattro ed entrano; "latte di mandorla" si ferma a un terzo e resta
+  fuori.
+
+E soprattutto: **"Oppure scegli tu"**. Il motore ordina per somiglianza, ma
+"somigliante" non è "voluto" — chi usa il latte proteico oggi e quello normale
+domani sta scegliendo, non cercando un'equivalenza. Il campo cercabile prende
+qualunque cosa si possa mangiare, propone la quantità che pareggia il macro
+dominante e la lascia modificabile, con i quattro scarti che si aggiornano
+mentre scrivi.
+
+**Prodotti compresi**, ed è stata una correzione: erano esclusi perché una
+ricetta ragiona per nomi di alimenti e un prodotto col codice a barre dentro il
+piano un nome non ce l'ha. Ma quello era un problema del modello, non
+dell'utente: se lo hai registrato e stasera lo mangi, il diario deve saperlo
+scrivere. Ora la sostituzione si porta dietro l'id del prodotto
+(`swap[slot] = { a, qta, prod }`), e `macroIngrediente()` / `unitaIngrediente()`
+risolvono una riga senza che chi la legge debba sapere di quale dei due si
+tratta.
+
+Nella composizione di un pasto invece un nome serve davvero, e allora scegliendo
+un prodotto lo si **promuove**: `prodottoInAlimento()` crea l'alimento con i
+valori dell'etichetta e ci collega il prodotto. La categoria nasce vuota
+apposta e la UI lo dice — serve al motore delle sostituzioni, e sceglierla per
+conto dell'utente vorrebbe dire inventarsi in che famiglia sta una cosa che non
+abbiamo mai visto.
+
+### Il pasto si apre, e dentro si modifica
+
+Su Oggi ogni pasto srotolava i suoi ingredienti: cinque righe per pasto, per
+cinque pasti, facevano della schermata piu' consultata dell'app un elenco
+della spesa lungo due schermate — e quasi sempre non si stava cercando niente
+li' dentro. Adesso la riga dice il nome, i macro e **cosa e' cambiato**, e gli
+ingredienti stanno dietro un tocco, nello stesso posto in cui si modificano.
+
+Dentro la scheda del pasto ci sono le quattro cose che si vogliono fare a un
+pasto, tutte con la stessa regola di sempre — **valgono solo per quel giorno**:
+
+| | |
+|---|---|
+| **quantita'** | il contatore che c'era gia', piu' il moltiplicatore per scalare tutto |
+| **sostituisci** | apre il motore di sempre, ma **ci torna dentro**: prima riportava a Oggi, e chi stava lavorando su un pasto perdeva il posto |
+| **togli** | un ingrediente del piano si porta a **zero**, non si cancella: il piano e' la ricetta e vale anche domani. Il cestino diventa un "rimettilo", o l'unica strada indietro sarebbe riscrivere a mano la quantita' |
+| **aggiungi** | il quarto strato del giorno |
+
+**`S.log[k].aggiunti[code]`** e' quel quarto strato, e non poteva essere
+`extra`: quello e' il fuori piano, che sta *fuori* dai pasti e si conta a
+parte. Mettendolo li' il totale del pasto avrebbe continuato a dire il numero
+della ricetta mentre tu ci avevi messo dentro altro. Lo slot e' `agg:<id>` con
+un id stabile — non l'indice, o togliendo il primo si sposterebbero le
+quantita' di tutti gli altri — cosi' porzioni e sostituzioni sanno
+indirizzarlo come qualunque altra riga.
+
+Difetto trovato provandolo: `mealMGiorno()` decideva se ricalcolare guardando
+solo tre strati, quindi **aggiungendo un alimento e basta il pasto continuava
+a dichiarare le calorie del piano**. Un pasto che mente sulle calorie e'
+peggio di un pasto che non si puo' modificare.
+
+**E la differenza si vede.** In fondo alla scheda, sotto il totale, c'e' lo
+scarto rispetto al piano su tutti e cinque i valori — non solo le calorie:
+sostituendo un alimento le calorie tornano quasi sempre, perche' il motore
+riscala apposta, e quello che si sposta sono le proteine o i grassi. Dire solo
+"+12 kcal" nasconderebbe esattamente la parte che cambia. Su Oggi la stessa
+cosa in forma corta: `modificato +242 kcal` accanto al nome.
+
+### Un pasto puo' essere anche un alimento solo
+
+Per mettere uno yogurt di soia allo spuntino bisognava **comporre una ricetta
+con dentro un ingrediente**. Un giro assurdo, e un elenco di ricette che si
+riempie di voci che ricette non sono: "Yogurt di soia", "Mela", "Frullato
+pronto" non sono piatti composti, sono cose che si mangiano e basta.
+
+La strada scelta **non tocca il modello**, ed e' quello che la rende
+economica: il codice di un pasto puo' essere un **codice sintetico**
+`ali:<qta>:<nome>`, e `pasto(code)` lo risolve in un oggetto della stessa
+forma di una ricetta — nome, ingredienti, macro. Da li' in poi il resto
+dell'app non si accorge di niente. Verificato una voce alla volta: i macro si
+calcolano (`ali:150:yogurt di soia` = 75 kcal su 50 kcal/100 g), la scheda
+Oggi lo elenca, la spunta lo congela, le porzioni lo modificano (300 g = 150
+kcal), **la lista della spesa lo somma insieme agli stessi alimenti usati
+dalle ricette**, e il resoconto lo conta come riga a se'.
+
+Due dettagli:
+
+- **`pasto()` e' l'unico accessore.** I ventidue punti che leggevano
+  `D.pasti[code]` per uno slot passano da li'; restano diretti solo l'editor
+  delle ricette e il file di scambio, che lavorano sul registro delle ricette
+  e non su un pasto della settimana.
+- **La quantita' sta dentro il codice**, e va bene perche' gli strati del
+  giorno sono indicizzati sull'**id del pasto** e non sul codice della
+  ricetta: cambiare la quantita' non lascia orfano niente. Prima di quella
+  correzione questa scelta sarebbe stata un disastro.
+
+Nel foglio dello slot la sezione si chiama **"Oppure un alimento solo"**, e
+c'e' anche quando di ricette non ne hai nessuna: chi comincia da zero non deve
+comporre un piatto per segnare una mela.
+
+### La terza cosa che si muoveva: la struttura del giorno
+
+Segnalato cosi': *"se modifico il piano mi vengono aggiunti pasti nuovi che mi
+rovinano i dati"*. Ed era vero, ed era l'unico dei tre buchi rimasto aperto.
+
+Il congelamento alla spunta protegge la **ricetta**; il timbro del target
+protegge il **metro**. Restava scoperta la piu' visibile delle tre: i **pasti
+che quel giorno prevedeva**. `slotsGiorno()` li leggeva da `D.settimana`, cioe'
+dal piano di adesso, quindi aggiungendo uno spuntino al mercoledi' ogni
+mercoledi' gia' registrato si ritrovava un pasto in piu' — mai spuntato,
+quindi contato come **saltato**.
+
+Misurato su dieci giorni tutti spuntati: da **49 su 49** a **49 su 51**, con
+una riga *"Spuntino serale 0/2"* per un pasto che quel giorno non esisteva. E
+`consumed()` restava fermo a 2466 kcal — che e' esattamente cio' che rendeva il
+difetto difficile da vedere: **le calorie erano giuste e l'aderenza no.**
+
+`S.log[k].slots` e' la fotografia della giornata — posto, ora e ricetta
+assegnata — scritta da `pinnaPassato()` quando il giorno smette di essere oggi.
+**Oggi non si timbra**: oggi non e' finito, e un pasto aggiunto stamattina vale
+per stamattina. Verificato: aggiungendo o togliendo un pasto dal piano, un
+mercoledi' di tre giorni fa resta a cinque pasti, 2466 kcal e 49 su 49, mentre
+oggi passa da cinque a sei.
+
+Con questo i tre lati sono chiusi, e vale la pena scriverli insieme perche'
+sono la stessa regola applicata a tre cose diverse:
+
+| Cosa si congela | Quando | Senza, cambiando il piano... |
+|---|---|---|
+| la **ricetta** (`fatti`) | alla spunta | i macro di un giorno registrato si spostavano |
+| il **metro** (`target`) | quando il giorno passa | le barre e gli scarti si riscrivevano |
+| la **struttura** (`slots`) | quando il giorno passa | comparivano pasti mai previsti, contati come saltati |
+
+E `GIORNO_META` cresce di conseguenza: `fatti`, `target`, `slots` non sono
+contenuto, sono **come l'app ha registrato** quella giornata. Senza quella
+eccezione una giornata vuota risulterebbe registrata per via di una
+fotografia.
+
+### "Da assegnare" mandava nel posto sbagliato
+
+Segnalato cosi': *"se premo il pulsante «da assegnare», invece di farmi mettere
+cosa ho mangiato mi rimanda al piano settimanale"*. Ed era letteralmente
+quello che faceva — e non e' un dettaglio di navigazione, e' **la terza porta
+riaperta**: il piano e' un modello, il diario e' un fatto, e *"cosa ho mangiato
+giovedi'"* non si scrive nel modello.
+
+Il difetto vero pero' si vede solo mettendoci dentro il congelamento, ed e'
+esattamente il caso riportato: **un giorno passato con uno slot vuoto**.
+
+1. giovedi' quel pasto non era assegnato, e lo salti;
+2. il giorno dopo lo assegni nel **piano settimanale** — che e' giusto, ed e'
+   quello che l'app suggeriva;
+3. torni a giovedi', premi "Da assegnare"… e la riga dice ancora "Da
+   assegnare", perche' la **struttura di quel giorno e' congelata**
+   (`S.log[k].slots`, timbrata quando il giorno smette di essere oggi). Il
+   bottone ti riporta al piano, dove il lavoro risulta gia' fatto.
+
+Un vicolo cieco con le due meta' che si danno ragione a vicenda: il
+congelamento fa il suo mestiere — quel giovedi' non deve muoversi piu' — e il
+bottone offriva l'unica strada che su quel giorno non poteva funzionare.
+
+La strada che mancava e' quella che c'e' gia' per ogni altra cosa del giorno:
+**`pastoSwap`, cioe' lo strato del diario**. Vale per quel giorno, non tocca il
+piano, e passa sopra la fotografia congelata perche' e' scritto dopo e a un
+livello piu' alto. `sheetSlotVuoto()` e' quel foglio: una delle tue ricette,
+oppure un alimento solo (lo stesso codice `ali:` del piano), e in fondo la
+strada per il piano settimanale — che resta quella giusta se quel pasto manca
+*tutte* le settimane.
+
+Tre decisioni:
+
+- **su un giorno passato il pasto si spunta da solo.** Scrivere "giovedi' a
+  pranzo ho mangiato questo" e' una dichiarazione di averlo mangiato, non un
+  piano: senza la spunta `consumed()` continuerebbe a contare zero e la
+  giornata resterebbe vuota. E' la stessa regola gia' scritta per la foto del
+  piatto. Su **oggi** no — alle nove del mattino si puo' decidere la cena — e
+  sul futuro non si scrive affatto, che e' la regola di sempre;
+- **"al posto di" presuppone che ci fosse qualcosa.** Su uno slot vuoto non
+  c'e' niente al cui posto stare, e la riga usciva con `al posto di null`. Li'
+  il pasto non sostituisce, si **aggiunge**;
+- **su un giorno passato la carta "Giornata da comporre" non manda piu' al
+  piano.** Dice invece che quel giorno e' passato senza ricette e che si puo'
+  ancora scrivere cosa e' stato mangiato, un pasto alla volta — e il bottone
+  "Apri il piano" sparisce, perche' porterebbe a fare un lavoro che quel
+  giorno non vedra' mai.
+
+Misurato sul caso segnalato, passo per passo: giorno congelato con lo slot
+vuoto, ricetta assegnata dopo nel piano, il giorno passato resta vuoto (il
+congelamento tiene), il tocco apre "Cosa hai mangiato" senza cambiare rotta,
+e assegnando la giornata passa da 0 a 635 kcal con il pasto spuntato — mentre
+il piano settimanale non si muove di una riga.
+
+### Il passato smette di muoversi, dai due lati
+
+Segnalato con un caso preciso: *"ho modificato dal piano la ricetta portando
+la pasta a 50 g, sono andato in un martedi' vecchio che avevo segnato e i
+macro erano cambiati. Stessa cosa per il target della giornata."* Riprodotto:
+quel giorno passava da **2459 a 2346 kcal**, e il suo target da **2459 a
+2347**.
+
+Due buchi diversi, uno per lato del confronto.
+
+**1. Le spunte senza copia congelata.** Il congelamento alla spunta e'
+arrivato dopo, e chi ha usato l'app prima ha giornate con `pasti[sid] = true`
+e nessun `fatti[sid]`. Questo file lo scriveva gia' — *"una spunta `true`
+senza copia legge la ricetta di adesso, cioe' si comporta come si comportava
+l'app prima"* — ma quella frase descriveva una scelta ragionevole solo finche'
+nessuno correggeva le ricette. Appena lo si fa, quelle giornate si muovono.
+
+La ricetta di allora non esiste piu' da nessuna parte, e inventarla sarebbe
+peggio. Ma si puo' **smettere di muoverle**: `pinnaPassato()` le congela
+com'erano l'ultima volta che l'app le ha calcolate. Non e' la storia vera, e'
+la fine della deriva — ed e' scritto cosi' anche nel codice, perche' e' una
+riparazione e non un ripristino.
+
+**2. Il target.** `dayTarget()` leggeva `D.settimana[...].totali`, cioe' il
+piano **di adesso**: cambiare la settimana riscriveva all'indietro il metro di
+ogni martedi' mai registrato. E' la stessa cosa gia' vietata per i pasti — *il
+piano e' un modello, il diario e' un fatto* — chiusa pero' solo dalla parte del
+**consumato**, mai da quella del metro. Adesso il target di una giornata
+passata si fissa su di lei e da li' in poi e' suo.
+
+**Oggi non si fissa**, ed e' voluto: oggi non e' finito, e se cambi il piano
+stamattina il metro di stamattina e' quello nuovo. Il fermo scatta quando il
+giorno smette di essere oggi.
+
+Un dettaglio che sarebbe passato inosservato: `giornoPieno()` e' **generico
+apposta** — qualunque campo con un contenuto conta — e scrivendo il target
+dentro la giornata una giornata vuota sarebbe risultata registrata. Da qui
+`GIORNO_META`, l'unica eccezione a quella regola, ed e' dichiarata: la copia
+congelata e il target di allora non sono contenuto, sono **come l'app ha
+registrato** quella giornata, ed esistono solo su un giorno che era gia'
+pieno.
+
+Verificato dopo la correzione: rifatta la stessa modifica, tolta del tutto la
+ricetta da quel giorno nel piano e cambiato il target generale a 1500, la
+giornata vecchia resta a 2459 su tutti e due i numeri, mentre oggi segue il
+piano di adesso.
+
+### I numeri erano al sicuro, il giudizio no
+
+Il congelamento alla spunta protegge i **numeri** di una giornata registrata:
+misurato subito dopo aver messo i pesi per pasto, cambiando i pesi nel piano,
+cambiando la ricetta e perfino riassegnando lo slot a un'altra ricetta, le
+calorie di quel giorno non si sono mosse di una — 635 in tutti e quattro i
+casi, ingredienti congelati compresi, resoconto compreso.
+
+Ma il **giudizio** su quella giornata continuava a nascere dal piano di
+adesso, e li' cambiava tutto:
+
+| Cosa cambiavo nel piano | Cosa diceva la giornata di tre giorni fa |
+|---|---|
+| i pesi di quel pasto | *"rispetto al piano \u2212225 kcal"* |
+| la ricetta | *"rispetto al piano \u2212375 kcal"* |
+| lo slot riassegnato | cambiava **nome**: dichiarava un piatto mai mangiato |
+
+Una giornata che nessuno ha toccato non ha nessuno scarto da dichiarare, e il
+nome del pasto e' quello che hai mangiato — non quello che il piano prevede
+oggi in quel posto. E' l'errore che questo file segnalava gia' da tempo
+(*"basta correggere il piano perche' una giornata mai toccata dichiari
+modificato +150 kcal"*) e che il codice faceva lo stesso: il congelamento era
+finito nei conti e non nel confronto.
+
+`ricettaMetro(sid, k)` e' il metro: **la copia congelata se c'e'**, la ricetta
+del piano altrimenti. Con **una** eccezione, che e' anche la ragione per cui
+non e' `ricettaGiorno()`: se quel giorno il pasto era stato **sostituito**, il
+confronto interessante e' proprio con la ricetta che il piano prevedeva — *"al
+posto di X, +102 kcal"* — e li' il metro torna a essere il piano.
+
+Provati uno per uno, gli scarti **veri** restano tutti: porzione cambiata
+(+190), alimento aggiunto (+371), ingrediente sostituito (+69), pasto intero
+sostituito (+102, spuntato e non spuntato). E i pesi che lo slot ha nel piano
+**non** sono uno scarto: quelli sono il piano, non una modifica del giorno.
+
+Nello stesso giro, due cose che si vedevano solo su una giornata gia'
+spuntata: il **nome** sulla riga di Oggi ora viene dalla copia congelata, e
+con lo slot svuotato nel piano quella riga scriveva *"Da assegnare"* sopra un
+pasto che era stato mangiato.
+
+### Un pasto puo' contenere piu' ricette
+
+Un pranzo non e' sempre un piatto: e' la pasta **e** l'insalata, il primo **e**
+la frutta. Lo slot ne teneva una sola, e sceglierne un'altra la
+**sostituiva** — quindi l'unica strada era comporre una ricetta "Pasta e
+insalata" che duplica due ricette gia' esistenti e che va rifatta ogni volta
+che si cambia il contorno.
+
+Terzo codice sintetico dopo `ali:` e `ric:`, e per la terza volta la stessa
+ragione: **non tocca il modello.** `piu:<a>+<b>`, e `pasto()` lo risolve in un
+oggetto della forma di sempre — un nome, un elenco di ingredienti, dei macro.
+Verificato una voce alla volta: i totali del giorno, la scheda Oggi, la
+spunta che congela l'elenco fuso, le porzioni del diario che si applicano
+sopra, la lista della spesa e il resoconto.
+
+**Si annida.** Una parte puo' essere a sua volta un `ric:` con i suoi pesi o
+un `ali:` con la sua quantita': un pranzo puo' essere "pasta con tonno pesata
+150/50" piu' "una mela da 180 g", e lo si e' provato.
+
+Due decisioni:
+
+- **gli ingredienti ripetuti si sommano.** Se tutte e due le ricette hanno il
+  tonno, nel pasto c'e' una riga sola con la somma. Non e' cosmesi: gli strati
+  del diario — porzioni, sostituzioni — sono indicizzati sul **nome**
+  dell'ingrediente, e due righe con la stessa chiave si sovrascriverebbero a
+  vicenda. Misurato su due ricette con un ingrediente in comune: 3 + 4 = 6
+  righe, `latte 300 + 200 = 500`;
+- **i macro si sommano parte per parte**, non si ricalcolano dall'elenco fuso:
+  i valori di una ricetta sono verificati a monte, e rifarli da capo li
+  sostituirebbe con la somma 4/4/9 anche quando nessuno ha toccato niente.
+
+Il foglio dello slot si chiama ora **"Cosa c'e' in questo pasto"** ed e'
+diventato un elenco: ogni parte con i suoi macro, il suo editor dei pesi e il
+suo cestino, il totale sotto quando sono piu' di una. Scegliere una ricetta
+qui sotto **aggiunge** invece di sostituire, e le ricette gia' dentro sono
+marcate. Togliendo una parte quando ne restano due il codice torna a essere
+quello nudo della ricetta: nessun `piu:` con dentro una cosa sola.
+
+**I pesi si toccano una parte alla volta** — `sheetPesiSlot(gi, si, pi)` — e
+non sull'elenco fuso: li' una riga ripetuta non saprebbe piu' a quale ricetta
+appartiene, ed e' lo stesso motivo per cui i doppioni si sommano.
+
+### La stessa ricetta, con pesi diversi
+
+Pasta con tonno e' una ricetta sola. Ma il lunedi' puo' essere 50 di pasta e
+150 di tonno, e il giovedi' 150 e 50: **stesso piatto, stessa spesa, stesso
+posto nell'elenco**, quantita' diverse. Le strade erano due, e tutte e due
+sbagliate: comporre due ricette quasi identiche — e ritrovarsi un elenco con
+"Pasta con tonno" e "Pasta con tonno 2", che e' il modo piu' rapido di rendere
+illeggibile la lista delle ricette — oppure cambiare le porzioni dal diario,
+che pero' vale **un giorno solo** e non entra nella lista della spesa.
+
+La strada scelta e' la stessa dell'alimento singolo, e per la stessa ragione:
+**non tocca il modello.** Il codice del pasto puo' essere `ric:<ricetta>:<pesi>`
+e `pasto()` lo risolve in un oggetto della stessa forma di sempre — nome,
+ingredienti, macro. Da li' in poi il resto dell'app non se ne accorge.
+Verificato una voce alla volta: i totali del giorno cambiano (lunedi' 2412,
+giovedi' 2400 sullo stesso piatto), la lista della spesa somma i pesi veri, la
+scheda Oggi lo elenca, la spunta lo congela con **quelle** quantita', le
+porzioni del diario si applicano ancora sopra, e il resoconto lo conta come
+**una** riga.
+
+Tre decisioni:
+
+- **si scrive solo quello che cambia, indicizzato sul nome dell'ingrediente**
+  e non sulla sua posizione. Correggendo la ricetta piu' avanti — un
+  ingrediente aggiunto in cima, uno tolto — i pesi restano attaccati a quello
+  che nominano invece di scivolare sul vicino: e' l'errore gia' fatto una
+  volta indicizzando gli alimenti aggiunti sull'indice dell'array. Provato:
+  aggiungendo un ingrediente alla ricetta, `50/150` resta `50/150` e il nuovo
+  entra con il suo peso di ricetta;
+- **nome e codice passano da `encodeURIComponent`**: il separatore e' `:`, e
+  un alimento che ne contenesse uno spezzerebbe il codice in silenzio;
+- **i macro si ricalcolano dagli ingredienti**, non si scalano. Cambiati i
+  pesi, il totale precalcolato della ricetta non descrive piu' niente — ed e'
+  la stessa cosa che fa gia' `mealMGiorno()` quando una porzione cambia.
+
+Dove si confrontano due codici la risposta e' sul **piatto**, non sui pesi, e
+per questo c'e' `codiceBaseRic()`: la pastiglia "attuale" nell'elenco delle
+ricette, "in che momento della giornata compare di solito", la migrazione dei
+registri vecchi, e il resoconto — dove due righe con lo stesso nome
+sembrerebbero un errore di stampa.
+
+L'editor sta dentro il foglio del pasto (`sheetPesiSlot`), e **torna al
+pasto**: e' l'editor di una riga, e chiudere il foglio da cui si e' arrivati
+e' l'errore gia' pagato con le righe di scheda in palestra. Non ha il cestino
+ne' la sostituzione — quelli sono strati del **diario**, e togliere un
+ingrediente dal piano si fa nella ricetta; qui si porta a zero, che e' la
+stessa cosa detta con i pesi. Il moltiplicatore riparte sempre dai pesi della
+**ricetta** e non da quelli gia' toccati: due tocchi su ×0,5 darebbero un
+quarto.
+
+Nella settimana la riga porta la pastiglia **"pesi tuoi"**: due righe con lo
+stesso nome e calorie diverse, senza una parola che lo spieghi, sembrano un
+errore.
+
+### Si chiamano ricette
+
+Per tutta la vita dell'app il piatto composto — quello che si costruisce
+pesando gli ingredienti, si assegna a uno slot e si puo' sostituire — si e'
+chiamato "pasto". Ma "pasto" nell'app vuol dire **due cose**, e la seconda e'
+il momento in cui si mangia: "il pasto che salti piu' spesso", "pasto fuori
+piano", "pasti spuntati". Chiamarle con la stessa parola costringeva ogni
+frase a chiarire di quale delle due stesse parlando.
+
+Adesso il piatto composto e' una **ricetta**, e il pasto resta il momento. La
+linea passa esattamente li':
+
+| Ricetta | Pasto |
+|---|---|
+| "Componi una ricetta", "Nuova ricetta", "Salva la ricetta" | "Aggiungi pasto fuori piano" |
+| "Assegna le ricette agli slot dei sette giorni" | "il pasto che salti piu' spesso" |
+| "Cambia la ricetta", "Scala tutta la ricetta" | "pasti spuntati", "giorni senza pasti" |
+| il passo del piano, che ora si chiama **"Le tue ricette"** | i promemoria del calendario |
+
+**Il pasto e' il contenitore, la ricetta il contenuto**, e in un punto la
+distinzione era saltata: nell'editor della settimana il bottone diceva
+*"Aggiungi una ricetta a lunedi"* e apriva un foglio intitolato *"Nuova
+ricetta"* — ma quel foglio chiede **un nome e un'ora**, cioe' costruisce un
+pasto. La ricetta la scegli dopo, toccandolo. Adesso: *"Aggiungi un pasto"*,
+*"Nuovo pasto"*, e sotto il campo del nome la riga che chiude il cerchio —
+*"e' il momento della giornata, non il piatto"*.
+
+Nello stesso giro i due bottoni in fondo alla scheda di un pasto, che facevano
+due cose diverse chiamandole quasi uguale: **"Togli solo la ricetta, lascia il
+pasto"** (l'ora resta) e **"Togli questo pasto dal giorno"** (sparisce lo slot).
+
+E la parola **"slot"** e' sparita dai testi: e' una parola del codice — dentro
+i dati resta `pasti[].slot`, che i backup gia' esportati non devono vedersi
+cambiare sotto — ma nell'interfaccia quel posto si chiama pasto.
+
+**Nessun sed alla cieca**, e per due ragioni concrete trovate strada facendo:
+"pastigl**ia**" contiene "pasti", e "pasto fuori piano" sarebbe diventato
+"ricetta fuori piano", che e' sbagliato. Cinquantotto stringhe riviste una a
+una, con l'elenco esplicito e un'asserzione per ciascuna.
+
+E **i dati non si toccano**: `D.pasti`, `d.pasti`, `pastoDelGiorno`,
+`pastoSwap`, `pianoTab = 'pasti'`, il prefisso `pasto-` degli id restano
+com'erano. Rinominare le chiavi vorrebbe dire rompere ogni backup gia'
+esportato per un cambio di etichetta.
+
+### Registrare qualcosa, in fondo a Oggi
+
+L'azione piu' frequente dell'app — "ho mangiato una cosa, la scrivo" — aveva
+due strade, tutte e due lunghe: scorrere fino in fondo a Oggi, dove sta il
+fuori piano, oppure aprire la ricetta giusta e cercare dentro.
+
+Il primo tentativo e' stato una carta "aggiungi in fretta" **in cima**, ed
+erano due errori insieme. Il primo: due carte che chiedono la stessa cosa —
+quella sopra e il fuori piano sotto — sono un doppione, e in questo file c'e'
+scritto da tempo che due elenchi che si somigliano sono peggio di uno lungo.
+Il secondo: un bottone verde pieno largo quanto lo schermo, in mezzo alla
+pagina, si prende un'attenzione che non merita — Oggi serve a **leggere** come
+sta andando, non a gridare "aggiungi".
+
+Adesso e' una carta sola, in coda, con la forma delle altre liste dell'app:
+icona a sinistra, testo, chevron a destra, come i prodotti e le schede. La
+gerarchia e' quella vera — prima quello che hai gia' registrato, poi le due
+strade per aggiungerne dell'altro, e in fondo le pastiglie:
+
+1. **"Aggiungi un alimento"**: cosa, quanto e **dove**, cioe' dentro una
+   ricetta del giorno oppure nel fuori piano. La destinazione parte gia'
+   scelta sulla ricetta piu' vicina all'ora di adesso, perche' chi registra
+   qualcosa quasi sempre lo sta mangiando;
+2. **"Scrivi i valori a mano"**, per quando l'alimento non c'e';
+3. **le pastiglie di quello che registri sempre** — un tocco, niente domande.
+   `extraFrequenti()` esisteva gia' e lo usava soltanto il foglio del fuori
+   piano, cioe' l'ultimo posto in cui si arriva. Qui basta un tocco.
+
+C'e' anche una terza riga, **"Lista ingredienti"**, e non registra niente: e'
+l'unica che porta altrove. Sta qui perche' e' qui che serve — chi cerca un
+alimento e non lo trova sta guardando proprio questa carta, e finora l'unica
+strada era il menu del profilo, cioe' due tocchi in un posto che con la
+giornata non c'entra. Il suo quadratino e' grigio e non verde: le due sopra
+aggiungono qualcosa a oggi, questa no.
+
+Il codice a barre **non** e' in questa carta, ed e' una rinuncia meditata:
+`leggiCodice()` puo' tornare col solo codice — quando l'utente sceglie di
+inserire i valori a mano — e i suoi macro sono per 100 g. Registrare "un
+prodotto, forse cento grammi, forse zero calorie" vorrebbe dire inventare due
+numeri per risparmiare un tocco. Resta dov'e' accolto da un modulo: in
+"aggiungi un alimento" dentro il piano.
+
+### Una ricetta intera nella giornata
+
+Il panino mangiato fuori e' una ricetta — composta, o arrivata da un file di
+scambio — e per metterlo in un giorno c'erano solo due strade sbagliate:
+aggiungerne gli ingredienti uno per uno, sei giri dello stesso foglio, o
+riscriverne i macro a mano. `sheetAggiungiRicetta()` e' la riga **"Aggiungi
+una ricetta"** sotto "Aggiungi un alimento", e compare solo se di ricette ce
+n'e' almeno una.
+
+Cosa, quanto e dove, come per l'alimento, con due differenze:
+
+- **la porzione e' a pastiglie** — mezza, intera, ×1,5, ×2 — come la scala
+  del pasto: "0,5" in un campo non lo scrive nessuno;
+- **il default e' il fuori piano**, non il pasto piu' vicino all'ora: una
+  ricetta intera e' quasi sempre un pasto a se', e li' resta una voce col suo
+  nome (piu' `ricetta: id`). Dentro un pasto entra **ingrediente per
+  ingrediente** nello strato degli aggiunti, cosi' il totale del pasto dice la
+  verita' e un prodotto collegato dopo corregge anche quelli. Una ricetta
+  scritta solo a macro non ha ingredienti, e resta comunque una voce a se'.
+
+Chi l'ha mangiata **al posto** di un pasto ha gia' la sua strada,
+"Sostituisci l'intero pasto", e la nota del foglio lo dice: aggiungere e
+sostituire sono due fatti diversi.
+
+**Il difetto trovato provandola.** Le pastiglie del "dove" passavano
+`x.codice` — la **ricetta**, `C1` — invece di `chiaveP(x)` — il **pasto**,
+`g4-0`. Gli strati del diario sono indicizzati sul pasto da quando le mandorle
+delle 11 e quelle delle 16:30 condividevano la spunta, e questo foglio era
+rimasto indietro: un alimento messo "dentro la colazione" dalla scorciatoia di
+Oggi finiva sotto una chiave che la colazione non legge, e **spariva dal
+conto**. Spuntando quella chiave per sbaglio nasceva perfino un pasto
+fantasma "Registrato". Adesso le pastiglie sono una funzione sola,
+`campoDove()`, per l'alimento e per la ricetta. Misurato: aggiungendo gli
+spiedini dentro la colazione spuntata il giorno sale di 302 kcal, cioe'
+esattamente gli spiedini, e nessun pasto in piu'.
+
+Gli aggiunti gia' scritti sotto il codice della ricetta **non** sono stati
+migrati: restano dove sono, invisibili come prima.
+
+### Le icone del momento della giornata
+
+Una lista di cinque pasti sono cinque righe uguali, e il primo modo in cui si
+riconosce un pasto non e' il nome ma **quando lo si mangia**. Da qui
+un'icona colorata per slot: alba, sole pieno, tramonto, luna, letto — piu' una
+tazza per gli spuntini fuori orario e un piatto per quando non si capisce.
+
+I tracciati vengono da **Feather Icons** (MIT) e **Lucide** (ISC), ricopiati
+dentro `icone.js` invece di essere caricati da un CDN: e' la stessa scelta di
+`data/corpo.json`, e per la stessa ragione — quest'app funziona offline, e una
+`<link>` a unpkg vorrebbe dire icone che spariscono in palestra dove non
+prende. Sono otto disegni, non una dipendenza, e la nota di licenza sta nel
+file.
+
+**Lo spuntino della mattina aveva l'icona del pranzo.** La soglia del sole
+pieno stava alle 11, quindi uno spuntino delle 11:00 usciva con lo stesso
+quadrato giallo di mezzogiorno — e in un elenco di cinque righe due icone
+identiche sono due righe che si assomigliano proprio dove dovrebbero
+distinguersi. Adesso e' la **tazza**, che e' anche quello che uno ha davvero
+in mano a meta' mattina, in un caramello caldo (`#B06A34`) vicino all'ambra
+dell'alba — stessa parte della giornata — ma con una forma completamente
+diversa. La soglia del sole pieno sale a mezzogiorno, e il nome
+("mattina", "mattutino") vince comunque sull'ora.
+
+`slotIcona()` guarda **prima il nome e poi l'ora**: il nome dice l'intenzione
+("Pre-nanna" e' pre-nanna anche alle 21), l'ora e' un ripiego ragionevole per
+gli slot chiamati "Post workout". Se non dicono niente ne' l'uno ne' l'altra
+resta il piatto — meglio un'icona neutra di una sbagliata.
+
+### Le sostituzioni fantasma
+
+Segnalato che "ogni tanto escono scritte di sostituzione dove in realta' non e'
+avvenuta o e' stata annullata". La causa piu' probabile e' **quella gia'
+chiusa**: fino alla versione precedente il diario era indicizzato sul codice
+della ricetta, quindi sostituire il pasto delle 11 metteva l'etichetta anche a
+quello delle 16:30 — che e' esattamente lo screenshot arrivato con la
+segnalazione. La migrazione **conserva** quel doppione, perche' e' quello che i
+totali di quei giorni hanno registrato, ma da adesso i due si annullano
+separatamente.
+
+I percorsi di annullamento sono stati ripercorsi uno per uno — sostituzione
+del pasto e ritorno al piano, sostituzione con scala, sostituzione di un
+ingrediente, cestino e "rimettilo", alimento aggiunto e tolto — e l'etichetta
+sparisce sempre. Quello che si e' trovato sono due stati che *potrebbero*
+produrla, e sono stati chiusi:
+
+- **il confronto si fa anche in lettura.** `pastoDelGiorno()` scartava una
+  sostituzione uguale alla ricetta del piano solo quando la si scriveva: se il
+  piano veniva riassegnato *dopo* proprio a quella ricetta, la sostituzione non
+  sostituiva piu' niente e la scritta restava li' a dichiarare un cambio che
+  non c'era;
+- **gli strati svuotati non restano in giro.** `porzioni: { c1: {} }` non
+  cambia nessun conto — chi li legge guarda sempre `Object.keys().length` — ma
+  e' uno stato che non dovrebbe esistere, e basta un punto che lo legga come
+  "c'e' qualcosa" perche' compaia un "modificato" su un pasto mai toccato.
+  Adesso si chiudono dove nascono (`pulisciStrati()`), e quelli gia' in giro si
+  buttano all'avvio.
+
+### `macro: null` non vuol dire zero
+
+`congelaPasto()` scrive `macro: null` sulle ricette che hanno degli
+ingredienti, ed e' voluto: i macro si ricalcolano da quelli, cosi' collegare
+un prodotto reale corregge anche i pasti gia' registrati. Ma chi leggeva
+`p.macro` senza saperlo si trovava `null` in mano, e da li' nascevano **tre
+difetti dello stesso ceppo**, tutti su un pasto spuntato:
+
+1. il confronto col piano dichiarava **l'intero pasto** come differenza —
+   `+533 kcal` su un pasto che nessuno aveva toccato, `+635` su uno
+   sostituito, dove la risposta giusta era +102;
+2. "Sostituisci l'intero pasto" non trovava **nessuna** ricetta equivalente,
+   perche' la guardia era `if (!src?.macro?.kcal) return []`;
+3. e la sua intestazione moriva su `null.kcal`.
+
+Segnalato come "dopo che sostituisco l'intero pasto mi esce +x calorie dove x
+sono le calorie dell'intero pasto". Provandolo si e' visto che il caso
+sostituito era solo il piu' evidente: bastava **spuntare** un pasto.
+
+Ora `macroRicetta(p)` e' il posto solo da cui si leggono i macro di una
+ricetta — se ci sono li' restituisce, altrimenti li ricalcola dagli
+ingredienti — come `pasto()` e' il posto solo da cui si legge una ricetta.
+
+Nello stesso giro il **metro del confronto** era sbagliato di suo. `pianoM()`
+faceva `pasto(code)` dove `code` e' ormai la chiave del **pasto** (`g0-2`),
+che non e' il codice di nessuna ricetta: non trovava niente e ripiegava sulla
+ricetta di oggi, cioe' si confrontava con se stessa. Misurato: un pasto
+sostituito e non ancora spuntato diceva "nessuna differenza" invece di +102
+kcal. Il metro giusto e' `codiceBase()`, la ricetta che il **piano** mette in
+quello slot — che e' quello che il commento sopra la funzione diceva gia'.
+
+### La sostituzione si applica
+
+Per molto tempo il foglio delle sostituzioni era una tabella: diceva "al posto
+di 100 g di riso vanno 120 g di patate" e poi lasciava li'. Chi la sostituzione
+la faceva davvero doveva andare in "porzioni", azzerare l'ingrediente originale
+e aggiungere l'altro come pasto fuori piano — tre schermate per una cosa che
+l'app aveva gia' calcolato.
+
+Ora si applica, e **vale solo per quel giorno**. E' la stessa regola delle
+porzioni ed e' quella giusta: il pasto nel piano e' la ricetta, il diario dice
+cos'e' successo quel giorno. Sostituire il riso per sempre si fa nell'editor
+del pasto, che e' un'altra cosa e un altro posto.
+
+Il modello e' `S.log[k].swap[codice][ingredienteDelPiano] = { a, qta }`, e la
+chiave e' importante: **l'indice e' il nome dell'ingrediente del piano**, anche
+dopo la sostituzione. Quello e' il posto nella ricetta, e non cambia perche' ci
+hai messo dentro un'altra cosa — se l'indice diventasse il nome nuovo, togliere
+la sostituzione non saprebbe piu' a cosa tornare.
+
+`ingredientiGiorno(code, k)` fonde gli strati e restituisce cosa c'era davvero
+in quel pasto quel giorno; `mealMGiorno()`, la lista su Oggi e il foglio delle
+porzioni passano tutti da li'. Togliendo una sostituzione sparisce anche la
+quantita' cambiata di quel posto: erano grammi dell'alimento sostituito, e
+riportarli sull'originale vorrebbe dire inventarsi una porzione che nessuno ha
+scelto.
+
+**E si puo' cambiare il pasto intero.** La sostituzione per alimento risolve
+"il tofu oggi non ce l'ho"; questa risolve "oggi quel pasto non lo mangio", che
+prima costringeva a spuntare niente e riscrivere la giornata come fuori piano —
+cioe' a buttare via il piano per un pasto.
+
+`pastiEquivalenti()` e' il motore delle sostituzioni un piano sopra: riscala il
+candidato per far combaciare le calorie e poi ordina per distanza sui quattro
+macro. La scala si ferma **fra ×0,6 e ×1,6**, perche' oltre quei limiti mezza
+porzione di un pasto non e' piu' quel pasto. Il momento della giornata non
+esclude niente — mangiare a cena quello che il piano metteva a colazione e' una
+scelta — ma la riga lo dice, invece di nasconderlo.
+
+Due dettagli del modello: il terzo strato e' `S.log[k].pastoSwap[codiceSlot]`, e
+**la chiave resta il codice dello slot**, cosi' la spunta e tutto il resto
+continuano a parlare della stessa riga. Cambiare il pasto **azzera** porzioni e
+sostituzioni di ingrediente di quello slot: erano grammi e alimenti di un'altra
+ricetta, e tenerli vorrebbe dire applicare a un pasto le correzioni fatte su un
+altro. La scala si scrive come porzioni del pasto nuovo, che e' lo stesso strato
+gia' usato dal moltiplicatore: non serviva inventarne un altro.
+
+### Un'ora non si scrive col tastierino
+
+Il campo dell'ora era `type="text"` con `inputmode="numeric"`, e su iOS quel
+tastierino **non ha i due punti**: si poteva digitare "1630" e nient'altro, e
+il controllo rifiutava. Un campo che chiede un formato che la tastiera che
+apre non sa produrre.
+
+Adesso e' `type="time"`, cioe' il selettore a rotella di sistema: l'ora si
+sceglie e il valore torna sempre in `HH:MM`, che e' esattamente quello che
+`oraMinuti()` si aspetta.
+
+Una trappola che sarebbe passata inosservata: **il campo nativo, con un valore
+che non e' `HH:MM`, si presenta vuoto e non dice niente**. Gli orari scritti a
+mano nelle versioni precedenti potevano essere "9:15", e aprendo il pasto per
+cambiare qualcos'altro il campo sarebbe apparso vuoto — salvando, l'ora
+spariva. `oraValida()` normalizza in ingresso: "9:15" e "9.5" diventano
+"09:15" e "09:05", "24:00" resta vuoto perche' non e' un'ora.
+
+### Sostituire l'intero pasto, anche con qualcosa che non c'entra
+
+Il bottone diceva **"Cambia la ricetta"**, che suona come *modificala* — ed e'
+quello che fa tutto il resto di quella scheda. Qui invece si butta via la
+ricetta prevista e se ne mette un'altra, per oggi: **"Sostituisci l'intero
+pasto"**.
+
+Dentro c'erano solo le ricette **a parita' di macro**, ordinate dal motore. E'
+la risposta giusta alla domanda "cosa ci sta al posto di questa", ma non a
+quella che uno si fa davvero la sera: *stasera voglio quello*. La stessa
+lezione gia' imparata sulle sostituzioni di ingrediente — *il motore ordina
+per somiglianza, ma "somigliante" non e' "voluto"* — che qui non era stata
+applicata.
+
+Adesso sotto c'e' **"Oppure scegline una qualunque"**: tutte le tue ricette in
+un campo cercabile, comprese quelle lontanissime. Scegliendone una compare
+subito **cosa cambia** (`+90 kcal · +7,8 P · +29,3 C · −9,4 G`) e due strade:
+metterla **intera**, oppure — solo se la scala sta dentro il ×0,6–×1,6 gia'
+dichiarato — riscalarla per pareggiare le calorie del pasto previsto. Fuori da
+quei limiti il secondo bottone non compare, invece di offrire un ×5,3 che non
+sarebbe piu' quella ricetta.
+
+### La tastiera che copre i risultati: provato e tolto
+
+Il problema e' vero. Su iOS aprire la tastiera **non ridimensiona la pagina**:
+restringe il *visual viewport* e ci disegna sopra la tastiera. Un foglio
+ancorato in basso resta percio' appoggiato al fondo dello **schermo**, cioe'
+sotto la tastiera — e con lui il campo che stai scrivendo e i risultati che
+compaiono sotto.
+
+Il rimedio provato faceva tre cose: alzava il fondo del foglio misurando
+`visualViewport`, portava il campo in cima con `scrollIntoView`, e limitava la
+lista allo spazio rimasto. **Alla prova sul telefono lo scroll e' peggiorato**,
+ed e' stato tolto: il codice e' tornato identico a prima.
+
+Il difetto piu' grosso e' anche il piu' facile da vedere a posteriori:
+`scrollIntoView` stava dentro `oninput`, quindi girava **a ogni tasto
+battuto** — la pagina si muoveva sotto le dita mentre si scriveva. Spostare
+poi il foglio con `visualViewport` mentre iOS sta gia' scorrendo per conto suo
+aggiungeva un secondo movimento sopra il primo.
+
+Resta scritto qui perche' la tentazione di riprovarci e' forte, e perche' la
+regola che ne esce vale in generale: **lo scroll non si tocca mentre l'utente
+scrive.** Un rimedio che rende imprevedibile il movimento della pagina e'
+peggio del fastidio che cura — la tastiera che copre il fondo e' scomoda, ma
+prevedibile.
+
+### I pasti del giorno vanno in ordine di orario
+
+Un giorno si legge dall'alto in basso come lo si vive. Aggiungere uno spuntino
+delle 16:30 e vederlo comparire sotto la cena e' il genere di cosa che fa
+riscrivere la settimana da capo.
+
+Ma non tutti i pasti hanno un'ora, e per quelli non esiste un ordine giusto da
+calcolare: l'unico che lo sa e' chi mangia. Da cui la regola di
+`ordinaSlotOrari()`: **si ordinano solo le voci con l'ora**, e finiscono nelle
+posizioni che le voci con l'ora occupavano gia'. Le altre restano inchiodate al
+loro indice, e si spostano trascinandole.
+
+Il trascinamento e' a pointer events e non HTML5 drag-and-drop, che su iOS non
+esiste: col dito non parte proprio. La maniglia e' un elemento a se' e non
+tutta la riga — toccando la riga si apre il pasto, e se il trascinamento
+partisse da ovunque non si potrebbe piu' scorrere la pagina con il dito sopra
+l'elenco. Le altre righe si spostano davvero mentre trascini: senza, non si
+capisce dove andra' a finire quella che si ha in mano.
+
+**E l'ordinamento sta in `fondiPiano()`, non nell'inserimento.** All'inizio si
+riordinava quando si aggiungeva un pasto, e bastava: chi componeva la settimana
+vedeva le righe al posto giusto. Ma un piano si scrive anche da un file di
+scambio, da un backup, o a mano nell'editor della settimana, e per tutte quelle
+strade nessuno passava di li' — la stessa giornata usciva ordinata dall'editor
+e disordinata su Oggi. Ordinando in lettura la domanda "chi l'ha scritta" non
+si pone piu': `ordinaSlotOrari()` e' idempotente e non tocca le voci senza ora,
+quindi rifonderlo mille volte da' sempre la stessa giornata, con i trascinamenti
+a mano ancora dove li avevi lasciati.
+
+### Un elenco lungo vuole un campo di ricerca
+
+Ventiquattro ricette e cinquantanove esercizi non si scorrono: si cercano. Il
+campo c'era gia' in **Gym > Esercizi** e mancava nei due posti in cui l'elenco
+delle ricette e' piu' lungo — il passo **Le tue ricette** e il foglio in cui si
+sceglie la ricetta di un pasto.
+
+Due decisioni:
+
+- **si cerca anche negli ingredienti.** La domanda che porta li' non e' "come
+  si chiama" ma "cosa ho con dentro il tofu", e un nome come "Bowl completa"
+  non risponde. Le parole si contano tutte: "ceci forno" trova la ricetta che
+  ha tutti e due, in qualunque ordine.
+- **il filtro non passa da `route()`.** Ridisegnare la vista a ogni lettera fa
+  perdere il fuoco al campo, e su un telefono questo chiude la tastiera. E'
+  la stessa regola gia' scritta per l'elenco degli esercizi, e vale ovunque
+  ci sia un campo che filtra mentre scrivi.
+
+Quando non trova niente lo dice, e nel foglio del pasto aggiunge la strada
+che resta: **"se e' un alimento solo, qui sotto lo metti senza farne una
+ricetta"** — cioe' proprio la sezione che sta due dita piu' giu'.
+
+### L'elenco degli esercizi dice quali hanno l'esecuzione
+
+"Come si esegue" c'e' solo per gli esercizi collegati ai fotogrammi del
+catalogo pubblico, e l'unico modo di sapere quali erano era **aprirli uno per
+uno**. Ora la riga porta una pastiglia `▶` quando `esecDi()` risponde, cosi'
+si vede scorrendo.
+
+E' un `<span>`, non un bottone: la riga **e' gia'** un `<button>`, e un bottone
+dentro un bottone non e' HTML valido — il tocco finirebbe a volte su uno e a
+volte sull'altro. La pastiglia dice che c'e' qualcosa da vedere; a vederlo ci
+si va dalla scheda, come prima.
+
+### La pastiglia ▶ porta all'esecuzione, e la carta non chiede piu' di collegarla
+
+Segnalato cosi': *"il click sulla capsula del play per gli esercizi con
+video/foto non porta direttamente al video ma bisogna premere collega
+esecuzione"*. Erano **due difetti**, e il secondo non si vedeva senza il primo.
+
+**1. La carta guardava la mappa, l'elenco guardava tutto.** `esecDi()` risponde
+da due posti — il collegamento fatto a mano (`P().esec`) e l'`exdbId` che un
+esercizio si porta dietro dall'import — mentre `sheetSchedaEsercizio()`
+leggeva solo `esecMappa()[id]`. Quindi ogni esercizio importato dal catalogo
+online aveva la pastiglia `▶` nell'elenco (che passa da `esecDi`) e dentro la
+carta il bottone **"Collega l'esecuzione"** con sotto la nota *"il
+collegamento si fa una volta"* — su un collegamento che c'era gia'. Due
+schermate che rispondono in modo opposto alla stessa domanda: quella
+sbagliata e' sempre quella che chiede di rifare un lavoro gia' fatto.
+
+**2. La pastiglia non si toccava.** Diceva "qui c'e' qualcosa da vedere" e
+poi mandava dove mandava tutta la riga, cioe' alla carta. Resta uno `<span>` —
+un `<button>` dentro un `<button>` non e' HTML valido, ed e' scritto poco piu'
+su — ma a distinguere il tocco e' il gestore della riga, che e' uno solo:
+`ev.target.closest('.pill.esec')`. E siccome adesso e' un bersaglio, ha la
+taglia di un bersaglio: 28 px di altezza contro 20, ripresi con un margine
+negativo perche' la riga non si alzi (misurato: pastiglia 37×28, riga ferma a
+62).
+
+**Nello stesso giro, un bottone che non faceva niente.** `esecDi()` metteva
+l'`exdbId` **prima** della scelta a mano, quindi "non e' questo: collegane un
+altro" scriveva nella mappa e sullo schermo non cambiava nulla — ed era
+l'unica strada per correggere un'esecuzione sbagliata. L'ordine giusto e'
+l'opposto, e la ragione e' che i due valori non sono la stessa cosa:
+**l'`exdbId` e' una supposizione dell'import, il collegamento a mano e' una
+scelta.** Verificato: scelto "Cross-Body Crunch" su un crunch inverso
+importato, `esecDi` risponde con quello; tolto il collegamento, torna quello
+dell'import.
+
+### Esercizi: una pagina, non un foglio
+
+"Esercizi" apriva un foglio con dentro solo i propri, e i 59 del catalogo non
+si vedevano da nessuna parte: per sapere se una cosa c'era gia' bisognava
+aprire una scheda e scorrere la tendina. Ora e' una sezione di Gym con tutto
+dentro, la ricerca sopra (nome, attrezzo e gruppo muscolare) e un **+** che
+apre le due strade — il catalogo online o la scrittura a mano.
+
+Il filtro non passa da `route()`: ridisegnare la vista a ogni lettera fa perdere
+il fuoco al campo, e su un telefono la tastiera si chiude.
+
+Accanto alla ricerca ci sono i **gruppi muscolari come pastiglie**, e non sono
+un doppione del campo di testo: la domanda vera non e' "come si chiama" ma
+"cosa ho per i femorali", e a quella si risponde toccando. Col filtro acceso
+ogni riga dice se quel gruppo e' primario o **secondario** — e' la differenza
+fra "allena i femorali" e "li usa un po'". Un gruppo senza esercizi non compare
+(sarebbe un bottone verso una lista vuota) e ritoccare quello scelto lo toglie,
+che e' piu' rapido di cercare un "azzera".
+
+Nello stesso giro e' sparita l'ultima tendina rimasta, quella della riga di
+scheda: con 59 voci un `<select>` non e' piu' un selettore, e' un elenco da
+scorrere col pollice — e su iPhone la tendina di sistema copre mezzo schermo.
+Al suo posto lo stesso `selettoreCercabile()` degli alimenti.
+
+### Il codice a barre sta dove hai in mano la confezione
+
+Il lettore c'era da tempo e non lo trovava nessuno: viveva dentro la pagina
+Prodotti, che si raggiunge dal menu in alto a destra — cioe' nel punto piu'
+lontano possibile da chi ha la scatola in mano e vuole registrarla.
+
+`leggiCodice(onValori)` lo rende richiamabile da ovunque: sceglie da solo fra
+fotocamera e digitazione, e **restituisce i valori** invece di finire per forza
+nel registro dei prodotti. Da li' il bottone e' entrato in **Piano → Cosa mangi
+→ Aggiungi un alimento**, accanto a "Cerca su internet".
+
+Tre cose che cambiano a seconda di dove arrivano i numeri, e non sono dettagli:
+
+- **prodotto gia' registrato** — i valori li ha scritti l'utente leggendo
+  l'etichetta, quindi niente `origine` e l'alimento nasce `verificato`;
+- **Open Food Facts** — `origine: 'openfoodfacts'`, quindi `stima` finche' non
+  si tocca "li ho controllati sulla confezione", e ci passa sopra `coerenza()`
+  come per la ricerca per nome: quei numeri li inseriscono le persone, e un
+  prodotto che dichiara 30 kcal con 20 g di proteine e' un errore di battitura;
+- **solo il codice** — l'utente scrive i valori qui, dall'etichetta: `verificato`.
+
+E quello che si era gia' scritto nel modulo non si perde ne' andando al lettore
+ne' tornando indietro: `compilato()` esisteva gia' per la ricerca online e vale
+anche qui.
+
+### Il catalogo esercizi
+
+59 voci in `data/palestra.json`. Le 25 aggiunte per ultime vengono da schede
+reali (varianti al multipower, ai cavi, con la trap bar, la panca Scott, i dips
+fra due panche). Restano fuori i doppioni di quello che c'e' gia': **un secondo
+id per lo stesso esercizio spezzerebbe in due lo storico dei carichi e il
+conteggio del volume**.
+
+Le varianti invece sono voci distinte, e non e' pignoleria: su "lat machine" e
+"lat con triangolo" i carichi sono diversi, e la progressione si legge per
+esercizio. Ogni voce dichiara primari e secondari fra i 13 gruppi del modello —
+uno che non colora niente non conta da nessuna parte.
+
+### Il resoconto e' un documento clinico, non uno screenshot
+
+La prima versione conteneva quello che c'era sullo schermo: verdetto, numeri a
+confronto, cosa non ha funzionato. Utile per chi lo scrive, magro per chi lo
+riceve. Un nutrizionista o un medico che quei numeri non li ha mai visti non
+chiede "come e' andata": chiede **dove** si concentra il problema, **quale**
+pasto salta, **cosa** entra oltre al piano, e soprattutto **quanto e' completo
+il registro** da cui esce tutto il resto.
+
+Da qui `statistiche.js` e otto sezioni in piu':
+
+| Sezione | Perche' un professionista la chiede |
+|---|---|
+| Il registro | Va per prima, e non e' burocrazia: una media di calorie su nove giorni registrati su trenta non e' un'alimentazione, e' quello che si e' avuto voglia di scrivere. Tutto il resto del foglio vale quanto vale questa riga |
+| La ripartizione | Non solo i grammi: la quota di calorie per macro e i **g per kg di peso**, che e' il modo in cui proteine e grassi si leggono in clinica — "135 g" non dice niente senza il peso della persona |
+| Come si distribuisce nella settimana | Non quanto si mangia, ma QUANDO le cose si spostano. Il sabato e il mercoledi sono quasi sempre due diete diverse, e la media dei sette giorni li nasconde tutti e due |
+| I pasti, uno per uno | Quante volte quel pasto era previsto e quante risulta consumato, per slot e per pasto. Il denominatore e' il numero di volte in cui compare nel piano, non i giorni: uno spuntino puo' esserci tre volte a settimana |
+| Fuori dal piano | Le voci ricorrenti con quante volte e quante kcal. E' il dato che di solito manca del tutto |
+| Peso e misure | Prima e ultima rilevazione dentro il periodo, con il ritmo settimanale calcolato sulla **tendenza** e non sulle due pesate agli estremi |
+| Allenamento | Sedute, serie, tonnellaggio, cardio, ritmo settimanale |
+| Integrazione e abitudini | Aderenza per voce, e acqua/sonno/passi/fame/energia contro i target |
+
+Due regole che valgono per tutte: **producono numeri, non giudizi** — "il pasto
+che salti piu' spesso" e' un fatto utile, farne una colpa non aggiungerebbe
+niente e romperebbe la regola sul tono — e **dichiarano il denominatore**, che
+e' l'unico modo di rendere verificabile una percentuale.
+
+Una sola voce assomiglia a un giudizio, l'"aderenza" per giorno della settimana,
+ed e' definita per esteso nel file: **la distanza delle calorie dal target**.
+Non e' un voto sul cibo, che questa app non da'.
+
+### "Inizio" e "Fine" erano lo stesso numero
+
+Segnalato sul resoconto: *"nelle misure vedo una discrepanza, iniziali e
+finali sono uguali"*. Riprodotto, ed era il **caso normale**: il metro si
+passa ogni due settimane e il resoconto piu' usato copre sette giorni, quindi
+dentro il periodo di rilevazioni ce n'e' **una sola**. `statMisure()`
+prendeva la prima e l'ultima di quelle dentro — che con una sola sono la
+stessa — e la tabella stampava lo stesso numero due volte con un trattino al
+posto della differenza. Misurato sulla settimana chiusa con una misura presa
+tre giorni fa: **sei righe su sei** con il numero ripetuto e sei differenze
+mancanti, mentre una rilevazione di dodici giorni prima era li' e non la
+guardava nessuno.
+
+Adesso, quando dentro il periodo ce n'e' una sola, il confronto **parte
+dall'ultima precedente** — `misuraPrimaDi()`, che guarda indietro fino a sei
+mesi — e la riga dichiara da quando: `Vita (ombelico) · dal 19 ago`. Il tratto
+diventa piu' lungo del periodo invece che lungo zero, ed e' la stessa cosa che
+fa gia' il peso, che confronta due valori di **tendenza** e non due pesate.
+
+Se prima non c'e' niente, `prima` resta `null` e la colonna dice `—`: un dato
+che non esiste si dichiara, non si riempie ripetendo l'altro. E una
+circonferenza che davvero non e' cambiata continua a mostrare due numeri
+uguali — con `+0,0 cm` accanto, che e' il modo in cui le due situazioni si
+distinguono a colpo d'occhio.
+
+Verificato sui cinque casi: una dentro piu' una prima (da 6 ripetizioni a 0),
+una dentro e niente prima (sei `—`, nessun numero inventato), due o piu'
+dentro (non va a pescare fuori), una misura ferma (`0,0` e non un trattino),
+e il periodo lungo, che non si e' mosso.
+
+### Il piano su carta
+
+Il resoconto risponde a *com'e' andata*; questo risponde a *cosa devo
+mangiare*, ed e' una domanda che si fa **davanti al frigo** — dove il telefono
+e' spesso in un'altra stanza e quasi sempre con le mani sporche. `pdfPiano()`
+mette i sette giorni con i loro pasti (ora, nome del pasto, ricetta, macro,
+calorie), il target in testa come metro dichiarato, e le quote per giorno,
+perche' i grammi da soli non si confrontano fra giornate di dimensione
+diversa.
+
+**Le ricette stanno in fondo e una volta sola**, numerate, con la riga del
+giorno che rimanda al numero. La stessa colazione compare sette volte su
+sette: ristamparne gli ingredienti ogni volta farebbe quattro pagine di
+ripetizioni al posto di una di elenco.
+
+Due decisioni piccole e non ovvie:
+
+- **la chiave delle ricette e' il codice intero, non `codiceBaseRic()`.**
+  "Pasta con tonno 50/150" e la stessa pesata 150/50 sono due voci diverse
+  nella lista della spesa e devono esserlo anche qui: e' esattamente il caso
+  per cui i pesi per giorno esistono;
+- **le porzioni del diario non ci sono.** Quelle valgono un giorno solo, e
+  questo foglio e' la settimana — la nota lo scrive invece di lasciare che
+  qualcuno trovi grammi diversi da quelli che si ricordava.
+
+Il bottone e' l'icona classica dello scarico — la freccia che entra nel
+vassoio, da Feather, ricopiata in `icone.js` come tutte le altre — accanto al
+titolo del passo, perche' il piano su carta e' un'azione su **tutti e sette**
+i giorni e non ha una casa dentro nessuno di loro.
+
+Nel farlo e' saltato fuori un difetto vecchio: `pianoSezione()` faceva
+`passi[i].t` senza controllare che quel passo esistesse, e i passi non sono
+sempre gli stessi sei — col piano alimentare spento sono due. Un `pianoTab`
+che in quella configurazione non esiste dava una **pagina bianca** invece
+dell'elenco. Adesso ricade sull'elenco dei passi.
+
+Verificato sulle dieci configurazioni della matrice: il PDF si genera in
+tutte, piano di esempio e **piano vuoto** compresi (34,5 kB contro 9,6),
+nessun `undefined`/`NaN` fra le 404 stringhe di testo, nessuna riga oltre il
+margine destro, gli accenti dei giorni interi (`Lunedi`, `Mercoledi` con la
+`i` accentata, non un `?`), e il bottone assente dove il passo non esiste.
+
+### Il resoconto in PDF
+
+Serve a una cosa che sullo schermo non si puo' fare: portarselo via. Il medico
+o l'allenatore non installano la PWA per guardare i tuoi numeri, e uno
+screenshot di sei schermate non e' un documento.
+
+`window.print()` era la strada corta ed e' proprio dove iOS si rompe: dentro
+una web app aggiunta alla Home la finestra di stampa a volte non si apre, e
+quando si apre e' il browser a decidere margini e interruzioni. Quindi il PDF
+si scrive: `pdf.js` e' un generatore vero — testo, righe, rettangoli, cerchi
+(quattro Bezier con kappa 0,5523), ritorno a capo, numerazione delle pagine e
+tabella `xref` con gli offset in byte.
+
+Tre scelte dichiarate:
+
+| Scelta | Perche' |
+|---|---|
+| Solo Helvetica e Helvetica-Bold | Sono fra i quattordici font che ogni lettore ha gia': non vanno incorporati, e il file resta di 10-20 kB invece che di qualche centinaio |
+| Solo WinAnsi | Accenti e virgolette tipografiche ci stanno tutti (`’` sta a 0x92, `—` a 0x97); quello che non entra diventa `?` invece di rompere il file in silenzio |
+| Tavolozza fissa del tema chiaro | Un PDF si stampa su carta bianca. Generarlo scuro perche' il telefono e' in modalita' notturna vorrebbe dire consegnare una pagina nera |
+
+Le larghezze dei caratteri (`PDF_WID`) sono le metriche vere di Helvetica in
+millesimi di em: senza, il ritorno a capo e' a occhio e il testo esce dal
+margine. E' l'unica tabella di dati dentro il codice di questo progetto, e ci
+sta perche' non e' dominio: e' il font.
+
+Il contenuto e' quello della schermata, **nello stesso ordine e con le stesse
+parole**. Riscriverlo per la carta avrebbe voluto dire mantenere due testi che
+dicono la stessa cosa, e prima o poi due testi che dicono cose diverse.
+
+Come si verifica, visto che qui non c'e' un lettore PDF: si riproduce il flusso
+di comandi su un canvas e si guarda, e in piu' si controlla a calcolo che
+nessuna riga superi il margine destro — `x + pdfLarghezza(testo)`, con le
+stesse metriche del ritorno a capo. Controllare solo la `x` di partenza non
+serve: una riga che sfora comincia dentro il margine.
+
+### Un periodo solo per tutta la scheda Andamento
+
+Segnalato cosi': *"il PDF non prende i filtri per le date. Se faccio il primo
+PDF settimanale e il secondo mensile, resta sempre settimanale."*
+
+Misurato, il motore era a posto: `pdfResoconto(per)` produceva il periodo
+giusto da tutte e due le strade, con il nome del file e il testo dentro
+corretti. Il difetto stava un piano sopra, ed era **di struttura**: nella
+stessa scheda vivevano **due periodi diversi**.
+
+| | |
+|---|---|
+| `datiRange` / `datiFine` | il selettore dei grafici — 7/30/90/180 e le date |
+| `revPeriodo` | il selettore della revisione — settimana chiusa, oppure le date |
+
+E due bottoni "Scarica il resoconto in PDF", uno per vista, ognuno con il suo.
+Quindi si sceglievano trenta giorni in **Grafici**, si passava a **Revisione**
+e si scaricava la settimana. Da fuori il filtro sembrava rotto, e in un certo
+senso lo era: arrivava il filtro dell'altra pagina.
+
+`periodoAndamento(da, a, preset)` e' adesso il posto solo da cui il periodo si
+scrive, e tutti e sei i selettori delle due viste passano da li'. E' la stessa
+regola gia' scritta un piano sotto per `datiIntervallo()` — *"l'unico modo di
+scriverlo e' passare da qui con tutte e due le date, cosi' non si puo' piu'
+cambiarne una e dimenticarsi l'altra"* — applicata alle due viste invece che
+ai due estremi.
+
+Tre decisioni:
+
+1. **I default restano diversi, ed e' voluto.** Il cruscotto nasce su trenta
+   giorni perche' guarda un andamento; la revisione sulla settimana chiusa
+   perche' e' l'unita' su cui e' costruita, e perche' l'impegno e "ho letto"
+   si agganciano li'. Ma **appena si sceglie, la scelta vale per tutte e due**:
+   e' la scelta a dover essere una sola, non il punto di partenza.
+2. **`custom` e `settimana` sono due domande diverse**, ed erano lo stesso
+   campo. `custom` dice **come** stai scegliendo — bottone o campi data —
+   `settimana` dice **cos'e'** il tratto. La prima versione le teneva insieme
+   riportando `revPeriodo` a `null` quando le date coincidevano con la
+   settimana, per non far sparire l'impegno; e cosi' **"Scegli le date" non
+   faceva piu' niente**: si apriva sulla settimana che stavi guardando — che e'
+   il punto di partenza giusto — e rimbalzava indietro nello stesso istante.
+
+   Adesso `revPeriodo` e' il modo e basta, e le parole e i cancelli guardano
+   `per.settimana`: sette giorni chiusi restano "la settimana prima" e tengono
+   l'impegno anche se ci sei arrivato dai campi data, e trenta giorni no.
+   Segnalato con tre parole — "il pulsante scegli le date non funziona piu'" —
+   ed era un difetto introdotto dalla correzione precedente.
+3. **`preset` esiste per non perdere una distinzione che si vede.** I quattro
+   bottoni del cruscotto tengono `datiFine` a `null` — *finisce oggi, e segue
+   oggi* — e scriverci dentro una data accenderebbe "Date" come se le avesse
+   messe l'utente.
+
+E i **due bottoni dicono quale periodo scaricheranno**: `Scarica il resoconto
+in PDF · 27 ago – 2 set` e `90 giorni · 6 giu – 3 set`. Sono due porte allo
+stesso documento, e con due porte "in PDF" da solo lascia aperta esattamente
+la domanda che ha fatto sembrare rotto il filtro.
+
+### Il PDF si apre con chi e', non con quanto ha mangiato
+
+Il resoconto raccontava **un periodo** e cominciava dai numeri. Ma chi lo
+riceve — un nutrizionista, un medico, un allenatore — quei numeri non li ha
+mai visti, e prima di leggerli ha bisogno di sapere **di chi sono** e **dove
+sta andando** quella persona: le medie settimanali di qualcuno di cui non si
+sa quanto e' alto, quanto pesa e cosa sta cercando di fare sono numeri senza
+soggetto.
+
+**Profilo e' quindi la prima pagina**, non una sezione a meta' documento, e
+dopo di lei si va a capo pagina: il verdetto comincia pulito invece di
+appoggiarsi in fondo a un grafico.
+
+Dentro: chi, la sagoma disegnata sulle circonferenze vere con il riferimento
+tratteggiato sopra, la tabella ora/target/manca, e quattro figure.
+
+### Quattro figure, quattro soggetti
+
+La prima versione erano **tre piani cartesiani che parlavano tutti e tre di
+grasso** — l'asse y del primo, l'asse x del secondo, l'asse y del terzo. Tre
+disegni per dire tre volte la stessa cosa sono un disegno solo, ripetuto; e
+per giunta erano piccoli, con gli assi su intervalli fissi mezzi vuoti e il
+testo a sei punti. Segnalati come "brutti graficamente, e tutti e tre parlano
+di grasso": tutte e due le critiche erano giuste.
+
+Adesso quattro soggetti diversi, e **quattro forme diverse** — la forma non e'
+decorazione, e' quello che dice se il dato ha una dimensione o due:
+
+| Figura | Il soggetto | Perche' quella forma |
+|---|---|---|
+| **Il peso, giorno per giorno** | il tempo | una serie storica e' una linea: pallini per le pesate, linea per la tendenza a sette giorni, e la riga tratteggiata del riferimento |
+| **Le circonferenze** | il metro | un manubrio per voce, tutte in centimetri sullo stesso asse. E' la stessa figura della revisione settimanale, e non e' un caso: e' la stessa domanda |
+| **Grassa e magra** | la composizione | l'unico che resta un piano a due assi, perche' le **diagonali del peso** dicono una cosa che nessuna tabella sa dire |
+| **La percentuale di grasso** | una fascia | un dato a **una** dimensione: su due assi si riempie mezza pagina di bianco per collocare un numero |
+
+Il piano grassa/magra resta perche' lungo una diagonale la bilancia non si
+muove, e una ricomposizione e' esattamente il movimento che le attraversa —
+verso sinistra e verso l'alto. Quattro numeri incolonnati non lo fanno vedere.
+
+Su peso e composizione c'e' la **scia** delle rilevazioni precedenti: un punto
+dice una posizione, due punti dicono una direzione. Si costruisce sulle date in
+cui la **vita** e' stata misurata — le uniche in cui la composizione ha un dato
+nuovo dalla parte del metro — e per collo e fianchi prende l'ultima misura
+**fino a quel giorno**: `lastMeas()` risponde sempre con l'ultima in assoluto,
+che va benissimo per "adesso" e falserebbe il passato.
+
+I riferimenti disegnati sono **di popolazione, non un giudizio**, ed e' scritto
+sotto ogni figura — la stessa regola delle costanti di Banister:
+
+- **vita/altezza 0,5 e 0,6** di NICE (NG246), ma disegnate **in centimetri per
+  questa altezza**, sulla riga della vita: 0,5 e' un rapporto, `90 cm` e' un
+  numero con cui si puo' fare qualcosa davanti a uno specchio. La nota riporta
+  anche l'obiezione della letteratura — quelle soglie penalizzano gli adulti
+  bassi, perche' la vita non cresce in proporzione all'altezza. Una soglia con
+  una critica nota si consegna con la critica;
+- **le fasce di grasso corporeo** dell'American Council on Exercise, distinte
+  per sesso, con la nota che "atleti" descrive dove si trova chi gareggia, non
+  dove dovrebbe stare chi legge.
+
+E la regola di sempre, che qui vale doppio perche' il foglio finisce in mano a
+qualcun altro: **niente date di arrivo.** Le figure dicono dove sei e dove
+punti, la distanza si legge sugli assi; quanto ci vuole non e' scritto da
+nessuna parte.
+
+Cinque difetti trovati **guardando la pagina**, non leggendo il codice:
+
+1. la freccia `→` non esiste in WinAnsi, e usciva `84,0 ? 79,0`. Il generatore
+   segnala cosi' un carattere che non ha, ed e' esattamente il tipo di cosa che
+   in un documento da consegnare non si nota finche' non e' stampato. Ci va
+   `›`, che in WinAnsi c'e';
+2. `doc.paragrafo` non conosce il grassetto, e i `**` di una didascalia
+   uscivano come asterischi;
+3. l'etichetta dell'asse x stava sulla riga delle tacche, dove a destra c'e'
+   sempre l'ultima etichetta: si stampavano una sopra l'altra;
+4. l'ultima tacca cade sul bordo destro, che in un grafico largo tutta la
+   pagina **e' il margine**: centrata, l'etichetta ci finiva sopra per meta'.
+   `pdfDentro()` la rientra, misurando con le stesse metriche di Helvetica che
+   usa il ritorno a capo;
+5. nella fascia del grasso i nomi delle fasce e le due etichette degli
+   indicatori stavano sulla stessa riga, e `rif. 10,0%` finiva stampato sopra
+   `atleti`. Tre livelli invece di due, e i due indicatori si scostano quando
+   sono vicini.
+
+Il PDF ha percio' un primitivo in piu': `doc.percorso()` porta dentro la
+pagina un `d` di SVG fatto **solo di `M`, `C` e `Z`**. Non e' un parser e non
+prova a esserlo — `smooth()`, la funzione che disegna la sagoma, emette
+esattamente quei tre comandi perche' una Catmull-Rom diventa cubiche e basta —
+e quello che non e' M/C/Z **fa lanciare**: un `A` ignorato in silenzio darebbe
+una figura con un pezzo mancante, che e' il tipo di difetto che non si vede
+finche' non lo si cerca.
+
+E la sagoma di riferimento, che sullo schermo e' verde tratteggiata, su A4
+prende **un colore suo**: li' la figura sta in quattro centimetri, e due verdi
+a un millimetro di distanza sono la stessa linea.
+
+### La classe per l'AI, e perche' non tiene una chiave
+
+Serve a valutare il piano, proporne una modifica, comporre una ricetta,
+aggiungere un alimento. Per adesso c'e' **solo la classe**: nessuna
+configurazione, nessuna interfaccia, nessuna chiave. Finche' nessuno chiama
+`configura()` ogni richiesta si ferma con `AI_NON_CONFIGURATA`, che e' meglio
+di partire verso un indirizzo inventato.
+
+Tre vincoli la disegnano, e vengono prima di qualunque comodita'.
+
+**1. Non c'e' un server, quindi non c'e' un posto dove nascondere una chiave.**
+E' lo stesso motivo per cui ExerciseDB e API Ninjas sono state scartate quando
+serviva un catalogo esercizi: una chiave nel codice della pagina e' una chiave
+regalata. `configura()` non prende ne' un URL ne' un segreto: prende un
+**trasporto**, cioe' una funzione `(richiesta) => Promise<testo>` che qualcun
+altro fornira'. Che dietro ci sia un Cloudflare Worker, un proxy o un
+incollaggio a mano non la riguarda, e la classe un segreto non lo vede mai.
+
+**2. Niente si applica da solo.** Ogni compito restituisce una **proposta**:
+un testo e un elenco di `azioni` gia' pulite, che pero' le esegue qualcun
+altro dopo un tocco — `applicata: false` e' un campo, non un commento. E' la
+stessa regola del target ricalibrato: cambiare di nascosto il metro con cui
+l'app giudica le giornate vuol dire che un giorno buono diventa storto senza
+che l'utente abbia fatto niente di diverso.
+
+**3. Le regole dell'app sono un filtro in uscita, non un'istruzione.**
+`AI_REGOLE` finisce nel prompt — niente punteggi al cibo, niente pasti saltati,
+niente date di arrivo — ma `valida()` ricontrolla quello che torna, perche' un
+modello che ignora un'istruzione e' un **caso normale**. Quando una risposta
+tocca una di quelle cose il verdetto non si stampa: resta un avviso che dice
+che e' stato tenuto fuori.
+
+E i numeri passano dagli stessi controlli del resto dell'app: `coerenza()` —
+quella di Open Food Facts — butta un alimento che dichiara 30 kcal con 20 g di
+proteine; una ricetta che nomina un alimento che non hai viene scartata invece
+di crearlo; i macro di una ricetta **non** si leggono dalla risposta ma si
+calcolano da `macroDaIngredienti()`; e un alimento generato nasce
+`fonte: 'stima'`, **mai** `verificato` — quello e' di chi ha letto l'etichetta
+sulla confezione.
+
+**Il contesto e' piccolo di proposito, e non per il costo:** e' roba che esce
+dal telefono. Ogni compito dichiara quali fette porta con se' — profilo,
+target, settimana, ricette, alimenti — e **il diario non c'e'**. Se un compito
+un giorno ne avesse bisogno andrebbe aggiunto li', di proposito e con un nome,
+invece di scivolarci dentro.
+
+Ultima cosa, detta nell'errore e non nascosta: **l'assistente e' l'unica parte
+dell'app che non funziona offline**, e senza rete si ferma subito invece di
+far aspettare dieci secondi un trasporto che non puo' riuscire.
+
+### L'assistente: una nuvoletta, tre domande, e nessuna risposta finta
+
+`ai.js` sapeva **comporre** una domanda e **validare** una risposta, e non lo
+usava nessuno: era una classe senza una porta. `assistente.js` e' la porta —
+una nuvoletta che si sposta dove vuoi e un foglio di vetro che apre — e resta
+l'unico posto da cui una domanda si fa.
+
+**Il periodo e' un presupposto, non una domanda.** *"Come sta andando"* senza
+dire da quando a quando non e' una domanda: la stessa richiesta fatta oggi e
+fra un mese direbbe cose diverse senza che si veda perche'. Sta quindi in una
+riga appesa sotto la testata, **fuori da quello che scorre** — la prima
+versione la metteva in cima al corpo e bastava una risposta perche' scorresse
+via, lasciando la conversazione a parlare di un tratto che non si vedeva
+piu'. Chiusa e' una riga (`PERIODO · 29 ago – 4 set · 7 gg · cambia`), aperta
+sono i tre preset e le due date.
+
+E **non e' un selettore nuovo**: passa da `periodoAndamento()`, cioe' lo
+stesso periodo della scheda Andamento, e la nota lo scrive. Due stati per lo
+stesso concetto sono l'errore gia' pagato con il PDF del resoconto, e un terzo
+qui non serviva a niente.
+
+**Si tocca, non si scrive.** Le tre domande che uno si fa davvero — *il piano
+regge? come sta andando? cosa non va?* — sono tre carte che dicono gia' **cosa
+guarderanno**, perche' un bottone che non dice cosa fara' e' un bottone al
+buio. Il campo libero resta in fondo per tutto il resto: e' l'ordine di
+un'assistenza, non di una chat.
+
+**E tre che chiedono una proposta, non un giudizio.** `ai.js` sapeva comporre
+anche `modificaPiano`, `nuovaRicetta` e `nuovoAlimento` — sono nati con la
+classe — e non c'era **nessun modo di sceglierli**: i compiti che producono
+un'azione (`assegnaPasto`, `creaRicetta`, `creaAlimento`) restavano scritti
+nel codice e basta. Stanno in un gruppo loro (`Chiedi una proposta`) e non
+mescolati agli altri tre: i primi **guardano** quello che c'e' gia', questi
+**propongono** qualcosa di nuovo, e sono due momenti diversi. Come tutto il
+resto, quello che torna resta una proposta: la esegue l'utente con un tocco.
+
+Due delle tre non si possono fare senza sapere **cosa**: *"componi una
+ricetta"* senza dire quale, e *"aggiungi un alimento"* senza dire quale, sono
+domande a cui si puo' rispondere qualunque cosa. Quelle non partono: **puntano
+il campo di scrittura**, che e' gia' il posto in cui si scrive — aprire un
+foglio a parte sarebbe un secondo posto per la stessa cosa. Una pastiglia
+viola sopra il campo dice a chi sta parlando, il segnaposto dice cosa
+scrivere, e la ✕ riporta alla domanda libera: un campo che ha cambiato
+mestiere senza una strada indietro e' un campo bloccato. Mandata la richiesta
+si scioglie da solo, o la domanda dopo partirebbe come un secondo brief per la
+stessa ricetta.
+
+Col piano alimentare spento restano solo quelle che hanno senso — via
+`valutaPiano`, `modificaPiano` e `nuovaRicetta`, resta `nuovoAlimento`, che
+l'elenco degli alimenti c'e' comunque. Verificato: da sette carte a quattro.
+
+E cambiano forma: **prima della prima domanda** sono tre carte alte, che e' il
+momento in cui non sai ancora cosa puoi chiedere; **dopo** diventano tre
+pastiglie in fila, perche' da li' in poi la cosa da leggere e' la risposta e
+tre carte da settanta pixel la spingerebbero sotto il bordo.
+
+**Non c'e' un trasporto, e non si finge che ci sia.** Al posto della risposta
+l'assistente consegna **la domanda gia' scritta**, con dentro i numeri del
+periodo, e un bottone per copiarla. Non e' un ripiego travestito: il lavoro
+vero di `ai.js` e' comporre quel testo, e una domanda da incollare dove vuoi e'
+piu' utile di una schermata che dice "non configurato" e piu' onesta di una
+che finge di rispondere. Quando un modello ci sara', l'unica riga che cambia e'
+quella: `ai.chiedi()` al posto di `ai.testoRichiesta()`, e la risposta passa
+gia' dal filtro in uscita che c'e' da prima.
+
+**Cosa esce dal telefono, e cosa no.** Due fette nuove nel contesto, `periodo`
+e `previsioni`, e sono **numeri gia' aggregati**: il registro, le medie contro
+i target, il ritmo del peso, le sedute, le proiezioni con la banda e l'R².
+Chiesti alle stesse funzioni del resoconto in PDF — due versioni degli stessi
+numeri prima o poi divergono. **Il diario giorno per giorno non c'e'**, e non
+cambia perche' la domanda e' "come sta andando": misurato mettendo dei
+canarini riconoscibili in quaranta giornate (un pasto fuori piano con un nome
+inventato, passi e sonno di un giorno), nessuno dei sette compiti ne fa uscire
+uno, e nel contesto ci sono al massimo **due date intere** — `da` e `a`. I
+prompt pesano fra 2,2 e 13,4 kB.
+
+**Il vetro.** `backdrop-filter: blur(26px) saturate(180%)`, un orlo chiaro di
+un pixel, una luce interna in alto e un'ombra col viola dentro. Dove
+`backdrop-filter` non c'e' resta un fondo pieno leggibile: **il vetro e' il
+modo, non il contenuto** — la stessa regola del `color-mix` della mappa
+muscolare. Il viola e' una tinta sua e non ne riusa nessuna: il verde vuol
+dire "in linea", l'ambra "fuori target", l'oro "in piu'", e sono tre
+significati gia' presi. `--ai-1` (#6A48E0) e' l'unico che porta testo bianco
+sopra — 5,7:1, sopra la soglia anche per il corpo del testo — e `--ai-2` sta
+solo nei gradienti e nei bordi, dove non ci scrive niente.
+
+**La nuvoletta si sposta e si appoggia.** Pointer events e non il
+drag-and-drop dell'HTML5, che su iOS col dito non parte — la stessa scelta
+gia' fatta per riordinare i pasti. Sotto i sei pixel di movimento il gesto e'
+un tocco e apre; sopra e' un trascinamento, e al rilascio la nuvoletta si
+**appoggia al lato piu' vicino**: una pastiglia lasciata a meta' schermo copre
+il contenuto e non si capisce se e' finita li' apposta. La posizione sta in
+**percentuale** (`S.settings.aiPos`), non in pixel, o ruotando il telefono
+finirebbe fuori dallo schermo, e i due estremi verticali sono la topbar e la
+tab bar — verificato su dieci configurazioni per sedici rotte che non ci
+finisce mai sopra.
+
+Il luccichio passa **una volta sola**, all'ingresso. L'unica animazione
+perpetua di quest'app resta la fiamma della striscia, e ci sta perche' il
+riempimento porta un dato: uno scintillio senza fine su una pastiglia sarebbe
+decorazione, e a batteria.
+
+**Nasce spento**, ed e' un modulo come gli altri (`Cosa ti serve`, che adesso
+sono tre): non e' collegato a nessun modello, e acceso a tutti sarebbe una
+nuvoletta che galleggia su ogni schermata per comporre un testo che quasi
+nessuno ha chiesto. Spegnerlo non cancella niente — la posizione resta dov'e'.
+
+Gli strati, dal basso: tab bar 20, nuvoletta 28, foglio dell'app 40, velo 45,
+pannello 46, toast 50. Cosi' con un foglio aperto la nuvoletta sta **sotto**,
+e un toast si vede anche sopra l'assistente.
+
+### Il conto del giorno: un anello, e "bruciate" che non si somma
+
+Erano quattro barre in fila — calorie, proteine, carboidrati, grassi — e le
+calorie erano una colonna come le altre. Ma delle quattro non sono una come le
+altre: **le calorie sono la domanda, gli altri tre sono come e' fatta la
+risposta.** Una barra alta quattro pixel e larga un quarto di schermo per il
+numero che si guarda dieci volte al giorno era il posto sbagliato.
+
+Adesso le calorie sono un **anello**, con dentro quello che resta, e ai lati i
+due fatti che lo spiegano: **quanto e' entrato** e **quanto e' stato bruciato**.
+
+**E "bruciate" NON entra nel conto.** E' la riga su cui quasi tutte le app
+sbagliano — MyFitnessPal calcola `restano = target − mangiato + bruciato` — e
+qui e' vietato da sempre: il dispendio che il filtro di Kalman misura nasce dal
+bilancio fra quanto mangi e come cambia il peso, quindi **contiene gia' tutto
+il movimento**, allenamenti compresi. Sommarlo di nuovo sarebbe contarlo due
+volte. Sta li' perche' e' un dato vero — quanto lavoro hai fatto oggi — e
+sotto il numero c'e' scritto **`non si sommano`**. Erano tre righe di
+spiegazione sotto l'anello, ed erano troppe per una carta che si legge in un
+secondo: adesso sono due parole attaccate al numero, dove il numero si guarda.
+Quello che non si poteva fare era toglierle del tutto — quella e' la sola cosa
+che distingue questo numero da un credito da spendere. Quando non c'e' un
+allenamento la colonna resta, spenta e senza la nota: un giorno di riposo e'
+un fatto anche lui, ma non c'e' niente da non sommare.
+
+`restano = target − mangiato`, e basta. Oltre il target il numero non diventa
+negativo: cambia parola (`1200 oltre` invece di `1069 restano`), l'anello si
+riempie e passa all'ambra e poi al rosso, e la riga sotto resta quella di
+sempre — *"Non compensare domani: conta la media della settimana."*
+
+**Tre barre sotto, non quattro, e nessuna riga che le spieghi.** Le fibre
+hanno un target vero (38 g) e una rampa apposta, ma non sono una cosa che si
+guarda dieci volte al giorno come le altre tre: la loro riga sta nel dettaglio
+della giornata. Le tre restano in grammi, `usato / target g`.
+
+E sotto non c'e' niente. La prima versione portava una riga che diceva *"per
+arrivarci mancano 40 g di proteine, 140 g di carboidrati e 37 g di grassi"* —
+cioe' **gli stessi numeri delle tre barre due dita sopra**, riscritti in
+italiano. Una didascalia che ripete la figura non e' una spiegazione, e' una
+riga in piu' da saltare. Restano solo le due frasi che dicono qualcosa che i
+numeri non dicono: che manca il metro, e che oltre il target non si compensa
+il giorno dopo.
+
+**La carta si tocca e apre il dettaglio della giornata.** Chi vuole sapere di
+piu' sul conto che ha davanti tocca il conto — le fibre, i pasti uno per uno,
+gli scarti — invece di risalire a cercare un'altra porta. E' un `<button>` e
+non un `div` con un `onclick`, o la tastiera e VoiceOver non ci arrivano; e
+allora gli serve anche il reset dello stile, o al buio prende il fondo chiaro
+di sistema.
+
+**Senza target l'anello non giudica.** Con `D.target.kcal` a zero — il primo
+avvio, finche' il profilo non c'e' — sarebbe uscito *"0 restano di 0"*, cioe'
+un numero inventato al posto di un metro che manca: la stessa cosa gia'
+vietata per `analyse()`. Il cerchio resta vuoto, al centro c'e' quello che si
+sa davvero (le calorie mangiate, con scritto **senza target**) e la riga sotto
+dice dove si mette il metro.
+
+E l'anello **si disegna gia' pieno al valore giusto** prima di qualunque
+animazione: se l'IntersectionObserver non scatta la pagina e' comunque
+leggibile. E' la stessa regola della bottiglia dell'acqua e della fiamma della
+striscia — il dato sta nel riempimento, il movimento e' solo il modo in cui ci
+si arriva.
+
+Il numero delle calorie che restano non si ripete nella riga sotto: quella
+dice quello che l'anello non puo' dire, cioe' **di cosa e' fatto quel buco**
+(*"Per arrivarci mancano 40 g di proteine, 140 g di carboidrati e 37 g di
+grassi"*).
+
+### Un piatto da una foto: la chiamata vera, non un testo da copiare
+
+Tre passi, e sono tre schermate della stessa: **la foto**, **cosa c'e'
+dentro**, **dove va**. Niente da copiare e niente da incollare — la domanda
+parte, la risposta torna, e quello che si vede e' gia' una proposta da
+correggere. Ci si arriva dalla nuvoletta e, con l'assistente acceso, anche
+**dal fondo di Oggi**: e' la strada piu' corta fra "ho il piatto davanti" e
+"e' registrato", e la sua riga sta prima di "scrivi i valori a mano".
+
+**La foto si scompone, non si riassume.** Il modello non restituisce "un
+piatto da 640 kcal" ma **gli alimenti che vede**, ognuno con i grammi e i
+valori per 100 g. E' come quest'app tiene il cibo da sempre, e da li' discende
+tutto: i grammi si correggono uno per uno prima di salvare, la roba entra in
+un pasto come qualunque altro ingrediente, e se un giorno colleghi un prodotto
+reale a uno di quei nomi i conti si aggiornano da soli. Una riga sola non
+saprebbe fare niente di tutto questo.
+
+Ogni alimento passa da **`coerenza()`**, la stessa di Open Food Facts: su
+numeri guardati in una fotografia serve piu' che altrove. Misurato su una
+risposta con cinque voci, due sbagliate apposta: tre tenute, e due scartate
+con il motivo scritto (`"alimento rotto": i macro darebbero 680 kcal contro le
+100 dichiarate`).
+
+**E il pasto si spunta.** `consumed()` conta solo i pasti spuntati: senza,
+chi ha appena fotografato il proprio pranzo vedrebbe le barre di Oggi ferme —
+l'app direbbe che non ha mangiato niente. Una foto del piatto e' la
+dichiarazione piu' netta che esista di averlo mangiato. Misurato: da 0 a 1186
+kcal, con il pasto congelato come da qualunque altra spunta. Se era gia'
+spuntato non si tocca: gli aggiunti si sommano sopra la ricetta congelata.
+
+Gli alimenti che non hai entrano nello strato del piano con `fonte: 'stima'`,
+**mai `verificato`** — quello resta di chi ha letto l'etichetta. E si creano
+**prima** delle righe nel giorno: una riga che nomina un alimento inesistente
+vale zero calorie, ed e' l'ordine giusto anche se si interrompe a meta'.
+
+**Senza trasporto la chiamata si ferma e lo dice**, con la strada che resta
+aperta — *"la foto e' pronta e la domanda anche, ma non c'e' nessuno a cui
+mandarla: intanto puoi scrivere tu cosa c'era"*. Non un errore in un vicolo
+cieco. Le tre risposte possibili (non configurato, offline, risposta
+illeggibile) hanno tre testi diversi, e solo le ultime due offrono "riprova":
+riprovare senza trasporto darebbe lo stesso errore.
+
+L'immagine viaggia **fuori dal testo** (`richiesta().immagine`, un data URL):
+ogni trasporto la infila nel suo formato — `image_url`, `inline_data`, un
+allegato — e quale sia non riguarda `ai.js`. La foto e' a 900 px e 0,72 di
+qualita': misurato, 10 kB di base64 per un piatto.
+
+Nel farlo, un difetto in `valida()` che c'era da prima: `verdetto` veniva
+azzerato **appena c'era un avviso qualunque**, e gli avvisi comprendono le
+cose scartate strada facendo. Cosi' due ingredienti illeggibili zittivano
+tutta la risposta e chi guardava non capiva perche'. Adesso `vietato` — una
+regola rotta — e' separato da `avvisi`, e solo il primo cancella il verdetto.
+
+Dettaglio di colore che vale come regola: **il viola e' del modello, il verde
+e' dell'app.** Il quadratino della riga su Oggi e la barra dei tre passi sono
+viola; "Aggiungi alla giornata" e' verde, perche' registrare non l'ha deciso
+un modello.
+
+### Un buco nel contesto si dichiara, e si riempie con quello che l'app sa
+
+Segnalato leggendo una risposta vera: *"non essendo presente un obiettivo
+dichiarato, non si puo' dire se questa direzione sia verso o lontano
+dall'obiettivo"*. La frase era **giusta**, ed e' proprio questo che la rende
+un difetto nostro: il contesto usciva con un `"obiettivo": null` nudo, e chi
+lo legge non puo' fare altro che dire che manca.
+
+Ma **un obiettivo, in quest'app, e' una posizione rispetto al dispendio.** Sta
+scritto nel motore da tempo — *"la direzione si misura sul dispendio, non sul
+target, cosi' vale anche per chi ha scelto tieni solo l'obiettivo"* — e
+`controlloPiano()` la calcola cosi'. Senza il nome dell'obiettivo il numero
+resta, e la direzione si legge lo stesso. Il contesto era piu' povero
+dell'app.
+
+Tre correzioni, e sono la stessa cosa detta a tre livelli:
+
+1. **Il dispendio viaggia sempre col target**, e con la sua provenienza:
+   `misurato sul bilancio (filtro di Kalman)` oppure `stimato con
+   Mifflin-St Jeor, non ancora misurato`. E' la regola di sempre — un numero
+   si consegna con da dove viene — e qui e' anche il metro della direzione.
+2. **Niente `null` nudi.** L'obiettivo esce come `{ scelto: false, nota: … }`,
+   e la nota dice cosa si puo' rispondere lo stesso invece di lasciarlo
+   dedurre. Accanto c'e' `piano_vs_dispendio`: media del piano, dispendio, e
+   lo scarto in percentuale. Misurato su un profilo senza obiettivo: prima
+   usciva `{"obiettivo":null}` e basta, adesso escono dispendio 2159 kcal
+   (misurato), pavimento 1874 e un piano che sta il **+15%** sopra — cioe'
+   tutto quello che serve a dire in che direzione va.
+3. **E l'app lo dice prima, non dopo.** Il buco lo scopriva chi leggeva la
+   risposta; adesso il foglio dell'assistente porta in cima le carte di
+   `assMancanze()` — obiettivo non scelto, target a zero, registro
+   incompleto, poche pesate — ognuna con **dove si sistema**, perche' un
+   avviso che non dice come uscirne e' un avviso che si impara a ignorare.
+   Sparisce da sola quando il buco non c'e' piu' (verificato: con l'obiettivo
+   scelto, zero carte).
+
+Il bordo di quelle carte e' viola e non ambra: l'ambra in quest'app vuol dire
+*fuori target*, e qui non c'e' niente di storto — c'e' qualcosa che manca.
+
+Nello stesso giro, un difetto di stato: chiudendo il foglio il pannello resta
+nel DOM per i 220 ms della dissolvenza, e chi riapriva subito si ritrovava due
+`.ai-pan` — il primo che `querySelector` incontra e' quello vecchio, che sta
+sparendo. Da fuori sembra un pannello che non si aggiorna. `assApri()` butta
+i resti prima di cominciare.
+
+### Passare un pezzo di piano
+
+Il backup completo c'era gia' e risponde a un'altra domanda: *come non perdo
+quello che ho*. Prende tutto, e quando lo rimetti **sostituisce** l'archivio —
+che e' esattamente cio' che deve fare un backup.
+
+La domanda che restava scoperta e' un'altra: voglio dare la mia dieta a
+qualcuno, o portarmi le schede sul secondo profilo. Con il backup completo si
+puo' solo consegnare anche sessanta giorni di pesate, che non c'entrano niente
+e non sono neanche sue. Da qui `scambio.js`, con quattro decisioni:
+
+1. **L'import aggiunge, non sostituisce.** Un backup si ripristina; una dieta
+   che ti passa qualcuno si affianca alla tua. Sui nomi che esistono gia' si
+   chiede — "tieni i miei" e' il default — e non si decide di nascosto.
+2. **`raccogli()` legge da `D`, non da `S.piano`.** Lo strato dell'utente e'
+   quasi vuoto per chi sta sul piano di esempio: esportarlo consegnerebbe un
+   file che **non contiene la dieta che mangi**. L'unica eccezione sono gli
+   alimenti: i 44 di base ce li ha gia' chiunque installi l'app, e rispedirli
+   sarebbe solo peso e quarantaquattro finti conflitti.
+3. **Settimana e target non arrivano di default**, sono due interruttori. I
+   target sono tarati su altezza, peso ed eta' di chi ha fatto quel piano; la
+   settimana riscrive l'assegnazione di sette giorni. Prendere i pasti senza
+   prendere quei due e' il caso normale, non l'eccezione.
+4. **Le schede si portano dietro i loro esercizi** (quelli personalizzati, presi
+   da `S.palestra.esercizi` per gli `ex` che citano), altrimenti dall'altra
+   parte arriva una scheda con le righe che puntano al nulla. E ogni scheda
+   importata prende un **id nuovo**: due schede con lo stesso id e la seconda
+   non si apre piu', perche' `scheda(id)` trova sempre la prima.
+
+Il diario non viene toccato in nessun caso, e la UI lo dice due volte.
+
+Un backup completo caricato qui per sbaglio non e' un errore dell'utente: e' un
+file giusto nella porta sbagliata. E la cortesia deve valere **nelle due
+direzioni**: per un po' non e' stato cosi'. Il carica-scambio riconosceva un
+backup e lo rimandava indietro, mentre l'importa-backup davanti a un file di
+scambio diceva "formato non riconosciuto" — un vicolo cieco, e per giunta
+falso, perche' quel formato l'app lo conosce benissimo. Segnalato da chi ci e'
+finito dentro esportando le schede su un secondo dispositivo.
+
+Adesso nessuna delle due rimanda a cercare un altro bottone: **apre quella
+giusta**. Chi ha scelto un file lo vuole importare, e sapere quale dei due
+pulsanti l'app si aspettava non e' un problema suo.
+
+**Le righe che puntano al nulla si dicono prima.** Gli esercizi del catalogo
+di base non viaggiano nel file — ce li ha gia' chiunque abbia l'app, e
+spedirne cinquantanove sarebbe solo peso — ma "chiunque" vale finche' i due
+dispositivi hanno lo stesso `data/palestra.json`. Uno fermo a una versione
+vecchia e la riga arriva senza il suo esercizio. `orfani()` li conta e
+l'anteprima li nomina: non e' un motivo per rifiutare il file, e' un motivo
+per dire perche' quella scheda si aprira' con delle righe vuote — e che di
+solito si risolve aggiornando l'app.
+
+Nota di robustezza trovata nello stesso giro: `riassuntoBackup()` dava per
+scontato `o.profili.lista`, e un backup troncato faceva morire l'anteprima a
+meta' foglio invece di dire che il file non conteneva niente.
+
+### Il backup e' completo? Misurato, e mancava una cosa sola
+
+Chiesto di verificarlo, e verificarlo vuol dire riempire **ogni angolo** dello
+stato — quaranta campi fra diario, piano, palestra, prodotti, sfide, modello,
+HYROX e impostazioni, piu' un secondo profilo — esportare, e camminare l'albero
+campo per campo confrontando quello che c'era con quello che e' nel file.
+
+Il risultato: **zero campi persi** e **zero chiavi di `localStorage` fuori dal
+backup**. Il formato 2 porta tutti i profili, l'anteprima dell'import li conta
+tutti e due, e il file di prova pesava 27,9 kB. Su questo lato non c'era niente
+da riparare.
+
+**Mancavano le foto**, e non per dimenticanza: sono Blob in IndexedDB perche'
+in `localStorage` non ci starebbero. La cosa era gia' scritta — ma **in fondo
+al foglio dell'import**, cioe' dopo, quando il file l'hai gia' fatto. Chi
+esporta e chiude non lo legge mai, e si porta a casa una copia che crede
+completa.
+
+Adesso le foto hanno un file loro (`fotoEsporta()` / `fotoImporta()`), e la
+riga in Impostazioni lo dice **prima**. Tre decisioni:
+
+- **JSON con le immagini in base64, non uno zip.** Uno zip scritto a mano
+  andrebbe anche letto a mano, e un export che non si puo' reimportare non e'
+  un backup: e' un salvataggio. Il prezzo e' il 37% di peso in piu' — misurato,
+  non stimato a occhio — e si dichiara **prima** di cominciare, insieme a
+  quante foto sono e a quanto pesano sul telefono;
+- **stesso id, stessa foto.** Rimettere lo stesso file due volte non duplica
+  niente: `fotoSalva` fa un `put`, e uno scatto sostituisce se stesso.
+  Verificato: due import di fila lasciano tre scatti, non sei;
+- **il file delle foto entra dalla porta del backup.** Sono tre bottoni che
+  chiedono tutti e tre un `.json` e da fuori si somigliano — la stessa
+  cortesia gia' fatta per il file di scambio: chi ha scelto un file lo vuole
+  importare, e sapere quale porta l'app si aspettava non e' un problema suo.
+
+E `S.settings.nFoto` — il contatore che i traguardi leggono, perche' si
+calcolano sincroni mentre le foto stanno in IndexedDB — si riallinea dopo
+l'import, o resterebbe quello di prima.
+
+Verificato sul giro completo: tre scatti dentro, esportati, magazzino
+svuotato, reimportati, e confrontati **byte per byte** — tre su tre identici,
+metadati compresi (giorno, posa, dimensioni, peso di quel giorno).
+
+Nota sull'attrezzatura, non sul codice: **IndexedDB non risponde sotto
+`--virtual-time-budget`** in questo headless — misurato, `fdb()` non chiama
+mai `onsuccess`. Il magazzino si sostituisce stubbando `ftx()`, che e' una
+dichiarazione di funzione e quindi vive sull'oggetto globale; `fotoTutte` e
+compagni sono `const` e riassegnarli su `window` non cambia quello che vedono.
+
+### Le copie automatiche: il backup che non dipende dalla memoria
+
+Segnalato cosi': *"il mio iPhone e' andato out of memory e ha cancellato
+tutti i dati; l'ultimo backup era di una settimana prima, le foto
+nell'IndexedDB si sono mantenute"*. localStorage e' sparito, il magazzino
+accanto no. E il backup fino a quel giorno stava solo nel file che bisogna
+ricordarsi di esportare — cioe' l'unica copia che dipende dalla memoria di
+una persona.
+
+Adesso ogni tre giorni `copie.js` mette da parte **lo stesso backup del
+menu** — `esportabile()`, tutti i profili, formato 2 — in un database
+IndexedDB suo. Non c'e' un formato nuovo: rimettere una copia passa da
+`sheetImport()`, cioe' dalla stessa anteprima e dalla stessa conferma di un
+file esportato. Verificato: il testo della copia e' identico, carattere per
+carattere, a quello che scaricherebbe "Esporta il backup".
+
+**Dove si trova quando serve.** Dopo una cancellazione l'app riparte dal
+benvenuto, e li' la domanda *"da cosa vuoi partire?"* ha una risposta che
+nessuna delle due strade offriva: **da dove eri**. Se sul telefono c'e' una
+copia, `cartaRipristino()` sta sopra tutto — la data, i giorni registrati,
+"Guarda e rimetti". Se non c'e' la carta non compare, e chi installa per la
+prima volta non vede niente. Nel menu del ⋯ la voce sta accanto all'export,
+con a destra la data dell'ultima: e' la stessa cosa fatta da sola.
+
+Cinque decisioni:
+
+1. **Un database suo, non una tabella in quello delle foto.** Aggiungerla
+   vorrebbe dire alzare la versione di `dieta-foto` e passare
+   dall'aggiornamento di un magazzino che contiene gli scatti di mesi: per
+   una comodita' non vale il rischio.
+2. **Una giornata vuota non si copia.** Dopo una cancellazione l'app riparte
+   a zero, e una copia di zero spingerebbe fuori quelle buone. Il benvenuto
+   non copia per costruzione (`pianoScelto()`), e uno stato senza nemmeno un
+   giorno pieno nemmeno.
+3. **La copia piu' completa non si butta mai.** Se ne tengono le ultime
+   cinque *piu'* quella con piu' giorni registrati. Di solito coincidono, e
+   smettono di coincidere esattamente dopo una perdita — cioe' proprio
+   quando serve. Misurato su otto copie con la piu' vecchia da 400 giorni:
+   ne restano sei, lei compresa.
+4. **Il controllo gira anche al ritorno in primo piano**, non solo
+   all'avvio: una web app aggiunta alla Home resta in memoria per giorni
+   senza ripartire, e un controllo solo all'avvio in quei giorni non
+   girerebbe mai.
+5. **Non lancia e non si appende.** Se IndexedDB non c'e' l'app vive lo
+   stesso; e siccome su iOS `indexedDB.open` a volte resta sospeso senza
+   rispondere ne' si' ne' no, il controllo ha un tetto di quindici secondi —
+   senza, il lucchetto contro le copie doppie resterebbe chiuso fino al
+   prossimo riavvio. Trovato in prova: la chiamata d'avvio, partita
+   sull'IndexedDB vero che nell'headless non risponde, bloccava tutte le
+   successive.
+
+**Il limite si dice, dove si decide quanto fidarsi.** Le copie stanno sullo
+stesso telefono: proteggono da una perdita come quella segnalata — il diario
+sparito, il resto rimasto — non da "Cancella dati siti web" ne' dalla
+rimozione dell'app dalla Home, dove se ne vanno insieme a tutto. La copia
+fuori dal telefono resta il file esportato, e il foglio lo scrive.
+
+Dettaglio di lingua trovato sulla carta: *"Del 11 set"*. Si scrive
+*dell'11*, e cosi' *dell'1* e *dell'8* — i tre numeri del mese che
+cominciano per vocale.
+
+### Passi e sonno senza scriverli
+
+Nessuna API web legge HealthKit. Un **Comando iOS** però ha i permessi che il
+browser non ha: legge il dato e apre `#/importa?passi=8432&sonno=7.4&data=…`,
+che `salute.js` valida e scrive. Un'automazione a ora fissa lo fa partire da
+sola. Il prezzo è che l'app va in primo piano per un attimo, e la schermata
+lo dice prima.
+
+## Roadmap suggerita
+
+I punti 1, 2 e 4 della vecchia roadmap sono fatti (revisione settimanale,
+doppia progressione, moltiplicatore sulle porzioni). Restano:
+
+1. **Rampa fibre** — l'utente parte da ~15-20 g e il piano ne prevede 38. Avvisare se
+   il salto settimanale supera i 5 g
+2. **Push reale** via Cloudflare Worker, solo se i promemoria da Calendario non bastano
+3. **Sostituzione automatica negli acciacchi** — oggi l'app dice "questo esercizio
+   ci va sopra"; potrebbe proporre il ricambio piu' vicino per gruppo muscolare
+4. **Dispensa che si scala da sola** mentre spunti i pasti. Attenzione: un
+   inventario che non torna e' peggio di nessun inventario, per questo oggi
+   la dispensa la aggiorni tu quando fai la spesa
+
+## Cose da non fare
+
+- Non promettere il tracciamento GPS in background: su iOS una PWA viene
+  sospesa appena esce dal primo piano e il GPS smette. Si tiene acceso lo
+  schermo con la Wake Lock e lo si dice PRIMA, non a corsa finita
+- Non dichiarare due volte lo stesso nome al livello superiore di due file:
+  sono tutti nello stesso scope globale, e un `const` duplicato uccide l'intera
+  app all'avvio senza dire niente. E' successo con PRIORITA fra hyrox.js e
+  piano.js: la pagina restava bianca e nessun `node --check` lo vedeva
+- Non provare solo il piano di esempio: il percorso consigliato a chi installa
+  e "comincio da zero", e li D.pasti e D.alimenti sono VUOTI. Un elenco vuoto
+  va detto, e esc(null) stampa la parola "null"
+- Non aggiungere un framework né una libreria di grafici: i grafici sono SVG
+  costruito a mano proprio per non introdurre un build step. L'app è divisa in
+  più file per restare modificabile dal telefono, non per essere impacchettata
+- Non far leggere a `bodyFat()` la formula maschile su un profilo femminile:
+  sono due equazioni diverse e quella femminile richiede anche i fianchi
+- Non sommare le calorie bruciate al target: sono già dentro il dispendio
+  stimato. Mostrarle si', perche' sono un dato vero — ma accanto al conto e con
+  scritto che non ci entrano, mai dentro "quanto ti resta"
+- Non dare a una barra alta quattro pixel il numero che si viene a guardare:
+  le calorie sono la domanda e i macro sono come e' fatta la risposta, e due
+  forme diverse lo dicono senza scriverlo
+- Non scrivere "0 restano di 0" quando il target non c'e': e' un verdetto
+  inventato al posto di un metro mancante. Al centro va quello che si sa —
+  quanto hai mangiato — e sotto dove si mette il metro
+- Non mettere sotto una figura una riga che ripete la figura: "per arrivarci
+  mancano 40 g di proteine" e' quello che dicono gia' le barre due dita sopra,
+  e una didascalia che non aggiunge un dato e' una riga che si impara a
+  saltare. Sotto ci va solo quello che i numeri non dicono
+- Non far diventare tre righe di spiegazione quello che si puo' dire in due
+  parole attaccate al numero: `non si sommano` sotto le calorie bruciate dice
+  la stessa cosa nel punto in cui si guarda. Ma non si toglie del tutto, o
+  quel numero diventa un credito da spendere
+- Non lasciare una tab bar di sole parole: si usa col pollice senza guardarla,
+  e a colpo d'occhio si riconosce la forma, non il testo. Ma il nome resta —
+  cinque disegni senza parole si devono imparare, e "Andamento" non ha
+  un'icona ovvia
+- Non dare a un elenco di voci un quadratino di una misura sua: 34 px, raggio
+  10, `--pine-soft`, e' quello che l'app usa gia' nelle liste di Oggi e dei
+  prodotti. Due misure diverse per la stessa cosa in due fogli si vedono
+- Non dare lo stesso disegno a due significati: le due frecce circolari sono
+  "aggiorna", e girare la fotocamera ha un'icona sua (`giracam`)
+- Nei grafici a barre le etichette dell'asse x devono usare `g.xb` (centro della
+  barra), non `g.x` (scala delle linee): lo scarto è mezza barra, invisibile su
+  novanta giorni ed evidente su sette
+- Non disegnare le etichette delle serie all'ultimo punto e basta: due curve
+  che finiscono vicine stampano due parole una sopra l'altra, ed e' proprio
+  quando si toccano che si guarda il grafico. Passano da `etichetteSerie()`,
+  che le distanzia e scansa le piastrine gia' occupate
+- Non mettere in evidenza la prontezza di Banister: e' sempre positiva per chi
+  si allena, quindi e' la curva che non puo' dire di no. Quello che decide e'
+  la fatica contro la fatica che porti di solito
+- Non confrontare fatica o prontezza con una soglia fissa, nemmeno con una
+  scelta bene: il confronto e' con il proprio regime, e il regime si misura
+  sulla **fatica** e non sul rapporto fatica/forma — quel rapporto ha un
+  transitorio di mesi, perche' la forma ci mette 42 giorni a riempirsi
+- Non calcolare il regime su tutta la storia disponibile: le prime settimane
+  di allenamento hanno una forma ancora piccola e valori fuori scala, e
+  finiscono nella mediana con cui si giudicano tutti gli altri giorni
+- Non chiamare "target" una riga di riferimento che e' una soglia da non
+  superare: dice che ci vuoi arrivare. C'e' `tTarget`
+- Non scrivere in un sottotitolo una scala che il diario non usa: fame ed
+  energia si dichiarano da 1 a 10, e il grafico diceva "da 1 a 5"
+- Non far vedere due serie su un grafico senza legenda: i punti grezzi lontani
+  dalla media mobile sembrano un errore di allineamento, e non lo sono
+- Non passare a `nf()` un numero che puo' non esserci aspettandosi un errore:
+  adesso scrive "—" invece di lanciare. Lanciava, e siccome `nf` sta in
+  qualche centinaio di punti bastava un dato mancante in uno solo per lasciare
+  mezza schermata non disegnata, con l'eccezione in console dove non la legge
+  nessuno
+- Non usare `nf()` per riempire il valore di un `<input>`: formatta 2482 come
+  "2.482" e rileggerlo dà 2,482
+- Non mettere le foto nel backup JSON insieme al resto: sono in IndexedDB
+  perche' in localStorage non ci starebbero. Hanno un file loro — e la cosa va
+  detta **sul lato dell'export**, non in fondo al foglio dell'import: chi
+  esporta e chiude non lo legge mai
+- Non esportare le foto in un formato che non si sa rileggere: uno zip scritto
+  a mano andrebbe letto a mano, e un export che non si reimporta e' un
+  salvataggio, non un backup
+- Non dimenticare `S.settings.nFoto` dopo un import di foto: i traguardi si
+  calcolano sincroni e leggono quel contatore, non IndexedDB
+- Non lasciare il backup solo al file che bisogna ricordarsi di esportare: e'
+  l'unica copia che dipende dalla memoria di una persona. Ogni tre giorni
+  `copie.js` lo mette in IndexedDB da solo
+- Non copiare uno stato vuoto, e non buttare mai la copia con piu' giorni: dopo
+  una cancellazione l'app riparte a zero, ed e' proprio li' che una rotazione
+  ingenua sostituirebbe le copie buone con quelle vuote
+- Non nascondere una copia di sicurezza in un menu: dopo una cancellazione si
+  arriva al benvenuto, ed e' li' che deve stare, sopra tutto
+- Non presentare le copie in IndexedDB come un backup fuori dal telefono:
+  proteggono dal diario perso con il resto rimasto, non da "Cancella dati siti
+  web". Il file esportato resta l'unica copia fuori
+- Non aspettare IndexedDB senza un tetto: su iOS `open` a volte resta sospeso,
+  e un lucchetto che aspetta per sempre blocca tutto quello che viene dopo
+- Non scrivere "del 11": uno, otto e undici cominciano per vocale
+- Non spostare i dati nutrizionali dentro il codice
+- Non introdurre un punteggio "cibo buono / cibo cattivo"
+- Non aggiungere obiettivi di peso a scadenza né conti alla rovescia
+  (vedi però "Quanto manca, in tempo": un intervallo non è un conto alla rovescia)
+- Non far applicare da sola una modifica al target: cambia il metro con cui
+  l app giudica ogni giornata registrata, e un giorno buono diventerebbe storto
+  senza che l utente abbia fatto niente di diverso
+- Non scalare le proteine insieme alle calorie quando si ricalibra il target:
+  restano ancorate al peso corporeo, sono la variabile che protegge la massa magra
+- Non usare una pausa per nascondere le settimane storte: quelle servono, ed e
+  da quelle che la revisione impara. La pausa e per i giorni in cui il piano
+  non era nemmeno in gioco
+- Non far collassare a zero la banda di una proiezione: va messo un pavimento
+  alla risoluzione dello strumento (0,5 cm sul metro, 2,5 kg sui dischi).
+  Una forbice di ±0,0 è precisione che nessuno possiede
+- Non dire mai una **data** di arrivo, e non far scendere un contatore giorno
+  dopo giorno: quello diventa una scadenza da mancare. Un **intervallo** che si
+  ricalcola sul ritmo di adesso — e che quindi può anche allungarsi — è un'altra
+  cosa, ed è quello che fa `tempoAlTarget()`. Con una regola sopra tutte: quando
+  l'intervallo del ritmo contiene lo zero, non si scrive un numero
+- Non giudicare **solo** in relativo al target: il target lo decide l'utente,
+  quindi abbassarlo e' un modo per far tacere l'app. Misurato: portando il
+  target da 2482 a 1200 spariscono due dei quattro allarmi rossi e la barra
+  scrive "in linea". Serve un metro che non dipende da quella scelta
+- Non controllare il piano sulla media della settimana: sei giorni a 2800 e
+  uno a 600 fanno 2482 di media, cioe' "coerente col target"
+- Non mettere una soglia calorica fissa tipo 1200: 1500 kcal per un uomo di
+  cento chili sono fame nera e per una persona di cinquanta sedentaria quasi
+  mantenimento. Il pavimento e' `max(BMR x 1,1, dispendio x 0,75)`, e la UI
+  scrive tutti e due i numeri
+- Non mettere il verdetto di un giorno solo in cima alla pagina: un giorno da
+  600 kcal nasce mentre lo componi, e un riepilogo in testa lo leggi quando
+  risali, cioe' quando non stai piu' guardando quel giorno
+- Non etichettare ogni opzione di un elenco con lo stato che avrebbe: su un
+  giorno con un pasto solo tutte e ventidue le ricette danno "sotto il
+  minimo", il che e' vero e inutile. L'etichetta compare solo se quella scelta
+  **cambia** lo stato; il numero resta sempre
+- Non trattare un giorno senza ricette assegnate come un giorno povero: e' un
+  giorno vuoto, e sette righe rosse al primo avvio fanno chiudere l'app
+- Non proporre di abbassare il target fino alla media del piano quando quella
+  media e' sotto il pavimento: e' un invito ad adeguare il metro alla fame
+- Non far sparire del tutto l'avviso a chi dichiara una prescrizione medica:
+  diventa una nota, e il pavimento calcolato resta scritto. Sparire sarebbe la
+  scappatoia piu' comoda per zittire l'app
+- Non far giudicare l'analisi con `D.target.kcal` a zero: le regole dividono
+  per il target, e chi mangiava 1200 si vedeva scrivere "Mangi piu' del piano".
+  Senza metro si dice che manca il metro
+- Non dare per scontato che chi usa l'app abbia un professionista che gli ha
+  detto quante calorie mangiare: e' il caso raro. Ma chi ce l'ha deve poter
+  ignorare il motore in un colpo solo, e la carta glielo dice per prima cosa
+- Non esprimere un ritmo in chili fissi: mezzo chilo a 55 kg e mezzo chilo a
+  100 kg sono due deficit diversi. La percentuale del peso e' la stessa cosa
+  per tutti
+- Non mostrare un ritmo che il pavimento calorico taglia senza dirlo prima:
+  promettere −0,7 kg a settimana e consegnare le calorie di −0,35 e' un
+  bottone che mente
+- Non scalare le proteine con le calorie nemmeno qui: dipendono dall'obiettivo
+  e dal peso, e in deficit salgono invece di scendere
+- Non dare a tutti lo stesso fisico di riferimento: `target_fisico` arrivava da
+  `...DBASE` anche a chi cominciava da zero, che e' la stessa cosa vietata per
+  il nome e le misure di partenza. Si sceglie, o non c'e'
+- Non presentare le misure di un personaggio pubblico come rilevate: sono
+  dichiarazioni di stampa, e vanno riportate sull'altezza di chi le guarda —
+  le circonferenze in proporzione, la massa magra col quadrato
+- Non offrire un fisico di riferimento senza dire quanta massa magra chiede:
+  l'FFMI e' l'unica informazione che distingue "impegnativo" da "non succede",
+  e non averla e' il motivo per cui si insegue per anni una cosa che non
+  arriva. Ma resta una soglia di pratica comune, non un divieto
+- Non promettere quanto ci vuole ad arrivare a un fisico: dipende da quanti
+  anni ti alleni, e una data sarebbe una scadenza da mancare
+- Non presentare come misurato ciò che è stimato. Il grasso corporeo esce da una
+  formula su vita, collo e altezza e sbaglia di ±3–4 punti; le misure di Brad Pitt
+  sono dichiarazioni di stampa (`fonte: "stima"`). Servono a dare una direzione,
+  non un verdetto, e la UI deve dirlo
+- Non usare la massa magra dichiarata da una bioimpedenza insieme alla pesata
+  di oggi: la grassa diventa la differenza fra due bilance diverse, e la
+  stessa tabella finisce per scrivere due percentuali diverse. Dalla BIA si
+  prende la percentuale
+- Non far valere una bioimpedenza per sempre: e' un punto nel tempo, e dopo
+  un mese descrive il corpo di un mese fa. La formula si rimisura, lei no
+- Non togliere il peso dalla tabella della composizione: li' non e' un
+  doppione della carta in cima, e' il totale di cui grasso e magra sono le
+  parti, e senza si somma a mente. Il doppione erano i rapporti fra
+  circonferenze, che sono proporzioni e stanno con le circonferenze
+- Non dimensionare con `auto` le colonne di una tabella la cui intestazione e
+  le cui righe sono griglie separate: ognuna si misura sul proprio contenuto,
+  e i numeri finiscono sotto la loro etichetta solo per coincidenza. Tracce
+  esplicite, uguali per l'intestazione e per le righe
+- Non lasciare un grafico senza griglia e senza numeri sull'asse quando la
+  scala si adatta ai dati: mezzo chilo e tre chili disegnano la stessa curva
+- Non far contare a un'intestazione una cosa diversa da quella che sta
+  intestando: due numeri sopra otto barre devono contare quelle otto barre
+- Non usare il grigio per dire "sotto il target": in quest'app il grigio vuol
+  dire "non c'e' dato", e una riga sotto target sembra disattivata. Il colore
+  dice dentro o fuori, la direzione la dice il testo
+- Non far calcolare la composizione con un collo fuori scala (32–48 cm): la formula
+  si regge sulla differenza vita−collo, 7 cm di errore lì valgono 5 punti di grasso.
+  Meglio rifiutare il calcolo che dare un numero falso
+- **Non far produrre a un'animazione l'unico contenuto della pagina.** Il numero
+  va scritto prima, l'anello va già riempito, la linea ha `stroke-dashoffset` zero
+  di suo. L'animazione riparte da capo e ci riarriva. Se l'IntersectionObserver
+  non scatta — scheda in secondo piano, elemento fuori vista, browser senza
+  l'API — la pagina deve essere comunque giusta. Questo errore è già stato fatto
+  due volte: i riquadri della revisione uscivano vuoti e le linee invisibili
+- Non promettere la lettura dei passi da HealthKit: **non esiste nessuna API web
+  che la faccia**, né su iOS né su Android. L'unica strada senza server è un
+  Comando che apre l'app con il valore nell'URL, ed è quella implementata
+- Non contare i tick per misurare il tempo: iOS strozza `setInterval` in secondo
+  piano. Si salva l'istante di partenza e si sottrae
+- Non confrontare la fatica di Banister con una soglia assoluta: con tau_forma 42
+  e tau_fatica 7 la prontezza di chi si allena è **sempre** positiva, per
+  costruzione. Il numero che dice qualcosa è il rapporto fatica/forma diviso il
+  suo valore di regime
+- Non sostituire `/cgi/search.pl` con `search.openfoodfacts.org` perché è più
+  moderno: quel dominio non manda `Access-Control-Allow-Origin` e dal browser la
+  richiesta viene bloccata. È stato verificato con i header alla mano, non supposto
+- Non marcare `verificato` un alimento che arriva da Open Food Facts: quei valori
+  li inseriscono gli utenti dell'archivio. Nasce `stima` e lo diventa solo se
+  qualcuno conferma di averlo letto sulla confezione
+- Non chiamare "video" i due fotogrammi dell'esecuzione, e non indovinare a
+  quale esercizio del catalogo pubblico corrisponde un esercizio italiano:
+  mostrare l'esecuzione sbagliata è peggio che non mostrarne nessuna
+- Non salvare specchiato lo scatto della fotocamera frontale: l'anteprima sì
+  (è come ci si aspetta di vedersi), il file no, o il confronto a cursore fra
+  due foto a mesi di distanza si ribalta a metà
+- Non mettere l'anteprima della fotocamera dentro un foglio, sopra un modulo:
+  quando si inquadra si guarda l'immagine, e un riquadro alto meta' schermo
+  con sotto tre paragrafi non si guarda. L'anteprima e' lo schermo
+- Non salvare il fotogramma intero quando l'anteprima e' `object-fit:cover`:
+  ai lati c'e' sempre una parte che sullo schermo non si vede, e si
+  consegnerebbe una foto diversa da quella inquadrata. Si ritaglia come
+  ritaglia il CSS
+- Non disegnare la cornice del piatto con `preserveAspectRatio: none`: su un
+  telefono stretto e alto gli angoli si allungano in verticale, e quattro
+  angoli di forma diversa non sono piu' una cornice. E quattro angoli, non un
+  rettangolo chiuso: il piatto ci deve stare dentro, non combaciare col bordo
+- Non aprire il pannello delle opzioni sotto l'anteprima: in fondo c'e' il
+  cerchio bianco, e spostarlo mentre si sta per scattare fa sbagliare il tocco
+- Non stirare l'anteprima a tutto lo schermo con `object-fit: cover`: un
+  fotogramma 3:4 dentro un riquadro alto e stretto perde i fianchi, e da fuori
+  si vede come uno zoom. Il riquadro prende la forma del fotogramma e sta al
+  centro di un palco nero, come la fotocamera di sistema
+- Non chiedere a `getUserMedia` anche la **forma** del fotogramma: una
+  proporzione che la fotocamera non ha nativa la ottiene ritagliando il
+  sensore, e quel ritaglio si somma a quello del CSS. Si chiede quanto
+  grande, non che forma
+- Non dare la proporzione a un riquadro con `aspect-ratio` e la larghezza al
+  100%: finche' l'altezza ci sta va bene, e quando non ci sta lo schiaccia
+  invece di rimpicciolirlo. Si misura, con `min()` fra i due fattori
+- Non lasciare la fotocamera accesa dopo un cambio di rotta o un passaggio in
+  secondo piano: `camfChiudi()` sta su `hashchange` e `pagehide`
+- Non far cancellare dati a un interruttore di modulo: spegnere nasconde, non
+  distrugge. E non dare per scontato che `S.settings.moduli` esista — un backup
+  scritto prima non ce l'ha, e `modulliDaStato()` lo deduce
+- Non usare `windowDays()` in Gym: e' la finestra dei periodi **chiusi** e si
+  ferma a ieri, quindi la seduta appena registrata non arriva ne' nella mappa
+  ne' nel volume ne' nel carico acuto. In palestra la domanda e' "cosa posso
+  fare adesso", e la finestra e' `settimanaGym()`
+- Non tenere due finestre diverse dentro la stessa carta: il volume che
+  arriva a ieri e la fatica che arriva a oggi fanno rispondere i tre modi
+  della mappa su due periodi, e la lettura al tocco li mette in fila
+- Non far dire alla mappa una frase generica al posto dei numeri: i tre modi
+  fanno tre domande, e la lettura le risponde tutte e tre
+- Non presentare come assolute le percentuali della mappa: sono rispetto al
+  gruppo che guida quella classifica, e "stanchezza 100%" e' "il piu' stanco
+  di oggi", non "distrutto"
+- Non colorare una mappa a gradini larghi: con quattro livelli il primo tiene
+  un quarto della scala, e due valori diversi escono identici. La scala e'
+  continua, e parte dal colore della superficie
+- Non normalizzare il volume della mappa su una costante mentre fatica e forma
+  sono relative alla settimana: la stessa mappa userebbe un terzo della
+  tavolozza e sembrerebbe spenta. Ma serve un pavimento, o una settimana quasi
+  vuota si dipinge come una piena
+- Non mettere l'intensita' del colore in `opacity`: l'animazione d'ingresso
+  anima quella, e si porterebbe via il dato. Va in `fill-opacity`
+- Non usare `color-mix` senza ripiego: sotto Safari 16.2 non esiste, e un
+  valore non valido in un attributo di presentazione non lascia il colore di
+  prima — lo azzera
+- Non mappare `adductors` e `neck` di free-exercise-db dentro glutei o trapezi
+  per far quadrare i conti: la mappa muscolare, il volume e la forma-fatica si
+  reggono su quei gruppi. Un muscolo senza corrispondenza va dichiarato, non
+  indovinato
+- Non trattare carboidrati e grassi come contorno di calorie e proteine: due
+  errori di segno opposto si compensano nel totale, e una giornata "in linea"
+  puo' essere 77 g sotto di carboidrati e 34 sopra di grassi
+- Non dare a carboidrati e grassi `verso: 'su'`: non sono le proteine, conta lo
+  scarto in tutte e due le direzioni
+- Non presentare il pavimento dei grassi come una misura: e' 0,6 g/kg preso
+  dalla letteratura, come le costanti di Banister. La UI deve continuare a dirlo
+- Non lasciare un grafico senza modo di leggere il numero esatto: il manubrio
+  mostra la direzione e nasconde il valore. La lettura e' al tocco, e la zona
+  toccabile e' la riga intera, non il pallino
+- Non saltare una serie che ha un punto solo: una **linea** ha bisogno di due
+  rilevazioni, un **dato** no. Saltandola il grafico esce vuoto con la legenda
+  piena — misurato sulle misure prese ogni due settimane con la finestra a
+  sette giorni: zero linee e sette voci sotto
+- Non far dire alla legenda piu' di quello che il grafico disegna: sono la
+  stessa cosa scritta due volte, e quando divergono ha ragione il disegno
+- Non prendere il target dalla carta quando le serie ne hanno uno ciascuna:
+  segue quella in evidenza, o e' la riga di riferimento di un'altra misura
+- Non mettere sei serie su un asse solo perche' condividono l'unita': sei
+  circonferenze fra 33 e 100 cm diventano sei righe quasi orizzontali, e si
+  legge l'ordine invece del movimento. Quel grafico e' stato tolto
+- Non tenere in piedi un grafico a forza di puntelli — un target, sei colori,
+  una media da togliere — quando la stessa cosa e' gia' detta meglio altrove:
+  un terzo posto che dice peggio e' un posto in meno da guardare
+- Non aggiungere colori categorici a occhio: oltre i tre dichiarati serve il
+  validatore della skill dataviz, e con sei linee non passa nessun ordinamento
+  su tutte le coppie
+- Non lasciare in giro l'impalcatura di una cosa che si toglie: un'opzione che
+  non usa piu' nessuno e' un pezzo che marcisce
+- Non fermare l'asse del manubrio a una costante: con dieci voci qualcuno
+  finisce oltre il 135%, e un punto appoggiato al bordo dice una cosa falsa
+- Non lasciare che una carta con i testi in bianco fisso prenda
+  `background:var(--ink)`: al buio quel token diventa chiaro, la carta si
+  ribalta e i testi spariscono. Se una superficie deve restare scura in tutti e
+  due i temi le serve un token suo (`--evid`)
+- Non stilare come `div` un elemento che e' diventato `button`: senza il reset
+  prende il fondo chiaro di sistema, e al buio e' un rettangolo bianco in mezzo
+  alla lista
+- Non centrare un titolo con `justify-content:space-between`: si mette al
+  centro dello spazio che avanza, e basta un bottone piu' largo dell'altro
+  per vederlo storto. Tre colonne, le due laterali uguali
+- Non scrivere `location.hash` per cambiare pagina: se e' l'indirizzo che hai
+  gia', `hashchange` non scatta e il bottone sembra rotto. Si passa da
+  `apri()`, che quando l'indirizzo non cambia chiede il disegno
+- Non dare a una voce di menu un nome a cui rispondono tre schermate: "Il
+  piano" e "Quello che mangi" erano domande, non destinazioni
+- Non mettere sotto ogni voce di un menu il paragrafo che spiega perche' quella
+  cosa esiste: dieci paragrafi fanno un muro davanti a dieci voci. Una riga che
+  dice **cosa fa**, e il perche' dentro la schermata che si apre — che e' il
+  momento in cui serve
+- Non trattare come descrizione quello che e' **stato**: l'ultimo backup e la
+  versione in uso vanno a destra della riga, dove si leggono senza aprire
+- Non aprire una carta di previsione con il dispendio e una tabella intestata
+  "Tendenza · Banda · Δ": e' un cruscotto da motore, e chi la guarda chiede
+  dove sta andando. Prima la risposta in italiano, poi i numeri che la
+  reggono, e **come fa a saperlo** in fondo e chiuso
+- Non scrivere una direzione quando il ritmo e' dentro il rumore della
+  bilancia: "stai scendendo di 0,02 kg a settimana" e' una direzione inventata.
+  Sotto i cinquanta grammi si scrive che il peso sta fermo
+- Non lasciare in un menu una voce che porta a un passo spento: con il piano
+  alimentare tolto, ricette e settimana non esistono
+- Non leggere un campo dentro un `setTimeout` senza controllare che ci sia
+  ancora: fra il tick e l'esecuzione la pagina puo' essere stata sostituita, e
+  quello che resta e' un'eccezione in console che nasconde quelle vere
+- Non far leggere allo stato di un giorno passato il programma di adesso: la
+  seduta resta, ma smettendo di seguire una scheda le sue giornate passano da
+  "fatta" a "extra". Il giorno porta il suo `previsto`
+- Non mandare un `null` nudo dentro il contesto dell'AI: chi lo legge puo'
+  solo dire che manca. Si dichiara con `{ scelto: false, nota }`, e la nota
+  dice cosa si puo' rispondere lo stesso
+- Non lasciare che il contesto sappia meno dell'app: senza un obiettivo
+  dichiarato la direzione si legge comunque, perche' un obiettivo qui e' una
+  posizione rispetto al **dispendio**. Il dispendio viaggia col target, con la
+  sua provenienza
+- Non far scoprire dalla risposta che mancava un pezzo: le carte di
+  `assMancanze()` lo dicono prima di chiedere, e portano dove si sistema
+- Non far restituire a un modello "un piatto da 640 kcal": si fa scomporre in
+  **alimenti** con grammi e valori per 100 g, che e' come l'app tiene il cibo.
+  Una riga sola non si corregge, non entra in un pasto e non segue un prodotto
+  reale collegato dopo
+- Non aggiungere alimenti a un pasto senza spuntarlo: `consumed()` conta solo
+  i pasti spuntati, e chi ha appena fotografato il pranzo vedrebbe le barre
+  ferme. Una foto del piatto e' la dichiarazione piu' netta di averlo mangiato
+- Non creare le righe del giorno prima degli alimenti che nominano: una riga
+  che punta a un alimento inesistente vale zero calorie
+- Non presentare come misurato un numero guardato in una fotografia: gli
+  alimenti nascono `fonte: 'stima'`, e i macro passano da `coerenza()` come
+  quelli di Open Food Facts
+- Non azzerare il verdetto di una risposta perche' e' stato scartato un
+  ingrediente: una **regola rotta** e una **voce buttata** sono due cose
+  diverse, e confonderle zittisce risposte buone
+- Non mettere l'immagine dentro il testo della domanda: viaggia a parte, e
+  come infilarla nella chiamata lo decide il trasporto
+- Non offrire "riprova" su un errore che si ripetera' identico: senza
+  trasporto non c'e' niente da riprovare, e la strada che resta e' scriverli
+  a mano
+- Non mettere le foto dei piatti nello stesso mucchio di quelle dei progressi:
+  `tipo` distingue, il default e' `progresso` (i record vecchi non ce l'hanno),
+  e il contatore dei traguardi conta solo i progressi
+- Non dare alle azioni dell'app la tinta dell'assistente: il viola e' del
+  modello, il verde e' dell'app. "Registra nella giornata" non l'ha deciso un
+  modello
+- Non dare all'assistente un selettore di periodo suo: e' lo stesso della
+  scheda Andamento, e passa da `periodoAndamento()`. Due stati per lo stesso
+  concetto sono l'errore gia' pagato con il PDF del resoconto
+- Non mettere il periodo dentro la parte che scorre: e' il presupposto di ogni
+  domanda, e alla prima risposta sparirebbe di sopra lasciando la
+  conversazione a parlare di un tratto che non si vede
+- Non far finta di rispondere quando non c'e' un trasporto: si consegna la
+  domanda gia' scritta, che e' quello che `ai.js` sa fare davvero
+- Non far entrare il diario giorno per giorno nel contesto perche' la domanda
+  riguarda un periodo: escono le medie, il registro e il ritmo. Si controlla
+  con dei canarini, non a occhio
+- Non tenere tre carte alte in cima quando la conversazione e' cominciata:
+  spingono la risposta sotto il bordo. Diventano pastiglie
+- Non lasciare un compito di `ai.js` senza una porta: `modificaPiano`,
+  `nuovaRicetta` e `nuovoAlimento` erano scritti da sempre e non li poteva
+  scegliere nessuno. Un compito che non si puo' chiedere e' codice che marcisce
+- Non mescolare le domande che **guardano** con quelle che **propongono**:
+  sono due momenti diversi, e due gruppi
+- Non far partire "componi una ricetta" senza sapere quale: e' una domanda a
+  cui si puo' rispondere qualunque cosa. Si punta il campo di scrittura, che
+  e' gia' il posto in cui si scrive — un foglio a parte sarebbe un secondo
+  posto per la stessa cosa
+- Non lasciare puntato il campo dopo che la richiesta e' partita: la domanda
+  dopo diventerebbe un secondo brief per la stessa ricetta. E finche' e'
+  puntato serve una ✕, o e' un campo bloccato
+- Non lasciare una nuvoletta trascinabile a meta' schermo: copre il contenuto
+  e non si capisce se ci e' finita apposta. Si appoggia al lato piu' vicino, e
+  la posizione si salva in percentuale o alla rotazione esce dallo schermo
+- Non far dipendere dal `backdrop-filter` la leggibilita' di una superficie:
+  dove non c'e' serve un fondo pieno. Il vetro e' il modo, non il contenuto
+- Non mettere una chiave in `ai.js` e nemmeno un URL: non c'e' un server dove
+  nasconderla, e una chiave nel codice della pagina e' una chiave regalata. La
+  classe prende un **trasporto**, cioe' una funzione
+- Non far applicare da sola una proposta dell'AI: e' la stessa regola del
+  target ricalibrato, e vale a maggior ragione per qualcosa che genera testo
+- Non fidarsi delle regole scritte nel prompt: un modello che ne ignora una e'
+  un caso normale. Si ricontrolla in uscita
+- Non marcare `verificato` un alimento generato da un modello, e non leggere
+  dalla risposta i macro di una ricetta: si calcolano dagli ingredienti
+- Non allargare il contesto mandato all'AI senza deciderlo: il diario non ne
+  fa parte, e ci finirebbe dentro per comodita'
+- Non tenere in Gym un bottone che porta dove porta gia' un riquadro della
+  griglia: "Cardio" era in due posti a tre centimetri di distanza
+- Non mostrare un mese intero in una striscia di giorni: si scorre per trovare
+  il giorno in cui si e' quasi sempre. Due settimane dietro e una avanti, e si
+  apre su oggi
+- Non assegnare le schede alle date: un programma si ripete, e riscriverlo
+  ogni sette giorni non lo fa nessuno. Si assegna al giorno della settimana,
+  e si fa dove si decide di seguire la scheda — sono la stessa decisione
+- Non trasformare un giorno del calendario in un pannello di comando: toccando
+  un giorno passato si vuole sapere com'e' andata, non decidere. Un giorno
+  passato e **vuoto** invece apre la registrazione su quella data, e il
+  futuro non si apre affatto
+- Non offrire la guida serie per serie o il GPS su un giorno passato: quella
+  seduta e' finita, e cronometrarla non ha senso
+- Non riscrivere il riassunto di una seduta dentro il calendario:
+  `sheetResoconto()` c'e' gia', e due versioni degli stessi conti prima o poi
+  dicono due cose diverse
+- Non togliere "sporadica" dalle scelte: una scheda si puo' seguire senza un
+  giorno fisso, e senza quella voce l'unico modo di dirlo sarebbe non seguirla
+- Non dare a un giorno passato e saltato lo stesso segno di domani: direbbe che
+  c'e' ancora tempo
+- Non usare l'ambra per l'allenamento extra: in quest'app l'ambra vuol dire
+  "fuori target", e un allenamento in piu' non e' un errore
+- Non far scintillare all'infinito un pallino: la fiamma della striscia e'
+  l'unica animazione perpetua, e ci sta perche' il riempimento porta un dato.
+  Una volta sola all'ingresso dice "guarda qui" e non costa batteria
+- Non scegliere un nome di classe corto senza cercarlo: `.cal` era gia' il
+  calendario della costanza in `viz.css`, che carica dopo e vince
+- Non aggiungere una terza superficie di navigazione: la persona e' "tu", il
+  ⋯ e' "l'app e i dati", e una tendina in mezzo che porta dove portano gia'
+  quelle due non aggiunge una destinazione
+- Non rompere `#/dati`, `#/analisi` e `#/revisione`: sono diventati viste di
+  Andamento ma restano indirizzi validi, e ci puntano parecchi link interni
+- Non ordinare la lista della spesa come stanno scritti i dati: una lista si
+  cammina, e l'ordine delle corsie lo conosce solo chi entra in quel negozio
+- Non chiedere di compilare un modulo di quarantaquattro righe per la
+  dispensa: la domanda "quanto ne ho" nasce sulla riga della spesa, ed e' li'
+  che va fatta
+- Non far scalare la dispensa da sola mentre si spuntano le ricette: resta
+  vero che un inventario che non torna e' peggio di nessun inventario. Ma "ho
+  comprato queste cose" e' dichiarato, non dedotto, e quella meta' si chiude
+- Non mettere i colori delle corsie in una tabella: si calcolano dal nome, o
+  una categoria nuova resta grigia finche' qualcuno non se ne ricorda
+- Non chiedere di scrivere a mano una categoria che esiste gia': il motore
+  delle sostituzioni confronta stringhe, e "legumi" contro "Legumi" sono due
+  famiglie separate senza che nessuno se ne accorga. Si sceglie fra quelle in
+  uso, e scriverne una nuova e' la seconda strada
+- Non dare un verdetto su quale di due alimenti sia "meglio": dipende da cosa
+  tieni fermo, e le tre risposte vanno mostrate tutte e tre
+- Non inventare un equivalente dove il vincolo non esiste (proteine di un olio):
+  `null` e una riga che lo dice valgono piu' di un numero enorme
+- Non far filtrare un elenco passando da `route()`: ridisegnare la vista a
+  ogni lettera fa perdere il fuoco al campo, e sul telefono chiude la
+  tastiera. Il filtro ridisegna solo il suo contenitore
+- Non cercare solo nel nome di una ricetta: la domanda e' "cosa ho con dentro
+  il tofu", e "Bowl completa" non risponde. Si cerca anche negli ingredienti
+- Non far rispondere a due schermate in modo diverso alla stessa domanda: la
+  pastiglia dell'elenco passava da `esecDi()` e la carta da `esecMappa()`, e
+  l'esercizio con i fotogrammi gia' li' si vedeva chiedere di collegarli
+- Non far vincere l'`exdbId` dell'import sul collegamento fatto a mano: il
+  primo e' una supposizione, il secondo e' una scelta — e con l'ordine
+  sbagliato "collegane un altro" non cambia niente
+- Non lasciare a una pastiglia che dice "qui c'e' qualcosa da vedere" il
+  destino della riga: se annuncia qualcosa deve portarci, e allora le serve
+  anche la taglia di un bersaglio da dito
+- Non mettere un `<button>` dentro una riga che e' gia' un `<button>`: non e'
+  HTML valido e il tocco finisce a volte su uno e a volte sull'altro. Per
+  segnare qualcosa su una riga toccabile serve uno `<span>`
+- Non aprire una seconda schermata per gli alimenti: "Cosa mangi" e la voce di
+  menu sono la stessa `elencoAlimenti()`. Due elenchi che si somigliano sono
+  peggio di uno lungo
+- Non mostrare in elenco `D.alimenti[nome]` dove un prodotto lo sostituisce:
+  vanno mostrati i valori che l'app usa davvero, o la riga dice "etichetta" e
+  scrive accanto la stima
+- Non escludere i prodotti col codice a barre dalle ricerche: se uno lo ha
+  registrato è perché lo mangia. Dove serve un nome — le ricette — si promuove
+  a alimento; dove basta un valore — il diario — si tiene l'id
+- Non ordinare le sostituzioni solo sui macro: "latte di soia proteico" ha
+  macro diversi da "latte di soia" *per costruzione*, ed è proprio la
+  sostituzione che si cerca più spesso. Il nome è un criterio, non un dettaglio
+- Non far entrare tutto fuori categoria per far salire le varianti: senza il
+  recinto l'elenco diventa un catalogo. Metà delle parole in comune è la soglia
+- Non offrire solo le ricette a parita' di macro quando si sostituisce un
+  pasto: il motore ordina per somiglianza, ma "somigliante" non e' "voluto".
+  La scelta libera c'e' gia' sugli ingredienti, e va anche qui
+- Non toccare lo scroll mentre l'utente scrive: `scrollIntoView` dentro
+  `oninput` gira a ogni tasto e fa muovere la pagina sotto le dita. E' stato
+  provato per tenere i risultati sopra la tastiera, ed e' finito peggio del
+  problema — la tastiera che copre il fondo di un foglio e' scomoda ma
+  prevedibile
+- Non spostare un foglio con `visualViewport` mentre iOS sta gia' scorrendo
+  per conto suo: i due movimenti si sommano
+- Non riscalare un pasto oltre ×0,6–×1,6 per far combaciare i macro: mezza
+  porzione di un pasto non e' piu' quel pasto
+- Non tenere porzioni e sostituzioni di ingrediente quando si cambia il pasto
+  intero: erano di un'altra ricetta
+- Non giudicare una scheda sulla prima seduta contro l'ultima, e non sotto le
+  tre sedute: una giornata storta sposterebbe il verdetto da sola
+- Non presentare le otto settimane come una soglia misurata: e' pratica comune,
+  come le costanti di Banister
+- Non costringere a comporre una ricetta per mettere un alimento solo in un
+  pasto: un codice `ali:<qta>:<nome>` risolto da `pasto()` si comporta come
+  una ricetta ovunque, senza sporcare l'elenco delle ricette
+- Non far leggere a `dayTarget()` la settimana di adesso: cambiare il piano
+  riscrive il metro di ogni giornata gia' registrata. Il target di un giorno
+  passato si fissa su di lui
+- Non mandare al piano settimanale chi vuole scrivere cosa ha mangiato: il
+  piano e' un modello e il diario e' un fatto. E su un giorno **passato** e'
+  anche un vicolo cieco, perche' la struttura di quel giorno e' congelata e il
+  piano non la tocchera' piu'. La strada e' `pastoSwap`, che e' lo strato del
+  giorno
+- Non far assegnare un pasto a un giorno passato senza spuntarlo: senza la
+  spunta `consumed()` conta zero e la giornata resta vuota. Su oggi invece no —
+  alle nove del mattino si puo' decidere la cena
+- Non scrivere "al posto di" dove il piano non prevedeva niente: non c'e'
+  niente al cui posto stare, e usciva `al posto di null`. Quel pasto si
+  **aggiunge**
+- Non far leggere a `slotsGiorno()` il piano di adesso per un giorno passato:
+  aggiungendo uno spuntino al mercoledi' ogni mercoledi' registrato si ritrova
+  un pasto in piu', contato come saltato. Misurato: da 49/49 a 49/51 con
+  `consumed()` fermo — le calorie giuste e l'aderenza no
+- Non fermarsi al primo dei tre lati: di una giornata registrata si congelano
+  la ricetta, il metro **e** la struttura. Chiuderne due su tre lascia il
+  difetto piu' difficile da vedere
+- Non fissare il target di **oggi**: oggi non e' finito, e una modifica al
+  piano fatta stamattina vale per stamattina
+- Non lasciare che una spunta `true` senza copia congelata continui a leggere
+  la ricetta di adesso: era ragionevole finche' nessuno correggeva le ricette.
+  La ricetta di allora non si puo' ricostruire, ma si puo' smettere di
+  muoverla — e va detto che e' una riparazione, non un ripristino
+- Non scrivere dentro la giornata un campo che non e' contenuto senza
+  dichiararlo in `GIORNO_META`: `giornoPieno()` e' generico, e una giornata
+  vuota risulterebbe registrata per via di un metadato
+- Non far nascere dal piano di adesso il giudizio su una giornata gia'
+  spuntata: i numeri sono congelati ma il confronto no, e correggere il piano
+  faceva dichiarare uno scarto a una giornata che nessuno aveva toccato. Il
+  metro e' `ricettaMetro()`
+- Non prendere il nome di un pasto spuntato dal piano di adesso: riassegnando
+  lo slot la giornata cambia nome, e svuotandolo scrive "Da assegnare" sopra
+  un pasto che e' stato mangiato
+- Non usare la copia congelata come metro quando quel giorno il pasto era
+  stato **sostituito**: li' il confronto con la ricetta del piano e' proprio
+  il senso di "al posto di X, +102 kcal"
+- Non trattare i pesi che uno slot ha nel piano come una modifica del giorno:
+  quelli sono il piano
+- Non far sostituire la ricetta di un pasto quando l'utente ne vuole
+  **aggiungere** una seconda: un pranzo di due piatti non e' una terza ricetta
+  che duplica le altre due
+- Non lasciare due righe con lo stesso ingrediente dentro un pasto: porzioni e
+  sostituzioni sono indicizzate sul nome, e le due chiavi si
+  sovrascriverebbero. I doppioni si sommano
+- Non ricalcolare i macro di un pasto multiplo dall'elenco fuso: i valori
+  delle ricette sono verificati a monte, e si sommano parte per parte
+- Non far toccare i pesi sull'elenco fuso di un pasto multiplo: una riga
+  ripetuta non saprebbe a quale ricetta appartiene. Una parte alla volta
+- Non lasciare un `piu:` con dentro una parte sola quando si toglie l'altra:
+  il codice torna quello nudo della ricetta
+- Non far comporre due ricette quasi identiche per due pesature dello stesso
+  piatto: l'elenco delle ricette si riempie di "Pasta con tonno 2" e smette di
+  essere leggibile. Il codice del pasto porta i pesi (`ric:`), la ricetta resta
+  una
+- Non usare le porzioni del diario per una pesatura che vale tutte le
+  settimane: quelle valgono un giorno e non entrano nella lista della spesa
+- Non indicizzare i pesi di un pasto sulla posizione dell'ingrediente:
+  correggendo la ricetta scivolano sul vicino. La chiave e' il nome
+- Non mettere un separatore in un codice sintetico senza passare da
+  `encodeURIComponent`: un alimento con i due punti nel nome lo spezzerebbe in
+  silenzio
+- Non scalare i macro precalcolati di una ricetta quando i pesi cambiano: si
+  ricalcolano dagli ingredienti, come fa gia' `mealMGiorno()`
+- Non confrontare due codici di pasto per sapere se e' lo stesso piatto:
+  `ric:C1:...` e `C1` sono la stessa ricetta pesata diversamente. Si passa da
+  `codiceBaseRic()`
+- Non contare due volte nel resoconto lo stesso piatto pesato diverso: due
+  righe con lo stesso nome sembrano un errore di stampa
+- Non leggere `D.pasti[code]` per il pasto di uno slot: passa da `pasto()`, o
+  gli alimenti singoli spariscono da quel conto. Restano diretti solo
+  l'editor delle ricette e il file di scambio
+- Non chiamare "ricetta" quello che si aggiunge a un giorno: quello e' un
+  **pasto**, cioe' un nome e un'ora, e la ricetta ci va dentro dopo. E non
+  usare "slot" nei testi: e' una parola del codice
+- Non usare `inputmode="numeric"` per un'ora: quel tastierino su iOS non ha i
+  due punti, quindi il campo chiede un formato che la tastiera che apre non sa
+  produrre. `type="time"` apre il selettore e restituisce sempre `HH:MM`
+- Non passare a `<input type="time">` un valore che non sia `HH:MM`: il campo
+  si presenta **vuoto senza dire niente**, e salvando cancella l'ora che
+  c'era. Gli orari vecchi passano da `oraValida()`
+- Non rinominare "pasto" in "ricetta" con una sostituzione globale:
+  "pastiglia" contiene "pasti", e "pasto fuori piano" non e' una ricetta. E
+  non toccare le chiavi dei dati per un cambio di etichetta: `D.pasti`,
+  `pastoDelGiorno`, `pastoSwap` e il prefisso `pasto-` reggono i backup gia'
+  esportati
+- Non mettere due carte che chiedono la stessa cosa in due punti della stessa
+  schermata: la registrazione di un alimento e il fuori piano sono la stessa
+  intenzione, e stanno in una carta sola
+- Non usare un bottone pieno a tutta larghezza per un'azione che non e' la
+  ragione per cui si e' aperta la pagina: Oggi si apre per leggere come sta
+  andando
+- Non srotolare gli ingredienti di ogni pasto su Oggi: cinque righe per cinque
+  pasti fanno un elenco della spesa lungo due schermate, e quasi mai si sta
+  cercando qualcosa li' dentro. Si aprono dove si modificano
+- Non aggiungere un alimento a un pasto dentro `extra`: quello e' il fuori
+  piano e si conta a parte, e il totale del pasto continuerebbe a dire il
+  numero della ricetta
+- Non decidere se una sostituzione e' attiva solo quando la si scrive: il
+  piano puo' cambiare dopo, e "al posto di X" resta a dichiarare un cambio che
+  non c'e' piu'. Il confronto va fatto anche in lettura
+- Non lasciare in giro strati svuotati (`porzioni: { c1: {} }`): non cambiano
+  i conti, ma sono lo stato da cui nasce un "modificato" su un pasto che
+  nessuno ha toccato
+- Non far sparire una carta che porta un dato solo perche' non ha allarmi da
+  dare: la striscia delle calorie e delle quote e' la cosa che si viene a
+  guardare, e nasconderla quando va tutto bene vuol dire non poterla mai
+  vedere quando va bene
+- Non mostrare i macro di un piano solo in grammi: fra giorni di dimensione
+  diversa non si confrontano, e la struttura della giornata e' quello che i
+  grammi nascondono
+- Non calcolare le quote dei macro sul totale dichiarato delle calorie: fra
+  quello e la somma di 4/4/9 c'e' sempre uno scarto, e le tre quote non
+  sommerebbero a cento
+- Non dare alle stesse tre cose due codici colore a due schermate di distanza:
+  proteine, carboidrati e grassi hanno le tinte di "Da dove vengono le
+  calorie" ovunque
+- Non mediare una serie su tutto il periodo e il suo totale sui soli giorni
+  pieni: le serie riportano zero nei giorni vuoti, e le quote sommano 70%
+  invece di 100
+- Non indicizzare il diario sul codice della ricetta: due pasti con la stessa
+  ricetta nello stesso giorno — le mandorle alle 11 e alle 16:30 — si
+  ritrovavano a condividere spunta, sostituzioni e porzioni. La chiave e' il
+  **pasto**, e si ricava con `chiaveP()`
+- Non assegnare l'id di un pasto dopo `ordinaSlotOrari()`: nasce dalla
+  posizione nel file, e quell'ordinamento cambia appena si tocca un'ora
+- Non far scegliere alla migrazione uno solo dei pasti che condividevano una
+  chiave: erano spuntati tutti e due, ed e' quello che i totali di quel giorno
+  hanno registrato. Si copia su tutti, e **per copia**, o il bug rientra
+  dalla porta della migrazione
+- Non dare allo spuntino della mattina la stessa icona del pranzo: due
+  quadrati identici in un elenco di cinque righe si assomigliano nel punto in
+  cui dovrebbero distinguersi
+- Non indicizzare gli alimenti aggiunti sull'indice dell'array: togliendo il
+  primo si spostano le quantita' di tutti gli altri. Serve un id stabile
+- Non decidere se ricalcolare un pasto guardando solo tre dei quattro strati:
+  e' cosi' che un pasto arriva a mentire sulle proprie calorie
+- Non cancellare un ingrediente del piano dal diario: si porta a zero, perche'
+  il piano e' la ricetta e domani vale ancora. E il cestino deve diventare un
+  "rimettilo", o non c'e' strada indietro
+- Non far tornare a Oggi una sostituzione aperta dalla scheda del pasto: si
+  stava lavorando li', ed e' li' che si vuole vedere il risultato
+- Non caricare le icone da un CDN: l'app funziona offline. Si ricopiano
+  dentro, con la licenza, come i tracciati del corpo
+- Non indicizzare una sostituzione sul nome dell'alimento NUOVO: la chiave e'
+  il posto nella ricetta, cioe' l'ingrediente del piano. Altrimenti togliere la
+  sostituzione non sa piu' a cosa tornare
+- Non far cambiare al foglio delle sostituzioni il pasto nel piano: quello e'
+  la ricetta e vale per tutti i giorni. Una sostituzione vale per il giorno in
+  cui la fai, come le porzioni
+- Non ordinare i pasti solo quando si inseriscono: un piano arriva anche da un
+  backup, da un file di scambio e dall'editor della settimana, e per quelle
+  strade nessuno passa dall'inserimento. Si ordina in lettura, in
+  `fondiPiano()`, dove l'ordinamento e' idempotente
+- Non far scegliere una scheda al buio quando l'app sa gia' come stanno i
+  gruppi che allena: l'informazione c'era, stava due schermate piu' in la'
+- Non pesare i gruppi di una scheda tutti uguali: dodici serie di petto e due
+  di polpacci non sono meta' e meta'
+- Non scrivere "sconsigliata" su una scheda: la scheda non ha fatto niente di
+  male, e quello che e' carico e' il corpo, per oggi
+- Non mostrare una pastiglia senza il perche': un'etichetta senza motivo si
+  impara a ignorare
+- Non riempire il modulo di una scheda con `ultimoUso()` quando oggi c'e'
+  gia' qualcosa registrato: quella funzione esclude oggi **apposta**, e
+  siccome il salvataggio sostituisce l'intera giornata, correggere una serie
+  ne cancella venti. Con una scheda mai usata prima il modulo si apre vuoto e
+  sparisce tutto
+- Non riappaiare le serie di oggi con l'indice della riga di scheda: lo stesso
+  esercizio puo' comparire su due righe. Serve un cursore per esercizio
+- Non ricostruire una serie dai soli campi del modulo: `rec_s` non c'e' dentro,
+  e da li' escono la durata della seduta e il recupero medio del resoconto
+- Non trattare un modulo svuotato come un salvataggio: su una giornata che
+  conteneva del lavoro e' una cancellazione, e si chiede
+- Non far cancellare una serie al tocco: nello storico una serie sbagliata
+  quasi mai e' di troppo, e' segnata male. Toccare apre, e dentro c'e' anche
+  l'esercizio — cambiarlo e' l'errore che nessun'altra schermata ripara
+- Non dimenticare `scordaFatica()` dopo aver toccato le serie: la forma-fatica
+  e' memorizzata per muscolo e continuerebbe a rispondere coi numeri di prima
+- Non far tornare `sheetLibero()` su una seduta che non esiste piu': togliendo
+  l'ultima serie la giornata sparisce dal registro
+- Non far nascere una seduta dall'aver **guardato** la schermata di scelta:
+  la giornata la creano i punti in cui una serie viene scritta davvero. Una
+  seduta a zero serie faceva scrivere "Continua la seduta" a chi non aveva
+  cominciato, e quel bottone non poteva continuare niente
+- Non decidere l'etichetta di un bottone sull'esistenza di un oggetto quando
+  quello che conta e' se dentro c'e' qualcosa: `serie.length`, non
+  `sessioni[k]`
+- Non far ricreare la seduta a `sheetLibero()` quando ci si torna dopo aver
+  cancellato l'ultima serie: rimetterebbe dentro quello che si e' appena
+  tolto. L'ingresso vero lo dichiara, il ritorno no
+- Non elencare nello storico le sedute senza serie: la traccia di un tocco non
+  e' un allenamento
+- Non far riprendere una guida che non ha registrato niente: aprire una
+  scheda e richiuderla lascia uno stato a zero serie, e riproporlo ogni volta
+  e' una domanda su un lavoro mai iniziato
+- Non abbreviare i giorni della settimana a tre lettere sotto un'intestazione
+  di mese: "mar" si legge marzo
+- Non lasciare senza uscita una seduta registrata per sbaglio: entra nel
+  volume, nella forma-fatica, nel monitoraggio della scheda e nel conteggio
+  della revisione. E chi la elimina va avvisato che tocca solo la palestra
+- Non far dimenticare a `_ffCache` una seduta cancellata: la forma-fatica e'
+  memorizzata per muscolo e continuerebbe a rispondere coi numeri di prima
+- Non scrivere `false` per togliere una spunta: mezza app conta i pasti di una
+  giornata con `Object.keys(d.pasti).length`, e una chiave a `false` fa
+  risultare registrata una giornata vuota. La chiave si cancella
+- Non contare i pasti spuntati con `Object.keys(d.pasti).length`: sono i
+  **valori** che dicono se un pasto e' stato spuntato
+- Non contare i giorni registrati con `Object.keys(S.log).length`: `day(k)`
+  crea la giornata anche in lettura, quindi scorrere il diario gonfia il
+  numero. Si passa da `loggedDays()` / `giornoPieno()`
+- Non elencare a mano i campi che rendono "piena" una giornata: la lista
+  invecchia e si perdono le giornate registrate solo con acqua, passi o un
+  pasto fuori piano. Il criterio e' generico — qualunque campo con un
+  contenuto — cosi' un campo nuovo conta da solo
+- Non chiamare "Giorni registrati" una riga che conta le pesate: il criterio
+  e' giusto (la pesata alimenta il filtro di Kalman), l'etichetta no, e chi
+  registra tutto tranne il peso si vede dare zero
+- Non far rileggere al diario la ricetta dal piano di adesso: correggere una
+  ricetta riscriverebbe mesi di storico, e con loro il dispendio che il filtro
+  di Kalman ha misurato. Si congela alla spunta, che e' il momento in cui
+  quella riga diventa un fatto
+- Non indicizzare un pasto registrato solo sul piano: la spunta sta sul codice
+  della ricetta, e riassegnare uno slot la lasciava orfana — il pasto spariva
+  dal registro senza che nessuno lo avesse tolto. Gli slot di un giorno
+  passano da `slotsGiorno()`, che unisce piano e registro
+- Non congelare i macro finali invece degli ingredienti: gli strati del giorno
+  si applicano sopra, e una copia dei totali andrebbe rifatta a ogni modifica
+  di uno strato. Dimenticarne uno e' l'errore gia' fatto con `mealMGiorno()`
+- Non congelare anche i valori degli alimenti: collegare un prodotto reale
+  deve correggere i conti ovunque, ed e' una funzione dichiarata. Li' la stima
+  di prima era il numero sbagliato, non un fatto storico
+- Non sostituire l'oggetto del giorno del piano con i soli slot: porta anche
+  il nome, l'attivita' e i totali, e l'intestazione di Oggi si mette a
+  scrivere "undefined"
+- Non usare `user-scalable=no` per fermare lo zoom da doppio tocco: toglie
+  anche il pizzico, che e' l'unico modo di leggere per chi ci vede poco, e iOS
+  lo ignora dalla 10. Si usa `touch-action: manipulation`
+- Non lasciare spuntare un pasto in un giorno che non e' arrivato: quel
+  giorno comincerebbe con le caselle gia' segnate. Ma nemmeno bloccare la
+  navigazione in avanti: "cosa mangio domani" e' una domanda legittima, e il
+  piano e' li' per rispondere. In avanti si legge, non si scrive
+- Non far scorrere Oggi oltre i sette giorni: il piano e' settimanale, e
+  l'ottavo giorno e' identico al primo
+- Non leggere `riga.strip`, `riga.piram` o `riga.rpMini` direttamente: passano
+  tutti da `serieDiRiga`, `bersaglioTesto`, `scarichiDiRiga` e `usaRestPause`,
+  che sono il posto in cui una scheda vecchia e una nuova si comportano uguale
+- Non lasciare `serie`, `reps` e `repsMax` sfasati rispetto a un `piram`: la
+  doppia progressione, il monitoraggio e il volume leggono quei tre campi e
+  non sanno che esiste un piramidale
+- Non scrivere "8–8": un range con gli estremi uguali non e' un range, e letto
+  su una scheda sembra un errore di compilazione
+- Non dedurre dal nome se un esercizio si fa un lato per volta: "Affondi" non
+  lo dice e "Alzate laterali" lo direbbe a torto. Si dichiara
+- Non raddoppiare tonnellaggio e volume per gli esercizi per lato: il `×2` e'
+  come il numero viene scritto, e ricalcolarlo riscriverebbe all'indietro
+  tutte le sedute gia' registrate
+- Non lasciare la doppia progressione in una riga grigia: e' la decisione piu'
+  importante della serie, e sotto un bilanciere un periodo intero non lo
+  legge nessuno
+- Non mostrare il consiglio sul carico oltre la prima serie di un esercizio:
+  dalla seconda in poi il campo ha gia' quello che hai appena sollevato, e
+  "sali a 62,5" mentre sei a 60 a meta' esercizio e' fuori tempo
+- Non far precompilare al campo kg il carico *consigliato*: quel campo dice
+  cosa avevi sul bilanciere. Se il consiglio e' un altro, si tocca la carta e
+  ce lo mette lei
+- Non far riscrivere il carico a ogni serie: se hai appena fatto 60 kg, la
+  serie dopo parte da 60. E dire da dove viene il numero, invece di lasciarlo
+  indovinare
+- Non mettere il timer del recupero SOPRA la carta della serie successiva:
+  chiede di compilare una serie prima di averla fatta. Il recupero e' la
+  schermata, e quando l'anello e' li' la barra in basso sparisce
+- Non attribuire il recupero alla serie che arriva: appartiene a quella che lo
+  ha reso necessario, cioe' a quella appena fatta
+- Non far ripassare da "come registri?" chi ha chiuso il foglio per sbaglio a
+  meta' seduta: se c'e' una guida in corso si riprende da li'
+- Non costringere a uscire dalla guida per sapere quanto manca: durante il
+  recupero non c'e' niente da fare tranne aspettare, ed e' li' che viene la
+  domanda. L'elenco si apre da un occhio e si chiude tornando al recupero
+- Non annunciare uno stripping quando sei gia' sotto il bilanciere: la carta
+  della tecnica dice **come si fa** e va bene dentro la serie, ma "cosa mi
+  serve" ha una risposta utile solo finche' c'e' tempo per procurarselo. Le
+  due postazioni di una superserie e i carichi leggeri di uno stripping si
+  dicono **nel recupero prima**
+- Non far comparire un avviso di preparazione su una serie normale: uno che
+  c'e' sempre si impara a saltare
+- Non inventare i chili degli scarichi di uno stripping: la scheda tiene le
+  ripetizioni, non i pesi, e quelli si decidono mentre si scarica
+- Non dare tre stati a un elenco di esercizi dentro una scheda con le
+  superserie: mentre tocca ad A2, A1 ha gia' delle serie fatte e non e' ne'
+  finita ne' da fare. Spegnerla direbbe che non l'hai cominciata
+- Non contare le serie fatte dal registro: una serie **saltata** fa avanzare
+  il passo e non scrive niente. Il conto viene dai passi, i chili dal registro
+- Non ricopiare a mano "mezza serie per scarico": sono `serieEquivalenti()`,
+  `tonnellaggioSerie()` e `ripetizioniSerie()`, e le chiamano tutti. Copiarle
+  significa che la stessa seduta vale di piu' o di meno a seconda di chi la
+  guarda
+- Non arrotondare a intero il numero di serie: con gli scarichi 12,5 e' un
+  numero giusto
+- Non dare un voto a una seduta: il resoconto e' un fatto con accanto il
+  metro con cui e' stato misurato, e una seduta leggera non e' un errore
+- Non confrontare una seduta con la media di tutte quando c'e' una scheda: una
+  giornata di gambe contro la media di tutto dice solo che le gambe pesano
+- Non leggere la forma-fatica del giorno stesso per dire come ci sei arrivato:
+  dopo la seduta la fatica e' quella della seduta
+- Non registrare il bersaglio al posto delle ripetizioni fatte quando il campo
+  e' vuoto: il registro direbbe quello che la scheda chiedeva, e da quel numero
+  escono massimale stimato, progressione e verdetto sulla scheda
+- Non trattare `+30` a tempo scaduto come "allunga di trenta": non muove
+  niente sullo schermo. A recupero finito quel bottone vuol dire "altri trenta
+  da adesso"
+- Non chiudere una barra senza guardare a quale recupero appartiene: il
+  `setTimeout` dei venti secondi deve portarsi dietro il `t0`, o uccide il
+  timer partito dopo
+- Non tenere due soglie diverse per lo stesso stato: la barra viva e
+  `recRiprendi()` devono decidere allo stesso modo quando un recupero e'
+  scaduto da troppo
+- Non far partire il recupero dopo l'ultima serie della seduta: non c'e'
+  niente da recuperare
+- Non presentare il recupero calcolato come una misura: e' pratica comune, ed
+  e' il motivo per cui `sc.recupero` e `riga.recupero` esistono
+- Non far partire il recupero in mezzo a una superserie: le due righe si fanno
+  attaccate, e il timer va sull'ultima del giro
+- Non far sparire dopo venti secondi il timer di una seduta guidata: li' il
+  tempo oltre il recupero e' un dato. E ricordarsi che sotto un foglio aperto
+  la barra non la vede nessuno — durante la guida deve stare sopra
+- Non tenere quattro copie della stessa regola: "mi sono allenato quel giorno"
+  la calcolavano costanza, revisione, statistiche e resoconto, ognuna per conto
+  suo. Ora e' `allenatoIl(k)`, e le quattro chiamano quella
+- Non chiedere all'utente un dato che l'app ha gia': l'interruttore
+  dell'allenamento poteva contraddire le serie registrate, e non c'era modo di
+  sapere quale delle due risposte valeva. Ma il flag dei registri vecchi va
+  continuato a leggere, o si riscrive la storia di chi l'ha usato
+- Non togliere il peso dal diario senza dare un altro posto dove **correggere
+  una giornata passata**: Corpo non ha la navigazione dei giorni, quindi il
+  foglio del peso porta la sua data dentro. Una pesata sbagliata resta nella
+  tendenza per due settimane
+- Non far incrementare al bottone del peso un numero che non esiste: su una
+  giornata senza pesata il primo tocco appoggia sulla tendenza, e non registra
+  una pesata che nessuno ha fatto
+- Non monitorare una scheda sola quando il programma ne ha due: Giorno 1 e
+  Giorno 2 sono un programma solo, e giudicarne meta' chiamandola "il
+  programma" e' un errore di soggetto, non di calcolo
+- Non mettere in un elenco solo la progressione di schede diverse: la panca del
+  Giorno 1 e quella del Giorno 2 sono due serie di dati, e affiancarle fa
+  sembrare doppioni due righe che non lo sono
+- Non presentare le capienze dei bicchieri come misure: 200/250/500/1500 ml
+  sono convenzioni, e per la borraccia da 750 deve restare il campo libero
+- Non tenere solo il totale dell'acqua: senza l'elenco dei sorsi "annulla"
+  dovrebbe chiedere a chi ha sbagliato tocco quanto valeva quel tocco
+- Non ordinare da soli i pasti senza orario: per quelli non esiste un ordine
+  giusto da calcolare, e vanno lasciati dove sono con una maniglia per
+  spostarli
+- Non usare l'HTML5 drag-and-drop: su iOS col dito non parte. Pointer events, e
+  la maniglia deve essere un elemento a se' o la pagina non si scorre piu'
+- Non lasciare il lettore di codici a barre dentro una sola schermata: chi ha
+  la confezione in mano sta aggiungendo un alimento, non navigando il registro
+  dei prodotti. `leggiCodice()` si chiama da dove serve
+- Non marcare `verificato` un alimento arrivato da un codice a barre passando
+  per Open Food Facts: quei valori li inseriscono le persone. Da un prodotto
+  gia' nel proprio registro si', perche' li ha scritti l'utente dall'etichetta
+- Non far cambiare la scheda a una sostituzione fatta durante la seduta: il
+  rack occupato di oggi non e' un cambio di programma. Dura quanto la seduta,
+  e quello che resta e' la serie registrata
+- Non offrire solo la sostituzione quando un attrezzo e' occupato: cambiare
+  esercizio costa uno storico dei carichi, fare prima un altro esercizio di
+  oggi non costa niente. Prima la strada che non tocca il programma
+- Non spostare un gruppo gia' cominciato, e non spostare niente sopra ai passi
+  gia' fatti: quelli sono il registro di com'e' andata. E l'unita' che si
+  sposta e' il gruppo, o una superserie si spezza a meta'
+- Non riscrivere `s.guida` per far avanzare l'indice: `{ scheda, i }` buttava
+  via la sostituzione dell'esercizio a ogni serie, e la seconda serie tornava
+  in silenzio all'esercizio della scheda. Si passa da `avanzaGuida()`
+- Non lasciare sei bottoni larghi uguali uno sotto l'altro: con sei nessuno e'
+  piu' secondario, e quello che si tocca dieci volte per seduta finisce in
+  mezzo alle eccezioni. Uno pieno, le eccezioni in riga, il resto piu' quieto
+- Non chiedere **come** prima di **cosa**: il modo e' una conseguenza dello
+  sport, e il GPS ha senso sulla corsa e non sul BJJ. Prima l'elenco, e la
+  domanda sul modo solo dove esiste una risposta
+- Non riproporre l'elenco dei tipi dentro il foglio quando lo sport e' gia'
+  stato scelto: e' la stessa domanda fatta due volte, e fra le alternative
+  c'e' anche quella scelta
+- Non chiedere la distanza dove non esiste: una casella vuota su un'ora di
+  BJJ chiede comunque di decidere qualcosa
+- Non disegnare a mano quindici icone di sport: a venti pixel non si
+  riconoscono, e un elenco in cui l'icona non distingue la riga e' un elenco
+  in cui l'icona e' peso. Si prendono da Tabler (MIT), che ha la stessa
+  griglia e lo stesso tratto di Feather e Lucide, e si ricopiano dentro
+- Non cercare un corridore in Lucide: non c'e', come non ci sono tennis,
+  basket e boxe. E quando un catalogo non ha proprio quel gesto — l'ellittica
+  non esiste da nessuna parte — si sceglie il piu' vicino **e lo si dichiara**,
+  invece di riusare un'icona gia' data a un'altra riga
+- Non mettere sotto ogni riga di un elenco la stessa identica didascalia:
+  "minuti e via" dodici volte non distingue niente. Li' ci va l'ultima volta
+  che quello sport e' stato fatto, e su uno mai fatto non ci va niente
+- Non far cominciare le righe di uno storico con la data ISO: `2026-09-16` e'
+  come la scrive un computer. C'e' gia' la figura dello storico dei pesi —
+  blocco del giorno, mesi che separano, barra in scala fra le sedute mostrate
+- Non far finire una domanda sul piano in un vicolo cieco: l'editor diceva
+  benissimo *com'e'* un giorno e non rispondeva a *cosa tocco*. Le mosse sono
+  porzioni e cambi di ricetta, e si applicano con gli scrittori che ci sono
+  gia' (`codiceRicetta()`, il codice dello slot), senza toccare il modello
+- Non ordinare le mosse solo per quanto danno sul macro chiesto: una che alza
+  le proteine sfondando i grassi non e' una mossa buona. Il punteggio e' il
+  guadagno **meno** quanto le altre tre voci si allontanano dal loro target
+- Non proporre di portare a zero un ingrediente per far tornare un numero:
+  togliere e' una modifica alla ricetta e si fa dentro il pasto. Una leva
+  cambia una porzione — fondo a un quarto, tetto a due volte e mezza
+- Non proporre la stessa ricetta per quattro pasti diversi: sono quattro righe
+  che dicono la stessa cosa. Una ricetta entra una volta, nel pasto in cui
+  rende di piu', e quelle che il giorno ha gia' non entrano affatto
+- Non inventare un magazzino nuovo per gli altri sport: `cardioDi()` lo
+  leggono gia' `allenatoIl()`, `kcalAllenamento()`, la striscia dei giorni e
+  la costanza. Si estende quello, e i quattro motori se ne accorgono da soli
+- Non far ricadere `cardioTipo()` su `CARDIO_TIPI[6]`: e' un ripiego **per
+  posizione**, e basta aggiungere un tipo in mezzo perche' diventi un altro
+- Non presentare un MET come una misura: sono medie di popolazione del
+  Compendium, e sulle arti marziali ce ne sono due che differiscono del
+  doppio. Si dichiara quale si sta usando
+- Non ricalcolare nel calendario quanto dura una seduta: lo sa gia'
+  `kcalAllenamento()`, ed e' l'unico posto in cui la stima dalle serie sta
+  scritta. Si aggiunge semmai un campo alle sue righe
+- Non lasciare che carico proposto, progressione e avviso sugli acciacchi
+  guardino l'esercizio scritto in scheda quando quello che stai facendo e' un
+  altro: sono i numeri di un esercizio diverso
+- Non ordinare alfabeticamente i ricambi di un esercizio: con un attrezzo
+  occupato la domanda e' "cosa mi allena la stessa cosa", e i muscoli primari
+  in comune pesano il doppio dei secondari
+- Non fissare il numero di scarichi di uno stripping su quello della scheda:
+  quante volte scarichi lo decidi mentre lo fai, e quello che non ha una
+  casella sparisce dal volume
+- Non concatenare i tuoi esercizi in fondo al catalogo di base: `esercizio(id)`
+  restituisce il primo che trova, quindi una tua correzione con lo stesso id
+  resterebbe invisibile. I tuoi vincono sull'id — e l'id non cambia, o lo
+  storico dei carichi si spezza in due
+- Non nascondere "Come si esegue" quando il collegamento manca: e' proprio da
+  li' che il collegamento si fa
+- Non dare un id nuovo a un esercizio che esiste gia' con un altro nome: lo
+  storico dei carichi e il volume settimanale si spezzano in due
+- Non scrivere una sola delle due date del cruscotto: `datiIntervallo()` le
+  prende tutte e due e ricalcola la lunghezza. Toccando solo la fine il periodo
+  scivolava intero e anche la data di inizio si muoveva da sola — dall'esterno
+  sembrava che il filtro non funzionasse, ed era esattamente quello che
+  succedeva
+- Non far contare a una pagina fino a ieri e a un'altra fino a oggi: sono due
+  numeri diversi per lo stesso periodo, e chi legge non puo' saperlo
+- Non mettere il nome di una persona reale in cima alla scheda del corpo di
+  qualcun altro: un paragone non e' un dato. Le misure di riferimento restano
+  nel file di dominio, il racconto no
+- Non lasciare fisse le soglie della revisione quando il periodo non e' di
+  sette giorni: l'obiettivo di sedute e' settimanale e va scalato, la soglia
+  del registro e' meta' dei giorni. Altrimenti ogni periodo corto risulta
+  "sotto" e ogni periodo lungo "sopra", che e' un artefatto e non una misura
+- Non confrontare un periodo con una finestra di lunghezza diversa: venti
+  giorni contro sette dicono che hai camminato tre volte tanto
+- Non agganciare l'impegno o `revisioneLetta` a un periodo scelto a mano: sono
+  due cose settimanali, e chiudere "dal 3 al 19" non deve zittire la revisione
+  di domenica
+- Non leggere `p.macro` da una ricetta che puo' essere congelata: la copia
+  della spunta ha `macro: null` **apposta**, e chi lo prende per zero dichiara
+  l'intero pasto come differenza rispetto al piano. Si passa da
+  `macroRicetta()`
+- Non confrontare un pasto del giorno con la ricetta che ha oggi: si
+  confronta con se stesso e dice sempre zero. Il metro e' `codiceBase()`, la
+  ricetta che il piano mette in quello slot
+- Non tenere due stati per lo stesso concetto in due viste della stessa
+  scheda: `datiRange`/`datiFine` e `revPeriodo` erano tutti e due "il periodo",
+  e ogni vista scaricava il PDF con il proprio. Il periodo si scrive da
+  `periodoAndamento()`, e basta
+- Non tenere nello stesso campo "come stai scegliendo" e "cos'e' il tratto":
+  `custom` e `settimana` rispondono a due domande, e fondendole "Scegli le
+  date" si apre sulla settimana e rimbalza indietro nello stesso istante,
+  cioe' non fa niente. Le parole e l'impegno guardano il tratto, il selettore
+  guarda il modo
+- Non scrivere una data dentro `datiFine` quando l'utente ha toccato un
+  preset: quel campo a `null` vuol dire "finisce oggi e segue oggi", e una
+  data li' accende "Date" come se le avesse messe lui
+- Non lasciare due bottoni che scaricano lo stesso documento senza dire quale
+  tratto ne esce: e' la domanda che fa sembrare rotto un filtro che funziona
+- Non aprire il resoconto con i numeri: chi lo riceve non sa di chi sono. La
+  sezione Profilo apre la meta' dati, e la sagoma con la tabella ora/target
+  vengono prima delle medie
+- Non fare tre grafici che parlano dello stesso soggetto: tre piani con il
+  grasso su un asse sono un disegno solo ripetuto tre volte. Quattro figure,
+  quattro soggetti — il tempo, il metro, la composizione, la fascia
+- Non disegnare su due assi un dato che ne ha una: la percentuale di grasso su
+  un piano cartesiano riempie mezza pagina di bianco per collocare un numero
+- Non disegnare un piano grassa/magra senza le diagonali del peso: senza
+  quelle una ricomposizione — il movimento che le attraversa a bilancia
+  ferma — non si vede
+- Non scartare una diagonale quando un estremo cade fuori dal grafico: con
+  `x + y` fissato quasi nessuna ha tutti e due gli estremi dentro, e non ne
+  compare nessuna. Si taglia sul riquadro
+- Non fissare da che parte va l'etichetta di un punto: "target" sopra e
+  "adesso" sotto si sovrappongono ogni volta che l'anello finisce sotto il
+  pallino, cioe' nel caso normale di chi sta scendendo di grasso
+- Non centrare l'etichetta dell'ultima tacca sul bordo del grafico: in un
+  grafico largo tutta la pagina quel bordo e' il margine, e meta' etichetta
+  finisce fuori. Si rientra con `pdfDentro()`, misurando
+- Non mettere l'etichetta di un asse sulla riga delle sue tacche: a destra c'e'
+  sempre l'ultima, e si stampano una sopra l'altra
+- Non usare `→` in un PDF: non sta in WinAnsi e diventa `?`. C'e' `›`
+- Non scrivere `**grassetto**` dentro `doc.paragrafo`: non e' markdown, e gli
+  asterischi finiscono stampati
+- Non esprimere una soglia in rapporto quando puoi darla in centimetri: 0,5 e'
+  un numero da ricordare, 90 cm e' un numero da misurare
+- Non presentare le fasce di NICE e ACE come un giudizio: sono riferimenti di
+  popolazione, e alla soglia 0,5 la letteratura contesta di penalizzare gli
+  adulti bassi. Una soglia con una critica nota si consegna con la critica
+- Non far ignorare in silenzio a `doc.percorso()` un comando SVG che non
+  conosce: una figura con un pezzo mancante non si vede finche' non la si
+  cerca. Fa lanciare, e chi la disegna degrada
+- Non lasciare al riferimento tratteggiato lo stesso colore della sagoma
+  piena: sullo schermo la figura e' grande e due verdi si distinguono, su A4
+  sta in quattro centimetri e sono la stessa linea
+- Non trattare una rilevazione sola come un "da dove a dove": con il metro
+  passato ogni due settimane e un resoconto di sette giorni e' il caso
+  normale, e la tabella stampa lo stesso numero in Inizio e in Fine. Si guarda
+  indietro all'ultima precedente e si dichiara da quando; se non c'e', `—`
+- Non ristampare gli ingredienti di una ricetta sotto ogni giorno che la usa:
+  la colazione compare sette volte su sette. Le ricette vanno in fondo, una
+  volta sola, numerate
+- Non leggere `passi[i].t` senza controllare che il passo esista: i passi del
+  piano non sono sempre gli stessi sei, e col piano alimentare spento sono due
+- Non pubblicare un commit senza alzare `V` in `sw.js` (`dieta-v118` →
+  `dieta-v119`): la versione che l'app dichiara e' il nome della cache del
+  worker, e se `sw.js` non cambia di un byte il telefono non reinstalla
+  niente. "Versione" continua a dire il numero vecchio e a rispondere che non
+  c'e' niente di nuovo. Un numero per commit, nello stesso commit
+- Non usare `window.print()` per fare un PDF su iOS: dentro una PWA aggiunta
+  alla Home la finestra di stampa a volte non si apre, e i margini li decide il
+  browser. Il file si genera, e cosi' si sa cosa contiene
+- Non incorporare font nel PDF ne' inventare le larghezze dei caratteri: con i
+  quattordici font di base il file resta di venti kB, e senza le metriche vere
+  il ritorno a capo va a occhio e il testo esce dal foglio
+- Non generare il PDF con i colori del tema scuro: si stampa su carta bianca
+- Non rispondere "formato non riconosciuto" a un formato che l'app conosce: se
+  il file e' dell'altra porta, si apre l'altra porta. Vale nelle due direzioni
+- Non dare per scontato che il catalogo esercizi sia lo stesso sui due
+  dispositivi: gli id di base non viaggiano nel file, e uno fermo a una
+  versione vecchia riceve righe che puntano al nulla. Si contano e si dicono
+- Non far sostituire l'archivio a un file di scambio: quello e' il mestiere del
+  backup. Un piano che arriva da fuori si **aggiunge**, e sui doppioni si chiede
+- Non esportare lo strato `S.piano` come se fosse il piano: chi sta sul piano di
+  esempio ce l'ha quasi vuoto, e il file consegnato non conterrebbe la dieta che
+  mangia davvero. Si esporta `D`, meno i 44 alimenti di base che ha gia' chiunque
+- Non riusare l'id di una scheda importata: `scheda(id)` restituisce la prima che
+  trova, e la seconda diventa impossibile da aprire
+- Non usare media e deviazione standard per riconoscere una pesata sbagliata:
+  il valore anomalo alza sia la media sia lo scarto e finisce per giustificarsi
+  da solo. Servono mediana e MAD
+
+
+---
+
+## Ottobre 2026 — il mese, e Corpo in chili
+
+### Basta, o devo fare di piu'?
+
+Segnalato cosi': *"vorrei qualcosa che aiutasse meglio a capire come sta
+andando un mese, se e' sufficiente, se devo fare di piu' o altro"*. L'app
+sapeva gia' tutto: il ritmo del peso, l'obiettivo con il suo ritmo, cosa si
+era mangiato, quanto ci si era allenati. Non lo metteva mai insieme.
+
+`mese.js` lo fa in tre passi: il **risultato** (la retta sulle pesate degli
+ultimi 28 giorni contro `obiettivo.pct x peso`, piu' vita e composizione in
+kg), il **perche'** (calorie e proteine medie sui giorni registrati fino a
+ieri, registro, giorni di forza, minuti di attivita') e **una cosa sola da
+fare**. Le fasce sono larghe — in linea fra meta' e una volta e mezza il
+ritmo scelto — e quando l'incertezza della retta e' piu' larga della fascia
+il verdetto e' "non ancora chiaro": il peso di tendenza ha un rumore vero, e
+fasce strette cambierebbero verdetto ogni due giorni.
+
+L'ordine delle domande dietro la cosa da fare evita il consiglio sbagliato:
+prima se i dati bastano, poi se il piano e' stato seguito — abbassare il
+target a chi mangia sopra il target correggerebbe il metro invece del gesto —
+e solo alla fine se il piano va cambiato, sempre di circa 150 kcal (le leve
+del file di dominio). Porta dove si fa, non lo fa.
+
+### La previsione partiva dal piano
+
+"Dove sta andando il peso" apriva con il ritmo che avresti *seguendo il
+piano*; quello vero stava sotto, in un riquadro ambra. Con il seme di prova —
+pesate in discesa di 0,3 kg a settimana — il titolo diceva **"Stai salendo di
+0,08 kg a settimana"**, e il tratteggio del grafico era piatto. Adesso il
+titolo e' `ritmoPeso()`, le colonne e il tratteggio proseguono quella retta,
+e il piano e' il confronto sotto, senza ambra. Stessa correzione nella
+proiezione della composizione.
+
+### Chili e percentuali sotto le stesse colonne
+
+La tabella della composizione aveva peso, magra e grassa in kg e "Grasso" in
+%, con una colonna "Manca" che diceva +4,8 senza dire in cosa. Adesso la % e'
+un titolo, e la tabella e' una somma: magra piu' grassa fa il peso, con il
+cambio dell'ultimo mese (`cambioComposizione()`, che esiste solo se fra le
+due date c'e' una misura **nuova** della vita o un'altra bioimpedenza: con la
+stessa vita grassa e magra si sposterebbero in proporzione al peso, cioe' un
+numero che sembra una misura e non lo e').
+
+Le misure: "Mese" e "Al rif." al posto di "Target" e "Manca", con ↓ e ↑ per
+il verso. Il cambio e' verde quando va verso il riferimento e ambra quando se
+ne allontana. "Dove stai andando" e' a frasi, l'R² compare solo quando avverte.
+
+### Le attivita' che non sono pesi
+
+Il cardio era un riquadro fra otto e un "ti sei allenato si'/no". Adesso ha
+due anelli in cima a Gym, come Fitness: minuti contro i 150 dell'OMS — un
+minuto intenso, MET >= 6, vale due — e giorni di forza contro due. I pesi non
+entrano nei minuti: per l'OMS sono una raccomandazione a parte, e sommarli
+farebbe sembrare coperto il cuore da chi fa solo panca.
+
+### Lo scarico che scattava da solo
+
+"N settimane di fila sopra il tuo volume abituale" contava le settimane
+**almeno all'80% della mediana**, cioe' al volume abituale; `filata >= 8`
+bastava da sola a dire "conviene scaricare", e "non hai mai segnato uno
+scarico" nasceva dallo stesso dato. Chiunque si allenasse regolarmente per due
+mesi se lo vedeva consigliare, con forza in salita. Adesso i segnali
+indipendenti sono tre (carico acuto, forza ferma, tempo senza una settimana
+leggera) e ne servono due.
+
+### I test restano
+
+`test.html` carica l'app con una memoria finta al posto di `localStorage` e
+senza IndexedDB, e verifica 25 casi. Provati contro il codice di prima,
+falliscono esattamente la previsione e lo scarico.
