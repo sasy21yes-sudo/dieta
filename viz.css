@@ -2339,3 +2339,44 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
   padding:7px 10px;border-radius:12px}
 .spu-chips .chip .n{font-size:13px;font-weight:600}
 .spu-chips .chip .k{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+
+/* il promemoria del backup: una riga d'avviso, non una carta da leggere */
+.card.bk-r{display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:center;
+  border-left:3px solid var(--amber);padding:11px 14px}
+.bk-r .ic{width:34px;height:34px;border-radius:10px;background:var(--amber-soft);color:var(--amber);
+  display:grid;place-items:center}
+.bk-r .body{display:flex;flex-direction:column;gap:1px;min-width:0}
+.bk-r .body b{font-size:14.5px;font-weight:600}
+.bk-r .body span{font-size:12.5px;color:var(--ink-2);line-height:1.35}
+
+/* ============================================== i pasti, una lista sola
+   Una lista raggruppata come in Promemoria o Salute: un contenitore, righe
+   separate da un filo, e il pasto spuntato che prende la tinta verde. */
+.meal-gruppo{background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+  margin-bottom:12px;overflow:hidden}
+.meal-gruppo .meal{border:0;border-radius:0;margin:0;border-top:1px solid var(--rule)}
+.meal-gruppo .meal:first-child{border-top:0}
+.meal-gruppo .meal.done{border-color:var(--rule)}
+
+/* ================================================== il cursore del diario
+   Come gli slider di iOS: binario sottile, pomello bianco con l'ombra, il
+   valore a destra dell'etichetta. Spento finche' non lo tocchi: un valore
+   che non hai dato non deve sembrare dato. */
+.field.cursore label{display:flex;justify-content:space-between;align-items:baseline}
+.field.cursore label b{font-size:17px;font-weight:600;color:var(--ink)}
+.field.cursore input[type=range]{width:100%;margin:6px 0 2px;accent-color:var(--pine);
+  -webkit-appearance:none;appearance:none;height:28px;background:transparent}
+.field.cursore input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--rule)}
+.field.cursore input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--rule)}
+.field.cursore input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;
+  border-radius:50%;background:#fff;margin-top:-11px;box-shadow:0 1px 4px rgba(0,0,0,.3),0 0 0 .5px rgba(0,0,0,.08)}
+.field.cursore input[type=range]::-moz-range-thumb{width:26px;height:26px;border:0;border-radius:50%;
+  background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.field.cursore.vuoto input[type=range]{opacity:.45}
+.field.cursore.vuoto label b{color:var(--ink-3)}
+.field.cursore .estremi{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-3)}
+
+/* l'introduzione ai passi del piano: una riga, non una carta */
+.pn-intro{display:flex;flex-direction:column;gap:2px;margin:6px 2px 10px}
+.pn-intro b{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.pn-intro span{font-size:13px;color:var(--ink-2);line-height:1.4}

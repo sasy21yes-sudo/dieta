@@ -1280,17 +1280,29 @@ function pinnaPassato() {
 }
 
 /** Promemoria in cima a Oggi, solo quando serve davvero. */
+/** "30 ottobre", con l'anno solo se non e' quello in corso: una data si
+    legge, e `2026-10-30` e' come la scrive un computer. */
+/** "VENERDÌ" -> "Venerdì": il maiuscolo tutto pieno si legge come un grido. */
+const capIniziale = s => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
+
+function dataEstesa(k) {
+  const a = k.slice(0, 4);
+  return `${+k.slice(8)} ${MESI_L[+k.slice(5, 7) - 1]}${a !== today().slice(0, 4) ? ' ' + a : ''}`;
+}
+
 function backupBanner(v) {
   const n = backupDue(); if (!n) return;
   const mai = !S.settings.backup;
-  const c = el('div', 'card flat');
-  c.append(el('div', 'eyebrow', 'Backup'));
-  c.append(el('div', 'muted', n + ' giorni registrati ' + (mai
-    ? 'e nessun backup finora' : 'dall\'ultimo backup')
-    + '. Se svuoti i dati di Safari o togli l\'app dalla schermata Home questo '
-    + 'storico non torna piu\': non ne esiste una copia da nessun\'altra parte.'));
-  const b = el('button', 'btn wide', 'Esporta adesso');
-  b.style.marginTop = '10px';
+  /* Una riga, come un avviso di iOS: era una carta con un paragrafo e un
+     bottone largo quanto lo schermo, in cima a Oggi, sopra il conto del
+     giorno. Il rischio si dice in mezza riga. */
+  const c = el('div', 'card bk-r');
+  const ic = el('span', 'ic');
+  if (typeof icona === 'function') ic.append(icona('download', { size: 18 }));
+  c.append(ic);
+  c.append(el('div', 'body', `<b>${n} giorni ${mai ? 'senza backup' : 'dall\'ultimo backup'}</b>`
+    + '<span>Svuotando Safari si perdono: fuori dal telefono non c\'e\' una copia.</span>'));
+  const b = el('button', 'spu-go', 'Esporta');
   b.onclick = () => { exportBackup(); route(); toast('Backup scaricato'); };
   c.append(b);
   v.append(c);
@@ -1464,8 +1476,8 @@ function viewOggi(v) {
   nav.append(el('div', 'eyebrow', esc(plan.attivita)));
   const r = el('div', 'row between');
   r.append(el('button', 'btn sm', '‹'),
-           el('div', 'grow', `<strong style="font-family:var(--serif);font-size:17px">${esc(plan.giorno)}</strong>
-             <div class="muted mono" style="font-size:11px">${k}${k === today() ? ' · oggi' : ''}</div>`),
+           el('div', 'grow', `<strong style="font-family:var(--serif);font-size:19px">${esc(capIniziale(plan.giorno))}</strong>
+             <div class="muted" style="font-size:12.5px">${dataEstesa(k)}${k === today() ? ' · oggi' : ''}</div>`),
            el('button', 'btn sm', '›'));
   r.children[0].onclick = () => { viewDate = addDays(viewDate, -1); route(); };
   r.children[2].onclick = () => {
@@ -1597,8 +1609,8 @@ function viewOggi(v) {
      si apre toccando questa carta. Quattro colonne su un telefono stringono
      le tre che si guardano davvero. */
   const g = el('div', 'macros');
-  for (const [id, lab, dec] of [['p', 'prot', 0], ['c', 'carb', 0],
-                                ['g', 'gras', 0]]) {
+  for (const [id, lab, dec] of [['p', 'Proteine', 0], ['c', 'Carboidrati', 0],
+                                ['g', 'Grassi', 0]]) {
     const pc = tgt[id] ? cons[id] / tgt[id] : 0;
     const cls = pc > 1.15 ? 'way' : pc > 1.02 ? 'over' : '';
     const mb = el('div', 'macro',
@@ -1689,6 +1701,11 @@ function viewOggi(v) {
     }
     v.append(av);
   }
+  /* I pasti in una lista raggruppata, come le liste di iOS: erano cinque
+     carte separate con sotto ognuna la riga "4 ingredienti · apri e
+     modifica" — il nome del pasto si apriva gia' con un tocco e aveva la sua
+     freccia, quindi quella riga allungava la pagina senza dire niente. */
+  const listaPasti = el('div', 'meal-gruppo');
   for (const s of plan.pasti) {
     // il pasto che c'e' oggi: se lo hai cambiato, si vede quello
     const eff = typeof pastoDelGiorno === 'function'
@@ -1714,7 +1731,7 @@ function viewOggi(v) {
         if (typeof pianoTab !== 'undefined') pianoTab = 'settimana';
         apri('#/piano');
       };
-      v.append(vuoto);
+      listaPasti.append(vuoto);
       continue;
     }
     const m = el('div', 'meal' + (done ? ' done' : ''));
@@ -1790,18 +1807,9 @@ function viewOggi(v) {
         return `<b>${nf(mg.kcal)}</b> kcal<span class="mm">${macroRiga(mg)}</span>`;
       })()));
     m.append(h);
-    // una riga sola sotto il nome: quanti ingredienti ci sono e come aprirli
-    const n = (typeof ingredientiGiorno === 'function'
-      ? ingredientiGiorno(chiaveP(s), k) : (p.ingredienti || [])).length;
-    if (n && !futuro) {
-      const apri = el('button', 'meal-apri');
-      apri.innerHTML = `<span>${n} ${n === 1 ? 'ingrediente' : 'ingredienti'}</span>`
-        + '<span class="go">apri e modifica &rsaquo;</span>';
-      apri.onclick = () => sheetPorzioni(k, chiaveP(s));
-      m.append(apri);
-    }
-    v.append(m);
+    listaPasti.append(m);
   }
+  if (listaPasti.children.length) v.append(listaPasti);
 
   // fuori piano: su un giorno che deve ancora arrivare non c'e' niente da
   // aggiungere, e il bottone chiederebbe di registrare una cena di giovedi'
@@ -2553,12 +2561,11 @@ function viewDiario(v) {
 
   // stesso giorno selezionato della scheda Oggi: si naviga il giorno, non la scheda
   const nav = el('div', 'card flat');
-  nav.append(el('div', 'eyebrow', 'Giorno'));
   const r = el('div', 'row between');
   const nomi = ['lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato', 'domenica'];
   r.append(el('button', 'btn sm', '‹'),
-    el('div', 'grow', `<strong style="font-family:var(--serif);font-size:17px">${nomi[dayIdx(k)].toUpperCase()}</strong>
-       <div class="muted mono" style="font-size:11px">${k}${k === today() ? ' · oggi' : ''}</div>`),
+    el('div', 'grow', `<strong style="font-family:var(--serif);font-size:19px">${esc(capIniziale(nomi[dayIdx(k)]))}</strong>
+       <div class="muted" style="font-size:12.5px">${dataEstesa(k)}${k === today() ? ' · oggi' : ''}</div>`),
     el('button', 'btn sm', '›'));
   r.children[0].onclick = () => { viewDate = addDays(viewDate, -1); route(); };
   r.children[2].onclick = () => {
@@ -2625,16 +2632,24 @@ function viewDiario(v) {
   grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:0 10px';
   grid.append(num('passi', 'Passi', '', '100'), num('sonno', 'Sonno', 'ore', '0.5'));
   c2.append(grid);
-  for (const [id, lab] of [['fame', 'Fame'], ['energia', 'Energia']]) {
-    const f = el('div', 'field', `<label>${lab} <span class="muted">1–10</span></label>`);
-    const s = el('div', 'seg');
-    for (let i = 1; i <= 10; i++) {
-      const b = el('button', null, i);
-      b.setAttribute('aria-pressed', d[id] === i);
-      b.onclick = () => { set(id, i); route(); };
-      s.append(b);
-    }
-    f.append(s); c2.append(f);
+  /* Un cursore da 1 a 10, come quelli di Impostazioni: erano dieci bottoni
+     spezzati su due righe (sette e tre), cioe' una griglia da decifrare per
+     dire un numero. Finche' non lo tocchi il valore non c'e' — il cursore
+     sta a meta' e spento — e non si ridisegna la pagina mentre trascini. */
+  for (const [id, lab, lo, hi] of [['fame', 'Fame', 'poca', 'tanta'],
+                                   ['energia', 'Energia', 'scarico', 'carico']]) {
+    const val = d[id];
+    const f = el('div', 'field cursore' + (val == null ? ' vuoto' : ''),
+      `<label><span>${lab}</span><b class="mono">${val == null ? '—' : val}</b></label>
+       <input type="range" min="1" max="10" step="1" value="${val ?? 5}" aria-label="${lab} da 1 a 10">
+       <div class="estremi"><span>${lo}</span><span>${hi}</span></div>`);
+    const inp = f.querySelector('input'), cifra = f.querySelector('b');
+    inp.oninput = () => {
+      set(id, +inp.value);
+      cifra.textContent = inp.value;
+      f.classList.remove('vuoto');
+    };
+    c2.append(f);
   }
   const fa = el('div', 'field', `<label>Aderenza al piano</label>`);
   const sa = el('div', 'seg');

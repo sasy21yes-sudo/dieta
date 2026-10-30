@@ -312,7 +312,7 @@ function cardCostanza(k, n) {
     c.append(fb);
   }
   c.append(el('div', 'sub',
-    `Ultimi ${co.n} giorni, oggi compreso. Non e' un voto su di te: dice quanto e' continuo il registro, che e' cio' che rende affidabile tutto il resto.`));
+    `Ultimi ${co.n} giorni: quanto e' continuo il registro, non un voto su di te.`));
 
   const riga = el('div', 'rings');
   riga.append(anello(co.generale, 'Generale', liv.nome));
@@ -321,9 +321,9 @@ function cardCostanza(k, n) {
   riga.append(anello(co.sfide, 'Sfide', `${co.dettaglio.sfideFatte}/${co.n}`, 'var(--c3)'));
   c.append(riga);
 
+  // il "come si calcola" stava qui in un paragrafo sempre aperto: il livello
+  // basta, e i pesi del punteggio sono nella storia del progetto
   c.append(el('p', 'note', `<strong>${esc(liv.nome)}</strong> — ${esc(liv.d)}`));
-  c.append(el('p', 'note',
-    `Il punteggio generale pesa nutrizione 35%, allenamento 30%, pesate 20%, sfide 15%. L'allenamento non si misura su tutti i giorni ma sulle ${S.hyrox?.profilo?.sedute || 4} sedute a settimana che hai dichiarato di reggere: riposare quando serve non abbassa il punteggio.`));
   return c;
 }
 

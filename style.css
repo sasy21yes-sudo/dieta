@@ -109,8 +109,11 @@ body,#view,#sheet,#sheet-card,#topbar,#tabbar{touch-action:manipulation}
 h2.sec{font-family:var(--serif);font-size:17px;font-weight:700;
   margin:22px 0 10px;letter-spacing:-.01em}
 h2.sec:first-child{margin-top:4px}
-.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+/* Le etichette di sezione come quelle di iOS 17: testo normale in grassetto
+   leggero, non maiuscoletto spaziato. Si leggono invece di decifrarle, e
+   ogni etichetta e' gia' scritta con la maiuscola iniziale. */
+.eyebrow{font-family:var(--sans);font-size:12.5px;font-weight:600;letter-spacing:0;
+  color:var(--ink-2);margin-bottom:6px}
 .muted{color:var(--ink-2);font-size:13px}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .row{display:flex;align-items:center;gap:10px}
@@ -148,8 +151,7 @@ button.btn.sm{min-height:36px;padding:7px 11px;font-size:13px}
   gap:6px;margin-bottom:14px}
 .sum-c{text-align:center;min-width:0}
 .sum-c.spenta{opacity:.55}
-.sum-c .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--ink-3)}
+.sum-c .k{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--ink-3)}
 .sum-c .v{font-family:var(--mono);font-size:20px;font-weight:600;
   line-height:1.2;margin:3px 0 1px}
 .sum-c .u{font-family:var(--mono);font-size:9.5px;line-height:1.35;
@@ -165,8 +167,7 @@ button.btn.sm{min-height:36px;padding:7px 11px;font-size:13px}
 .sum-r .n{font-family:var(--mono);font-size:29px;font-weight:600;line-height:1}
 .sum-r .n.over{color:var(--amber)}
 .sum-r .n.way{color:var(--alert)}
-.sum-r .u{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--ink-3);margin-top:4px}
+.sum-r .u{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--ink-3);margin-top:3px}
 .sum-r .t{font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:2px}
 /* La carta e' un bottone: senza il reset prende il fondo chiaro di sistema,
    e al buio diventa un rettangolo bianco in mezzo alla pagina. */
@@ -178,8 +179,7 @@ button.btn.sm{min-height:36px;padding:7px 11px;font-size:13px}
   font-size:19px;line-height:1}
 
 .macros{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
-.macro .lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--ink-3)}
+.macro .lab{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--ink-3)}
 .macro .val{font-family:var(--mono);font-size:17px;font-weight:600;
   line-height:1.2;margin:2px 0 1px}
 .macro .of{font-family:var(--mono);font-size:10px;color:var(--ink-3)}
@@ -200,8 +200,7 @@ button.btn.sm{min-height:36px;padding:7px 11px;font-size:13px}
   display:flex;align-items:center;justify-content:center;font-size:14px;
   color:transparent;margin-top:1px}
 .meal.done .tick{background:var(--pine);border-color:var(--pine);color:#fff}
-.meal-slot{font-family:var(--mono);font-size:10px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--pine)}
+.meal-slot{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--pine)}
 .meal-name{font-weight:600;font-size:15px;line-height:1.3;margin-top:1px}
 .meal-kcal{font-family:var(--mono);font-size:12px;color:var(--ink-2);
   text-align:right;flex:none}
@@ -278,8 +277,8 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;
 .cmp-h,.cmp-r{display:grid;grid-template-columns:1fr 58px 58px 64px;gap:8px;
   align-items:baseline;text-align:right}
 .cmp-h>span:first-child,.cmp-r>span:first-child{text-align:left}
-.cmp-h{font-family:var(--mono);font-size:10px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--ink-3);padding-bottom:5px;
+.cmp-h{font-family:var(--sans);font-size:11.5px;font-weight:600;letter-spacing:0;
+  color:var(--ink-3);padding-bottom:5px;
   border-bottom:1px solid var(--rule)}
 .cmp-r{padding:8px 0;border-bottom:1px solid var(--rule);font-size:14px}
 .cmp>.cmp-r:last-child,.cmp>div>.cmp-r:last-child{border-bottom:0}

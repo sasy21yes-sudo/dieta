@@ -602,7 +602,7 @@ function viewPiano(v) {
   /* --- profilo attivo --- */
   const P0 = profili();
   const cp = el('div', 'card');
-  cp.append(el('div', 'eyebrow', 'Stai modificando il profilo'));
+  cp.append(el('div', 'eyebrow', 'Profilo'));
   const sel = el('select');
   sel.style.cssText = 'width:100%;padding:11px;border:1px solid var(--rule);border-radius:9px;'
     + 'background:var(--paper);color:var(--ink);font:inherit;font-weight:600;margin:6px 0 10px';
@@ -617,7 +617,7 @@ function viewPiano(v) {
   };
   cp.append(bn);
   cp.append(el('p', 'hint',
-    'Ogni profilo ha il suo diario, il suo piano, le sue foto e la sua palestra, separati del tutto. Il piano di partenza e’ lo stesso file per tutti: quello che cambi vale solo per il profilo attivo.'));
+    'Ogni profilo ha diario, piano, foto e palestra suoi, separati del tutto.'));
   if (P0.lista.length > 1 && P0.attivo !== 'principale') {
     const bd = el('button', 'btn wide');
     bd.style.marginTop = '8px';
@@ -632,7 +632,8 @@ function viewPiano(v) {
     };
     cp.append(bd);
   }
-  v.append(cp);
+  /* Il profilo va in fondo: apriva la pagina, ed e' la cosa che si tocca
+     meno. In cima ci va la risposta — il piano regge? — e poi i passi. */
 
   /* Le calorie giorno per giorno stanno **in cima al piano**, non solo dentro
      il passo della settimana: chi apre il piano vuole sapere prima di tutto se
@@ -642,23 +643,14 @@ function viewPiano(v) {
     if (cc) v.append(cc);
   }
 
-  /* --- che cos'e' un piano --- */
+  /* --- i passi, con una riga sola d'introduzione ---
+     Era una carta "Come funziona" di cinque righe sopra l'elenco: i passi
+     dicono gia' cosa sono, numerati e nell'ordine giusto. */
   const passi = pianoPassi();
   const miei = passi.filter(x => x.mio).length;
-  // con il piano spento le domande sono due, non cinque: dirne cinque e
-  // mostrarne due sembrerebbe un pezzo mancante
-  v.append(el('div', 'card flat',
-    `<div class="eyebrow">Come funziona</div>
-     <div class="muted">${usaPiano()
-       ? `Un piano risponde a cinque domande, in quest’ordine:
-          <strong>chi sei</strong>, <strong>quanto mangiare</strong>, <strong>cosa</strong>,
-          <strong>come lo combini</strong>, <strong>quando</strong>.`
-       : `Con il piano alimentare spento restano le due domande che contano comunque:
-          <strong>chi sei</strong> e <strong>quanto mangiare</strong>. Da lì escono i
-          target contro cui l’app misura quello che registri ogni giorno.`}
-     Puoi fermarti a qualsiasi punto: quello che non tocchi resta come nel piano
-     di partenza, e l’app continua a funzionare.</div>
-     <div class="hint" style="margin-top:8px">Hai personalizzato ${miei} passi su ${passi.length}.</div>`));
+  v.append(el('div', 'pn-intro', `<b>${usaPiano() ? 'Cinque domande, in ordine' : 'Due domande'}</b>`
+    + `<span>Fermati dove vuoi: quello che non tocchi resta come nel piano di partenza. `
+    + `Personalizzati ${miei} su ${passi.length}.</span>`));
 
   /* --- i passi --- */
   for (const [i, s] of passi.entries()) {
@@ -711,11 +703,7 @@ function viewPiano(v) {
   sc.append(bsc);
   v.append(sc);
 
-  v.append(el('div', 'card flat',
-    `<div class="eyebrow">Se ti sei perso</div>
-     <div class="muted">Il caso piu’ comune sono i primi due passi e basta: metti i tuoi
-     dati e i tuoi target, e continui a usare i pasti gia’ pronti. Comporre pasti e
-     riorganizzare la settimana serve solo se il piano di partenza non ti va bene.</div>`));
+  v.append(cp);
 }
 
 /** Una sezione aperta, con l'intestazione che dice sempre dove sei. */

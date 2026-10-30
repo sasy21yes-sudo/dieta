@@ -46,6 +46,7 @@ style.css    design system (token CSS, tema chiaro/scuro automatico)
 viz.css      tavolozza dei grafici + componenti
 app.js       stato, router, viste principali, motori. Caricato PER ULTIMO
 mese.js      il giudizio sul mese, gli anelli della settimana
+spunti.js    "Oggi, per il tuo obiettivo": cosa fare oggi, con un tocco
 anim.js      animazioni (prima di charts.js)    icone.js  icone ricopiate dentro
 charts.js    grafici SVG + Andamento            revisione.js  revisione per periodo
 obiettivo.js obiettivo e fisico di riferimento  target.js     target ricalibrato
@@ -114,6 +115,10 @@ test.html / test.js   controlli fissi
 - **Prima quello che succede, poi quello che succederebbe**: titoli e
   proiezioni partono dal ritmo misurato (`ritmoPeso()`, retta sulle pesate di
   28 giorni) o dall'introito reale; il piano è il confronto, non il titolo.
+- **Gli spunti** (`spuntiOggi()`): al massimo tre, nati dai numeri di oggi,
+  ognuno con un'azione da un tocco. Le proteine mancanti si contano al netto
+  dei pasti che restano (`previstoRestante()`). Niente frasi generiche: se non
+  c'e' niente da dire, una riga lo dice.
 - **Il mese** (`giudizioMese()`): ritmo vero contro ritmo dell'obiettivo, con
   fasce larghe; se l'incertezza è più grande della fascia dice "non ancora
   chiaro". Una cosa sola da fare, in quest'ordine: dati, piano seguito, piano
@@ -151,6 +156,15 @@ test.html / test.js   controlli fissi
 
 - Prima la risposta in italiano, poi i numeri che la reggono, poi "come fa a
   saperlo" chiuso in fondo. Una riga che dice cosa fa, non perché esiste.
+- Stile Apple: etichette di sezione in testo normale (`.eyebrow`, niente
+  maiuscoletto), liste raggruppate in un contenitore con righe separate da un
+  filo (i pasti di Oggi), avvisi in una riga con l'azione come bottone di
+  testo, cursori per le scale, date scritte per esteso (`dataEstesa()`), nomi
+  dei giorni con la sola iniziale maiuscola (`capIniziale()`).
+- Oggi: il conto del giorno subito sotto il giorno, poi gli avvisi e gli
+  spunti; la sfida in fondo.
+- Prima di dare un nome a una classe cercalo: `.cal` era della costanza,
+  `.sp-` e' della spesa (gli spunti usano `spu-`).
 - **Una sola unità per tabella.** Composizione in kg (la % una volta, come
   titolo); misure con "Mese" e "Al rif." e la freccia del verso.
 - Colori: verde = in linea, **ambra = fuori target**, oro = allenamento extra,
@@ -187,4 +201,6 @@ applicano da sole, il diario giorno per giorno non esce dal telefono, e un
 3. Ricambio automatico dell'esercizio negli acciacchi
 4. Migrazione degli `aggiunti` scritti sotto il codice della ricetta (vedi
    STORIA.md, "Una ricetta intera nella giornata")
-5. Un giro per togliere testo dalle carte fuori da Corpo e Andamento
+5. Un giro per togliere testo e maiuscoletti locali ("GIORNI DI FILA",
+   "IN LINEA") dalle carte fuori da Oggi, Diario, Piano, Corpo e Andamento
+6. Unire "Cosa posso migliorare" della Sintesi con Il mese

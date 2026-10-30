@@ -490,7 +490,7 @@ function sheetPorzioni(k, code) {
   const stato = { ...(d.porzioni[code] || {}) };
 
   const w = el('div');
-  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
+  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : dataEstesa(k)));
   w.append(el('h2', 'sec', esc(p.nome || code)));
   w.lastChild.style.marginTop = '0';
   w.append(el('p', 'muted',
@@ -739,7 +739,7 @@ function sheetAggiungiAlPasto(k, code) {
 
   const p = code ? ricettaGiorno(code, k) : null;
   const w = el('div');
-  w.append(el('div', 'eyebrow', code ? esc(p?.nome || code) : (k === today() ? 'Oggi' : k)));
+  w.append(el('div', 'eyebrow', code ? esc(p?.nome || code) : (k === today() ? 'Oggi' : dataEstesa(k))));
   w.append(el('h2', 'sec', 'Aggiungi un alimento'));
   w.lastChild.style.marginTop = '0';
   w.append(el('p', 'muted', code
@@ -889,7 +889,7 @@ function sheetAggiungiRicetta(k) {
   const st = { id: null, f: 1 };
 
   const w = el('div');
-  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : k));
+  w.append(el('div', 'eyebrow', k === today() ? 'Oggi' : dataEstesa(k)));
   w.append(el('h2', 'sec', 'Aggiungi una ricetta'));
   w.lastChild.style.marginTop = '0';
   w.append(el('p', 'muted',

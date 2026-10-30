@@ -6304,3 +6304,32 @@ leggera) e ne servono due.
 `test.html` carica l'app con una memoria finta al posto di `localStorage` e
 senza IndexedDB, e verifica 25 casi. Provati contro il codice di prima,
 falliscono esattamente la previsione e lo scarico.
+
+
+### Oggi, per il tuo obiettivo
+
+Segnalato: *"l'app non ti da' nessuno spunto per aiutarti a raggiungere i
+propri obiettivi"*. Il consiglio del giorno ruotava sulla data, la sfida era
+casuale, e i giudizi stavano in Andamento. `spunti.js` risponde a "cosa
+faccio oggi": al massimo tre righe, ordinate per quanto pesano sull'obiettivo
+(il mese se non e' in linea, la pesata, le proteine, la forza di oggi, i
+minuti per i 150 della settimana, acqua e sonno), ognuna con un'azione.
+
+Due decisioni. Le proteine si contano **al netto dei pasti che restano**: alle
+nove "ne mancano 100" e' vero e inutile se pranzo e cena le coprono. E le
+proposte per coprirle sono ordinate per proteine ogni 100 kcal, in porzioni da
+mangiare (20-250 g, fino a 30 g di proteine): un tocco e sono registrate.
+
+### Lo stile di iOS
+
+Il conto del giorno era la quarta carta di Oggi: adesso e' subito sotto il
+giorno. I pasti sono una lista raggruppata, senza la riga "4 ingredienti ·
+apri e modifica" che ripeteva quello che il nome toccabile faceva gia'. Il
+backup e' una riga d'avviso, Fame ed Energia sono cursori (erano dieci bottoni
+su due righe), le etichette di sezione non sono piu' in maiuscoletto, le date
+si scrivono "30 ottobre". Il Piano apre con "Il piano regge?" e mette i profili
+in fondo.
+
+Dal calendario, infine, un allenamento si corregge e si toglie: il resoconto
+ha "Elimina la seduta" e mostra il cardio dello stesso giorno, e una sessione
+di cardio si modifica (tipo, minuti, distanza, giorno).
