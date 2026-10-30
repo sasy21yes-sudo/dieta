@@ -185,8 +185,12 @@ function scaricoConsigliato(k = today()) {
   if (fermi.length >= 2)
     motivi.push({ t: `La forza e' ferma o in calo su ${fermi.length} esercizi`,
       d: `${fermi.slice(0, 3).join(', ')}${fermi.length > 3 ? ' e altri' : ''}. Con la fatica alta, un massimale stimato che non sale non e' un limite genetico: e' recupero mancato.` });
+  /* "Sopra il tuo volume abituale" era falso: il conto e' delle settimane
+     ALMENO all'80% della tua mediana, cioe' al tuo volume normale. Chi si
+     allena con regolarita' ce le ha tutte, ed e' giusto — il segnale e' che
+     non ce n'e' stata una piu' leggera, non che hai esagerato. */
   if (filata >= 6)
-    motivi.push({ t: `${filata} settimane di fila sopra il tuo volume abituale`,
+    motivi.push({ t: `${filata} settimane di fila al tuo volume pieno`,
       d: 'Nessuna settimana piu' + '’ leggera in mezzo. Prima o poi la si prende comunque, meglio sceglierla.' });
   if (daUltimo != null && daUltimo >= 42)
     motivi.push({ t: `Ultimo scarico ${daUltimo} giorni fa`,
@@ -195,12 +199,22 @@ function scaricoConsigliato(k = today()) {
     motivi.push({ t: 'Non hai mai segnato una settimana di scarico',
       d: 'Puo' + '\u2019 darsi che tu ne abbia fatte senza segnarle. Se non e\' cosi\', questa e\' la prima.' });
 
-  const forte = motivi.length >= 2 || filata >= 8;
+  /* I segnali **indipendenti** sono tre, e ne servono due. Prima bastava
+     `filata >= 8` da sola, e "non hai mai segnato uno scarico" nasceva dallo
+     stesso dato — quindi chiunque si allenasse con regolarita' per due mesi
+     si vedeva consigliare lo scarico con due motivi che erano uno. Misurato
+     su otto settimane a volume costante: "Conviene scaricare" con forza in
+     salita e carico acuto a regime. Il tempo senza una settimana leggera e'
+     un segnale solo, comunque lo si misuri. */
+  const segnali = (acrMediano != null && acrMediano >= 1.35 && stanchi.length >= 2 ? 1 : 0)
+    + (fermi.length >= 2 ? 1 : 0)
+    + (filata >= 6 || (daUltimo != null && daUltimo >= 42) ? 1 : 0);
+  const forte = segnali >= 2;
   return {
     serve: forte, dati: true, motivi, stanchi, fermi, filata, acr: acrMediano,
     d: forte
       ? 'Piu' + '’ di un segnale punta nella stessa direzione. Una settimana piu' + '’ leggera adesso costa poco e sblocca il mese dopo.'
-      : motivi.length === 1
+      : motivi.length
         ? 'Un segnale solo: da tenere d\'occhio, non da correre a scaricare.'
         : 'Nessun segnale di sovraccarico. Il carico regge, continua cosi' + '’.',
     come: [

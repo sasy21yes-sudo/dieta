@@ -2955,10 +2955,8 @@ function cardPeso(k) {
   c.append(alt);
 
   c.append(el('p', 'note',
-    'Pesati al mattino, dopo il bagno, prima di bere o mangiare. Una singola '
-    + 'pesata non contiene informazione: conta solo la media a 7 giorni, ed e\' '
-    + 'quella che i conti dell\'app usano. I bottoni vanno di 100 g, che e\' '
-    + 'quanto una bilancia da casa sa distinguere.'));
+    'Al mattino, dopo il bagno, prima di bere. Conta la media a 7 giorni, non '
+    + 'la pesata del giorno.'));
   return c;
 }
 
@@ -3026,6 +3024,9 @@ function viewCorpo(v) {
      niente: le misure di riferimento restano dove servono davvero — la
      sagoma tratteggiata qui sotto e la colonna "Target" della tabella. */
   v.append(cardPeso(k));
+  /* Subito sotto la pesata, la domanda che si fa guardandola: sta
+     funzionando? Il verdetto e una riga, il resto sta in Andamento. */
+  if (typeof cardMeseCorta === 'function') v.append(cardMeseCorta(k));
 
   /* --- figura --- */
   const curM = figMeas(Object.fromEntries(D.misure.map(m => [m.id, lastMeas(m.id)])));
@@ -3038,17 +3039,14 @@ function viewCorpo(v) {
     '<span><i class="sw sw-now"></i>Ora</span>'
     + (TF.misure ? '<span><i class="sw sw-tgt"></i>Riferimento</span>' : '')));
   cf.append(el('p', 'hint',
-    'La sagoma è disegnata sulle circonferenze registrate: cambia quando cambiano i numeri. È schematica, serve a leggere le proporzioni.'));
+    'Disegnata sulle tue circonferenze: schematica, serve a leggere le proporzioni.'));
   // la nota sulla provenienza del target segue il target, che ora e' solo qui
   // e nella tabella: presentare come rilevato cio' che e' stimato sarebbe la
   // stessa bugia anche detta in un punto diverso
   if (TF.misure) cf.append(el('p', 'note',
-    `La tratteggiata e\' <strong>${esc(TF.nome || 'il fisico di riferimento')}</strong>. `
-    + 'Non e\' un obiettivo di peso: fra qui e li\' la bilancia cambia poco e '
-    + 'cambiano le proporzioni.'
+    `La tratteggiata e\' <strong>${esc(TF.nome || 'il fisico di riferimento')}</strong>`
     + (TF.fonte === 'stima' || TF.fonte === 'dichiarazione'
-      ? ' I suoi numeri sono dichiarati e non rilevati: danno una direzione, non '
-        + 'una soglia da centrare al decimo.' : '')));
+      ? ': numeri dichiarati, non rilevati. Una direzione, non una soglia.' : '.')));
   else {
     cf.append(el('p', 'note',
       'Non hai scelto un fisico di riferimento, quindi c\'e\' solo la tua sagoma. '
@@ -3077,40 +3075,44 @@ function viewCorpo(v) {
      diceva una cosa gia' detta due carte sopra. E i due rapporti — vita su
      altezza, torace su vita — non sono composizione ma proporzioni, e sono
      scesi nella carta delle misure da cui escono. */
+  /* **Una sola unita' per riga, e i chili sono chili.**
+     La tabella mescolava tre righe in kg e una in percentuale sotto le
+     stesse colonne, e "Manca" diceva +4,8 o −6,2 senza dire in cosa. La
+     percentuale adesso compare una volta, come titolo; la tabella e' la
+     somma che si legge dall'alto in basso — magra piu' grassa fa il peso —
+     e la seconda colonna e' il cambio dell'ultimo mese, che e' la domanda
+     che si fa guardandola. */
   if (C.bf != null) {
+    const cm = typeof cambioComposizione === 'function' ? cambioComposizione(k) : null;
+    cc.append(el('div', 'cmp-big',
+      `<b class="mono">${nf(C.bf, 1)}<em>%</em></b><span>di grasso, su ${nf(C.peso, 1)} kg</span>`));
     cc.append(divisionePeso(C));
+    const conT = C.t.peso != null && C.t.bf != null;
+    const tFm = conT ? C.t.peso * C.t.bf / 100 : null;
+    const tLbm = conT ? (C.t.lbm ?? C.t.peso - tFm) : null;
     const cmp = el('div', 'cmp');
     cmp.append(el('div', 'cmp-h',
-      '<span></span><span>Ora</span><span>Target</span><span>Manca</span>'));
-    /* Senza fisico di riferimento le due colonne di destra non hanno un
-       contenuto: vanno lasciate vuote, non riempite con la sottrazione di un
-       numero che non c'e'. Con `nf` che ora tollera i null uscirebbe "—" in
-       tutte e due, che sembra un dato mancante invece di una scelta. */
-    const rowC = (lab, now, tgt, dec, unit) => {
-      if (now == null) return;
-      const noT = tgt == null || !isFinite(tgt);
-      const d = noT ? null : tgt - now;
-      const vicino = !noT && Math.abs(d) <= Math.abs(tgt) * 0.03;
-      cmp.append(el('div', 'cmp-r',
-        `<span>${lab}</span>
-         <span class="mono">${nf(now, dec)}</span>
-         <span class="mono muted">${noT ? '—' : nf(tgt, dec)}</span>
-         <span class="mono ${vicino ? 'good' : ''}">${noT ? '—' : vicino ? '✓'
-           : (d > 0 ? '+' : '') + nf(d, dec) + `<em>${unit}</em>`}</span>`));
+      `<span>kg</span><span>Ora</span><span>Mese</span><span>${conT ? 'Rif.' : ''}</span>`));
+    const sg = x => x == null ? '—' : (x > 0.05 ? '+' : x < -0.05 ? '−' : '') + nf(Math.abs(x), 1);
+    const rowC = (lab, now, d, tgt, buono, cls = '') => {
+      const col = d == null || Math.abs(d) < 0.1 ? '' : buono(d) ? 'good' : 'dn';
+      cmp.append(el('div', 'cmp-r ' + cls,
+        `<span>${lab}</span><span class="mono">${nf(now, 1)}</span>
+         <span class="mono ${col}">${sg(d)}</span>
+         <span class="mono muted">${tgt == null ? '' : nf(tgt, 1)}</span>`));
     };
-    /* Il peso c'e', anche se sta grande in cima alla schermata: qui non e'
-       un doppione ma il totale di cui le due righe sotto sono le parti, e
-       una divisione senza il totale costringe a sommarla a mente. Quello che
-       era davvero un doppione — e infatti se n'e' andato — erano i rapporti
-       fra circonferenze, che composizione non sono. */
-    rowC('Peso', C.peso, C.t.peso, 1, ' kg');
-    rowC('Grasso', C.bf, C.t.bf, 1, ' %');
-    rowC('Massa magra', C.lbm, C.t.lbm, 1, ' kg');
-    rowC('Massa grassa', C.fm, C.t.peso * C.t.bf / 100, 1, ' kg');
+    rowC('Massa magra', C.lbm, cm?.dLbm, tLbm, d => d > 0);
+    rowC('Massa grassa', C.fm, cm?.dFm, tFm, d => d < 0);
+    rowC('Peso', C.peso, cm ? cm.ora.peso - cm.prima.peso : null, conT ? C.t.peso : null,
+      () => true, 'tot');
     cc.append(cmp);
-    cc.append(el('p', 'hint',
-      `Da qui al target ci sono ${nf(Math.abs(C.dFm), 1)} kg di grasso in meno e ${
-        nf(Math.abs(C.dLbm), 1)} kg di muscolo in più: lo stesso numero sulla bilancia, un corpo diverso.`));
+    cc.append(el('p', 'hint', cm
+      ? `Nell'ultimo mese la massa grassa e' ${cm.dFm < 0 ? 'scesa' : 'salita'} di ${nf(Math.abs(cm.dFm), 1)} kg `
+        + `e la magra ${cm.dLbm >= 0 ? 'salita' : 'scesa'} di ${nf(Math.abs(cm.dLbm), 1)} kg.`
+        + (conT ? ` Al riferimento mancano ${nf(Math.max(0, C.fm - tFm), 1)} kg di grassa`
+          + (tLbm > C.lbm ? ` e ${nf(tLbm - C.lbm, 1)} kg di magra.` : '.') : '')
+      : 'Per vedere come cambia serve una misura della vita di almeno un mese fa, '
+        + 'oppure due bioimpedenze.'));
   } else if (!C.colloSospetto) {
     cc.append(el('p', 'muted',
       'Servono vita e collo per stimare il grasso, oppure una bioimpedenza. '
@@ -3131,8 +3133,8 @@ function viewCorpo(v) {
   const cm = el('div', 'card');
   cm.append(el('h2', 'sec', 'Misure'));
   cm.lastChild.style.marginTop = '0';
-  cm.append(el('p', 'muted', 'Al mattino, a digiuno, prima di bere. Sempre allo stesso modo: '
-    + 'la costanza del punto conta piu' + '\u2019 della precisione del metro.'));
+  cm.append(el('p', 'muted', 'Al mattino, a digiuno, sempre nello stesso punto: conta piu\u2019 '
+    + 'della precisione del metro.'));
   const fatteOggi = D.misure.filter(m => day(k).misure[m.id] != null).length;
   const giro = el('button', 'btn wide' + (fatteOggi ? '' : ' pri'));
   giro.style.marginBottom = '10px';
@@ -3141,23 +3143,31 @@ function viewCorpo(v) {
     : 'Prendi le misure · una alla volta';
   giro.onclick = () => sheetMisura(D.misure[0], k, D.misure);
   cm.append(giro);
+  /* **Tre domande, tre colonne**: quanto misura adesso, quanto si e' mosso
+     nell'ultimo mese, e quanto manca al riferimento — con la freccia che dice
+     da che parte. Prima l'ultima colonna era "Manca +3,0", che non diceva se
+     salire o scendere, e il movimento era un numerino attaccato al nome
+     contato dalla prima misura di sempre. Il cambio si colora solo quando
+     c'e' un riferimento: verde se va verso, rosso se si allontana. */
   const tb = el('div', 'cmp');
-  tb.append(el('div', 'cmp-h', '<span></span><span>Ora</span><span>Target</span><span>Manca</span>'));
+  tb.append(el('div', 'cmp-h', '<span>cm</span><span>Ora</span><span>Mese</span><span>Al rif.</span>'));
   for (const m of D.misure) {
-    // measTrend vuole due rilevazioni per dare un delta; il valore corrente
-    // invece esiste già dalla prima, e deve essere lo stesso che usa la
-    // composizione — altrimenti le due tabelle si contraddicono
-    const tr = measTrend(m.id, k), cur = lastMeas(m.id);
+    // il valore corrente deve essere lo stesso che usa la composizione,
+    // altrimenti le due tabelle si contraddicono
+    const cur = lastMeas(m.id);
+    const cmb = typeof cambioMisura === 'function' ? cambioMisura(m.id, k) : null;
     const d = cur != null && m.target != null ? m.target - cur : null;
     const vicino = d != null && Math.abs(d) <= 1;
-    const dl = tr && Math.abs(tr.delta) >= 0.5
-      ? `<em class="${tr.delta > 0 ? 'up' : 'dn'}">${tr.delta > 0 ? '+' : ''}${nf(tr.delta, 1)}</em>` : '';
+    const md = cmb?.delta;
+    const verso = md == null || Math.abs(md) < 0.3 || d == null || vicino ? ''
+      : Math.sign(md) === Math.sign(d) ? 'good' : 'dn';
     const r = el('button', 'cmp-r tap',
-      `<span>${esc(m.label)}${dl}</span>
+      `<span>${esc(m.label)}</span>
        <span class="mono">${cur != null ? nf(cur, 1) : '—'}</span>
-       <span class="mono muted">${m.target != null ? nf(m.target, 1) : '—'}</span>
-       <span class="mono ${vicino ? 'good' : ''}">${d == null ? '—' :
-         vicino ? '✓' : (d > 0 ? '+' : '') + nf(d, 1)}</span>`);
+       <span class="mono ${verso}">${md == null ? '—'
+         : (md > 0.05 ? '+' : md < -0.05 ? '−' : '') + nf(Math.abs(md), 1)}</span>
+       <span class="mono ${vicino ? 'good' : 'muted'}">${d == null ? '—'
+         : vicino ? '✓' : (d > 0 ? '↑ ' : '↓ ') + nf(Math.abs(d), 1)}</span>`);
     r.onclick = () => sheetMisura(m, k);   // una sola, fuori dal giro
     tb.append(r);
   }
@@ -3165,20 +3175,55 @@ function viewCorpo(v) {
      circonferenze, e le circonferenze sono le righe qui sopra. */
   if (C.vitaAltezza || C.toraceVita) {
     const rp = el('div', 'cmp rapp');
+    // stesse colonne delle circonferenze: un rapporto non ha "un mese fa"
+    // che valga la pena calcolare, e l'ultima colonna dice da che parte
     const rowR = (lab, now, tgt) => {
       if (now == null) return;
-      const d = tgt - now, vicino = Math.abs(d) <= Math.abs(tgt) * 0.03;
+      const noT = tgt == null;
+      const d = noT ? 0 : tgt - now, vicino = !noT && Math.abs(d) <= Math.abs(tgt) * 0.03;
       rp.append(el('div', 'cmp-r',
-        `<span>${lab}</span><span class="mono">${nf(now, 2)}</span>
-         <span class="mono muted">${nf(tgt, 2)}</span>
-         <span class="mono ${vicino ? 'good' : ''}">${vicino ? '✓'
-           : (d > 0 ? '+' : '') + nf(d, 2)}</span>`));
+        `<span>${lab}</span><span class="mono">${nf(now, 2)}</span><span></span>
+         <span class="mono ${vicino ? 'good' : 'muted'}">${noT ? '—' : vicino ? '✓'
+           : (d > 0 ? '↑ ' : '↓ ') + nf(Math.abs(d), 2)}</span>`));
     };
     rowR('Vita / altezza', C.vitaAltezza, C.t.vitaAltezza);
     rowR('Torace / vita', C.toraceVita, C.t.toraceVita);
     tb.append(rp);
   }
   cm.append(tb);
+  cm.append(el('p', 'hint',
+    '↓ 5,6 vuol dire 5,6 cm da togliere per arrivare al riferimento, ↑ da mettere. '
+    + 'Il cambio del mese e\' verde quando va verso il riferimento.'));
+
+  /* **Dove ti porta questo ritmo**, in frasi e dentro la carta delle misure.
+     Era una pagina a parte con una tabella da quattro colonne, le forbici e
+     l'R²: numeri veri, ma la domanda era "sta funzionando?", e la risposta
+     sta qui accanto ai numeri da cui nasce. Chiuso, perche' e' una
+     proiezione e non una misura. */
+  if (typeof proiezioneMisura === 'function') {
+    const pr = D.misure.map(m => ({ m, p: proiezioneMisura(m.id) })).filter(x => x.p.ok);
+    if (pr.length) {
+      const det = el('details', 'fc-det');
+      det.append(el('summary', null, '<span>Dove ti porta questo ritmo</span>'
+        + `<span class="mono">fra ${ORIZZONTE} giorni</span>`));
+      for (const { m, p } of pr) {
+        const fermo = Math.abs(p.fra - p.ora) < 0.3;
+        let frase = fermo ? `resta intorno a ${nf(p.ora, 1)} cm`
+          : `da ${nf(p.ora, 1)} a ${nf(p.fra, 1)} cm, ±${nf(p.banda, 1)}`;
+        if (m.target != null && !fermo) {
+          const t = typeof tempoAlTarget === 'function' ? tempoAlTarget(p, m.target) : null;
+          if (t?.stato === 'ci-sei') frase += ': il riferimento e\' dentro';
+          else if (t?.stato === 'lontano') frase += ': si allontana dal riferimento';
+        }
+        det.append(el('div', 'pv-r', `<b>${esc(m.label)}</b><span>${frase}</span>`));
+      }
+      det.append(el('p', 'note',
+        'E\' la retta sulle tue rilevazioni proseguita di quattro settimane, con la forbice dentro '
+        + 'cui ci si aspetta di stare. Una direzione, non una promessa: servono almeno tre misure '
+        + 'su due settimane perche\' compaia.'));
+      cm.append(det);
+    }
+  }
   const nota = D.misure.find(m => m.nota);
   if (nota) cm.append(el('p', 'hint', `<strong>${esc(nota.label)}:</strong> ${esc(nota.nota)}.`));
   v.append(cm);
@@ -3189,17 +3234,9 @@ function viewCorpo(v) {
   /* --- grafico peso --- */
   v.append(weightCard(k));
 
-  /* --- le altre proiezioni --- */
-  if (typeof viewPrevisioni === 'function') {
-    const b = el('button', 'card rev-invito');
-    b.innerHTML = `<span class="eyebrow">Non solo il peso</span>
-      <span class="t">Dove stai andando</span>
-      <span class="d">Misure, grasso e massa magra, forza: dove ti porta il ritmo
-      delle ultime settimane, con la forbice dentro cui starai.</span>
-      <span class="g">Apri le proiezioni &rsaquo;</span>`;
-    b.onclick = () => { apri('#/previsioni'); };
-    v.append(b);
-  }
+  /* L'invito a "Dove stai andando" non c'e' piu': le misure hanno la loro
+     proiezione dentro la loro carta, e il giudizio sul mese sta in cima. La
+     pagina resta, per la forza e per chi ci arriva da Andamento. */
 }
 
 /* =========================================================== previsione
@@ -3241,26 +3278,49 @@ function forecastCard(k) {
     return c;
   }
 
-  const fp = forecast(7, D.target.kcal, k);
-  const f28 = forecast(28, D.target.kcal, k);
+  /* **Prima quello che succede, poi quello che succederebbe.**
+     Il titolo era il ritmo che avresti *seguendo il piano*, e quello vero
+     stava piu' sotto in un riquadro "ma non stai mangiando cosi'": con le
+     pesate in discesa il titolo poteva dire "il peso sta fermo". Due risposte
+     opposte alla stessa domanda, e la sbagliata era la piu' grande.
+     Adesso il titolo e' la retta sulle pesate del mese (`ritmoPeso()`, la
+     stessa del verdetto del mese), le tre colonne proseguono quella, e il
+     piano e' il confronto sotto. Senza abbastanza pesate si ripiega sul
+     modello, alimentato da quello che mangi davvero se c'e'. */
+  const R = typeof ritmoPeso === 'function' ? ritmoPeso(k) : { ok: false };
   const ri = realIntake(k);
-  const fr = ri != null ? forecast(7, ri, k) : null;
+  const fp = forecast(7, ri ?? D.target.kcal, k);
+  const f28 = forecast(28, ri ?? D.target.kcal, k);
+  const fPiano = forecast(7, D.target.kcal, k);
+  if (R.ok) {
+    // le colonne seguono la retta, con la forbice dell'incertezza del ritmo
+    // sommata al rumore della tendenza
+    const proj = h => {
+      const sd = Math.sqrt((R.se * h / 7) ** 2 + (fp.rumore / Math.sqrt(7)) ** 2);
+      return { peso: w + R.kgSett * h / 7, delta: R.kgSett * h / 7, banda: 1.96 * sd };
+    };
+    Object.assign(fp, proj(7), { settimana: R.kgSett });
+    Object.assign(f28, proj(28));
+  }
 
   /* --- 1. la risposta --- */
-  const rit = fp.settimana;
+  const rit = R.ok ? R.kgSett : fp.settimana;
   /* Sotto i cinquanta grammi a settimana non si scrive una direzione: e'
      dentro il rumore della bilancia, e un "stai scendendo" li' dentro e' una
      direzione inventata. E' la stessa regola di `tempoAlTarget()`, che si
      rifiuta quando l'intervallo del ritmo contiene lo zero. */
   const fermo = Math.abs(rit) < 0.05;
   const su = rit > 0;
+  const fonteRit = R.ok
+    ? `Misurato sulle ${R.n} pesate degli ultimi 28 giorni.`
+    : ri != null ? 'Stimato da quello che hai mangiato nelle ultime due settimane: servono '
+      + 'piu\' pesate per misurarlo.'
+    : `Stimato seguendo il piano da ${nf(D.target.kcal)} kcal: servono piu\' pesate per misurarlo.`;
   const ver = el('div', 'fc-ver' + (fermo ? ' fermo' : ''));
   ver.innerHTML = fermo
-    ? '<b>Il peso sta fermo</b><span>Seguendo il piano il ritmo e\' cosi\' '
-      + 'piccolo da non distinguersi dall\'oscillazione della bilancia.</span>'
+    ? `<b>Il peso sta fermo</b><span>${fonteRit}</span>`
     : `<b>Stai ${su ? 'salendo' : 'scendendo'} di ${nf(Math.abs(rit), 2)} kg a settimana</b>`
-      + `<span>E\' il ritmo che avresti seguendo il piano da ${nf(D.target.kcal)} kcal, `
-      + 'a partire dalla tendenza di oggi.</span>';
+      + `<span>${fonteRit}</span>`;
   c.append(ver);
 
   const oggi = el('div', 'fc-tre');
@@ -3277,21 +3337,19 @@ function forecastCard(k) {
     + cella('Fra un mese', f28.peso, f28.banda, f28.delta);
   c.append(oggi);
   c.append(el('p', 'hint',
-    'Il primo numero e\' quanto cambieresti; il <strong>±</strong> e\' di '
-    + 'quanto quella previsione puo\' sbagliare. Non e\' imprecisione da '
-    + 'correggere: e\' quanto si puo\' sapere oggi, e piu\' lontano guardi piu\' '
-    + 'si allarga. Nessuna data di arrivo: oltre il mese sarebbe finzione.'));
+    'Sotto ogni numero: quanto cambieresti, e <strong>±</strong> di quanto la '
+    + 'previsione puo\' sbagliare. Piu\' lontano guardi, piu\' si allarga.'));
 
-  /* Il confronto che serve davvero: il piano e' un'intenzione, quello che
-     mangi e' un fatto, e quando i due non coincidono il ritmo vero e' l'altro. */
-  if (fr && Math.abs(fr.settimana - fp.settimana) > 0.05) {
+  /* Il piano viene dopo, come confronto: il piano e' un'intenzione, quello
+     che succede e' un fatto. Si dice solo quando i due ritmi si separano. */
+  if (fPiano && D.target.kcal > 0 && Math.abs(fPiano.settimana - rit) > 0.05) {
     const d = el('div', 'fc-vero');
-    d.innerHTML = '<b>Ma non stai mangiando cosi\'</b>'
-      + `<span>Nelle ultime due settimane hai mangiato <strong>${nf(ri)} kcal</strong> `
-      + `al giorno invece di ${nf(D.target.kcal)}. Con quel ritmo il peso `
-      + (Math.abs(fr.settimana) < 0.05 ? 'starebbe <strong>fermo</strong>.'
-         : `${fr.settimana > 0 ? 'salirebbe' : 'scenderebbe'} di `
-           + `<strong>${nf(Math.abs(fr.settimana), 2)} kg a settimana</strong>.`)
+    d.innerHTML = `<b>Seguendo il piano da ${nf(D.target.kcal)} kcal</b>`
+      + '<span>il peso '
+      + (Math.abs(fPiano.settimana) < 0.05 ? 'starebbe <strong>fermo</strong>'
+         : `${fPiano.settimana > 0 ? 'salirebbe' : 'scenderebbe'} di `
+           + `<strong>${nf(Math.abs(fPiano.settimana), 2)} kg a settimana</strong>`)
+      + (ri != null ? `. Nelle ultime due settimane hai mangiato in media ${nf(ri)} kcal.` : '.')
       + '</span>';
     c.append(d);
   }
@@ -3376,7 +3434,15 @@ function weightCard(k) {
   }
   const pts = days.map(x => ({ k: x, w: S.log[x].peso }));
   const ma = pts.map(p => ({ k: p.k, w: weightMA(p.k) })).filter(p => p.w);
-  const H = 28, f = forecast(H, D.target.kcal, k);
+  /* Il tratteggio prosegue il ritmo vero, come il titolo della previsione
+     qui sopra: seguiva il piano, e con le pesate in discesa disegnava una
+     linea piatta che smentiva le due carte vicine. */
+  const H = 28, ri = realIntake(k), f = forecast(H, ri ?? D.target.kcal, k);
+  const Rw = typeof ritmoPeso === 'function' ? ritmoPeso(k) : { ok: false };
+  if (f && Rw.ok) {
+    f.peso = f.base + Rw.kgSett * H / 7;
+    f.banda = 1.96 * Math.sqrt((Rw.se * H / 7) ** 2 + (f.rumore / Math.sqrt(7)) ** 2);
+  }
   /* Il riquadro lascia una spalla a sinistra per i chili: senza numeri
      sull'asse la linea dice solo "sale" o "scende", e su un grafico del peso
      la domanda vera e' **di quanto** — mezzo chilo e tre chili disegnano la
@@ -3435,10 +3501,13 @@ function weightCard(k) {
   c.append(el('div', 'row between',
     `<span class="muted">Media mobile 7 giorni</span>
      <span class="mono"><strong>${nf(cur, 2)} kg</strong>${prev
-       ? ` <span class="pill ${Math.abs(cur - prev) < 0.35 ? 'ok' : 'warn'}">${cur - prev >= 0 ? '+' : ''}${nf(cur - prev, 2)}/sett</span>` : ''}</span>`));
+       // neutra: era ambra oltre 0,35 kg, cioe' "fuori target" anche quando
+       // scendere era proprio l'obiettivo. Se basta lo dice Il mese
+       ? ` <span class="pill">${cur - prev >= 0 ? '+' : ''}${nf(cur - prev, 2)}/sett</span>` : ''}</span>`));
   c.lastChild.style.marginTop = '8px';
   if (f) c.append(el('p', 'hint',
-    `Il tratteggio è la previsione a 28 giorni seguendo il piano; l'area è la banda di confidenza al 95%, e si allarga perché l'incertezza sul dispendio si accumula giorno dopo giorno.`));
+    `Il tratteggio prosegue il ritmo ${Rw.ok ? 'delle pesate dell\'ultimo mese' : 'di quello che mangi'} `
+    + `per 28 giorni; l'area e' la forbice al 95%, e si allarga perche' l'incertezza si accumula.`));
   return c;
 }
 
@@ -3451,7 +3520,10 @@ function weightCard(k) {
  * La scala e' condivisa fra "ora" e "target", o confrontarle non direbbe niente.
  */
 function divisionePeso(C) {
-  const tFm = C.t.peso * C.t.bf / 100, tLbm = C.t.lbm;
+  // senza riferimento la seconda barra non c'e': prima usciva con larghezze NaN
+  const conT = C.t.peso != null && C.t.bf != null;
+  const tFm = conT ? C.t.peso * C.t.bf / 100 : 0;
+  const tLbm = conT ? (C.t.lbm ?? C.t.peso - tFm) : 0;
   const max = Math.max(C.peso, tFm + tLbm) || 1;
   const box = el('div', 'dvp');
   const barra = (lab, magra, grassa, cls) => {
@@ -3465,7 +3537,7 @@ function divisionePeso(C) {
     return r;
   };
   box.append(barra('Ora', C.lbm, C.fm));
-  box.append(barra('Target', tLbm, tFm, 'tgt'));
+  if (conT) box.append(barra('Rif.', tLbm, tFm, 'tgt'));
   box.append(el('div', 'leg',
     '<span><i style="background:var(--pine)"></i>massa magra</span>'
     + '<span><i style="background:var(--amber)"></i>massa grassa</span>'));

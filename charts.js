@@ -795,9 +795,10 @@ function iconaDati(id) {
  * riscriverli tutti per un cambio di navigazione e' il modo piu' sicuro di
  * romperne uno.
  */
-let andTab = 'sintesi';
+let andTab = 'mese';
 
 const AND_VISTE = [
+  ['mese', 'Il mese', 'Basta, devo fare di più, o altro? Il ritmo vero contro il tuo obiettivo.'],
   ['sintesi', 'Sintesi', 'Cosa non torna negli ultimi sette giorni chiusi.'],
   ['grafici', 'Grafici', 'I numeri giorno per giorno, sul periodo che scegli.'],
   ['revisione', 'Revisione', 'Il giudizio su un periodo, e la sola cosa da cambiare.']
@@ -805,7 +806,7 @@ const AND_VISTE = [
 
 /** Traduce i vecchi indirizzi nella vista giusta di Andamento. */
 function rottaAndamento(name) {
-  const mappa = { dati: 'grafici', analisi: 'sintesi', revisione: 'revisione' };
+  const mappa = { dati: 'grafici', analisi: 'sintesi', revisione: 'revisione', mese: 'mese' };
   if (mappa[name]) { andTab = mappa[name]; return 'andamento'; }
   return name;
 }
@@ -824,7 +825,8 @@ function viewAndamento(v) {
   if (d) barra.append(el('div', 'hint', d));
   v.append(barra);
 
-  ({ sintesi: sezSintesi, grafici: viewDati, revisione: viewRevisione }[andTab]
+  ({ mese: w => w.append(cardMese()), sintesi: sezSintesi, grafici: viewDati,
+     revisione: viewRevisione }[andTab]
     || sezSintesi)(v);
 }
 

@@ -72,12 +72,17 @@ function proiezioneMisura(id, orizzonte = ORIZZONTE) {
 function proiezioneComposizione(orizzonte = ORIZZONTE, k = today()) {
   const oggi = composition(k);
   if (oggi.bf == null) return { perche: 'manca il calcolo della composizione di oggi' };
-  const fp = forecast(orizzonte, D.target.kcal, k);
+  /* Il peso fra un mese e' quello del ritmo vero, non del piano: e' lo stesso
+     errore che faceva il titolo della previsione, che diceva "fermo" con le
+     pesate in discesa. Prima la retta sulle pesate del mese, poi il modello
+     con quello che mangi davvero, e il piano solo se non c'e' altro. */
+  const fp = forecast(orizzonte, realIntake(k) ?? D.target.kcal, k);
+  const R = typeof ritmoPeso === 'function' ? ritmoPeso(k) : { ok: false };
   const pv = proiezioneMisura('vita', orizzonte);
   if (!fp || !pv.ok) return { perche: 'servono piu\' pesate e almeno tre misure della vita', oggi };
 
   const p = D.profilo;
-  const vita = pv.fra, peso = fp.peso;
+  const vita = pv.fra, peso = R.ok ? fp.base + R.kgSett * orizzonte / 7 : fp.peso;
   const collo = lastMeas('collo'), fianchi = lastMeas('fianchi');
   // bodyFat(vita, collo, altezza, sesso, fianchi): posizionale, e sui profili
   // femminili pretende anche i fianchi
@@ -282,16 +287,26 @@ function chartProiezione(serie, pr, o = {}) {
 /* =============================================================== vista */
 let prevMisura = null;
 
+/**
+ * "Dove stai andando", in frasi.
+ *
+ * Segnalato con "non si capisce molto bene", ed era giusto: una tabella da
+ * quattro colonne con `±` e `/sett` stretti dentro ogni cella, l'R² in
+ * colonna, e la composizione con chili e percentuali sotto le stesse
+ * intestazioni. Ogni numero era vero, e la pagina non rispondeva a niente.
+ *
+ * Adesso ogni misura e' una riga che si legge ad alta voce — "da 84,6 a
+ * 83,5 cm, ±0,5" — la composizione e' tutta in chili come in Corpo, e l'R²
+ * compare solo quando dice qualcosa: quando e' basso, e quindi la retta vale
+ * poco.
+ */
 function viewPrevisioni(v) {
   const k = today();
 
   v.append(el('div', 'card flat',
-    `<div class="eyebrow">Come si leggono</div>
-     <div class="muted">Ogni proiezione dice dove ti porta il ritmo delle ultime
-     settimane <strong>fra ${ORIZZONTE} giorni</strong>, con la forbice dentro cui
-     starai. Non c'e' una data di arrivo, e non e' una dimenticanza: dipende dal
-     fatto che il ritmo di oggi valga per mesi, e non succede mai. Quello che si
-     puo' dire e' se il target sta dentro la forbice oppure no.</div>`));
+    `<div class="muted">Dove ti porta il ritmo delle ultime settimane <strong>fra
+     ${ORIZZONTE} giorni</strong>, con la forbice dentro cui starai. Una direzione,
+     non una data di arrivo.</div>`));
 
   /* ---------------------------------------------------------- misure */
   const cm = el('div', 'card');
@@ -299,46 +314,31 @@ function viewPrevisioni(v) {
   cm.lastChild.style.marginTop = '0';
   const proiezioni = D.misure.map(m => ({ m, p: proiezioneMisura(m.id) }));
   const buone = proiezioni.filter(x => x.p.ok);
-
   if (!buone.length) {
     cm.append(el('p', 'muted',
-      'Nessuna misura ha abbastanza storia per una proiezione. Servono almeno tre '
-      + 'rilevazioni distribuite su due settimane: con due punti la retta passa '
-      + 'esatta e la forbice verrebbe zero, che sarebbe una certezza finta.'));
+      'Nessuna misura ha abbastanza storia: servono almeno tre rilevazioni su due '
+      + 'settimane. Con due punti la retta passa esatta e la forbice sarebbe zero, cioe\' '
+      + 'una certezza finta.'));
     const b = el('button', 'btn wide pri', 'Prendi le misure');
     b.style.marginTop = '10px';
     b.onclick = () => { apri('#/corpo'); };
     cm.append(b);
   } else {
-    cm.append(el('div', 'sub',
-      'Al ritmo delle ultime settimane. La colonna "fra ' + ORIZZONTE + ' giorni" '
-      + 'e\' il centro della forbice, non una promessa.'));
-    const tb = el('div', 'cmp');
-    tb.append(el('div', 'cmp-h',
-      `<span></span><span>Ora</span><span>Fra ${ORIZZONTE}g</span><span>Target</span>`));
     for (const { m, p } of proiezioni) {
-      const r = el('button', 'cmp-r tap');
-      const dentro = p.ok && m.target != null
-        && m.target >= p.fra - p.banda && m.target <= p.fra + p.banda;
-      r.innerHTML = `<span>${esc(m.label)}${p.ok
-          ? `<em class="${p.cmSettimana < 0 ? 'dn' : 'up'}">${p.cmSettimana > 0 ? '+' : ''}${nf(p.cmSettimana, 2)}/sett</em>`
-          : ''}</span>
-        <span class="mono">${p.ok ? nf(p.ora, 1) : '—'}</span>
-        <span class="mono">${p.ok ? nf(p.fra, 1) + '<em class="pm">±' + nf(p.banda, 1) + '</em>' : '—'}</span>
-        <span class="mono ${dentro ? 'good' : 'muted'}">${m.target != null
-          ? (dentro ? '✓ ' : '') + nf(m.target, 1) : '—'}</span>`;
-      if (p.ok) r.onclick = () => { prevMisura = m.id; route(); };
-      else r.onclick = () => toast(p.perche.charAt(0).toUpperCase() + p.perche.slice(1));
-      tb.append(r);
+      const r = el('button', 'pv-r tap' + (p.ok && m.id === prevMisura ? ' on' : ''));
+      let frase;
+      if (!p.ok) frase = `<span class="muted">${esc(p.perche)}</span>`;
+      else if (Math.abs(p.fra - p.ora) < 0.3) frase = `resta intorno a ${nf(p.ora, 1)} cm`;
+      else {
+        frase = `da ${nf(p.ora, 1)} a <strong>${nf(p.fra, 1)} cm</strong>, ±${nf(p.banda, 1)}`;
+        const t = m.target != null ? tempoAlTarget(p, m.target) : null;
+        if (t?.stato === 'ci-sei') frase += ' · riferimento dentro';
+        else if (t?.stato === 'lontano') frase += ' · si allontana dal riferimento';
+      }
+      r.innerHTML = `<b>${esc(m.label)}</b><span>${frase}</span>`;
+      r.onclick = p.ok ? () => { prevMisura = m.id; route(); } : null;
+      cm.append(r);
     }
-    cm.append(tb);
-    const conTarget = buone.filter(x => x.m.target != null);
-    const dentro = conTarget.filter(x =>
-      x.m.target >= x.p.fra - x.p.banda && x.m.target <= x.p.fra + x.p.banda).length;
-    if (conTarget.length) cm.append(el('p', 'hint',
-      `Il segno di spunta dice che il target cade dentro la forbice: `
-      + `${dentro} misur${dentro === 1 ? 'a' : 'e'} su ${conTarget.length}. Le altre non sono in ritardo, `
-      + `sono semplicemente piu' lontane di quattro settimane.`));
   }
   v.append(cm);
 
@@ -347,10 +347,10 @@ function viewPrevisioni(v) {
     const sceltaId = buone.some(x => x.m.id === prevMisura) ? prevMisura : buone[0].m.id;
     const scelta = buone.find(x => x.m.id === sceltaId);
     const c = card(scelta.m.label,
-      `Rilevazioni vere, poi la retta tratteggiata fino a +${ORIZZONTE} giorni. `
-      + `L'area e' la forbice al 95%.`);
+      `Le rilevazioni, poi la retta tratteggiata fino a ${ORIZZONTE} giorni con la sua forbice.`);
     if (buone.length > 1) {
-      const seg = el('div', 'seg');
+      // sei misure non stanno in una riga: si scorre, invece di schiacciare i nomi
+      const seg = el('div', 'seg scorre');
       seg.style.marginBottom = '8px';
       for (const { m } of buone) {
         const b = el('button', null, m.label.split(' ')[0]);
@@ -364,21 +364,16 @@ function viewPrevisioni(v) {
     const p = scelta.p;
     c.append(el('div', 'read',
       `<span><b>${nf(p.fra, 1)} cm</b> fra ${ORIZZONTE} giorni</span>`
-      + `<span>±${nf(p.banda, 1)}</span>`
-      + `<span>${p.n} rilevazioni</span>`
-      + (p.piatta ? `<span>ferma</span>` : `<span>R² ${nf(p.r2, 2)}</span>`)));
-    // quanto manca, in tempo: si rifiuta da solo quando non ha senso
+      + `<span>±${nf(p.banda, 1)}</span><span>${p.n} rilevazioni</span>`));
     const ct = cardTempo(tempoAlTarget(p, scelta.m.target), scelta.m.label);
     if (ct) c.append(ct);
-    c.append(el('p', 'note', p.piatta
-      ? 'Questa misura non si e\' mossa di un millimetro fra una rilevazione e '
-        + 'l\'altra. Puo\' essere vero, ma capita anche quando si riscrive il valore '
-        + 'della volta prima invece di rimisurare davvero.'
-      : p.r2 < 0.4
-      ? `R² ${nf(p.r2, 2)}: le rilevazioni sono sparse e la retta ci passa in mezzo `
-        + `senza spiegarle. La direzione vale poco finche' non ne aggiungi altre.`
-      : `R² ${nf(p.r2, 2)}: le rilevazioni stanno abbastanza in fila da rendere `
-        + `sensata una retta. Resta una tendenza, non un impegno.`));
+    // l'R² si nomina solo quando avverte: alto, non aggiunge niente
+    if (p.piatta) c.append(el('p', 'note',
+      'Non si e\' mossa di un millimetro fra una rilevazione e l\'altra. Puo\' essere vero, '
+      + 'ma capita anche riscrivendo il valore della volta prima invece di rimisurare.'));
+    else if (p.r2 < 0.4) c.append(el('p', 'note',
+      `Le rilevazioni sono sparse (R² ${nf(p.r2, 2)}): la direzione vale poco finche' `
+      + 'non ne aggiungi altre.'));
     v.append(c);
   }
 
@@ -390,38 +385,31 @@ function viewPrevisioni(v) {
   if (!pc.ok) {
     cc.append(el('p', 'muted', 'Non calcolabile: ' + esc(pc.perche) + '.'));
   } else {
-    cc.append(el('div', 'sub',
-      `Peso previsto e vita prevista, dentro la stessa formula che usa la scheda Corpo.`));
-    const rows = [
-      ['Peso', pc.oggi.peso, pc.peso, 'kg', 1],
-      ['Grasso', pc.oggi.bf, pc.bf, '%', 1],
-      ['Massa grassa', pc.oggi.fm, pc.fm, 'kg', 1],
-      ['Massa magra', pc.oggi.lbm, pc.lbm, 'kg', 1]
-    ];
+    cc.append(el('div', 'cmp-big',
+      `<b class="mono">${nf(pc.oggi.bf, 1)}<em>%</em> → ${nf(pc.bf, 1)}<em>%</em></b>`
+      + `<span>di grasso fra ${ORIZZONTE} giorni</span>`));
     const tb = el('div', 'cmp');
     tb.append(el('div', 'cmp-h',
-      `<span></span><span>Ora</span><span>Fra ${ORIZZONTE}g</span><span>Δ</span>`));
-    for (const [lab, ora, fra, u, dec] of rows) {
-      if (ora == null || fra == null) continue;
+      '<span>kg</span><span>Ora</span><span>+28 gg</span><span>Cambio</span>'));
+    const riga = (lab, ora, fra, buono, cls = '') => {
+      if (ora == null || fra == null) return;
       const d = fra - ora;
-      const bene = lab === 'Massa magra' ? d >= -0.1 : d <= 0.1;
-      tb.append(el('div', 'cmp-r',
-        `<span>${lab}</span><span class="mono">${nf(ora, dec)}</span>
-         <span class="mono">${nf(fra, dec)}</span>
-         <span class="mono ${bene ? 'good' : 'dn'}">${d > 0 ? '+' : ''}${nf(d, dec)} ${u}</span>`));
-    }
+      const col = Math.abs(d) < 0.1 ? '' : buono(d) ? 'good' : 'dn';
+      tb.append(el('div', 'cmp-r ' + cls,
+        `<span>${lab}</span><span class="mono">${nf(ora, 1)}</span>
+         <span class="mono">${nf(fra, 1)}</span>
+         <span class="mono ${col}">${d > 0.05 ? '+' : d < -0.05 ? '−' : ''}${nf(Math.abs(d), 1)}</span>`));
+    };
+    riga('Massa magra', pc.oggi.lbm, pc.lbm, d => d > 0);
+    riga('Massa grassa', pc.oggi.fm, pc.fm, d => d < 0);
+    riga('Peso', pc.oggi.peso, pc.peso, () => true, 'tot');
     cc.append(tb);
     const ricomp = pc.dFm != null && pc.dLbm != null && pc.dFm < -0.2 && pc.dLbm > -0.2;
-    cc.append(el('p', 'muted', ricomp
-      ? 'Grasso in calo con la massa magra che tiene: e' + '’ esattamente la ricomposizione, '
-        + 'ed e' + '’ il motivo per cui la bilancia da sola non basta a giudicare.'
-      : 'Guarda le due righe in basso insieme: lo stesso peso puo' + '’ nascondere due corpi diversi.'));
-    cc.append(el('p', 'note',
-      'Attenzione a cosa e' + '’ questo numero: una stima costruita su altre due stime — '
-      + 'il peso previsto e la vita prevista — passate dentro una formula che da sola '
-      + 'sbaglia di tre o quattro punti di grasso. Serve a vedere la direzione, non il '
-      + 'valore. Se il grasso scende e la massa magra tiene, la direzione e' + '’ giusta '
-      + 'anche se le cifre non lo sono.'));
+    cc.append(el('p', 'note', (ricomp
+      ? 'Grasso in calo con la magra che tiene: e\' la direzione giusta. '
+      : '')
+      + 'E\' una stima su due proiezioni — peso e vita — dentro una formula che sbaglia di '
+      + 'tre o quattro punti: guarda la direzione, non la cifra.'));
   }
   v.append(cc);
 
@@ -432,40 +420,28 @@ function viewPrevisioni(v) {
   cf.lastChild.style.marginTop = '0';
   if (!pf.length) {
     cf.append(el('p', 'muted',
-      'Nessun esercizio ha tre sedute registrate. Il massimale stimato serve proprio '
-      + 'a questo: mette d\'accordo "meno ripetizioni ma piu\' peso" e "stesso peso ma '
-      + 'piu\' ripetizioni", che altrimenti non si potrebbero confrontare.'));
+      'Nessun esercizio ha tre sedute registrate: il massimale stimato ha bisogno di '
+      + 'almeno tre punti per avere una direzione.'));
   } else {
-    cf.append(el('div', 'sub', 'Massimale stimato, proiettato con la stessa retta.'));
-    const tb = el('div', 'cmp');
-    tb.append(el('div', 'cmp-h',
-      `<span></span><span>Ora</span><span>Fra ${ORIZZONTE}g</span><span>R²</span>`));
     for (const p of pf) {
-      tb.append(el('div', 'cmp-r',
-        `<span>${esc(p.nome)}<em class="${p.kgSettimana < 0 ? 'dn' : 'up'}">${
-           p.kgSettimana > 0 ? '+' : ''}${nf(p.kgSettimana, 2)} kg/sett</em></span>
-         <span class="mono">${nf(p.ora, 1)}</span>
-         <span class="mono">${nf(p.fra, 1)}<em class="pm">±${nf(p.banda, 1)}</em></span>
-         <span class="mono muted">${nf(p.r2, 2)}</span>`));
+      cf.append(el('div', 'pv-r',
+        `<b>${esc(p.nome)}</b><span>massimale stimato da ${nf(p.ora, 1)} a `
+        + `<strong>${nf(p.fra, 1)} kg</strong>, ±${nf(p.banda, 1)}</span>`));
     }
-    cf.append(tb);
     cf.append(el('p', 'note',
-      'Il massimale stimato viene da Epley corretto col RIR, non da un massimale vero: '
-      + 'sopra le dodici ripetizioni sovrastima. E la forza non sale in linea retta per '
-      + 'sempre — piu' + '’ ci si avvicina al proprio limite, piu' + '’ la retta e' + '’ ottimista.'));
+      'Il massimale viene da Epley corretto col RIR, non da un massimale vero. E la forza non '
+      + 'sale in linea retta per sempre: vicino al proprio limite la retta e\' ottimista.'));
   }
   v.append(cf);
 
   /* --------------------------------------------------- rimando al peso */
   const cp = el('div', 'card flat');
-  cp.append(el('div', 'eyebrow', 'E il peso?'));
   cp.append(el('div', 'muted',
-    'Quello ha un motore a parte, piu' + '’ fine: un filtro che ricalibra il dispendio '
-    + 'ogni volta che registri, e che tiene una pagella dei propri errori passati. '
-    + 'Sta nella scheda Corpo.'));
-  const b = el('button', 'btn wide', 'Apri la previsione del peso');
+    'Il peso ha un motore suo, che ricalibra il dispendio a ogni registrazione: sta in Corpo, '
+    + 'e il giudizio sul mese in Andamento.'));
+  const b = el('button', 'btn wide', 'Apri Il mese');
   b.style.marginTop = '10px';
-  b.onclick = () => { apri('#/corpo'); };
+  b.onclick = () => { andTab = 'mese'; apri('#/andamento'); };
   cp.append(b);
   v.append(cp);
 }

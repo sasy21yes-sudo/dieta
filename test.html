@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dieta · test</title>
+<!--
+  I controlli fissi sui motori delicati. Si apre da un server (anche GitHub
+  Pages: /test.html) e scrive in cima quanti passano.
+
+  Non tocca MAI i dati veri: localStorage e' sostituito da una memoria finta
+  prima che parta qualunque script, e IndexedDB e' tolto, cosi' nemmeno le
+  copie automatiche del backup possono scrivere. Aprirlo sul telefono e'
+  sicuro come aprire una pagina vuota.
+-->
+<script>
+(function () {
+  const m = new Map();
+  const finta = {
+    getItem: k => (m.has(k) ? m.get(k) : null),
+    setItem: (k, v) => { m.set(k, String(v)); },
+    removeItem: k => { m.delete(k); },
+    clear: () => m.clear(),
+    key: i => [...m.keys()][i] ?? null,
+    get length() { return m.size; }
+  };
+  Object.defineProperty(window, 'localStorage', { value: finta, configurable: true });
+  Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: true });
+  finta.setItem('dieta.profili', JSON.stringify({ attivo: 't', lista: [{ id: 't', nome: 'Test' }] }));
+  finta.setItem('dieta.v1:t', JSON.stringify({ log: {}, piano: {}, palestra: {}, model: {},
+    settings: { pianoBase: 'esempio', moduli: { piano: true, hyrox: false } } }));
+})();
+</script>
+<style>
+  body{font:14px/1.45 -apple-system,system-ui,sans-serif;margin:0;background:#fff;color:#151a1f}
+  #esito{margin:0;padding:16px;white-space:pre-wrap;font:12.5px/1.5 ui-monospace,monospace}
+  #esito .ko{color:#9e2b1b;font-weight:700} #esito .ok{color:#12594a}
+  #app{display:none}
+</style>
+</head>
+<body>
+<pre id="esito">in corso…</pre>
+<div id="app"></div>
+<script src="test.js"></script>
+</body>
+</html>

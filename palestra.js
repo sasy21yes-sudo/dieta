@@ -1170,6 +1170,11 @@ function viewPalestra(v) {
      distanza non aggiungeva una destinazione. */
   v.append(testa);
 
+  /* Gli anelli: la corsa e il BJJ pesano quanto i pesi, e qui si vede. La
+     striscia sopra dice SE ti sei allenato; gli anelli dicono QUANTO, contro
+     le linee guida, e il cardio ha finalmente un numero suo. */
+  if (typeof cardAnelliSettimana === 'function') v.append(cardAnelliSettimana(k));
+
   /* --- solo cio' che non puo' aspettare: uno scarico consigliato, un dolore
          in corso. Il resto sta dentro i riquadri. --- */
   if (typeof scaricoConsigliato === 'function') {
