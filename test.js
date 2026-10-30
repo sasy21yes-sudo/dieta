@@ -190,6 +190,30 @@ function casiScarico() {
     sc.dati && !sc.serve, `serve=${sc.serve} filata=${sc.filata}`);
 }
 
+/** Gli spunti di oggi: nascono dai numeri, si fanno con un tocco. */
+function casiSpunti() {
+  const k = today();
+  stato({ settings: { moduli: { piano: false, hyrox: false }, ...cut } });
+  day(k).extra.push({ nome: 'colazione', kcal: 400, p: 15, c: 60, g: 10, fibre: 5 });
+  const S0 = spuntiOggi(k);
+  const pr = S0.lista.find(s => s.id === 'proteine');
+  verifica("mancano proteine: lo spunto c'e' e porta tre proposte", pr && pr.proposte.length === 3,
+    pr ? pr.t : S0.lista.map(s => s.id).join(','));
+  if (pr) {
+    verifica('le proposte sono porzioni da mangiare (20-250 g, fino a ~30 g di proteine)',
+      pr.proposte.every(x => x.qta >= 20 && x.qta <= 250 && x.pq <= 40));
+    const p0 = consumed(k).p;
+    aggiungiProposta(k, pr.proposte[0]);
+    verifica('un tocco su una proposta la registra', consumed(k).p > p0 + 5,
+      `${nf(p0)} -> ${nf(consumed(k).p)}`);
+  }
+  verifica('nessuno spunto suggerisce di saltare pasti, digiunare o compensare',
+    !/salt|digiun|compens/i.test(JSON.stringify(spuntiOggi(k).lista.map(s => [s.t, s.d]))));
+  verifica("settimana senza attivita': piu' di uno spunto calcolato", spuntiOggi(k).tutti >= 2);
+  const c = cardSpunti(k);
+  verifica('la carta degli spunti si disegna senza parole rotte', !/NaN|undefined|\bnull\b/.test(c.textContent));
+}
+
 /** Dal calendario un allenamento si aggiunge, si corregge e si toglie. */
 function casiCalendario() {
   const ieri = addDays(today(), -1), l_altro = addDays(today(), -2);
@@ -250,7 +274,7 @@ function casiVuoto() {
   const out = document.getElementById('esito');
   try {
     await caricaApp();
-    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiCalendario, casiVuoto]) {
+    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiCalendario, casiSpunti, casiVuoto]) {
       try { f(); } catch (e) { verifica(f.name + ' non deve lanciare', false, e.message); }
     }
   } catch (e) {

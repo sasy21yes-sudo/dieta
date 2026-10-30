@@ -1496,23 +1496,6 @@ function viewOggi(v) {
   }
   nav.append(r); v.append(nav);
 
-  if (k === today()) {
-    if (typeof cardPesataAnomala === 'function') {
-      const ca = cardPesataAnomala(k); if (ca) v.append(ca);
-    }
-    if (typeof revisionePronta === 'function' && revisionePronta(k)) {
-      const inv = el('button', 'card rev-invito');
-      inv.innerHTML = `<span class="eyebrow">La settimana e' chiusa</span>
-        <span class="t">Guarda com'e' andata</span>
-        <span class="d">Il confronto con la settimana prima, cosa non ha funzionato e la sola cosa da cambiare.</span>
-        <span class="g">Apri la revisione &rsaquo;</span>`;
-      inv.onclick = () => { apri('#/revisione'); };
-      v.append(inv);
-      if (typeof pulsa === 'function') setTimeout(() => pulsa(inv), 250);
-    }
-    const cc = cardConsiglio(k); if (cc) v.append(cc);
-    if (typeof cardSfida === 'function') { const cs = cardSfida(k); if (cs) v.append(cs); }
-  }
 
   /* ------------------------------------------------- il conto del giorno
    *
@@ -1651,6 +1634,30 @@ function viewOggi(v) {
     box.lastChild.style.marginTop = '10px';
   }
   v.append(box);
+
+  /* **Prima il conto, poi gli spunti.** Il conto del giorno — il motivo per
+     cui si apre l'app — era la quarta carta, sotto il consiglio del giorno e
+     la sfida, grandi mezzo schermo l'una. Adesso viene subito dopo il giorno;
+     sotto ci sono gli avvisi del momento e "Oggi, per il tuo obiettivo", che
+     prende il posto del consiglio: dice cosa fare oggi, con un tocco, invece
+     di una frase che ruota sulla data. La sfida scende in fondo. */
+  if (k === today()) {
+    if (typeof cardPesataAnomala === 'function') {
+      const ca = cardPesataAnomala(k); if (ca) v.append(ca);
+    }
+    if (typeof revisionePronta === 'function' && revisionePronta(k)) {
+      const inv = el('button', 'card rev-invito');
+      inv.innerHTML = `<span class="eyebrow">La settimana e' chiusa</span>
+        <span class="t">Guarda com'e' andata</span>
+        <span class="d">Il confronto con la settimana prima, cosa non ha funzionato e la sola cosa da cambiare.</span>
+        <span class="g">Apri la revisione &rsaquo;</span>`;
+      inv.onclick = () => { apri('#/revisione'); };
+      v.append(inv);
+      if (typeof pulsa === 'function') setTimeout(() => pulsa(inv), 250);
+    }
+    if (typeof cardSpunti === 'function') v.append(cardSpunti(k));
+    else { const cc = cardConsiglio(k); if (cc) v.append(cc); }
+  }
 
   // pasti — solo se il piano e' acceso
   if (!usaPiano()) {
@@ -1799,6 +1806,10 @@ function viewOggi(v) {
   // fuori piano: su un giorno che deve ancora arrivare non c'e' niente da
   // aggiungere, e il bottone chiederebbe di registrare una cena di giovedi'
   if (!futuro) v.append(listaExtra(k, d, true));
+  // la sfida in fondo: e' un gioco, non la ragione per cui si apre la giornata
+  if (k === today() && typeof cardSfida === 'function') {
+    const cs = cardSfida(k); if (cs) v.append(cs);
+  }
 }
 
 /**
