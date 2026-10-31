@@ -306,8 +306,10 @@ function rigaIngresso(lab, val, metro, stato) {
 function cardMese(k = today()) {
   const g = giudizioMese(k), S0 = MESE_STATI[g.stato];
   const c = el('div', 'card mese');
-  c.append(el('div', 'eyebrow', `Ultimi ${MESE_GG} giorni`));
+  // il periodo sotto il verdetto, non sopra: un'etichetta sopra il titolo
+  // e' il segno piu' comune del design generato, e il titolo e' la risposta
   c.append(el('div', 'ms-ver ' + S0.cls, `<span class="dot"></span><b>${S0.t}</b>`));
+  c.append(el('div', 'ms-per', `Gli ultimi ${MESE_GG} giorni${g.ob ? ', obiettivo: ' + esc(g.ob.n.toLowerCase()) : ''}`));
 
   /* --- il risultato: tre riquadri, e i chili sono chili --- */
   const T = el('div', 'ms-tiles');
@@ -333,8 +335,7 @@ function cardMese(k = today()) {
   /* --- la cosa da fare --- */
   const a = g.azione;
   const box = el('div', 'ms-fai');
-  box.innerHTML = `<span class="et">La cosa da fare</span><b>${esc(a.t)}</b>`
-    + (a.d ? `<p>${esc(a.d)}</p>` : '');
+  box.innerHTML = `<b>${esc(a.t)}</b>` + (a.d ? `<p>${esc(a.d)}</p>` : '');
   // la cosa da fare porta dove si fa, e non la fa: niente si applica da solo
   if (a.go) {
     const b = el('button', 'btn wide');
@@ -360,26 +361,9 @@ function cardMese(k = today()) {
   c.append(det);
 
   c.append(el('p', 'note',
-    'Il ritmo del peso e\' la retta sulle pesate del mese, non due pesate agli estremi. '
-    + 'Calorie e proteine sono la media dei giorni registrati fino a ieri. I minuti di attività '
-    + 'contano doppi quando l\'attività e\' intensa (corsa, BJJ, nuoto), come fanno le '
-    + 'linee guida OMS; i pesi contano a parte, come giorni di forza.'));
+    'Ritmo: la retta sulle pesate del mese. Calorie e proteine: media dei giorni registrati '
+    + 'fino a ieri. Attività: i minuti intensi contano doppio, come per l\'OMS.'));
   return c;
-}
-
-/** La versione corta, in cima a Corpo: il verdetto e una riga, e porta al mese. */
-function cardMeseCorta(k = today()) {
-  const g = giudizioMese(k), S0 = MESE_STATI[g.stato];
-  const b = el('button', 'card mese corta');
-  const riga = g.R.ok
-    ? `${ritmoTesto(g.R.kgSett)} a settimana` + (g.obSett != null ? ` · obiettivo ${ritmoTesto(g.obSett)}` : '')
-    : `${g.R.n} pesate utili nell'ultimo mese`;
-  b.innerHTML = `<span class="eyebrow">Il mese</span>`
-    + `<span class="ms-ver ${S0.cls}"><span class="dot"></span><b>${S0.t}</b></span>`
-    + `<span class="ms-riga">${riga}</span>`
-    + `<span class="ms-fai-c">${esc(g.azione.t)}</span><span class="go">›</span>`;
-  b.onclick = () => { andTab = 'mese'; apri('#/andamento'); };
-  return b;
 }
 
 /** Gli anelli della settimana in Gym: attività e forza, come Fitness. */
@@ -408,5 +392,31 @@ function cardAnelliSettimana(k = today()) {
   if (typeof anelloFermo === 'function') { anelloFermo(aA, Math.min(qa, 1)); anelloFermo(aF, Math.min(qf, 1)); }
   if (typeof osserva === 'function' && typeof riempiAnello === 'function')
     osserva(ring, () => { riempiAnello(aA, Math.min(qa, 1)); riempiAnello(aF, Math.min(qf, 1), { ritardo: 260 }); });
+  return c;
+}
+
+/**
+ * Da tenere d'occhio: quello che il verdetto del mese non dice gia'.
+ *
+ * Gli avvisi dell'analisi stavano nella vista Sintesi, che e' stata tolta
+ * perche' rispondeva alla stessa domanda del mese e della revisione con un
+ * terzo metro (sette giorni). Restano solo quelli che il mese non copre —
+ * fibre, carboidrati, grassi, acqua, sonno, caffeina, passi, aderenza,
+ * sintomi, B12 — o la stessa cosa verrebbe detta due volte nella stessa
+ * pagina: calorie, proteine e pesate le dice gia' la carta sopra.
+ */
+const DA_OCCHIO = /Fibre|Carboidrati|Grassi|Bevi|Dormi|Coca|Passi|Aderenza|Sintomi|B12|Dose/;
+function cardDaTenereDOcchio(k = today()) {
+  if (typeof analyse !== 'function') return null;
+  const F = analyse(k).filter(f => f[0] !== 'ok' && DA_OCCHIO.test(f[2]));
+  if (!F.length) return null;
+  const c = el('div', 'card');
+  c.append(el('h2', 'sec', 'Da tenere d\'occhio'));
+  c.lastChild.style.marginTop = '0';
+  c.append(el('p', 'note', 'Sugli ultimi sette giorni chiusi.'));
+  for (const [kind, , title, body] of F) {
+    c.append(el('div', 'occ-r ' + kind,
+      `<span class="dot"></span><div><b>${esc(title)}</b><p>${body}</p></div>`));
+  }
   return c;
 }

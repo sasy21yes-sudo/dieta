@@ -799,20 +799,30 @@ let andTab = 'mese';
 
 const AND_VISTE = [
   ['mese', 'Il mese', 'Basta, devo fare di più, o altro? Il ritmo vero contro il tuo obiettivo.'],
-  ['sintesi', 'Sintesi', 'Cosa non torna negli ultimi sette giorni chiusi.'],
   ['grafici', 'Grafici', 'I numeri giorno per giorno, sul periodo che scegli.'],
   ['revisione', 'Revisione', 'Il giudizio su un periodo, e la sola cosa da cambiare.']
 ];
 
 /** Traduce i vecchi indirizzi nella vista giusta di Andamento. */
 function rottaAndamento(name) {
-  const mappa = { dati: 'grafici', analisi: 'sintesi', revisione: 'revisione', mese: 'mese' };
+  // #/analisi apriva la Sintesi, che non c'e' piu': porta al mese
+  const mappa = { dati: 'grafici', analisi: 'mese', revisione: 'revisione', mese: 'mese' };
   if (mappa[name]) { andTab = mappa[name]; return 'andamento'; }
   return name;
 }
 
+/** Il mese, e sotto le due cose della vecchia Sintesi che non dice nessun altro. */
+function vistaMese(v) {
+  v.append(cardMese());
+  const occ = typeof cardDaTenereDOcchio === 'function' ? cardDaTenereDOcchio() : null;
+  if (occ) v.append(occ);
+  if (typeof cardCostanza === 'function') v.append(cardCostanza(today(), 28));
+}
+
 function viewAndamento(v) {
-  const barra = el('div', 'card flat');
+  // il segmented control da solo, come in cima alle schermate di iOS: la
+  // carta intorno e la frase sotto erano cornice
+  const barra = el('div', 'and-barra');
   const seg = el('div', 'seg');
   for (const [id, lab] of AND_VISTE) {
     const b = el('button', null, lab);
@@ -821,13 +831,10 @@ function viewAndamento(v) {
     seg.append(b);
   }
   barra.append(seg);
-  const d = (AND_VISTE.find(x => x[0] === andTab) || [])[2];
-  if (d) barra.append(el('div', 'hint', d));
   v.append(barra);
 
-  ({ mese: w => w.append(cardMese()), sintesi: sezSintesi, grafici: viewDati,
-     revisione: viewRevisione }[andTab]
-    || sezSintesi)(v);
+  ({ mese: vistaMese, grafici: viewDati, revisione: viewRevisione }[andTab]
+    || vistaMese)(v);
 }
 
 /* ========================================================== cruscotto */

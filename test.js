@@ -253,7 +253,7 @@ function casiVuoto() {
   for (const base of ['vuoto', 'esempio']) {
     stato({ settings: { pianoBase: base } });
     const v = document.createElement('div');
-    for (const f of [cardMese, cardMeseCorta, cardAnelliSettimana]) v.append(f());
+    for (const f of [cardMese, cardAnelliSettimana]) v.append(f());
     viewCorpo(v); viewPrevisioni(v); viewPalestra(v);
     const t = v.textContent;
     verifica(`piano ${base} senza dati: niente NaN, undefined o null a schermo`,

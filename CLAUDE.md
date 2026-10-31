@@ -154,15 +154,47 @@ test.html / test.js   controlli fissi
 
 ## Interfaccia
 
+**Il design segue le Human Interface Guidelines di Apple**, lette dalla fonte
+(`developer.apple.com/tutorials/data/design/human-interface-guidelines/<pagina>.json`,
+lo stesso JSON che usa il sito: le pagine HTML si caricano in JavaScript).
+Le regole che ne escono, e che valgono per ogni carta nuova:
+
+- **Un font solo, quello di sistema** (SF Pro su iPhone): `--sans`, `--serif`
+  e `--mono` puntano tutti a lui, e le cifre sono tabulari ovunque. La
+  gerarchia si fa con dimensione e peso, non con un'altra famiglia. Testo
+  normale 15–17 px, minimo 11.
+- **Superfici di iOS**: la pagina e' `--bg` (systemGroupedBackground, grigio;
+  nero al buio), le carte sono `--paper` senza bordo, dentro una carta i
+  riempimenti sono `--wash`. Dentro un foglio le carte prendono `--wash`.
+- **Comandi di iOS**: bottone secondario = riempimento grigio col testo nel
+  colore dell'app, primario = pieno; segmented control = binario grigio con la
+  voce scelta in bianco (da sei voci in su diventa pastiglie che vanno a capo);
+  campi senza bordo; barre traslucide con lo sfocato.
+- **Le sezioni sono liste raggruppate** (come Impostazioni): icona nel
+  quadratino colorato a sinistra, titolo, stato, freccia, separatore rientrato.
+- **Colore con parsimonia**, e mai lo stesso colore per due significati.
+
+**Segnali di design generato da non usare** (catalogo di impeccable.style e
+simili): strisce colorate sul lato delle carte, etichette sopra il titolo,
+icona sopra il titolo in riquadri a griglia, titoli serif con numeri
+monospazio, maiuscoletto spaziato, bordo sottile insieme all'ombra, carte
+dentro carte, gradienti viola, testo che spiega la scelta di progetto al
+lettore. Lo stato si dice con un'icona, una parola o un punto colorato.
+
+**Niente doppioni.** Prima di aggiungere una carta, cerca se la stessa cosa e'
+gia' detta altrove: il ritmo del peso sta in un posto (la previsione in
+Corpo), il giudizio in un altro (Il mese), e una carta che riassume quello che
+c'e' gia' due dita sotto si toglie.
+
 - Prima la risposta in italiano, poi i numeri che la reggono, poi "come fa a
   saperlo" chiuso in fondo. Una riga che dice cosa fa, non perché esiste.
-- Stile Apple: etichette di sezione in testo normale (`.eyebrow`, niente
-  maiuscoletto), liste raggruppate in un contenitore con righe separate da un
-  filo (i pasti di Oggi), avvisi in una riga con l'azione come bottone di
-  testo, cursori per le scale, date scritte per esteso (`dataEstesa()`), nomi
-  dei giorni con la sola iniziale maiuscola (`capIniziale()`).
+- Avvisi in una riga con l'azione come bottone di testo, cursori per le scale,
+  date scritte per esteso (`dataEstesa()`), giorni con la sola iniziale
+  maiuscola (`capIniziale()`).
 - Oggi: il conto del giorno subito sotto il giorno, poi gli avvisi e gli
-  spunti; la sfida in fondo.
+  spunti; la sfida in fondo. Andamento ha tre viste: Il mese (con sotto "Da
+  tenere d'occhio" e la costanza), Grafici, Revisione. La Sintesi non c'e'
+  piu', e `#/analisi` porta al mese.
 - Prima di dare un nome a una classe cercalo: `.cal` era della costanza,
   `.sp-` e' della spesa (gli spunti usano `spu-`).
 - **Una sola unità per tabella.** Composizione in kg (la % una volta, come
@@ -201,6 +233,7 @@ applicano da sole, il diario giorno per giorno non esce dal telefono, e un
 3. Ricambio automatico dell'esercizio negli acciacchi
 4. Migrazione degli `aggiunti` scritti sotto il codice della ricetta (vedi
    STORIA.md, "Una ricetta intera nella giornata")
-5. Un giro per togliere testo e maiuscoletti locali ("GIORNI DI FILA",
-   "IN LINEA") dalle carte fuori da Oggi, Diario, Piano, Corpo e Andamento
-6. Unire "Cosa posso migliorare" della Sintesi con Il mese
+5. Un giro per togliere testo dalle carte fuori da Oggi, Diario, Piano, Corpo
+   e Andamento, e uniformare i titoli delle carte (h3 contro h2.sec)
+6. Il mese e la Revisione si sovrappongono ancora in parte: valutare se la
+   revisione debba partire dal mese invece di ripeterne il verdetto

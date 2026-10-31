@@ -2597,29 +2597,10 @@ function viewDiario(v) {
   v.append(cardAcqua(k));
 
 
-  /* L'allenamento non si dichiara piu': si legge. La riga resta perche' e'
-     un dato della giornata e sparire del tutto sembrerebbe che non conti
-     piu', ma e' una lettura e non un campo — e porta dove si registra. */
-  const ca = el('div', 'card flat');
-  const ser = typeof serieDelGiorno === 'function' ? serieDelGiorno(k) : [];
-  const car = typeof cardioDi === 'function' ? cardioDi(k) : [];
-  const hx = !!S.hyrox?.sessioni?.[k]?.fatto;
-  const pezzi = [];
-  if (ser.length) pezzi.push(`${ser.length} ${ser.length === 1 ? 'serie' : 'serie'} in palestra`);
-  if (car.length) pezzi.push(`${car.length} ${car.length === 1 ? 'uscita' : 'uscite'} di cardio`);
-  if (hx) pezzi.push('una seduta HYROX');
-  if (!pezzi.length && S.log[k]?.allenamento === true) pezzi.push('segnato a mano (registro vecchio)');
-  ca.append(el('div', 'row between',
-    `<div><div class="eyebrow">Allenamento</div>
-       <div class="muted">${pezzi.length ? esc(pezzi.join(' · '))
-         : 'Niente registrato in questa giornata.'}</div></div>
-     <span class="pill${pezzi.length ? ' ok' : ''}">${pezzi.length ? 'fatto' : 'riposo'}</span>`));
-  const bg = el('button', 'btn wide');
-  bg.style.marginTop = '10px';
-  bg.textContent = pezzi.length ? 'Apri Gym' : 'Registra una seduta';
-  bg.onclick = () => { apri('#/palestra'); };
-  ca.append(bg);
-  v.append(ca);
+  /* La carta "Allenamento" stava qui e ripeteva quello che dice Gym: quante
+     serie, quante uscite, e un bottone per andarci. L'allenamento resta un
+     dato della giornata — `allenatoIl()` lo legge per costanza e revisione —
+     ma si guarda dove si registra. */
 
   /* Passi e sonno non hanno piu' un riquadro loro: erano due campi dentro una
      carta con un titolo, cioe' piu' cornice che contenuto. Stanno qui, in cima
@@ -3046,9 +3027,9 @@ function viewCorpo(v) {
      niente: le misure di riferimento restano dove servono davvero — la
      sagoma tratteggiata qui sotto e la colonna "Target" della tabella. */
   v.append(cardPeso(k));
-  /* Subito sotto la pesata, la domanda che si fa guardandola: sta
-     funzionando? Il verdetto e una riga, il resto sta in Andamento. */
-  if (typeof cardMeseCorta === 'function') v.append(cardMeseCorta(k));
+  /* Il mese in versione corta stava qui, e ripeteva il ritmo del peso che la
+     carta della previsione dice piu' sotto: il giudizio sta in Andamento, e
+     quando non e' in linea lo ricordano gli spunti di Oggi. */
 
   /* --- figura --- */
   const curM = figMeas(Object.fromEntries(D.misure.map(m => [m.id, lastMeas(m.id)])));
@@ -3250,11 +3231,11 @@ function viewCorpo(v) {
   if (nota) cm.append(el('p', 'hint', `<strong>${esc(nota.label)}:</strong> ${esc(nota.nota)}.`));
   v.append(cm);
 
-  /* --- previsione --- */
+  /* --- il peso: dove sta andando, con il grafico dentro ---
+     Erano due carte una sotto l'altra che dicevano il ritmo due volte (il
+     titolo della previsione e la pastiglia sotto il grafico) e la media a
+     sette giorni una terza, dopo la carta del peso in cima. */
   v.append(forecastCard(k));
-
-  /* --- grafico peso --- */
-  v.append(weightCard(k));
 
   /* L'invito a "Dove stai andando" non c'e' piu': le misure hanno la loro
      proiezione dentro la loro carta, e il giudizio sul mese sta in cima. La
@@ -3344,6 +3325,7 @@ function forecastCard(k) {
     : `<b>Stai ${su ? 'salendo' : 'scendendo'} di ${nf(Math.abs(rit), 2)} kg a settimana</b>`
       + `<span>${fonteRit}</span>`;
   c.append(ver);
+  c.append(weightCard(k, true));
 
   const oggi = el('div', 'fc-tre');
   /* Una riga sola sotto il numero, e non due: su un telefono stretto tre
@@ -3445,10 +3427,12 @@ function forecastCard(k) {
 }
 
 /* ---------------------------------------------------------- grafico */
-function weightCard(k) {
-  const c = el('div', 'card');
-  c.append(el('h2', 'sec', 'Peso'));
-  c.lastChild.style.marginTop = '0';
+function weightCard(k, dentro = false) {
+  const c = el('div', dentro ? 'peso-graf' : 'card');
+  if (!dentro) {
+    c.append(el('h2', 'sec', 'Peso'));
+    c.lastChild.style.marginTop = '0';
+  }
   const days = Object.keys(S.log).filter(x => S.log[x]?.peso != null).sort();
   if (days.length < 2) {
     c.append(el('p', 'muted', 'Servono almeno due pesate. La linea che conterà è la media mobile a 7 giorni, non i singoli punti.'));
@@ -3520,13 +3504,14 @@ function weightCard(k) {
     `<div class="hint" style="margin-top:2px">Asse in kg, da ${nf(lo, 1)} a ${nf(hi, 1)}: la scala si adatta ai dati, quindi guarda i numeri e non la pendenza.</div>`);
 
   const cur = weightMA(days[last]), prev = weightMA(addDays(days[last], -7));
-  c.append(el('div', 'row between',
+  // dentro la previsione la media e il ritmo li dice gia' il titolo sopra
+  if (!dentro) c.append(el('div', 'row between',
     `<span class="muted">Media mobile 7 giorni</span>
      <span class="mono"><strong>${nf(cur, 2)} kg</strong>${prev
        // neutra: era ambra oltre 0,35 kg, cioe' "fuori target" anche quando
        // scendere era proprio l'obiettivo. Se basta lo dice Il mese
        ? ` <span class="pill">${cur - prev >= 0 ? '+' : ''}${nf(cur - prev, 2)}/sett</span>` : ''}</span>`));
-  c.lastChild.style.marginTop = '8px';
+  if (!dentro) c.lastChild.style.marginTop = '8px';
   if (f) c.append(el('p', 'hint',
     `Il tratteggio prosegue il ritmo ${Rw.ok ? 'delle pesate dell\'ultimo mese' : 'di quello che mangi'} `
     + `per 28 giorni; l'area e' la forbice al 95%, e si allarga perche' l'incertezza si accumula.`));
@@ -3853,126 +3838,10 @@ function sheetMisura(m, k, seq) {
   sheet(w);
 }
 
-/* -------------------------------------------------------- vista ANALISI */
-/**
- * La sintesi: cosa non torna, adesso.
- *
- * Era la scheda "Analisi", una delle tre porte alla stessa domanda — insieme a
- * Dati e alla Revisione. Ora e' la prima delle tre viste di Andamento, e ha
- * smesso di ripetere quello che dicono le altre due: la costanza si calcola e
- * si mostra una volta sola, e i grafici stanno nella vista accanto.
- *
- * Resta un motore a regole diverso da quello della revisione, e la differenza
- * e' il tempo: qui gli ultimi sette giorni chiusi e basta, li' un periodo
- * scelto, con il confronto e la sola cosa da cambiare.
- */
-function sezSintesi(v) {
-  const k = today();
-  const c = el('div', 'card flat');
-  c.append(el('div', 'eyebrow', 'Carichi in palestra'));
-  const ct = typeof caricoTrend === 'function' ? caricoTrend() : { stato: null, n: 0 };
-  if (ct.stato) {
-    // non si dichiara piu' a mano: si legge dalle schede
-    const parola = { su: 'in salita', fermi: 'fermi', giu: 'in calo' }[ct.stato];
-    c.append(el('p', 'muted',
-      `I carichi sono <strong>${parola}</strong>: mediana ${ct.mediana >= 0 ? '+' : ''}${nf(ct.mediana, 2)}% a settimana
-       sul massimale stimato, su ${ct.n} esercizi con almeno tre sedute negli ultimi due mesi.
-       Non serve piu' dichiararlo: viene dalle serie che registri.`));
-    const tb = el('div', 'cmp');
-    tb.append(el('div', 'cmp-h', '<span></span><span>%/sett</span><span>Sedute</span><span></span>'));
-    for (const x of ct.pend.slice(0, 6))
-      tb.append(el('div', 'cmp-r',
-        `<span>${esc(x.nome)}</span>
-         <span class="mono ${x.pctSett > 0 ? 'good' : ''}">${x.pctSett >= 0 ? '+' : ''}${nf(x.pctSett, 2)}</span>
-         <span class="mono muted">${x.n}</span><span></span>`));
-    c.append(tb);
-    c.append(el('p', 'hint',
-      'Il massimale stimato mette d\'accordo "meno ripetizioni ma piu\' peso" e "stesso peso ma piu\' ripetizioni": due sedute con lo stesso valore sono progresso zero, comunque siano composte. Si usa la mediana fra esercizi perche\' un singolo record fortunato non sposti il giudizio.'));
-  } else {
-    c.append(el('p', 'muted',
-      `Servono almeno due esercizi con tre sedute ciascuno negli ultimi due mesi
-       perche\' l'app possa calcolarli da sola${ct.n ? ` (adesso ne ha ${ct.n})` : ''}.
-       Finche\' mancano, dichiaralo tu: serve alla regola sulle calorie, perche\'
-       peso e vita da soli non bastano a decidere.`));
-    const seg = el('div', 'seg');
-    for (const [val, lab] of [['su', 'In salita'], ['fermi', 'Fermi'], ['giu', 'In calo']]) {
-      const b = el('button', null, lab);
-      b.setAttribute('aria-pressed', (S.settings.carichi || 'fermi') === val);
-      b.onclick = () => { S.settings.carichi = val; save(); route(); };
-      seg.append(b);
-    }
-    c.append(seg);
-  }
-
-  /* --- cosa non torna, e quanto --- */
-  const trovati = analyse();
-
-  // la costanza sta qui e in nessun altro posto: prima era un anello in questa
-  // schermata e una carta intera in Dati, cioe' lo stesso numero due volte a
-  // due dita di distanza
-  if (typeof cardCostanza === 'function') v.append(cardCostanza(k, 28));
-
-  const testa = el('div', 'cw');
-  testa.append(el('h3', null, 'La settimana in un colpo d\'occhio'));
-  testa.append(el('div', 'sub',
-    'Medie degli ultimi sette giorni chiusi, confrontate con i tuoi target. La barra dice quanto, il segno verticale dove doveva arrivare.'));
-  /* I due numeri contano **le otto voci qui sotto**, non i messaggi
-     dell'analisi.
-     Prima erano `analyse().length` e quanti di quelli non erano 'ok': cioe' un
-     conto sui testi che compaiono in fondo alla pagina, messo in cima a una
-     carta che ne mostra otto altre. Usciva "1 cose a posto / 2 da sistemare"
-     sopra otto barre di cui cinque senza dato — tre numeri che non tornavano
-     con niente di visibile, e per giunta "1 cose".
-     Le voci senza dato sono il terzo stato e vanno dette: sono la ragione per
-     cui la somma non fa otto, e sono anche la cosa da sistemare per prima. */
-  const M = (typeof metriche === 'function' && D.target.kcal > 0)
-    ? metriche(k, 7) : [];
-  const dentro = m => m.val != null && m.tgt
-    && Math.abs(m.val - m.tgt) <= m.tgt * (m.tolleranza ?? 0.1);
-  const senza = M.filter(m => m.val == null).length;
-  const ok = M.filter(dentro).length;
-  const fuori = M.length - senza - ok;
-  const plur = (n, uno, tanti) => n === 1 ? uno : tanti;
-  const r = el('div', 'an-conta solo');
-  r.innerHTML = `<div><b>${ok}</b><span>${plur(ok, 'in linea', 'in linea')}</span></div>
-     <div class="${fuori ? 'warn' : ''}"><b>${fuori}</b><span>${
-       plur(fuori, 'fuori target', 'fuori target')}</span></div>`
-     + (senza ? `<div class="vuoto"><b>${senza}</b><span>${
-       plur(senza, 'senza dato', 'senza dato')}</span></div>` : '');
-  if (M.length) testa.append(r);
-  for (const m of M) testa.append(meter(m));
-  /* Otto barre contro un target che non c'e' disegnerebbero otto volte lo
-     stesso nulla, e i contatori direbbero "6 fuori target" senza un target. */
-  if (!M.length) {
-    testa.append(el('p', 'muted',
-      'Non c\'e\' ancora un target con cui confrontare questi sette giorni. '
-      + 'Si calcola da solo appena il profilo e\' compilato.'));
-    const b2 = el('button', 'btn wide');
-    b2.style.marginTop = '8px';
-    b2.textContent = 'Imposta quanto mangiare';
-    b2.onclick = () => { if (typeof pianoTab !== 'undefined') pianoTab = 'target';
-      apri('#/piano'); };
-    testa.append(b2);
-  }
-  v.append(testa);
-
-  const daDire = trovati.filter(f => f[0] !== 'ok').length;
-  v.append(el('h2', 'sec', daDire ? 'Cosa posso migliorare' : 'Tutto a posto'));
-  for (const [kind, ico, title, body] of trovati) {
-    v.append(el('div', 'flag ' + kind,
-      `<div class="ico">${ico}</div>
-       <div class="grow"><h4>${esc(title)}</h4><p>${body}</p></div>`));
-  }
-
-  /* I carichi stavano in cima, ed era il posto sbagliato: non sono una
-     diagnosi, sono un ingrediente della regola sulle calorie. */
-  v.append(c);
-
-  v.append(el('div', 'card flat',
-    `<div class="eyebrow">Promemoria</div>
-     <div class="muted">Non modificare le calorie prima di 3 settimane di dati puliti,
-     mai più di ±200 kcal per volta, mai in base a una singola pesata.</div>`));
-}
+/* La vista Sintesi stava qui ed e' stata tolta: rispondeva a "come sta
+   andando" con un terzo metro (sette giorni) accanto al mese e alla
+   revisione. `analyse()` resta, e i suoi avvisi che nessun altro dice
+   stanno sotto Il mese (`cardDaTenereDOcchio()`). */
 
 /* ---------------------------------------------------------- vista SPESA */
 function shoppingList() {

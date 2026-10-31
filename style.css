@@ -7,15 +7,23 @@
   --oro:#B8860B; --oro-1:#F3DE9C; --oro-2:#8A6208; --oro-ink:#3A2A02;
   --alert:#9E2B1B; --alert-soft:#FBECE9;
   --amber:#8A5D0F; --amber-soft:#FCF3E2;
-  --ink:#151A1F; --ink-2:#4A5560; --ink-3:#8A93A0;
-  --paper:#FFFFFF; --wash:#F4F7F9; --rule:#DDE3E8;
+  /* Le superfici di iOS: la pagina e' systemGroupedBackground (grigio), le
+     carte sono celle bianche senza bordo, e dentro una carta i riempimenti
+     sono di nuovo grigi. Testo: label, secondaryLabel, tertiaryLabel. */
+  --ink:#1D1D1F; --ink-2:#6E6E73; --ink-3:#8E8E93;
+  --bg:#F2F2F7; --paper:#FFFFFF; --wash:#F2F2F7; --rule:#E5E5EA;
   /* La carta della priorita' e' scura in TUTTI E DUE i temi, e ha un token
      suo per questo: con background:var(--ink) al buio si ribaltava in una
      carta chiara, e i testi dentro — scritti in bianco fisso — sparivano. */
   --evid:#151A1F;
-  --sans:"IBM Plex Sans",-apple-system,system-ui,sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,monospace;
-  --serif:"IBM Plex Serif",Georgia,serif;
+  /* Un font solo, quello di sistema: SF Pro su iPhone. Erano tre famiglie
+     (IBM Plex Sans, Serif e Mono) — titoli serif e numeri monospazio sono
+     uno stile editoriale, non quello di iOS, dove la gerarchia si fa con
+     dimensione e peso. I token restano per non toccare duecento righe: oggi
+     puntano tutti allo stesso font, e le cifre sono tabulari ovunque. */
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;
+  --mono:var(--sans);
+  --serif:var(--sans);
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-t:env(safe-area-inset-top,0px);
   /* Il viola dell'assistente. E' l'unico posto dell'app che non parla di
@@ -34,8 +42,8 @@
     --oro:#E0B84E; --oro-1:#FFEBB0; --oro-2:#A87F1C; --oro-ink:#2A1F04;
     --alert:#E5715C; --alert-soft:#331714;
     --amber:#D9A441; --amber-soft:#2E2410;
-    --ink:#E9EEF1; --ink-2:#A6B2BC; --ink-3:#6E7B87;
-    --paper:#0E1417; --wash:#161E23; --rule:#26313A;
+    --ink:#FFFFFF; --ink-2:#AEAEB2; --ink-3:#8E8E93;
+    --bg:#000000; --paper:#1C1C1E; --wash:#2C2C2E; --rule:#38383A;
     --evid:#15302A;
     --ai-1:#8B6BFF; --ai-2:#D888F0; --ai-ink:#C9B6FF;
     --ai-vetro:rgba(30,34,48,.72); --ai-orlo:rgba(255,255,255,.14);
@@ -43,8 +51,9 @@
   }
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0;background:var(--paper);color:var(--ink)}
-body{font-family:var(--sans);font-size:15px;line-height:1.45;
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink)}
+body{font-family:var(--sans);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums;
+     -webkit-font-smoothing:antialiased;
      overscroll-behavior-y:none;padding-bottom:calc(64px + var(--safe-b))}
 
 /* ---------------- il doppio tocco non deve zoomare ----------------
@@ -78,36 +87,41 @@ body,#view,#sheet,#sheet-card,#topbar,#tabbar{touch-action:manipulation}
 #topbar{position:sticky;top:0;z-index:20;display:grid;align-items:center;
   grid-template-columns:42px 1fr 42px;gap:6px;
   padding:calc(10px + var(--safe-t)) 12px 10px;
-  background:var(--paper);border-bottom:1px solid var(--rule)}
-#top-title{font-family:var(--serif);font-weight:700;font-size:21px;
+  background:color-mix(in srgb,var(--bg) 82%,transparent);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:.5px solid var(--rule)}
+#top-title{font-family:var(--sans);font-weight:600;font-size:17px;
   letter-spacing:-.01em;text-align:center;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #btn-menu{justify-self:start;background:none;border:0;color:var(--ink-3);
   font-size:22px;padding:4px 8px;cursor:pointer;line-height:1}
 
 #tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;
-  background:var(--paper);border-top:1px solid var(--rule);
+  background:color-mix(in srgb,var(--paper) 86%,transparent);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-top:.5px solid var(--rule);
   padding-bottom:var(--safe-b)}
 /* Icona sopra e nome sotto. Il nome resta: cinque disegni senza parole
    costringono a impararli, e "Andamento" non ha un'icona ovvia. */
 #tabbar a{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
-  padding:8px 2px 9px;font-size:10.5px;font-weight:600;letter-spacing:.01em;
-  color:var(--ink-3);text-decoration:none;border-top:2px solid transparent;
-  margin-top:-1px;min-width:0}
+  padding:7px 2px 8px;font-size:10.5px;font-weight:500;
+  color:var(--ink-3);text-decoration:none;min-width:0}
 #tabbar a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   max-width:100%}
 #tabbar a svg{display:block;flex:none}
-#tabbar a[aria-current]{color:var(--pine);border-top-color:var(--pine)}
+/* la voce attiva e' nel colore dell'app, come in iOS: il filo sopra era un
+   segno in piu' che le barre di sistema non hanno */
+#tabbar a[aria-current]{color:var(--pine)}
 #tabbar a[aria-current] svg{stroke-width:2.4}
 
 #view{padding:16px 16px 24px;max-width:640px;margin:0 auto}
 
 /* ---------------- primitivi ---------------- */
-.card{background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+.card{background:var(--paper);border:0;border-radius:12px;
   padding:14px;margin-bottom:12px}
-.card.flat{background:var(--wash);border-color:transparent}
-h2.sec{font-family:var(--serif);font-size:17px;font-weight:700;
-  margin:22px 0 10px;letter-spacing:-.01em}
+.card.flat{background:var(--paper)}
+h2.sec{font-family:var(--sans);font-size:19px;font-weight:700;
+  margin:22px 0 10px;letter-spacing:-.015em}
 h2.sec:first-child{margin-top:4px}
 /* Le etichette di sezione come quelle di iOS 17: testo normale in grassetto
    leggero, non maiuscoletto spaziato. Si leggono invece di decifrarle, e
@@ -119,10 +133,13 @@ h2.sec:first-child{margin-top:4px}
 .row{display:flex;align-items:center;gap:10px}
 .row.between{justify-content:space-between}
 .grow{flex:1;min-width:0}
-button.btn{font-family:var(--sans);font-size:14px;font-weight:600;
-  padding:11px 14px;border-radius:10px;border:1px solid var(--rule);
-  background:var(--paper);color:var(--ink);cursor:pointer;min-height:44px}
-button.btn.pri{background:var(--pine);border-color:var(--pine);color:#fff}
+/* I bottoni di iOS: il secondario e' un riempimento grigio col testo nel
+   colore dell'app, il primario e' pieno. Niente bordi. */
+button.btn{font-family:var(--sans);font-size:15px;font-weight:600;
+  padding:11px 14px;border-radius:12px;border:0;
+  background:rgba(120,120,128,.12);color:var(--pine);cursor:pointer;min-height:44px}
+button.btn:active{opacity:.7}
+button.btn.pri{background:var(--pine);color:#fff}
 button.btn.wide{width:100%}
 button.btn.sm{min-height:36px;padding:7px 11px;font-size:13px}
 .pill{display:inline-block;font-family:var(--mono);font-size:11px;
@@ -235,8 +252,8 @@ button.btn.sm{min-height:36px;padding:7px 11px;font-size:13px}
    a rotella, che e' il motivo per cui esiste: dal tastierino numerico i due
    punti non si possono scrivere. */
 input[type=number],input[type=text],input[type=date],input[type=time]{width:100%;
-  font-family:var(--mono);font-size:16px;padding:11px 12px;border-radius:10px;
-  border:1px solid var(--rule);background:var(--paper);color:var(--ink);
+  font-family:var(--sans);font-size:17px;padding:11px 12px;border-radius:10px;
+  border:0;background:rgba(120,120,128,.12);color:var(--ink);
   min-height:44px}
 input:focus{outline:2px solid var(--pine);outline-offset:1px}
 /* Safari centra il contenuto dei campi data/ora e non li allarga: senza
@@ -244,12 +261,25 @@ input:focus{outline:2px solid var(--pine);outline-offset:1px}
    sembrano rotti */
 input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;
   text-align:left;min-width:0}
-.seg{display:flex;gap:6px;flex-wrap:wrap}
-.seg button{flex:1;min-width:38px;min-height:40px;border-radius:9px;
-  border:1px solid var(--rule);background:var(--paper);color:var(--ink-2);
-  font-family:var(--mono);font-size:14px;cursor:pointer}
-.seg button[aria-pressed=true]{background:var(--pine);border-color:var(--pine);
-  color:#fff;font-weight:600}
+/* Il segmented control di iOS: un binario grigio, la voce scelta in bianco
+   con un'ombra leggera. Le varianti che vanno a capo o scorrono (.wrap,
+   .chips, .scorre) sono pastiglie, come i filtri di Foto o di Mappe. */
+.seg{display:flex;gap:2px;flex-wrap:nowrap;background:rgba(118,118,128,.12);
+  border-radius:9px;padding:2px}
+.seg button{flex:1;min-width:0;min-height:32px;border-radius:7px;
+  border:0;background:transparent;color:var(--ink);
+  font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;padding:0 6px}
+.seg button[aria-pressed=true]{background:var(--paper);font-weight:600;
+  box-shadow:0 3px 8px rgba(0,0,0,.12),0 0 1px rgba(0,0,0,.08)}
+@media (prefers-color-scheme:dark){
+  .seg button[aria-pressed=true]{background:#636366}
+}
+.seg.wrap,.seg.chips,.seg.scorre{background:none;padding:0;gap:6px}
+.seg.wrap,.seg.chips{flex-wrap:wrap}
+.seg.wrap button,.seg.chips button,.seg.scorre button{flex:none;min-height:34px;border-radius:17px;
+  padding:0 14px;background:rgba(120,120,128,.12);box-shadow:none}
+.seg.wrap button[aria-pressed=true],.seg.chips button[aria-pressed=true],
+.seg.scorre button[aria-pressed=true]{background:var(--pine);color:#fff}
 
 /* ---------------- corpo ---------------- */
 .bodywrap{position:relative;margin:2px auto 6px;max-width:212px}
@@ -344,7 +374,7 @@ button.cmp-r:active{background:var(--wash)}
 #sheet{position:fixed;inset:0;z-index:40}
 #sheet-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.45)}
 #sheet-panel{position:absolute;left:0;right:0;bottom:0;max-height:88vh;
-  overflow-y:auto;background:var(--paper);border-radius:18px 18px 0 0;
+  overflow-y:auto;background:var(--paper);border-radius:14px 14px 0 0;
   padding:8px 16px calc(24px + var(--safe-b));
   animation:up .22s ease-out}
 @keyframes up{from{transform:translateY(100%)}to{transform:none}}
@@ -386,7 +416,7 @@ button.swapopt:active{background:var(--wash)}
 .gcal-d{flex:0 0 auto;width:40px;padding:6px 0 8px;border:0;background:none;
   display:flex;flex-direction:column;align-items:center;gap:3px;
   border-radius:12px;cursor:pointer;font:inherit;color:var(--ink-3)}
-.gcal-d .dow{font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+.gcal-d .dow{font-size:10px;
   color:var(--ink-3)}
 .gcal-d .num{font-size:13px;font-weight:600;color:var(--ink-2);line-height:1}
 .gcal-d .box{width:24px;height:24px;border-radius:50%;margin-top:2px;
@@ -519,3 +549,16 @@ button.swapopt:active{background:var(--wash)}
   .gcal-d.extra.brilla .box::after{animation:none}
   .gcal-s{scroll-behavior:auto}
 }
+
+/* Dentro un foglio (bianco) una carta prende il grigio dei riempimenti, o
+   sparirebbe nel fondo: e' lo stesso gioco di livelli delle tabelle iOS. */
+#sheet-panel .card{background:var(--wash)}
+#sheet-panel .card input[type=text],#sheet-panel .card input[type=date],
+#sheet-panel .card input[type=time],#sheet-panel .card input[type=number]{background:var(--paper)}
+/* Un segmented control vero regge cinque voci: da sei in su diventa una fila
+   di pastiglie che va a capo, come i filtri di iOS. Cosi' le scelte lunghe
+   (i recuperi, le scale, i giorni) non vanno riscritte una per una. */
+.seg:has(>button:nth-child(6)){background:none;padding:0;gap:6px;flex-wrap:wrap}
+.seg:has(>button:nth-child(6))>button{flex:none;min-height:34px;border-radius:17px;
+  padding:0 13px;background:rgba(120,120,128,.12);box-shadow:none}
+.seg:has(>button:nth-child(6))>button[aria-pressed=true]{background:var(--pine);color:#fff}

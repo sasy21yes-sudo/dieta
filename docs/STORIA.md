@@ -6333,3 +6333,42 @@ in fondo.
 Dal calendario, infine, un allenamento si corregge e si toglie: il resoconto
 ha "Elimina la seduta" e mostra il cardio dello stesso giorno, e una sessione
 di cardio si modifica (tipo, minuti, distanza, giorno).
+
+
+### Troppe ripetizioni, e un design che sembrava generato
+
+Segnalato cosi': *"ci sono troppe cose che si ripetono in generale. In piu' il
+design a volte sembra troppo AI generated e non Apple designer. Cerca su
+internet queste linee guida"*.
+
+Le regole sono state lette dalla fonte: le pagine delle HIG di Apple si
+caricano in JavaScript, ma il sito le serve anche come JSON
+(`developer.apple.com/tutorials/data/design/human-interface-guidelines/typography.json`
+e affini), e da li' il testo vero — font di sistema, 17 pt come corpo e 11 come
+minimo, niente pesi leggeri, sfondi grouped con le celle sopra, colore con
+parsimonia e mai lo stesso per due significati, elementi collegati raggruppati
+con spazio, contenitori o separatori. Per i segnali del design generato il
+catalogo di impeccable.style, che mette in cima proprio le strisce colorate sul
+lato delle carte, le etichette sopra il titolo e le icone sopra il titolo in
+riquadri a griglia — tutte e tre presenti nell'app.
+
+**Il sistema, alla radice.** Tre famiglie IBM Plex (sans, serif per i titoli,
+mono per i numeri) sono diventate il font di sistema, con le cifre tabulari;
+la pagina e' grigia e le carte bianche senza bordo (nero e grigio scuro al
+buio, i valori di iOS); bottoni, segmented control, campi e barre sono quelli
+di iOS. Tolti con uno script 58 maiuscoletti e 16 strisce laterali, e i bordi
+di 8 contenitori sulla pagina. La griglia di Gym e' una lista come
+Impostazioni.
+
+**Le ripetizioni.**
+- *Andamento*: alla domanda "come sta andando" rispondevano Il mese (28
+  giorni), la Sintesi (7 giorni) e la Revisione (un periodo). La Sintesi se ne
+  va; i suoi avvisi che nessun altro dice — fibre, grassi, acqua, sonno, B12 —
+  stanno sotto Il mese in "Da tenere d'occhio", con la costanza.
+- *Corpo*: il ritmo del peso compariva tre volte (Il mese corto, il titolo
+  della previsione, la pastiglia sotto il grafico) e la media a sette giorni
+  due. Il grafico e' entrato nella carta della previsione, e Il mese corto non
+  c'e' piu'.
+- *Diario*: la carta "Allenamento" ripeteva Gym.
+- *Il mese*: il periodo e' sceso sotto il verdetto, e la cosa da fare non ha
+  piu' l'etichetta sopra.

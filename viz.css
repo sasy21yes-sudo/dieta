@@ -22,7 +22,7 @@
   :root{
     --c1:#3987e5; --c2:#d95926; --c3:#199e70;
     --s1:#35796A; --s2:#45947E; --s3:#57AF94; --s4:#6FC8AA;
-    --grid:#1B242A;
+    --grid:#2C2C2E;
     /* Al buio il grigio del target era #6E7B87 e contro la serie #4FA88F dava
        ΔE 13,0 a vista normale: sotto la soglia di 15, cioe' due righe che si
        confondono anche a chi vede tutti i colori. Era un problema che c'era
@@ -35,10 +35,10 @@
 
 /* ---------------- riquadri statistici ---------------- */
 .kpis{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px}
-.tile{background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+.tile{background:var(--paper);border:0;border-radius:12px;
   padding:11px 12px;min-width:0}
-.tile .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--ink-3);white-space:nowrap;
+.tile .k{font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3);white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 .tile .v{font-size:25px;font-weight:600;letter-spacing:-.02em;line-height:1.15;
   margin-top:3px;font-variant-numeric:tabular-nums}
@@ -50,7 +50,7 @@
 .tile svg{margin-top:5px;display:block;width:100%;height:22px}
 
 /* ---------------- carta del grafico ---------------- */
-.cw{background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+.cw{background:var(--paper);border:0;border-radius:12px;
   padding:13px 13px 11px;margin-bottom:12px}
 .cw h3{font-family:var(--serif);font-size:15.5px;font-weight:700;margin:0;
   letter-spacing:-.01em}
@@ -166,7 +166,7 @@
 .diffm{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;
   font-family:var(--mono);font-size:11.5px;margin-top:6px;
   padding-top:7px;border-top:1px solid var(--rule)}
-.diffm .l{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+.diffm .l{font-size:9.5px;
   color:var(--ink-3);width:100%}
 .diffm .su{color:var(--amber)}
 .diffm .giu{color:var(--media)}
@@ -253,15 +253,15 @@
 .cf-r .b{color:var(--ink)}
 .cf-r .d{color:var(--ink-3)}
 .cf-r .d.su{color:var(--pine)} .cf-r .d.giu{color:var(--amber)}
-.cf-r.cf-h{border-top:0;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--ink-3);padding-bottom:2px}
+.cf-r.cf-h{border-top:0;font-family:var(--mono);font-size:10px;
+  color:var(--ink-3);padding-bottom:2px}
 .cf-r.cf-h .a,.cf-r.cf-h .b,.cf-r.cf-h .d{font-size:10px;color:var(--ink-3);
   font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .cf-bars{margin-top:12px;display:flex;flex-direction:column;gap:7px}
 .cf-b{display:grid;grid-template-columns:46px 1fr;gap:8px;align-items:center}
-.cf-b .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--ink-3);grid-row:span 2}
+.cf-b .l{font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3);grid-row:span 2}
 .cf-b .s{height:9px;border-radius:3px;background:var(--wash);overflow:hidden}
 .cf-b .s i{display:block;height:100%;border-radius:3px}
 .cf-b .s i.a{background:var(--pine)}
@@ -347,8 +347,8 @@
 .dvp{margin:2px 0 12px}
 .dvp-r{display:grid;grid-template-columns:46px 1fr 46px;gap:8px;align-items:center;
   margin-bottom:6px}
-.dvp-r .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--ink-3)}
+.dvp-r .l{font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3)}
 .dvp-r .t{display:flex;height:14px;border-radius:7px;overflow:hidden;
   background:var(--wash)}
 .dvp-r .t i{display:block;height:100%}
@@ -417,24 +417,24 @@
 /* testata */
 .hx-hero{border:1px solid var(--rule);border-radius:14px;padding:20px 16px 16px;
   background:linear-gradient(160deg,#181C1E,#0E1112);margin-bottom:14px}
-.hx-kicker{font-family:var(--mono);font-size:10px;letter-spacing:.34em;
-  text-transform:uppercase;color:var(--ink-3)}
+.hx-kicker{font-family:var(--mono);font-size:10px;
+  color:var(--ink-3)}
 .hx-logo{font-size:38px;font-weight:800;letter-spacing:.10em;line-height:1;
   margin:2px 0 14px;color:#fff}
 .hx-clock{display:flex;align-items:baseline;gap:9px;margin-bottom:14px}
 .hx-clock b{font-size:52px;font-weight:800;line-height:.9;color:var(--pine);
   letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.hx-clock span{font-family:var(--mono);font-size:11px;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--ink-3)}
+.hx-clock span{font-family:var(--mono);font-size:11px;
+  color:var(--ink-3)}
 .hx-clock .hx-set{font-size:13px;letter-spacing:0;text-transform:none;color:var(--ink-2)}
 .hx-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
   border-top:1px solid var(--rule);padding-top:12px;margin-bottom:13px}
-.hx-meta span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
+.hx-meta span{display:block;font-family:var(--mono);font-size:9px;
+  color:var(--ink-3);margin-bottom:3px}
 .hx-meta b{font-size:14px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
 .hx-btn{width:100%;background:var(--pine);color:#0B0D0E;border:0;border-radius:10px;
-  padding:13px;font:inherit;font-weight:800;letter-spacing:.08em;
-  text-transform:uppercase;font-size:12px;cursor:pointer}
+  padding:13px;font:inherit;font-weight:800;
+  font-size:12px;cursor:pointer}
 .hx-btn:active{opacity:.82}
 .hx-btn.ghost{background:none;color:var(--ink-3);border:1px solid var(--rule);
   margin-top:10px;font-weight:600}
@@ -444,13 +444,13 @@
   padding-bottom:2px;-webkit-overflow-scrolling:touch}
 .hx-tabs button{flex:none;background:none;border:1px solid var(--rule);color:var(--ink-3);
   border-radius:20px;padding:8px 14px;font:inherit;font-size:11px;font-weight:700;
-  letter-spacing:.09em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+  cursor:pointer;white-space:nowrap}
 .hx-tabs button.on{background:var(--pine);color:#0B0D0E;border-color:var(--pine)}
 
 /* carte */
 .hx-card{border:1px solid var(--rule);border-radius:13px;padding:15px 14px;
   margin-bottom:12px;background:var(--paper)}
-.hx-h{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+.hx-h{font-size:12px;font-weight:800;
   color:var(--pine);margin-bottom:9px}
 .hx-p{font-size:13px;color:var(--ink-2);line-height:1.5;margin:0 0 11px}
 .hx-note{font-size:11.5px;color:var(--ink-3);line-height:1.45;margin:11px 0 0;
@@ -464,8 +464,8 @@
 .hx-split{margin-top:4px}
 .hx-split-h,.hx-split-r{display:grid;grid-template-columns:22px 1fr 52px 62px;
   gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--rule)}
-.hx-split-h{font-family:var(--mono);font-size:9px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--ink-3);padding-bottom:6px}
+.hx-split-h{font-family:var(--mono);font-size:9px;
+  color:var(--ink-3);padding-bottom:6px}
 .hx-split-h span:nth-child(n+3),.hx-split-r .t,.hx-split-r .c{text-align:right}
 .hx-split-r{font-size:13px}
 .hx-split-r.run{color:var(--ink-3)}
@@ -485,8 +485,8 @@
 .hx-tile.has{border-color:var(--pine-line)}
 .hx-tile .n{position:absolute;top:9px;right:10px;font-family:var(--mono);
   font-size:9px;color:var(--ink-3);letter-spacing:.1em}
-.hx-tile .nm{display:block;font-weight:800;font-size:14px;letter-spacing:.04em;
-  text-transform:uppercase;color:#fff}
+.hx-tile .nm{display:block;font-weight:800;font-size:14px;
+  color:#fff}
 .hx-tile .ms{display:block;font-family:var(--mono);font-size:9.5px;
   color:var(--ink-3);margin-bottom:7px}
 .hx-tile .pb{display:block;font-family:var(--mono);font-size:20px;font-weight:600;
@@ -510,8 +510,8 @@
   align-items:center;background:none;border:0;border-bottom:1px solid var(--rule);
   padding:11px 0;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .hx-sess:last-of-type{border-bottom:0}
-.hx-sess .tp{font-family:var(--mono);font-size:9px;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--ink-3)}
+.hx-sess .tp{font-family:var(--mono);font-size:9px;
+  color:var(--ink-3)}
 .hx-sess .nm{font-weight:600;color:#fff;font-size:13.5px}
 .hx-sess .du{font-family:var(--mono);font-size:11px;color:var(--ink-3);text-align:right}
 .hx-sess.mirato .tp{color:var(--pine)}
@@ -520,8 +520,8 @@
 /* quote e checklist */
 .hx-quote{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:10px 0 0}
 .hx-quote div{background:var(--wash);border-radius:9px;padding:9px 10px}
-.hx-quote span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
+.hx-quote span{display:block;font-family:var(--mono);font-size:9px;
+  color:var(--ink-3);margin-bottom:3px}
 .hx-quote b{display:block;font-size:16px;font-weight:700;color:#fff;
   font-variant-numeric:tabular-nums}
 .hx-quote em{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;
@@ -537,20 +537,20 @@
   margin-top:2px;line-height:1.4}
 .hx-tip{padding:9px 0;border-bottom:1px solid var(--rule)}
 .hx-tip:last-child{border-bottom:0}
-.hx-tip b{display:block;font-size:12px;font-weight:800;letter-spacing:.05em;
-  text-transform:uppercase;color:var(--pine);margin-bottom:3px}
+.hx-tip b{display:block;font-size:12px;font-weight:800;
+  color:var(--pine);margin-bottom:3px}
 .hx-tip span{font-size:12.5px;color:var(--ink-2);line-height:1.45}
 
 /* ingresso dalla scheda Gym */
 .hx-entry{background:linear-gradient(150deg,#181C1E,#0B0D0E);border:1px solid #2A3134;
   border-radius:13px;padding:16px;margin-bottom:12px;color:#fff;display:block;
   width:100%;text-align:left;font:inherit;cursor:pointer}
-.hx-entry .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.3em;
-  text-transform:uppercase;color:#8A9499}
+.hx-entry .k{font-family:var(--mono);font-size:9.5px;
+  color:#8A9499}
 .hx-entry .l{font-size:26px;font-weight:800;letter-spacing:.09em;margin:2px 0 6px}
 .hx-entry .d{font-size:12.5px;color:#C2CACE;line-height:1.45}
 .hx-entry .g{display:inline-block;margin-top:9px;font-family:var(--mono);font-size:10px;
-  letter-spacing:.1em;text-transform:uppercase;color:#F2E205}
+  color:#F2E205}
 
 /* ---------------- righe di serie nelle schede ---------------- */
 .setrow{display:grid;grid-template-columns:26px 1fr 1fr 1fr;gap:6px;
@@ -589,8 +589,8 @@
 /* ---------------- righe di una scheda ---------------- */
 .sk-h,.sk-r{display:grid;grid-template-columns:26px 1fr 30px 44px 40px 12px;
   gap:7px;align-items:center}
-.sk-h{font-family:var(--mono);font-size:9px;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--ink-3);padding:0 0 5px;
+.sk-h{font-family:var(--mono);font-size:9px;
+  color:var(--ink-3);padding:0 0 5px;
   border-bottom:1px solid var(--rule)}
 .sk-h span:nth-child(n+3){text-align:right}
 .sk-r{width:100%;background:none;border:0;border-bottom:1px solid var(--rule);
@@ -606,8 +606,8 @@
   font-size:10px;color:var(--amber);font-weight:400}
 .sk-r .v{font-family:var(--mono);font-size:12px;text-align:right;color:var(--ink-2)}
 .sk-r .go{color:var(--ink-3);text-align:right}
-.setrow.sethead{font-family:var(--mono);font-size:9px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--ink-3);margin-top:10px}
+.setrow.sethead{font-family:var(--mono);font-size:9px;
+  color:var(--ink-3);margin-top:10px}
 .setrow.sethead span{text-align:center}
 .hx-sess.fatta .nm{color:var(--pine)}
 .hx-sess.fatta{opacity:.72}
@@ -615,18 +615,18 @@
 /* ---------------- calendario fino alla gara ---------------- */
 .cal-l{margin-top:4px}
 .cal-w{display:flex;justify-content:space-between;gap:10px;font-family:var(--mono);
-  font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);
+  font-size:9.5px;color:var(--ink-3);
   padding:14px 0 6px;border-bottom:1px solid var(--rule);margin-bottom:2px}
 .cal-w span:last-child{color:var(--pine)}
 .cal-d{display:grid;grid-template-columns:74px 1fr 34px;gap:9px;width:100%;
   align-items:baseline;background:none;border:0;border-bottom:1px solid var(--rule);
   padding:9px 0;color:inherit;font:inherit;text-align:left;cursor:pointer;font-size:13px}
 .cal-d .g{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);
-  text-transform:uppercase;letter-spacing:.04em}
+  }
 .cal-d .n{font-weight:600;color:#fff}
 .cal-d .n em{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;
-  color:var(--ink-3);font-weight:400;margin-top:2px;letter-spacing:.05em;
-  text-transform:uppercase}
+  color:var(--ink-3);font-weight:400;margin-top:2px;
+  }
 .cal-d .t{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);text-align:right}
 .cal-d.rip{cursor:default}
 .cal-d.rip .n{color:var(--ink-3);font-weight:400}
@@ -640,7 +640,7 @@
 
 /* ---------------- menu a tendina ---------------- */
 #dropdown{position:absolute;top:100%;right:0;z-index:60;min-width:224px;
-  background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+  background:var(--paper);border:0;border-radius:12px;
   box-shadow:0 8px 28px rgba(0,0,0,.16);overflow:hidden;margin-top:6px}
 #dropdown button{display:block;width:100%;text-align:left;background:none;border:0;
   border-bottom:1px solid var(--rule);padding:12px 14px;font:inherit;color:inherit;
@@ -651,7 +651,7 @@
 #dropdown .s{display:block;font-size:11.5px;color:var(--ink-3);margin-top:2px}
 
 /* ---------------- sfida del giorno ---------------- */
-.card.sfida{border-left:3px solid var(--amber)}
+.card.sfida{}
 .card.sfida.ok{border-left-color:var(--pine);background:var(--pine-soft);
   border-color:var(--pine-line);border-left-color:var(--pine)}
 .card.sfida.skip{opacity:.66}
@@ -726,8 +726,8 @@
 /* il terzo contatore e' "senza dato", e non e' ne' buono ne' cattivo: prende
    il grigio, che qui vuol dire esattamente quello */
 .an-conta .vuoto b{color:var(--ink-3)}
-.an-conta span{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--ink-3)}
+.an-conta span{font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3)}
 /* tre numeri stanno stretti su 390 px: si dividono la riga in parti uguali e
    l'etichetta va a capo invece di uscire dal bordo */
 .an-conta.tre{gap:10px;margin:10px 0 12px;padding-bottom:12px;
@@ -741,8 +741,8 @@
    periodo, poi le righe. Il blocco del giorno a sinistra fa da ancora
    verticale — scorrendo si legge la data prima del nome — e la barra sotto
    dice a colpo d'occhio quali sedute sono state grosse. */
-.st-mese{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--ink-3);margin:14px 0 2px}
+.st-mese{font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3);margin:14px 0 2px}
 .st-mese:first-of-type{margin-top:4px}
 .st-r{display:flex;width:100%;align-items:center;gap:11px;padding:9px 0;
   border:0;border-bottom:1px solid var(--rule);background:none;color:var(--ink);
@@ -754,7 +754,7 @@
   border:1px solid var(--rule)}
 .st-r .gg b{font-family:var(--mono);font-size:14px;font-weight:600;line-height:1}
 .st-r .gg em{font-style:normal;font-family:var(--mono);font-size:8.5px;
-  color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;margin-top:1px}
+  color:var(--ink-3);margin-top:1px}
 .st-r .grow{min-width:0}
 .st-r .n{display:block;font-size:13.5px;font-weight:600;line-height:1.2;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -798,8 +798,8 @@
 .rev-hero{position:relative;background:linear-gradient(155deg,var(--pine-soft),var(--paper));
   border:1px solid var(--pine-line);border-radius:16px;padding:20px 18px 18px;
   margin-bottom:14px;overflow:hidden}
-.rev-kick{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
-  text-transform:uppercase;color:var(--ink-3)}
+.rev-kick{font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3)}
 .rev-parola{max-width:calc(100% - 96px);font-family:var(--serif);font-size:34px;font-weight:700;line-height:1.05;
   letter-spacing:-.02em;margin:4px 0 6px;color:var(--pine);transform-origin:left center}
 .rev-sotto{font-size:13.5px;color:var(--ink-2);line-height:1.5;max-width:calc(100% - 96px)}
@@ -807,14 +807,14 @@
 .rev-anello svg{width:86px;height:86px;display:block}
 .rev-anello-n{position:absolute;top:30px;left:0;right:0;font-size:22px;font-weight:600;
   letter-spacing:-.02em}
-.rev-anello-l{font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--ink-3);margin-top:-2px}
+.rev-anello-l{font-family:var(--mono);font-size:8.5px;
+  color:var(--ink-3);margin-top:-2px}
 
 .rev-nums{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
-.rev-num{background:var(--paper);border:1px solid var(--rule);border-radius:11px;
+.rev-num{background:var(--paper);border:0;border-radius:11px;
   padding:11px 12px}
-.rev-num .l{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--ink-3)}
+.rev-num .l{display:block;font-family:var(--mono);font-size:9px;
+  color:var(--ink-3)}
 .rev-num .v{display:block;font-size:23px;font-weight:600;letter-spacing:-.02em;
   margin-top:2px;font-variant-numeric:tabular-nums}
 .rev-num .d{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-3);
@@ -833,8 +833,8 @@
 
 .rev-fix{padding:11px 0;border-bottom:1px solid var(--rule)}
 .rev-fix:last-child{border-bottom:0}
-.rev-fix .t{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--pine);margin-bottom:4px}
+.rev-fix .t{display:block;font-family:var(--mono);font-size:9.5px;
+  color:var(--pine);margin-bottom:4px}
 .rev-fix .c{display:block;font-size:13.5px;color:var(--ink);line-height:1.5}
 
 .rev-prio{background:var(--evid);color:#fff;border-radius:14px;
@@ -847,13 +847,13 @@
   margin:12px 0 0;padding-top:11px;border-top:1px solid rgba(255,255,255,.15)}
 
 .rev-invito{display:block;width:100%;text-align:left;font:inherit;color:inherit;
-  cursor:pointer;border-left:3px solid var(--pine);
+  cursor:pointer;
   background:linear-gradient(140deg,var(--pine-soft),var(--paper))}
 .rev-invito .t{display:block;font-family:var(--serif);font-size:19px;font-weight:700;
   margin:3px 0 5px;letter-spacing:-.01em}
 .rev-invito .d{display:block;font-size:13px;color:var(--ink-2);line-height:1.45}
 .rev-invito .g{display:inline-block;margin-top:9px;font-family:var(--mono);font-size:10px;
-  letter-spacing:.1em;text-transform:uppercase;color:var(--pine)}
+  color:var(--pine)}
 
 /* Il manubrio si legge al tocco come tutti gli altri grafici: la fascia dice
    quale riga stai guardando, e i numeri esatti finiscono nella riga sotto.
@@ -950,15 +950,15 @@
   align-items:center;justify-content:center;gap:2px}
 .gd-ring .mid .t{font-family:var(--mono);font-size:36px;font-weight:600;
   letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
-.gd-ring .mid .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--ink-3)}
+.gd-ring .mid .l{font-family:var(--mono);font-size:10px;
+  color:var(--ink-3)}
 .gd-ring.oltre .mid .t{color:var(--alert)}
 .gd-piu{display:flex;gap:10px;justify-content:center;margin:6px 0 2px}
 .gd-piu .btn{flex:1;max-width:130px;font-family:var(--mono)}
 .gd-poi{display:flex;flex-direction:column;gap:2px;margin:14px 0 2px;
   padding:10px;border-radius:12px;background:var(--wash);text-align:left}
-.gd-poi .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--ink-3)}
+.gd-poi .l{font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3)}
 .gd-poi .n{font-weight:600;font-size:15px}
 .gd-poi .d{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
 .gd-rec .note{text-align:left}
@@ -966,8 +966,8 @@
 .rec-mid{flex:1;text-align:center;line-height:1.15}
 .rec-t{display:block;font-family:var(--mono);font-size:20px;font-weight:700;
   font-variant-numeric:tabular-nums}
-.rec-l{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;
-  text-transform:uppercase;opacity:.65;white-space:nowrap;overflow:hidden;
+.rec-l{display:block;font-family:var(--mono);font-size:9px;
+  opacity:.65;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;max-width:46vw}
 .rec-b,.rec-x{background:rgba(255,255,255,.14);color:inherit;border:0;
   border-radius:8px;font:inherit;font-size:12px;font-family:var(--mono);
@@ -986,7 +986,7 @@
   transition:width .3s ease}
 .guida .read{margin:6px 0 10px}
 .gd-tec{font-size:12.5px;line-height:1.45;color:var(--ink-2);background:var(--wash);
-  border-left:3px solid var(--pine-line);border-radius:0 9px 9px 0;
+  border-radius:0 9px 9px 0;
   padding:8px 10px;margin:8px 0}
 .gd-tec.ss{border-left-color:var(--amber)}
 
@@ -1010,7 +1010,7 @@
 
 /* la copia trovata sul telefono, in cima al benvenuto: verde perche' e'
    l'app che la propone, e il filo a sinistra la stacca dalle due strade sotto */
-.copie-rip{border-left:3px solid var(--pine)}
+.copie-rip{}
 .gd-in{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 8px}
 .gd-in.due{grid-template-columns:1fr 1fr}
 .gd-in input{font-family:var(--mono);font-size:19px;text-align:center;padding:11px 6px}
@@ -1035,7 +1035,7 @@
 .card.res .res-r{font-size:12.5px;line-height:1.45;color:var(--ink-2);
   padding:7px 0;border-top:1px solid var(--rule)}
 .card.res .res-r .l{display:block;font-family:var(--mono);font-size:9.5px;
-  letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:1px}
+  color:var(--ink-3);margin-bottom:1px}
 .card.res .res-r.su{color:var(--pine)}
 .card.res .res-r b{font-family:var(--mono)}
 
@@ -1056,7 +1056,7 @@
 .gd-rip button{min-height:34px}
 .gd-drop{margin:2px 0 6px;padding:8px 10px;border:1px dashed var(--rule);border-radius:11px}
 .gd-drop .lab,.gd-fatte .lab{font-family:var(--mono);font-size:9.5px;
-  letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+  color:var(--ink-3);margin-bottom:4px}
 .gd-ok{margin-top:12px;font-size:16px;padding:15px}
 .gd-fatte{margin-top:14px;padding-top:10px;border-top:1px solid var(--rule)}
 .gd-fatte .r{display:flex;justify-content:space-between;gap:10px;
@@ -1066,7 +1066,7 @@
   text-align:right}
 
 /* ---------------- scarico e acciacchi ---------------- */
-.card.scarico.on{border-left:3px solid var(--amber)}
+.card.scarico.on{}
 .sc-motivi{margin-top:10px}
 .sc-m{padding:9px 0;border-bottom:1px solid var(--rule)}
 .sc-m:last-child{border-bottom:0}
@@ -1080,19 +1080,19 @@
   font-family:var(--mono);font-size:10px;font-weight:700;display:flex;
   align-items:center;justify-content:center}
 .sc-p .c{font-size:13.5px;line-height:1.5}
-.hint.acciacco{border-left:3px solid var(--amber);padding-left:9px}
+.hint.acciacco{padding-left:9px}
 .acc-r{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;
   width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;
   border-top:1px solid var(--rule);padding:11px 0;cursor:pointer}
-.acc-r .lv{font-family:var(--mono);font-size:9px;letter-spacing:.08em;
-  text-transform:uppercase;padding:3px 7px;border-radius:99px;color:#fff}
+.acc-r .lv{font-family:var(--mono);font-size:9px;
+  padding:3px 7px;border-radius:99px;color:#fff}
 .acc-r .lv.l1{background:var(--ink-3)} .acc-r .lv.l2{background:var(--amber)}
 .acc-r .lv.l3{background:var(--rust,var(--amber));filter:saturate(1.2) brightness(.85)}
 .acc-r .nm{font-weight:600;font-size:14px}
 .acc-r .gg{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
 
 /* ---------------- pesate anomale e ciclo ---------------- */
-.card.anomala{border-left:3px solid var(--amber)}
+.card.anomala{}
 .cic-barra{position:relative;display:flex;gap:2px;height:9px;margin:11px 0 10px}
 .cic-s{background:var(--wash);border-radius:3px}
 .cic-s.on{background:var(--pine)}
@@ -1126,8 +1126,8 @@
 .sp-num > div{flex:1;min-width:0}
 .sp-num b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;
   color:var(--pine);line-height:1}
-.sp-num span{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--ink-3);display:block;margin-top:2px;
+.sp-num span{font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3);display:block;margin-top:2px;
   line-height:1.25}
 .sp-bar{height:6px;border-radius:3px;background:var(--wash);overflow:hidden;
   border:1px solid var(--rule)}
@@ -1172,7 +1172,7 @@ button.sp-h{cursor:pointer}
   padding:5px 9px;font-size:12.5px}
 .sp-cop-l .tag em{font-style:normal;font-family:var(--mono);font-size:10px;
   color:var(--ink-3)}
-.card.sp-fine{border-left:3px solid var(--pine)}
+.card.sp-fine{}
 
 /* l'ordine delle corsie: le stesse maniglie dei pasti nella settimana */
 .riga-slot.sp-ord{display:flex;align-items:center;gap:10px}
@@ -1322,8 +1322,8 @@ html.camf-on,html.camf-on body{overflow:hidden}
   font-size:12.5px;font-weight:600;cursor:pointer}
 .camf-riga button[aria-pressed="true"]{background:#fff;color:#111}
 .camf-op{display:flex;align-items:center;gap:10px;margin-top:8px}
-.camf-op .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
-  text-transform:uppercase;opacity:.7}
+.camf-op .l{font-family:var(--mono);font-size:9.5px;
+  opacity:.7}
 .camf-op input{flex:1;min-width:0;accent-color:#fff}
 .camf-nota{margin:8px 2px 0;font-size:11.5px;line-height:1.4;opacity:.72}
 
@@ -1389,7 +1389,7 @@ html.camf-on,html.camf-on body{overflow:hidden}
 .esec.fine img.a{opacity:0}
 .esec.fine img.b{opacity:1}
 .esec-t{position:absolute;left:8px;bottom:8px;font-family:var(--mono);font-size:10px;
-  letter-spacing:.09em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.55);
+  color:#fff;background:rgba(0,0,0,.55);
   padding:3px 8px;border-radius:99px}
 .esec-due{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:4px 0 8px}
 .esec-due figure{margin:0}
@@ -1448,10 +1448,10 @@ html.camf-on,html.camf-on body{overflow:hidden}
   background:rgba(255,255,255,.14);border-radius:7px;padding:5px 0}
 .rev-leva .a{font-size:13.5px;line-height:1.4}
 .rev-imp{margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,255,255,.15)}
-.rev-imp .t{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
-  text-transform:uppercase;color:rgba(255,255,255,.55)}
+.rev-imp .t{display:block;font-family:var(--mono);font-size:9.5px;
+  color:rgba(255,255,255,.55)}
 .rev-imp .d{display:block;font-size:14px;font-weight:600;margin:3px 0 9px}
-.card.imp-esito{border-left:3px solid var(--amber);overflow:hidden}
+.card.imp-esito{overflow:hidden}
 .card.imp-esito.ok{border-left-color:var(--pine)}
 .imp-t{font-family:var(--serif);font-size:19px;font-weight:700;margin:3px 0 6px;
   letter-spacing:-.01em}
@@ -1459,8 +1459,8 @@ html.camf-on,html.camf-on body{overflow:hidden}
 /* ---------------- scorciatoie di registrazione ---------------- */
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
 .chip{display:flex;flex-direction:column;align-items:flex-start;gap:1px;
-  background:var(--wash);border:1px solid var(--rule);border-radius:9px;
-  padding:7px 10px;font:inherit;color:inherit;cursor:pointer;text-align:left}
+  background:rgba(120,120,128,.12);border:0;border-radius:12px;
+  padding:7px 11px;font:inherit;color:inherit;cursor:pointer;text-align:left}
 .chip .n{font-size:13px;font-weight:600;max-width:42vw;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .chip .k{font-family:var(--mono);font-size:10px;color:var(--ink-3)}
@@ -1508,8 +1508,8 @@ html.camf-on,html.camf-on body{overflow:hidden}
 .fi-t{display:flex;flex-direction:column;line-height:1.15}
 .fi-n{font-size:26px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .fi-blocco.cp .fi-n{font-size:18px}
-.fi-l{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--ink-3)}
+.fi-l{font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3)}
 .fi-s{font-size:12px;color:var(--ink-2);margin-top:2px}
 
 /* ---------------- la sfida ---------------- */
@@ -1517,8 +1517,8 @@ html.camf-on,html.camf-on body{overflow:hidden}
 .sfida-f{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px;
   margin-top:12px;padding-top:11px;border-top:1px solid var(--rule)}
 .sf-nums{display:grid;grid-template-columns:auto auto;gap:1px 8px;text-align:right}
-.sf-nums .l{font-family:var(--mono);font-size:9px;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--ink-3);align-self:center}
+.sf-nums .l{font-family:var(--mono);font-size:9px;
+  color:var(--ink-3);align-self:center}
 .sf-nums .v{font-family:var(--mono);font-size:14px;font-weight:600;
   font-variant-numeric:tabular-nums}
 
@@ -1538,8 +1538,8 @@ html.camf-on,html.camf-on body{overflow:hidden}
 .cd-live .v{background:var(--wash);border-radius:11px;padding:12px 6px}
 .cd-live .n{display:block;font-family:var(--mono);font-size:22px;font-weight:700;
   font-variant-numeric:tabular-nums;line-height:1.1}
-.cd-live .u{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--ink-3);margin-top:3px}
+.cd-live .u{display:block;font-family:var(--mono);font-size:9px;
+  color:var(--ink-3);margin-top:3px}
 .seg.wrap{flex-wrap:wrap}
 /* i gruppi muscolari come pastiglie: quattordici voci su un telefono vanno a
    capo da sole, e non devono diventare quattordici bottoni alti quaranta */
@@ -1556,7 +1556,7 @@ html.camf-on,html.camf-on body{overflow:hidden}
    larghezza invece di lasciare un buco a destra */
 .act-grid>:last-child:nth-child(odd){grid-column:1/-1}
 .gym-t,.act-t{display:flex;flex-direction:column;align-items:flex-start;gap:7px;
-  background:var(--paper);border:1px solid var(--rule);border-radius:13px;
+  background:var(--paper);border:0;border-radius:13px;
   padding:14px 13px 13px;font:inherit;color:inherit;text-align:left;cursor:pointer;
   min-height:104px}
 .gym-t.on,.act-t.on{border-color:var(--amber);background:var(--wash)}
@@ -1566,7 +1566,7 @@ html.camf-on,html.camf-on body{overflow:hidden}
 .gym-t .t,.act-t .t{font-weight:600;font-size:14px;line-height:1.2}
 .gym-t .s,.act-t .s{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);line-height:1.35}
 .gym-avv{display:block;width:100%;text-align:left;font:inherit;color:inherit;
-  background:var(--wash);border:0;border-left:3px solid var(--amber);
+  background:var(--wash);border:0;
   border-radius:11px;padding:12px 13px;margin-top:10px;cursor:pointer}
 .gym-avv .t{display:block;font-weight:600;font-size:14px;margin-bottom:3px}
 .gym-avv .d{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.45}
@@ -1579,8 +1579,8 @@ html.camf-on,html.camf-on body{overflow:hidden}
 .gd-att{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.75)}
 .gd-op{display:flex;align-items:center;gap:10px;margin:10px 0 4px}
-.gd-op .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--ink-3);flex:none}
+.gd-op .l{font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3);flex:none}
 .gd-op input{flex:1;min-width:0}
 
 /* ---------------- riepilogo sotto i grafici ---------------- */
@@ -1627,8 +1627,8 @@ html.camf-on,html.camf-on body{overflow:hidden}
 .fc-tre{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
   padding:12px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
 .fc-c{min-width:0}
-.fc-c .et{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--ink-3);line-height:1.3}
+.fc-c .et{display:block;font-family:var(--mono);font-size:9.5px;
+  color:var(--ink-3);line-height:1.3}
 .fc-c .v{display:block;font-size:20px;font-weight:600;margin-top:3px}
 .fc-c .v em{font-style:normal;font-size:11px;color:var(--ink-3);margin-left:2px}
 .fc-c .d{display:block;font-size:11px;color:var(--ink-3);margin-top:2px;
@@ -1654,14 +1654,14 @@ html.camf-on,html.camf-on body{overflow:hidden}
 @media (prefers-reduced-motion: reduce){.fc-det>summary::after{transition:none}}
 .fc-det .eyebrow{margin-top:14px}
 .led-r.led-h{color:var(--ink-3);font-family:var(--mono);font-size:9.5px;
-  letter-spacing:.06em;text-transform:uppercase}
+  }
 /* l'intestazione non e' una riga di dati: il rosso dello scarto e' il colore
    di un valore fuori banda, non della parola "scarto" */
 .led-r.led-h>span:last-child{color:inherit;font-weight:inherit}
 
 /* ---------------- quanto manca, in tempo ---------------- */
 .tempo{margin:10px 0 4px;padding:12px 13px;border-radius:11px;
-  background:var(--pine-soft);border-left:3px solid var(--pine)}
+  background:var(--pine-soft);}
 .tempo.ok{background:var(--pine-soft);border-left-color:var(--pine)}
 .tempo.ni{background:var(--wash);border-left-color:var(--ink-3)}
 .tempo.no{background:var(--wash);border-left-color:var(--amber)}
@@ -1679,13 +1679,13 @@ html.camf-on,html.camf-on body{overflow:hidden}
    target.js (.tg-r): sono la stessa domanda a due livelli di dettaglio, e
    due disegni diversi le farebbero sembrare due cose che non c'entrano. */
 .ob-r{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;
-  background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+  background:var(--paper);border:0;border-radius:12px;
   padding:11px 13px;margin-top:8px;font:inherit;color:inherit;cursor:pointer}
 .ob-r.on{border-color:var(--pine);background:var(--pine-soft)}
 .ob-r .k{flex:0 0 62px;font-family:var(--mono);font-size:17px;font-weight:600;
   color:var(--pine);line-height:1.1}
-.ob-r .k em{display:block;font-style:normal;font-size:9px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--ink-3);margin-top:1px}
+.ob-r .k em{display:block;font-style:normal;font-size:9px;
+  color:var(--ink-3);margin-top:1px}
 .ob-r .body{flex:1;min-width:0}
 .ob-r .t{display:block;font-weight:600;font-size:14px}
 .ob-r .d{display:block;color:var(--ink-2);font-size:12.5px;line-height:1.35;
@@ -1695,10 +1695,10 @@ html.camf-on,html.camf-on body{overflow:hidden}
 
 .fis-h{display:flex;flex-direction:column;margin:2px 0 8px}
 .fis-h .t{font-weight:600;font-size:15px}
-.fis-h .d{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;
-  text-transform:uppercase;color:var(--ink-3);margin-top:2px}
+.fis-h .d{font-family:var(--mono);font-size:10.5px;
+  color:var(--ink-3);margin-top:2px}
 .fis-r{display:flex;gap:10px;align-items:center;width:100%;text-align:left;
-  background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+  background:var(--paper);border:0;border-radius:12px;
   padding:11px 13px;margin-top:8px;font:inherit;color:inherit;cursor:pointer}
 .fis-r.on{border-color:var(--pine);background:var(--pine-soft)}
 .fis-r .body{flex:1;min-width:0}
@@ -1722,8 +1722,8 @@ html.camf-on,html.camf-on body{overflow:hidden}
 .pl-d{flex:1;display:flex;flex-direction:column;align-items:center;
   justify-content:flex-end;gap:4px;min-width:0}
 .pl-d i{display:block;width:100%;border-radius:3px;background:var(--s2)}
-.pl-d .n{font-family:var(--mono);font-size:9px;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--ink-3)}
+.pl-d .n{font-family:var(--mono);font-size:9px;
+  color:var(--ink-3)}
 /* i quattro stati, e il vuoto non e' uno di quelli storti */
 .pl-d.basso i{background:var(--alert)}
 .pl-d.sotto i,.pl-d.sopra i{background:var(--amber)}
@@ -1760,8 +1760,8 @@ button.flag.tap:active{opacity:.75}
 .gg-f.bad{color:var(--alert)}
 .gg-f.warn{color:var(--amber)}
 /* un filo di colore sul bordo sinistro: si vede scorrendo, prima di leggere */
-.card.gg-basso{border-left:3px solid var(--alert)}
-.card.gg-sotto,.card.gg-sopra{border-left:3px solid var(--amber)}
+.card.gg-basso{}
+.card.gg-sotto,.card.gg-sopra{}
 /* la riga di lettura del foglio: l'ultima cella prende il colore dello stato */
 .read span.bad{color:var(--alert)}
 .read span.warn{color:var(--amber)}
@@ -1936,7 +1936,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .ai-perbar{flex:none;padding:9px 14px 11px;border-bottom:1px solid var(--rule)}
 .ai-per{display:flex;align-items:center;gap:8px;
   font-size:12px;color:var(--ink-2)}
-.ai-per .et{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+.ai-per .et{font-size:10.5px;
   color:var(--ink-3);font-weight:600}
 .ai-per b{color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis}
@@ -1959,7 +1959,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
    colore di "fuori target" e qui non c'e' niente di storto, c'e' un buco */
 .ai-manca{display:flex;flex-direction:column;gap:3px;margin-top:10px;
   padding:11px 12px;border-radius:14px;background:var(--wash);
-  border:1px solid var(--rule);border-left:3px solid var(--ai-1)}
+  border:1px solid var(--rule);}
 .ai-manca b{font-size:13px;font-weight:600;color:var(--ink)}
 .ai-manca span{font-size:11.5px;line-height:1.4;color:var(--ink-3)}
 .ai-manca button{align-self:flex-start;margin-top:5px;border:0;background:none;
@@ -1982,7 +1982,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
   line-height:1.35}
 .ai-q .ch{flex:none;color:var(--ink-3);font-size:15px}
 
-.ai-tit{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+.ai-tit{font-size:10.5px;
   color:var(--ink-3);font-weight:600;margin:16px 0 2px}
 
 /* i messaggi */
@@ -2060,7 +2060,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .pf-g{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 12px;
   padding:9px 11px;border-radius:14px;background:var(--wash);
   border:1px solid var(--rule);font-size:12px;color:var(--ink-2)}
-.pf-g .et{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+.pf-g .et{font-size:10.5px;
   color:var(--ink-3);font-weight:600}
 .pf-g b{color:var(--ink);font-weight:600}
 .pf-g .og{padding:2px 7px;border-radius:999px;font-size:10.5px;font-weight:600;
@@ -2093,7 +2093,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 /* i tre passi: dove sei, e quanto manca. Non e' decorazione — la foto e'
    il primo di tre, e senza il filo si crede che sia finita li' */
 .pf-passi{display:flex;gap:6px;margin:10px 0 14px}
-.pf-passi .p{flex:1;font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+.pf-passi .p{flex:1;font-size:10px;
   font-weight:600;color:var(--ink-3);padding-top:7px;
   border-top:2px solid var(--rule)}
 .pf-passi .p.fatto{color:var(--ai-ink);border-top-color:var(--ai-1)}
@@ -2112,7 +2112,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 @media (prefers-reduced-motion:reduce){.pf-att .sp{animation-duration:2.4s}}
 
 .pf-err{padding:13px;margin-top:12px;border-radius:15px;background:var(--wash);
-  border:1px solid var(--rule);border-left:3px solid var(--ai-1)}
+  border:1px solid var(--rule);}
 .pf-err b{display:block;font-size:13.5px;margin-bottom:4px}
 .pf-err span{display:block;font-size:12px;line-height:1.45;color:var(--ink-3)}
 
@@ -2143,7 +2143,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 
 .pf-tot{display:flex;align-items:baseline;gap:8px;margin-top:12px;padding:11px 12px;
   border-radius:13px;background:var(--wash);border:1px solid var(--rule)}
-.pf-tot .e{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+.pf-tot .e{font-size:10.5px;
   color:var(--ink-3);font-weight:600}
 .pf-tot b{font-size:16px}
 .pf-tot .m{flex:1;text-align:right;font-family:var(--mono);font-size:10.5px;
@@ -2192,7 +2192,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 /* "stimato": un numero guardato in una foto non e' un numero letto su
    un'etichetta, e la riga lo dice invece di farlo credere misurato */
 .ex-st{margin-left:6px;font-style:normal;font-size:9.5px;font-weight:600;
-  letter-spacing:.04em;text-transform:uppercase;color:var(--ai-ink);
+  color:var(--ai-ink);
   padding:2px 6px;border-radius:999px;
   background:color-mix(in srgb,var(--ai-1) 13%,transparent)}
 @supports not (color:color-mix(in srgb,red,blue)){.ex-st{background:var(--wash)}}
@@ -2230,7 +2230,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 
 .ms-fai{margin-top:14px;padding:13px 14px;border-radius:12px;background:var(--pine-soft)}
 .ms-fai .et,.ms-in .et{display:block;font-size:11px;font-weight:600;color:var(--ink-2);
-  text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+  margin-bottom:4px}
 .ms-fai b{display:block;font-size:16px;font-weight:600;line-height:1.3}
 .ms-fai p{margin:5px 0 0;font-size:13px;color:var(--ink-2);line-height:1.45}
 .ms-fai .btn{margin-top:11px;background:var(--paper)}
@@ -2247,17 +2247,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .ms-r .s.warn{background:var(--amber)}
 .ms-r .s.mute{background:var(--rule);color:var(--ink-2)}
 
-/* la versione corta e' un bottone: reset, o al buio prende il fondo di sistema */
-.card.mese.corta{display:grid;grid-template-columns:1fr auto;column-gap:10px;width:100%;
-  text-align:left;font:inherit;color:inherit;cursor:pointer}
-.card.mese.corta .eyebrow,.card.mese.corta .ms-ver,.card.mese.corta .ms-riga,
-.card.mese.corta .ms-fai-c{grid-column:1}
-.card.mese.corta .ms-ver{margin:0 0 4px}
-.card.mese.corta .ms-ver b{font-size:19px}
-.card.mese.corta .ms-riga{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
-.card.mese.corta .ms-fai-c{font-size:13px;font-weight:600;margin-top:8px}
-.card.mese.corta .go{grid-column:2;grid-row:1/span 4;align-self:center;font-size:24px;color:var(--ink-3)}
-.card.mese.corta:active{transform:scale(.99)}
+
 
 /* ================================================== gli anelli della settimana
    Due anelli come in Fitness: fuori l'attivita' contro i 150 minuti, dentro
@@ -2342,7 +2332,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 
 /* il promemoria del backup: una riga d'avviso, non una carta da leggere */
 .card.bk-r{display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:center;
-  border-left:3px solid var(--amber);padding:11px 14px}
+  padding:11px 14px}
 .bk-r .ic{width:34px;height:34px;border-radius:10px;background:var(--amber-soft);color:var(--amber);
   display:grid;place-items:center}
 .bk-r .body{display:flex;flex-direction:column;gap:1px;min-width:0}
@@ -2352,7 +2342,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 /* ============================================== i pasti, una lista sola
    Una lista raggruppata come in Promemoria o Salute: un contenitore, righe
    separate da un filo, e il pasto spuntato che prende la tinta verde. */
-.meal-gruppo{background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+.meal-gruppo{background:var(--paper);border:0;border-radius:12px;
   margin-bottom:12px;overflow:hidden}
 .meal-gruppo .meal{border:0;border-radius:0;margin:0;border-top:1px solid var(--rule)}
 .meal-gruppo .meal:first-child{border-top:0}
@@ -2380,3 +2370,36 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .pn-intro{display:flex;flex-direction:column;gap:2px;margin:6px 2px 10px}
 .pn-intro b{font-size:17px;font-weight:600;letter-spacing:-.01em}
 .pn-intro span{font-size:13px;color:var(--ink-2);line-height:1.4}
+
+/* ==================================== le sezioni come Impostazioni di iOS
+   Erano riquadri con l'icona sopra il titolo, in griglia: il catalogo dei
+   segni del design generato lo mette fra i primi, e iOS non lo fa mai.
+   Adesso e' una lista raggruppata: l'icona in un quadratino colorato a
+   sinistra, titolo e stato, la freccia a destra, il separatore che parte dal
+   testo e non dal bordo. */
+.gym-grid,.act-grid{display:block;background:var(--paper);border-radius:12px;overflow:hidden;
+  margin:12px 0}
+.gym-t,.act-t{display:grid;grid-template-columns:30px 1fr 14px;align-items:center;gap:12px;
+  width:100%;padding:11px 14px;background:none;border:0;border-radius:0;
+  text-align:left;font:inherit;color:inherit;cursor:pointer;position:relative;min-height:56px}
+.gym-t+.gym-t::before,.act-t+.act-t::before{content:'';position:absolute;top:0;left:56px;right:0;
+  border-top:.5px solid var(--rule)}
+.gym-t::after,.act-t::after{content:'\203A';color:var(--ink-3);font-size:20px;line-height:1;justify-self:end}
+.gym-t:active,.act-t:active{background:var(--wash)}
+.gym-t .ic-g,.act-t .ic-g{width:30px;height:30px;padding:6px;border-radius:8px;
+  background:var(--pine);color:#fff;box-sizing:border-box}
+.gym-t.on,.act-t.on{border:0;background:none}
+.gym-t.on .ic-g,.act-t.on .ic-g{background:var(--amber);color:#fff}
+.gym-t .t,.act-t .t{font-size:16px;font-weight:400}
+.gym-t .s,.act-t .s{font-family:var(--sans);font-size:13px;color:var(--ink-2)}
+
+/* da tenere d'occhio: righe di una lista, con un punto di stato e non una
+   carta colorata per avviso — sei carte rosse e ambra in fila erano rumore */
+.occ-r{display:grid;grid-template-columns:10px 1fr;gap:12px;padding:11px 0;border-top:.5px solid var(--rule)}
+.occ-r .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);margin-top:6px}
+.occ-r.bad .dot{background:var(--alert)}
+.occ-r b{font-size:15px;font-weight:600}
+.occ-r p{margin:2px 0 0;font-size:13px;color:var(--ink-2);line-height:1.4}
+
+.ms-per{font-size:13px;color:var(--ink-2);margin:-8px 0 14px}
+.and-barra{margin:2px 0 14px}
