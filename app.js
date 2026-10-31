@@ -851,10 +851,21 @@ function ledgerRecord(k = today()) {
   S.model ||= {}; S.model.prev ||= [];
   if (trendW(k) == null) return;
   let added = 0;
+  /* La pagella giudica la previsione che la carta mostra: quella sul ritmo
+     misurato, o su quello che mangi davvero. Registrava la previsione
+     "seguendo il piano", cioe' un numero che nessuno vedeva piu' — e chi non
+     segue il piano al grammo si ritrovava un motore bocciato per una
+     previsione mai fatta. */
+  const R = typeof ritmoPeso === 'function' ? ritmoPeso(k) : { ok: false };
+  const ri = realIntake(k);
   for (const h of [7, 14]) {
     if (S.model.prev.some(p => p.fatta === k && p.h === h)) continue;
-    const f = forecast(h, D.target.kcal, k);
+    const f = forecast(h, ri ?? D.target.kcal, k);
     if (!f) continue;
+    if (R.ok) {
+      f.peso = f.base + R.kgSett * h / 7;
+      f.banda = 1.96 * Math.sqrt((R.se * h / 7) ** 2 + (f.rumore / Math.sqrt(7)) ** 2);
+    }
     S.model.prev.push({ fatta: k, h, target: addDays(k, h),
       previsto: +f.peso.toFixed(2), banda: +f.banda.toFixed(2),
       tdee: Math.round(f.tdee) });
@@ -2394,15 +2405,22 @@ function bottigliaSVG(quota) {
   // l'acqua parte dal fondo: alta quanto la quota, e con la superficie mossa
   const h = 6 + q * (H - 12);
   const y = H - h;
-  g.append(mk('path', {
+  const acqua = mk('path', {
     d: `M-4 ${y + 4} q 10 -5 20 0 t 20 0 t 20 0 t 20 0 V${H + 4} H-4 Z`,
     fill: 'var(--media)', opacity: q ? .85 : 0
-  }));
+  });
+  g.append(acqua);
   s.append(g);
   s.append(mk('path', { d: sagoma, fill: 'none', stroke: 'var(--ink-3)',
     'stroke-width': 2.4, 'stroke-linejoin': 'round' }));
-  return { svg: s, gruppo: g };
+  /* `livello(q)` dice a che altezza starebbe l'acqua con quella quota: serve
+     all'animazione per partire dal livello di prima invece che da vuota. */
+  return { svg: s, gruppo: g, acqua, h, livello: x => 6 + Math.max(0, Math.min(1, x || 0)) * (H - 12) };
 }
+
+/* Il livello d'acqua prima dell'ultimo bicchiere: la pagina si ridisegna a
+   ogni tocco, e senza questo l'animazione ripartiva da bottiglia vuota. */
+let _acquaPrima = null;
 
 /**
  * La carta dell'acqua.
@@ -2421,7 +2439,7 @@ function cardAcqua(k) {
   c.append(el('div', 'eyebrow', 'Cosa bevi'));
 
   const testa = el('div', 'acq-testa');
-  const { svg, gruppo } = bottigliaSVG(quota);
+  const { svg, acqua, h: hOra, livello } = bottigliaSVG(quota);
   testa.append(svg);
   const nums = el('div', 'acq-num');
   const manca = Math.max(0, tgt - litri);
@@ -2434,17 +2452,30 @@ function cardAcqua(k) {
       : `ne mancano ${nf(manca, 2)} L`}</div>`;
   testa.append(nums);
   c.append(testa);
-  if (typeof osserva === 'function' && typeof motionOk === 'function')
-    osserva(c, () => {
-      if (!motionOk()) return;
-      gruppo.style.transformOrigin = 'bottom';
-      gruppo.animate([{ transform: 'scaleY(0)' }, { transform: 'none' }],
-        { duration: 700, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' });
-      contaSu(nums.querySelector('.v .n'), litri, { dec: 2, dur: 700 });
-    });
+  /* **Sale l'acqua, non si schiaccia la bottiglia.** L'animazione scalava in
+     verticale il gruppo che porta anche il ritaglio a forma di bottiglia: si
+     deformava la sagoma dell'acqua invece di vederla salire. Adesso si sposta
+     solo l'acqua, dentro la sagoma che resta ferma — e dopo un bicchiere
+     parte dal livello di prima, non da vuota. Il livello giusto e' gia'
+     disegnato prima dell'animazione: senza, la bottiglia sarebbe comunque
+     piena al punto giusto. */
+  const daQuota = _acquaPrima != null ? _acquaPrima / tgt : 0;
+  const dopoTocco = _acquaPrima != null;
+  _acquaPrima = null;
+  const parti = () => {
+    if (typeof motionOk === 'function' && !motionOk()) return;
+    const dy = hOra - livello(daQuota);
+    if (dy > 0.5) acqua.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }],
+      { duration: dopoTocco ? 550 : 800, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' });
+    contaSu(nums.querySelector('.v .n'), litri, { dec: 2, dur: dopoTocco ? 550 : 800,
+      da: dopoTocco ? daQuota * tgt : 0 });
+  };
+  if (dopoTocco) requestAnimationFrame(parti);
+  else if (typeof osserva === 'function') osserva(c, parti);
 
   const aggiungi = ml => {
     const dd = day(k);
+    _acquaPrima = dd.acqua || 0;
     dd.sorsi = [...(dd.sorsi || []), ml];
     dd.acqua = Math.round(((dd.acqua || 0) + ml / 1000) * 1000) / 1000;
     save(); route();
@@ -2474,6 +2505,7 @@ function cardAcqua(k) {
   undo.disabled = !ultimo;
   undo.onclick = () => {
     const dd = day(k);
+    _acquaPrima = dd.acqua || 0;             // scende senza ripartire da vuota
     const ml = (dd.sorsi || []).pop();
     if (!ml) return;
     dd.acqua = Math.max(0, Math.round(((dd.acqua || 0) - ml / 1000) * 1000) / 1000);
@@ -4127,8 +4159,7 @@ function sheetProfilo() {
   /* Il target sta qui e non solo dentro l'elenco dei passi del piano: e' il
      metro con cui l'app giudica ogni giornata, quindi ci si torna spesso e da
      ogni schermata — e finora ci si arrivava scegliendo due volte. */
-  vai('Quanto mangiare', 'bersaglio', 'Calorie e macro da centrare ogni giorno, con la proposta '
-    + 'ricalibrata sul dispendio che l\'app ha misurato.',
+  vai('Quanto mangiare', 'bersaglio', 'Il tuo target di calorie e macro, e se basta per il tuo obiettivo.',
     porta('#/piano', 'target'));
   if (usaPiano()) {
     vai('Piano settimanale', 'calendario', 'Quale ricetta in quale pasto, nei sette giorni. Da qui '

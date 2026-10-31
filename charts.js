@@ -471,6 +471,59 @@ function chartBars(o) {
   return c;
 }
 
+/**
+ * L'errore delle previsioni: barre che partono dallo zero, in su o in giu'.
+ *
+ * Era `chartBars`, che parte da zero e cresce solo verso l'alto: un errore
+ * negativo — il peso vero sotto la previsione — finiva fuori dal disegno, e
+ * meta' delle barre spariva. In piu' ci aggiungeva la riga della media e il
+ * riepilogo "ultimo / media / target", che su degli errori non vogliono dire
+ * niente, e metteva in fila le previsioni a una e a due settimane con la
+ * stessa data, cioe' due barre per giorno.
+ *
+ * Qui una barra per previsione a una settimana, in scala simmetrica attorno
+ * allo zero; il colore dice se il peso vero e' caduto dentro la forbice che la
+ * previsione aveva dichiarato — verde dentro, ambra fuori — e il tocco legge
+ * cosa diceva, cosa e' stato e di quanto ha sbagliato.
+ */
+function chartErrori(prev, L) {
+  const ultime = prev.filter(p => p.h === 7 && p.errore != null).slice(-30);
+  if (ultime.length < 3) return vuoto('Errore delle previsioni', 'Quanto ha sbagliato ogni previsione a una settimana.',
+    'Servono almeno tre previsioni scadute: la prima arriva una settimana dopo la prima pesata.');
+  const c = card('Errore delle previsioni',
+    'Ogni barra e\' una previsione a una settimana: sopra lo zero il peso vero e\' stato piu\' alto, sotto piu\' basso.');
+  const H = 140, g = geo(H); g.n = ultime.length;
+  const m = Math.max(0.5, ...ultime.map(p => Math.abs(p.errore)), ...ultime.map(p => p.banda || 0)) * 1.15;
+  g.scale(-m, m);
+  const s = svgEl(H);
+  s.append(grid(g));
+  s.append(mk('line', { x1: g.l, x2: g.l + g.w, y1: g.y(0), y2: g.y(0),
+    stroke: 'var(--ink-3)', 'stroke-width': 1 }));
+  const bw = Math.max(2, g.w / g.n - 2);
+  ultime.forEach((p, i) => {
+    const y0 = g.y(0), y1 = g.y(p.errore);
+    s.append(mk('rect', { x: g.xb(i) - bw / 2, y: Math.min(y0, y1), width: bw,
+      height: Math.max(1.5, Math.abs(y1 - y0)), rx: 2,
+      fill: p.dentro ? 'var(--pine)' : 'var(--amber)' }));
+  });
+  s.append(xLabels(g, ultime.map(p => p.target), true));
+  c.append(s);
+  c.append(legenda([{ n: 'dentro la forbice', col: 'var(--pine)' },
+                    { n: 'fuori', col: 'var(--amber)' }]));
+  const read = el('div', 'read', '<span class="ph">Tocca una barra</span>');
+  c.append(read);
+  tappable(s, read, g, ultime.map(p => p.target), i => {
+    const p = ultime[i];
+    return `<span>${p.target.slice(8)}/${p.target.slice(5, 7)}</span>`
+      + `<span>diceva ${nf(p.previsto, 1)}</span><span>era ${nf(p.reale, 1)}</span>`
+      + `<span><b>${p.errore >= 0 ? '+' : '−'}${nf(Math.abs(p.errore), 2)} kg</b></span>`;
+  }, true);
+  c.append(el('p', 'note',
+    `In media sbaglia di ${nf(L.mae, 2)} kg, e ${nf(L.colpiti * 100)} volte su 100 il peso vero e\' `
+    + 'dentro la forbice. Barre tutte dalla stessa parte vogliono dire che il ritmo sta cambiando.'));
+  return c;
+}
+
 /** Barre impilate: parte sul tutto. Massimo tre serie, con legenda. */
 function chartStack(o) {
   const somma = o.days.map((_, i) => o.serie.reduce((a, s) => a + (s.vals[i] || 0), 0));
@@ -1251,15 +1304,7 @@ function viewDati(v) {
     }));
   }
   const L = ledgerScore(k);
-  if (L.n >= 3) {
-    const ultime = (S.model.prev || []).filter(p => p.errore != null).slice(-datiRange);
-    v.append(chartBars({
-      titolo: 'Errore delle previsioni', sub: 'Ogni barra e\' una previsione scaduta: quanto ha sbagliato, in kg.',
-      days: ultime.map(p => p.target), vals: ultime.map(p => p.errore),
-      unit: 'kg', dec: 2,
-      note: `Errore medio ${nf(L.mae, 2)} kg, ${nf(L.colpiti * 100)}% dentro la banda dichiarata. Se le barre stanno tutte dallo stesso lato il modello e\' in ritardo e il filtro allarga il passo.`
-    }));
-  }
+  if (L.n >= 3) v.append(chartErrori(S.model.prev || [], L));
 
   /* --- integratori --- */
   const sup = D.integratori.map(s => ({

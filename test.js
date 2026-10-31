@@ -248,13 +248,43 @@ function casiCalendario() {
   }
 }
 
+/** Il grafico degli errori regge gli errori negativi, e la pagella giudica la previsione mostrata. */
+function casiPrevisioni() {
+  const prev = [];
+  const err = [0.3, -0.4, 0.1, -0.2, 0.5, -0.6, 0.05];
+  err.forEach((e, i) => {
+    const t = addDays(today(), -10 + i);
+    prev.push({ fatta: addDays(t, -7), h: 7, target: t, previsto: 70, reale: 70 + e, errore: e,
+                banda: 0.45, dentro: Math.abs(e) <= 0.45 });
+    prev.push({ fatta: addDays(t, -14), h: 14, target: t, previsto: 70, reale: 70 + e, errore: e,
+                banda: 0.6, dentro: true });
+  });
+  const c = chartErrori(prev, { mae: 0.3, colpiti: 0.7 });
+  const rect = [...c.querySelectorAll('svg rect')].filter(r => r.getAttribute('rx') === '2');
+  const svgH = 140;
+  verifica('errori: una barra per previsione a una settimana, non due per data', rect.length === err.length,
+    rect.length + ' barre');
+  verifica('errori: anche le barre negative stanno dentro il disegno',
+    rect.every(r => +r.getAttribute('y') >= 0 && +r.getAttribute('y') + +r.getAttribute('height') <= svgH));
+  verifica('errori: fuori dalla forbice e\' ambra, dentro e\' verde',
+    rect.some(r => r.getAttribute('fill') === 'var(--amber)') && rect.some(r => r.getAttribute('fill') === 'var(--pine)'));
+
+  // il registro salva la previsione sul ritmo vero, non quella del piano
+  stato({ log: mangia(pesate(-0.35), 2000), settings: cut });
+  ledgerRecord(today());
+  const p7 = S.model.prev.find(p => p.fatta === today() && p.h === 7);
+  const w = trendW(today()), R = ritmoPeso(today());
+  verifica('la pagella registra la previsione che la carta mostra (ritmo misurato)',
+    p7 && vicino(p7.previsto, w + R.kgSett, 0.02), p7 && `${nf(p7.previsto, 2)} vs ${nf(w + R.kgSett, 2)}`);
+}
+
 /** Le schermate nuove si disegnano anche senza niente dentro, e senza parole rotte. */
 function casiVuoto() {
   for (const base of ['vuoto', 'esempio']) {
     stato({ settings: { pianoBase: base } });
     const v = document.createElement('div');
     for (const f of [cardMese, cardAnelliSettimana]) v.append(f());
-    viewCorpo(v); viewPrevisioni(v); viewPalestra(v);
+    viewCorpo(v); viewPrevisioni(v); viewPalestra(v); sezTarget(v); viewDiario(v);
     const t = v.textContent;
     verifica(`piano ${base} senza dati: niente NaN, undefined o null a schermo`,
       !/NaN|undefined|\bnull\b/.test(t), (t.match(/.{30}(NaN|undefined|\bnull\b).{10}/) || [''])[0]);
@@ -274,7 +304,7 @@ function casiVuoto() {
   const out = document.getElementById('esito');
   try {
     await caricaApp();
-    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiCalendario, casiSpunti, casiVuoto]) {
+    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiCalendario, casiSpunti, casiPrevisioni, casiVuoto]) {
       try { f(); } catch (e) { verifica(f.name + ' non deve lanciare', false, e.message); }
     }
   } catch (e) {

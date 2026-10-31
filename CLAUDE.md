@@ -109,6 +109,10 @@ test.html / test.js   controlli fissi
 
 ## I motori, e quello che non devono fare
 
+- **La pagella delle previsioni** (`ledgerRecord()`) registra la previsione che
+  la carta mostra (ritmo misurato o introito reale), non quella del piano; il
+  suo grafico e' `chartErrori()`, divergente attorno allo zero — `chartBars`
+  parte da zero e non regge valori negativi.
 - **Il peso** si legge sulla tendenza (`trendW`, pesate anomale escluse con
   mediana e MAD), mai sulla pesata del giorno. Il dispendio è un filtro di
   Kalman sul bilancio introito/peso.
@@ -180,6 +184,17 @@ icona sopra il titolo in riquadri a griglia, titoli serif con numeri
 monospazio, maiuscoletto spaziato, bordo sottile insieme all'ombra, carte
 dentro carte, gradienti viola, testo che spiega la scelta di progetto al
 lettore. Lo stato si dice con un'icona, una parola o un punto colorato.
+
+**Un numero alla volta.** Il passo "Quanto mangiare" mostra il target com'e'
+(`cardIlTuoTarget()`), una riga che lo confronta con l'obiettivo e una sola
+proposta (`pianoCalorico()`, che parte dal dispendio misurato); i campi stanno
+in un foglio. Non aggiungere un secondo motore di proposte accanto: la carta
+ricalibrata dalla matrice e' stata tolta perche' contraddiceva l'obiettivo.
+
+**Le animazioni muovono il dato, non la cornice.** La bottiglia: si sposta
+l'acqua dentro la sagoma ferma, e dopo un bicchiere parte dal livello di prima
+(`_acquaPrima`). Scalare un gruppo che porta un `clip-path` scala anche il
+ritaglio.
 
 **Niente doppioni.** Prima di aggiungere una carta, cerca se la stessa cosa e'
 gia' detta altrove: il ritmo del peso sta in un posto (la previsione in

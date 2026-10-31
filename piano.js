@@ -837,6 +837,11 @@ function sezProfilo(v) {
   c.append(b);
   v.append(c);
 
+  /* Il fisico di riferimento sta qui e non in "Quanto mangiare": parla del
+     corpo a cui punti, non di quante calorie mangiare, e li' era la quarta
+     carta piena di numeri in un passo che doveva dirne uno. */
+  if (typeof cardFisico === 'function') v.append(cardFisico());
+
   /* --- 3. cosa ti serve, per ultimo --- */
   v.append(cardModuli());
 }
@@ -914,28 +919,89 @@ function cardFotoProfilo() {
 
 /* ---------------------------------------------------------------- target */
 function sezTarget(v) {
-  const p = piano();
-  /* L'obiettivo viene PRIMA di tutto: e' la domanda a cui gli altri numeri
-     sono la risposta, e finora non la faceva nessuno. */
+  /* **Un numero, e da dove viene.** Questo passo aveva sedici calorie
+     diverse in quattro carte — le quattro proposte dell'obiettivo, il
+     dispendio, il target, una seconda proposta ricalibrata, un secondo
+     elenco di ritmi, il pavimento, il metabolismo a riposo, la somma dei
+     macro, la media del piano — e il target vero stava in fondo, dentro un
+     modulo. Adesso in cima c'e' il target com'e', con una riga che lo
+     confronta con l'obiettivo; sotto si sceglie l'obiettivo, che e' l'unica
+     proposta; i campi stanno dietro "Modifica i numeri". */
+  v.append(cardIlTuoTarget());
   if (typeof cardObiettivo === 'function') v.append(cardObiettivo());
-  if (typeof cardFisico === 'function') v.append(cardFisico());
-  if (typeof cardTarget === 'function') v.append(cardTarget());
   if (typeof cardRampaFibre === 'function') { const rf = cardRampaFibre(); if (rf) v.append(rf); }
-  const c = el('div', 'card');
-  c.append(el('h2', 'sec', 'Target giornalieri'));
+}
+
+/** Il target di adesso: il numero grande, i macro, e una riga sola di contesto. */
+function cardIlTuoTarget() {
+  const T = D.target || {};
+  const c = el('div', 'card tg');
+  c.append(el('h2', 'sec', 'Il tuo target'));
   c.lastChild.style.marginTop = '0';
+  if (!(T.kcal > 0)) {
+    c.append(el('p', 'muted', 'Non c\'e\' ancora un target: scegli un obiettivo qui sotto, '
+      + 'oppure scrivi i numeri che ti ha dato chi ti segue.'));
+  } else {
+    const peso = lastWeight() || D.profilo.peso_iniziale_kg;
+    c.append(el('div', 'tg-big', `<b>${nf(T.kcal)}</b><span>kcal al giorno</span>`));
+    const riga = (lab, val, unit, sub = '') => `<div class="tg-r"><span>${lab}</span>`
+      + `<span class="v">${nf(val)} ${unit}</span><span class="s">${sub}</span></div>`;
+    c.append(el('div', 'tg-macro',
+      riga('Proteine', T.p, 'g', peso ? nf(T.p / peso, 1) + ' g/kg' : '')
+      + riga('Carboidrati', T.c, 'g') + riga('Grassi', T.g, 'g') + riga('Fibre', T.fibre, 'g')));
+    c.append(el('p', 'tg-altro',
+      `Acqua ${nf(T.acqua_l, 2)} L · passi ${nf(T.passi)} · sonno ${nf(T.sonno_h, 1)} h`));
 
-  /* calcolatore: da qui esce una proposta, non un obbligo */
-  const bmr = 10 * (lastWeight() ?? D.profilo.peso_iniziale_kg)
-    + 6.25 * D.profilo.altezza_cm - 5 * D.profilo.eta + (D.profilo.sesso === 'm' ? 5 : -161);
-  const E = energyModel();
-  c.append(el('div', 'card flat',
-    `<div class="eyebrow">Da dove partire</div>
-     <div class="muted">Metabolismo a riposo stimato <strong>${nf(bmr)} kcal</strong>
-     (Mifflin-St Jeor). Il dispendio totale che il motore stima adesso e'
-     <strong>${nf(E.tdee)} kcal</strong>${E.n ? ` , ricalibrato ${E.n} volte sui tuoi dati` : ', ancora da formula'}.
-     Per crescere piano si sta 10–15% sopra, per dimagrire piano 10–15% sotto.</div>`));
+    /* La sola riga di contesto: il target contro l'obiettivo. La proposta
+       dell'obiettivo parte gia' dal dispendio misurato, quindi e' anche il
+       confronto col dispendio: non serve un secondo numero per quello. */
+    const att = typeof obiettivoAttivo === 'function' ? obiettivoAttivo() : null;
+    if (att && typeof pianoCalorico === 'function') {
+      const pc = pianoCalorico(att.id, att.pct);
+      const diff = T.kcal - pc.kcal;
+      const ritmo = pc.kgSett === 0 ? 'a peso fermo'
+        : `a ${pc.kgSett > 0 ? '+' : '−'}${nf(Math.abs(pc.kgSett), 2)} kg a settimana`;
+      if (Math.abs(diff) < 30) {
+        c.append(el('p', 'tg-ctx ok', '<span class="dot"></span><span>'
+          + `E’ quello che serve per ${esc(att.n.toLowerCase())} ${ritmo}.</span>`));
+      } else {
+        c.append(el('p', 'tg-ctx', '<span class="dot"></span><span>'
+          + `Per ${esc(att.n.toLowerCase())} ${ritmo} servirebbero circa `
+          + `<strong>${nf(pc.kcal)} kcal</strong>: ${nf(Math.abs(diff))} ${diff > 0 ? 'in meno' : 'in più'}.</span>`));
+        const usa = el('button', 'btn wide pri', `Usa ${nf(pc.kcal)} kcal`);
+        usa.onclick = () => sheetObiettivo(att.id);
+        c.append(usa);
+      }
+    } else {
+      c.append(el('p', 'tg-ctx', '<span class="dot"></span>'
+        + '<span>Scegli un obiettivo qui sotto per sapere se questi numeri bastano.</span>'));
+    }
 
+    // il piano settimanale, solo se non centra questo numero
+    const cp = typeof controlloPiano === 'function' ? controlloPiano() : null;
+    if (cp && cp.pieni && (Math.abs(cp.scartoMedia ?? 0) > 0.08 || cp.sottoPavimento.length)) {
+      const n = cp.sottoPavimento.length;
+      const b = el('button', 'tg-piano');
+      b.innerHTML = `<span>I pasti del piano fanno in media <b>${nf(cp.media)} kcal</b>`
+        + (n ? `, e ${n === 1 ? 'un giorno è' : n + ' giorni sono'} sotto il minimo` : '')
+        + '</span><span class="go">›</span>';
+      b.onclick = () => { pianoTab = 'settimana'; route(); };
+      c.append(b);
+    }
+  }
+  const mod = el('button', 'btn wide', T.kcal > 0 ? 'Modifica i numeri' : 'Scrivi i numeri a mano');
+  mod.style.marginTop = '10px';
+  mod.onclick = () => sheetTargetNumeri();
+  c.append(mod);
+  return c;
+}
+
+/** I campi del target, in un foglio: chi ha i numeri da un professionista li scrive qui. */
+function sheetTargetNumeri() {
+  const p = piano();
+  const w = el('div');
+  w.append(el('h2', 'sec', 'I numeri del target'));
+  w.lastChild.style.marginTop = '0';
   // niente nf() dentro un input: formatterebbe 2482 come "2.482" e rileggerlo
   // darebbe 2,482 kcal. Nei campi va il numero grezzo.
   const campo = (id, lab, unit) => el('div', 'field',
@@ -947,87 +1013,35 @@ function sezTarget(v) {
            campo('c', 'Carboidrati', 'g'), campo('g', 'Grassi', 'g'),
            campo('fibre', 'Fibre', 'g'), campo('acqua_l', 'Acqua', 'L'),
            campo('passi', 'Passi', ''), campo('sonno_h', 'Sonno', 'h'));
-  c.append(g);
-
+  w.append(g);
   const eco = el('div', 'read');
   const ricalcola = () => {
-    // Il primo giro e' differito di un tick, e in quel tick la pagina puo'
-    // essere gia' stata sostituita: chi apre questo passo e tocca subito una
-    // voce che porta altrove lasciava dietro un TypeError. Nessuno se ne
-    // accorgeva — l'eco e' un di piu' e non lo aspetta nessuno — ma
-    // un'eccezione in console e' la cosa che nasconde quelle vere.
     if (!$('#tg-kcal')) return;
     const k = parseNum($('#tg-kcal').value) || 0, pr = parseNum($('#tg-p').value) || 0;
     const ca = parseNum($('#tg-c').value) || 0, gr = parseNum($('#tg-g').value) || 0;
     const somma = pr * 4 + ca * 4 + gr * 9;
     eco.innerHTML = `<span>Dai macro: <b>${nf(somma)} kcal</b></span>`
-      + `<span>${Math.abs(somma - k) < 60 ? 'coerente' : `scarto ${nf(somma - k)} kcal`}</span>`
-      + `<span>${lastWeight() ? nf(pr / (lastWeight() || 1), 2) + ' g/kg' : ''}</span>`;
+      + `<span>${Math.abs(somma - k) < 60 ? 'coerente' : `scarto ${nf(somma - k)} kcal`}</span>`;
   };
-  c.append(eco);
-  setTimeout(ricalcola, 0);
-  c.querySelectorAll('input').forEach(i => i.oninput = ricalcola);
-
-  const b = el('button', 'btn wide pri', 'Salva target');
+  w.append(eco);
+  w.querySelectorAll('input').forEach(i => { i.oninput = ricalcola; });
+  const b = el('button', 'btn wide pri', 'Salva');
   b.onclick = () => {
     for (const id of ['kcal', 'p', 'c', 'g', 'fibre', 'acqua_l', 'passi', 'sonno_h']) {
       const n = parseNum($('#tg-' + id).value);
       if (n != null && n >= 0) p.target[id] = n;
     }
-    save(); fondiPiano(); route(); toast('Target aggiornati');
+    save(); fondiPiano(); closeSheet(); route(); toast('Target aggiornati');
   };
-  c.append(b);
-  c.append(el('p', 'hint',
-    'I macro non devono per forza tornare esatti alle calorie: 4 kcal per grammo di proteine e carboidrati e 9 per i grassi sono valori di tabella, e gli alimenti reali si discostano. Uno scarto sotto le 60 kcal e\' normale.'));
-
-  /* Il target e la settimana pianificata sono due cose diverse: le barre
-     della scheda Oggi vengono dalla somma dei pasti previsti, non da qui. Se i
-     due numeri divergono l'app lo deve dire, altrimenti si insegue un target
-     che nessun pasto del piano puo' centrare.
-
-     Qui resta la **media**, che risponde alla domanda di questo passo ("il
-     numero che ho scritto e' quello che il piano produce?"). Il giorno per
-     giorno sta nel passo della settimana, dove i giorni si compongono. */
-  const cp = typeof controlloPiano === 'function' ? controlloPiano() : null;
-  if (cp && cp.pieni) {
-    const sotto = cp.sottoPavimento.length;
-    if (Math.abs(cp.scartoMedia ?? 0) > 0.08) {
-      const f = el('div', 'flag warn');
-      /* Il vecchio testo offriva "oppure riporta il target a <media>". Con una
-         media sotto il pavimento quello e' un consiglio sbagliato: propone di
-         adeguare il metro alla fame, ed e' esattamente il modo in cui un'app
-         smette di protestare proprio quando la situazione peggiora. */
-      f.innerHTML = `<div class="ico">!</div><div class="grow">
-        <h4>Il piano non centra questo target</h4>
-        <p>I pasti assegnati fanno in media <strong>${nf(cp.media)} kcal</strong>,
-        cioe' ${cp.media > cp.tgt ? nf(cp.media - cp.tgt) + ' in piu\''
-          : nf(cp.tgt - cp.media) + ' in meno'} del target che hai impostato. Le barre
-        della scheda Oggi seguono i pasti, non questo numero.
-        ${cp.media < cp.pav.pavimento
-          ? `E quella media e\' sotto il tuo pavimento di ${nf(cp.pav.pavimento)} kcal:
-             la strada non e\' abbassare il target fin li\', sono i pasti.`
-          : `Per farli coincidere cambia i pasti nella settimana, oppure riporta il
-             target a ${nf(cp.media)}.`}</p></div>`;
-      c.append(f);
-    } else {
-      c.append(el('div', 'read',
-        `<span>Settimana pianificata: <b>${nf(cp.media)} kcal</b> di media</span>`
-        + '<span>coerente col target</span>'));
-    }
-    if (sotto) {
-      const b = el('button', 'flag bad tap');
-      b.innerHTML = `<div class="ico">!</div><div class="grow">
-        <h4>${sotto === 1 ? 'Un giorno del piano e\' sotto il minimo'
-          : sotto + ' giorni del piano sono sotto il minimo'}</h4>
-        <p>${esc(cp.sottoPavimento.map(g => g.giorno).join(', '))}: sotto le
-        ${nf(cp.pav.pavimento)} kcal calcolate sul tuo corpo. Tocca per vedere
-        quali e sistemarli.</p></div>`;
-      b.onclick = () => { pianoTab = 'settimana'; route(); };
-      c.append(b);
-    }
-  }
-
-  v.append(c);
+  w.append(b);
+  const ann = el('button', 'btn wide', 'Annulla');
+  ann.style.marginTop = '8px';
+  ann.onclick = closeSheet;
+  w.append(ann);
+  w.append(el('p', 'note', 'Se i macro non tornano esatti con le calorie va bene: 4/4/9 sono '
+    + 'valori di tabella, e uno scarto sotto le 60 kcal è normale.'));
+  sheet(w);
+  ricalcola();
 }
 
 /* -------------------------------------------------------------- alimenti */

@@ -6372,3 +6372,35 @@ Impostazioni.
 - *Diario*: la carta "Allenamento" ripeteva Gym.
 - *Il mese*: il periodo e' sceso sotto il verdetto, e la cosa da fare non ha
   piu' l'etichetta sopra.
+
+
+### Tre cose rotte, e il target che non si capiva
+
+Segnalato cosi': *"Errore delle previsioni e' un grafico rotto. L'animazione
+della bottiglia l'hai rotta. Dal profilo non si capisce mai il target, stanno
+300 dati diversi"*.
+
+**Il grafico degli errori** usava `chartBars`, che parte da zero e cresce
+solo verso l'alto: gli errori negativi finivano fuori dal disegno. In piu'
+aggiungeva la riga della media e il riepilogo "ultimo / media / target", e
+metteva le previsioni a una e a due settimane con la stessa data. Adesso e'
+`chartErrori()`: barre divergenti attorno allo zero, una per previsione a una
+settimana, verdi dentro la forbice e ambra fuori. E la pagella giudica la
+previsione che la carta mostra: registrava ancora quella "seguendo il piano",
+un numero che nessuno vedeva piu'.
+
+**La bottiglia** scalava in verticale il gruppo che porta il ritaglio a forma
+di bottiglia: si deformava la sagoma invece di vedere salire l'acqua, e a ogni
+bicchiere ripartiva da vuota perche' la pagina si ridisegna. Ora si sposta
+solo l'acqua, e dopo un bicchiere parte dal livello di prima.
+
+**Il target** stava in fondo al passo "Quanto mangiare", dentro un modulo, dopo
+quattro carte con **sedici numeri di calorie** — e due proposte che si
+contraddicevano: l'obiettivo diceva di scendere a 2050, la carta ricalibrata
+dalla matrice di salire a 2682. Adesso in cima c'e' "Il tuo target": il numero
+grande, i macro, e una riga sola che lo confronta con l'obiettivo ("per
+perdere grasso a −0,35 kg a settimana servirebbero circa 2050 kcal: 432 in
+meno"), con un bottone. La proposta e' una sola, quella dell'obiettivo; i
+campi stanno in un foglio; il fisico di riferimento e' passato in "Chi sei";
+la carta ricalibrata e il secondo elenco di ritmi sono stati tolti, e di
+`target.js` resta la rampa delle fibre.

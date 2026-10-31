@@ -380,17 +380,14 @@ function applicaFisico(fs) {
  */
 function cardObiettivo(k = today()) {
   const c = el('div', 'card');
-  c.append(el('div', 'eyebrow', 'Per fare cosa'));
   c.append(el('h2', 'sec', 'Il tuo obiettivo'));
   c.lastChild.style.marginTop = '0';
 
   /* Chi ha un professionista non ha bisogno di niente di tutto questo, e
      dirglielo per primo e' piu' onesto che lasciarglielo scoprire in fondo. */
   c.append(el('p', 'muted',
-    'Se ti segue un nutrizionista o un medico, i numeri sono i suoi: scrivili '
-    + 'qui sotto a mano e salta questa carta. Nessuna formula qui dentro ha '
-    + 'visto il tuo sangue ne\' la tua storia. Serve a chi non ha nessuno che '
-    + 'gliel\'abbia detto, e non deve tirare a indovinare.'));
+    'Ogni obiettivo ha le sue calorie, calcolate sul tuo dispendio. Se ti segue '
+    + 'un nutrizionista, i numeri sono i suoi: scrivili in “Modifica i numeri”.'));
 
   if (!(D.profilo.altezza_cm > 0 && D.profilo.eta > 0
         && (lastWeight() || D.profilo.peso_iniziale_kg) > 0)) {
@@ -423,20 +420,14 @@ function cardObiettivo(k = today()) {
     c.append(b);
   }
 
+  /* Il dispendio da cui partono le proposte si dice solo quando e' ancora
+     una formula: misurato, e' gia' dentro i numeri qui sopra, e il confronto
+     col target sta nella carta in cima. Prima c'erano due righe in piu', con
+     un altro numero di calorie e lo stesso confronto detto due volte. */
   const pc = pianoCalorico(scelto || 'ricomp', att?.pct, k);
-  c.append(el('p', 'note',
-    (pc.misurato
-      ? `Il dispendio da cui partono e\' <strong>${nf(pc.tdee)} kcal</strong>, misurato sui tuoi dati e ricalibrato ${pc.nCal} volte.`
-      : `Il dispendio da cui partono e\' <strong>${nf(pc.tdee)} kcal</strong>, e per ora e\' una <strong>formula</strong> (Mifflin-St Jeor per il livello di attivita\'): il motore non ha ancora abbastanza registro per misurarlo. Fra un paio di settimane questo numero diventa tuo, e i target vanno rifatti da qui.`)
-    + ' I ritmi sono intervalli di pratica comune, non misure su di te.'));
-
-  if (att) {
-    const stessa = Math.abs(pc.kcal - D.target.kcal) < 30;
-    c.append(el('div', 'hint',
-      stessa
-        ? `Stai puntando a <strong>${esc(att.n).toLowerCase()}</strong>, e i tuoi target sono gia\' quelli che ne escono.`
-        : `Stai puntando a <strong>${esc(att.n).toLowerCase()}</strong>, ma i tuoi target dicono ${nf(D.target.kcal)} kcal invece di ${nf(pc.kcal)}. Riaprilo per aggiornarli.`));
-  }
+  if (!pc.misurato) c.append(el('p', 'note',
+    'Per ora le calorie partono da una formula (Mifflin-St Jeor): dopo un paio di '
+    + 'settimane di pesate e pasti registrati partiranno dal tuo dispendio misurato.'));
   return c;
 }
 
