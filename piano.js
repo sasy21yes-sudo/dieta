@@ -1608,7 +1608,7 @@ function sezSettimana(v) {
     az.append(add);
     if (typeof sheetLeve === 'function') {
       const lv = el('button', 'btn b-leve');
-      lv.title = 'Come alzare o abbassare un macro tenendo gli altri a target';
+      lv.title = 'Alza o abbassa un macro tenendo fermi gli altri';
       if (typeof icona === 'function') lv.append(icona('leve', { size: 17 }));
       lv.append(document.createTextNode('Aggiusta i macro'));
       lv.onclick = () => sheetLeve(gi);

@@ -278,6 +278,41 @@ function casiPrevisioni() {
     p7 && vicino(p7.previsto, w + R.kgSett, 0.02), p7 && `${nf(p7.previsto, 2)} vs ${nf(w + R.kgSett, 2)}`);
 }
 
+/** Aggiusta i macro: sposta quello scelto, tiene fermo il resto, scrive quello che dice. */
+function casiLeve() {
+  verifica('il sistema 3x3 si risolve esatto',
+    JSON.stringify(levSolve([[2, 1, 0], [1, 3, 1], [0, 1, 4]], [3, 5, 5]).map(x => +x.toFixed(6))) === '[1,1,1]');
+
+  stato();
+  const ric = JSON.stringify(D.pasti);
+  for (const [id, dv] of [['p', 10], ['c', -20], ['g', -6]]) {
+    const r = leveGiorno(0, id, dv, 'altri');
+    const m = [...r.porzioni, ...r.ricette].find(x => x.buona);
+    const altri = LEV_VOCI.filter(v => v.id !== id);
+    verifica(`${id} ${dv > 0 ? '+' : ''}${dv}: si sposta e gli altri due restano fermi`,
+      m && vicino(m.d[id], dv, levVoce(id).tol * 2) && altri.every(v => Math.abs(m.d[v.id]) <= v.tol * 2),
+      m ? JSON.stringify(m.d) : 'nessuna proposta');
+  }
+  const k = leveGiorno(0, 'p', 10, 'kcal');
+  const mk = k.porzioni.find(x => x.buona);
+  verifica('proteine +10 a calorie ferme: le calorie non si muovono',
+    mk && vicino(mk.d.p, 10, 4) && Math.abs(mk.d.kcal) <= 2 * LEV_TOL_KCAL, mk ? JSON.stringify(mk.d) : 'nessuna');
+
+  // applicata, il giorno finisce dove la riga aveva scritto, e il registro non si muove
+  const m = leveGiorno(2, 'p', 15, 'altri').porzioni.find(x => x.buona);
+  if (m) {
+    levApplica(2, m);
+    const t = D.settimana[2].totali;
+    verifica('applicata, il giorno fa quello che la proposta scriveva',
+      vicino(t.kcal, m.dopo.kcal, 1) && vicino(t.p, m.dopo.p, 0.5), `${nf(t.kcal)} contro ${nf(m.dopo.kcal)}`);
+    verifica('applicata, le ricette del registro restano quelle', JSON.stringify(D.pasti) === ric);
+  } else verifica('proteine +15 il mercoledi\' ha una proposta', false);
+
+  stato({ settings: { pianoBase: 'vuoto' } });
+  const v = leveGiorno(0, 'p', 10, 'altri');
+  verifica('piano vuoto: nessuna proposta, nessun errore', !v.porzioni.length && !v.ricette.length);
+}
+
 /** Le schermate nuove si disegnano anche senza niente dentro, e senza parole rotte. */
 function casiVuoto() {
   for (const base of ['vuoto', 'esempio']) {
@@ -304,7 +339,7 @@ function casiVuoto() {
   const out = document.getElementById('esito');
   try {
     await caricaApp();
-    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiCalendario, casiSpunti, casiPrevisioni, casiVuoto]) {
+    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiCalendario, casiSpunti, casiPrevisioni, casiLeve, casiVuoto]) {
       try { f(); } catch (e) { verifica(f.name + ' non deve lanciare', false, e.message); }
     }
   } catch (e) {

@@ -1372,6 +1372,71 @@ proteine) e il registro delle ricette non si muove. Con il piano vuoto non
 esce nessuna mossa e il foglio lo dice: senza ricette assegnate non c'e'
 niente da spostare.
 
+*Superata da "Aggiusta i macro: uno si muove, gli altri stanno fermi", qui
+sotto.*
+
+### Aggiusta i macro: uno si muove, gli altri stanno fermi
+
+Il foglio delle leve è stato giudicato "totalmente folle", e a rileggerlo
+aveva ragione. Sul mercoledì dell'esempio, per **+5 g di proteine** proponeva
+otto righe: sei erano *"metti un'altra ricetta"* (la pasta cremosa a
+colazione, i pancake allo spuntino), e ognuna portava con sé `+163 kcal`,
+`+218 kcal`. Una mossa sola non può alzare un macro senza trascinare gli
+altri: il tofu porta anche grassi, la pasta di lenticchie anche carboidrati.
+In più il punteggio "quanto ottieni meno quanto rompi" metteva in cima la
+mossa che rompeva meno, non quella che non rompeva niente, e un tocco sulla
+riga la applicava subito.
+
+La richiesta era precisa: **scegliere il macro, e cambiare solo quello**.
+Quindi il motore è diventato un piccolo sistema lineare:
+
+- ogni ingrediente del giorno porta un vettore (kcal, P, C, G per grammo);
+- le righe sono *lo spostamento chiesto sul macro scelto, zero sugli altri
+  due* (oppure *zero sulle calorie*, se si sceglie "Calorie ferme"), ognuna
+  divisa per la sua tolleranza: 2 g di proteine, 3 di carboidrati, 1,5 di
+  grassi, 20 kcal;
+- per ogni gruppo di uno, due o tre ingredienti (anche in pasti diversi) si
+  risolve la variazione esatta, o ai minimi quadrati quando gli ingredienti
+  sono meno delle righe;
+- le soluzioni con una porzione sotto un quarto o sopra due volte e mezza si
+  **scartano** (non si tagliano al limite: sarebbe un'altra soluzione, peggiore,
+  spacciata per quella), le altre si arrotondano a scatti da 5 g (10 g sopra i
+  100) e **si rifanno coi codici veri**, così il numero scritto nella riga è
+  quello che il giorno farà;
+- vince chi sbaglia meno, con il macro scelto che pesa una volta e mezza (chi
+  chiede +5 e trova +4 se ne accorge), poi chi tocca meno cose e di meno.
+
+Le calorie non sono fra i macro da scegliere: seguono dai tre (4/4/9), e
+"più calorie a macro fermi" non ha soluzione. Si possono invece **tenere
+ferme**: proteine +10 a calorie ferme vuol dire togliere carboidrati o grassi
+per far posto, che è la domanda di chi fa ricomposizione.
+
+La ricetta sostituita è rimasta, ma **ripesata**: la ricetta nuova deve fare
+quello che faceva il pasto vecchio più lo spostamento chiesto, e le sue dosi
+si muovono tra la metà e il doppio per arrivarci. Costa un po' di più di una
+porzione (cambiare piatto è più che cambiare peso), e un po' di più ancora se
+di solito sta in un altro momento della giornata; la pastiglia lo dice.
+
+Nel foglio:
+
+- **le barre sono il selettore.** Una riga per macro: il prima pieno, il dopo
+  nella stessa tinta schiarita, il tolto vuoto col bordo, la tacca del target.
+  Si tocca il macro da cambiare;
+- **un cursore per "di quanto"**, che parte dallo scarto dal target arrotondato
+  al passo (5 g, 10 g, 2 g). Ridisegna solo barre ed elenco, non il foglio,
+  per non togliere il dito al cursore;
+- **toccare una proposta la mostra nelle barre**; la scrive nel piano solo
+  "Applica al piano";
+- le proposte che non tengono fermo il resto entrano solo se nessuna ci
+  riesce, e solo se arrivano almeno a metà strada. Se non ce n'è nessuna, una
+  riga lo dice e suggerisce uno spostamento più piccolo o le calorie ferme.
+
+Misurato sul piano di esempio: su 7 giorni × 3 macro × 2 modalità × 4
+ampiezze (±1 e ±2 passi) ogni combinazione ha almeno una proposta che tiene
+fermo il resto; a ±3 e ±4 passi restano senza 7 su 168, tutte grassi giù o
+carboidrati su a calorie ferme. Il calcolo prende 2 ms di mediana e 7 ms al
+massimo, quindi segue il cursore senza scatti.
+
 ### Il mese degli allenamenti
 
 La striscia dei giorni risponde a *questa settimana*: tre settimane, e si apre
