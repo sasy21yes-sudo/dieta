@@ -218,10 +218,20 @@ const AI_COMPITI = {
         + 'cosa salta, cosa mangia fuori piano), `attivita` quanto si allena, `corpo` '
         + 'come si muove il peso. Un piano che somiglia a come si mangia gia\' e\' un piano '
         + 'che si segue: tieni i pasti che spunta sempre, cambia quelli che salta.\n\n'
-        + 'I gusti: usa spesso `preferenze.di_piu`, al massimo due volte a settimana '
-        + '`preferenze.di_meno`, **mai** `preferenze.mai`. Rispetta `preferenze.note`. '
+        + 'I gusti: usa spesso `preferenze.di_piu`, **mai** `preferenze.mai`. '
+        + '`preferenze.di_meno` sono cose che la persona preferisce evitare: usale solo se '
+        + 'senza non si arriva ai numeri, al massimo due volte a settimana. Non sono una '
+        + 'quota da riempire. Rispetta `preferenze.note`. '
         + 'La stessa ricetta al massimo tre volte a settimana, salvo un pasto che le '
         + 'abitudini mostrano sempre uguale.\n\n'
+        /* Segnalato al primo test vero: un piano che tornava coi numeri aveva il
+           toast col tofu affumicato a colazione. I numeri non bastano: ogni pasto
+           deve essere uno che si mangia davvero a quell'ora. */
+        + 'Ogni pasto deve essere un pasto vero per quel momento della giornata: a '
+        + 'colazione cose da colazione, prendendo come modello le colazioni che la persona '
+        + 'ha gia\' in `settimana` e `ricette`; niente piatti da pranzo o da cena al '
+        + 'mattino, e al pre-nanna qualcosa di leggero. Non mettere lo stesso carboidrato '
+        + 'principale (riso, pasta, patate) a pranzo e a cena dello stesso giorno.\n\n'
         + 'Le azioni, in quest\'ordine:\n'
         + '- `{"tipo":"creaAlimento","nome":"tempeh","unita":"g","categoria":"legumi",'
         + '"kcal":192,"p":20.3,"c":7.6,"g":10.8,"fibre":5}` per ogni alimento nuovo, '
