@@ -60,7 +60,10 @@ function assIcona(nome) {
     ricetta: ['M16.6 20.4a.9.9 0 0 0 .9-.9v-4.9c0-.42.3-.78.67-.96a3.7 3.7 0 0 0-1.97-7'
       + 'a4.6 4.6 0 0 0-8.4 0 3.7 3.7 0 0 0-1.97 7c.37.18.67.54.67.96v4.9a.9.9 0 0 0 .9.9z',
       'M6.4 16.8h11.2'],
-    alimento: ['M4.8 4.8h14.4v14.4H4.8z', 'M12 8.6v6.8', 'M8.6 12h6.8']
+    alimento: ['M4.8 4.8h14.4v14.4H4.8z', 'M12 8.6v6.8', 'M8.6 12h6.8'],
+    calendario: ['M5 4.6h14a1.6 1.6 0 0 1 1.6 1.6v13.2a1.6 1.6 0 0 1-1.6 1.6H5'
+      + 'a1.6 1.6 0 0 1-1.6-1.6V6.2A1.6 1.6 0 0 1 5 4.6z', 'M16 2.8v3.6', 'M8 2.8v3.6',
+      'M3.4 10h17.2']
   }[nome] || [];
   const pieno = nome === 'scintilla';
   const s = mk('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true',
@@ -343,6 +346,12 @@ function assMancanze() {
  * scrittura invece di partire — vedi `assPunta()`.
  */
 const AI_PROPOSTE = [
+  /* Il piano intero apre un foglio suo: ha bisogno di sapere da dove partire
+     e cosa ti piace prima di chiedere, e la risposta e' una settimana da
+     guardare, non una bolla da leggere. */
+  { id: 'generaSettimana', ic: 'calendario', corto: 'Piano settimanale', piano: true, apre: true,
+    det: 'Sette giorni dai tuoi gusti, da come mangi e da come ti alleni. Con le tue ricette, '
+      + 'o con ricette e alimenti nuovi.' },
   { id: 'modificaPiano', ic: 'ritocca', corto: 'Modifica il piano', piano: true,
     det: 'Le modifiche minime alla settimana per avvicinarla al target, '
       + 'usando solo le ricette che hai gia’.' },
@@ -441,7 +450,8 @@ function assDisegna(corpo) {
         b.append(el('span', 'gr',
           `<b>${esc(AI_COMPITI[p.id].n)}</b><span>${esc(p.det)}</span>`));
         b.append(el('span', 'ch', '›'));
-        b.onclick = () => (p.chiede ? assPunta(p) : assChiedi(p.id));
+        b.onclick = () => (p.apre ? (assChiudi(), sheetPianoAI())
+          : p.chiede ? assPunta(p) : assChiedi(p.id));
         corpo.append(b);
       }
     }
@@ -463,7 +473,8 @@ function assDisegna(corpo) {
      fila scorre di lato, quindi sei pastiglie non spingono niente sotto il
      bordo. */
   for (const p of assProposte())
-    pill(p.ic, p.corto, () => (p.chiede ? assPunta(p) : assChiedi(p.id)));
+    pill(p.ic, p.corto, () => (p.apre ? (assChiudi(), sheetPianoAI())
+      : p.chiede ? assPunta(p) : assChiedi(p.id)));
   corpo.append(fila);
 }
 
@@ -1042,4 +1053,460 @@ async function pfSalva() {
   closeSheet(); assChiudi(); route();
   toast(nuovi ? A.length + ' alimenti aggiunti, ' + nuovi + ' nuovi'
               : A.length + ' alimenti aggiunti');
+}
+
+
+/* ============================================ un piano settimanale
+ *
+ * Tre passi, come la foto: **da dove partire** (i tuoi alimenti e ricette,
+ * anche cose nuove, o tutto nuovo), **cosa ti piace** (di piu', di meno,
+ * mai), e **la settimana**. Il terzo passo e' la domanda e la risposta.
+ *
+ * **La domanda porta tutto quello che l'app sa, aggregato.** Profilo,
+ * target, obiettivo con la proposta dell'app, la struttura dei pasti, come
+ * mangi davvero nelle ultime quattro settimane (le ricette spuntate, quelle
+ * saltate, il fuori piano), quanto ti alleni, come si muove il peso, e i
+ * gusti. Il primo passo mostra il riassunto di quello che esce, preso dallo
+ * stesso `ai.contesto()` che scrive la domanda: due conti diversi direbbero
+ * due cose diverse. Il diario giorno per giorno non c'e'.
+ *
+ * **Senza un modello collegato si copia e si incolla**, e la risposta
+ * incollata passa dallo stesso `ai.valida()` di una risposta vera: i macro
+ * li rifa' l'app, gli alimenti nuovi sono stime, un ingrediente in "mai"
+ * butta la ricetta. Quello che si vede e' una **proposta**: entra nel piano
+ * solo con "Applica", e la settimana di prima resta da riprendere.
+ */
+let pgS = null;
+const PG_PASSI = ['origine', 'gusti', 'piano'];
+
+/** I gusti: vivono nelle impostazioni, valgono per ogni domanda futura. */
+function prefGusti() {
+  S.settings.preferenze ||= {};
+  const p = S.settings.preferenze;
+  p.di_piu ||= []; p.di_meno ||= []; p.mai ||= [];
+  if (p.note == null) p.note = '';
+  return p;
+}
+
+function pgNuovo() {
+  return { passo: 'origine', modo: 'misto', stato: null, err: null, prop: null, testo: '', fatto: false };
+}
+const pgDati = () => ({ modo: pgS.modo, preferenze: prefGusti() });
+
+function sheetPianoAI() {
+  pgS ||= pgNuovo();
+  const w = el('div', 'pf pg');
+  w.append(el('h2', 'sec', pgS.fatto ? 'Piano applicato' : {
+    origine: 'Un piano settimanale', gusti: 'Cosa ti piace', piano: 'La settimana' }[pgS.passo]));
+  w.lastChild.style.marginTop = '0';
+
+  const gd = el('div', 'pf-passi');
+  for (const [i, p2] of PG_PASSI.entries()) {
+    const t = el('span', 'p' + (p2 === pgS.passo ? ' ora'
+      : (PG_PASSI.indexOf(pgS.passo) > i ? ' fatto' : '')));
+    t.textContent = ['Da dove', 'Gusti', 'La settimana'][i];
+    gd.append(t);
+  }
+  w.append(gd);
+
+  ({ origine: pgPassoOrigine, gusti: pgPassoGusti, piano: pgPassoPiano })[pgS.passo](w);
+  sheet(w);
+}
+
+/* ------------------------------------------------------ 1. da dove partire */
+function pgPassoOrigine(w) {
+  const MODI = [
+    ['salvati', 'ricetta', 'I miei alimenti e ricette',
+     'Solo quello che hai già salvato. Può comporre ricette nuove, ma con i tuoi alimenti.'],
+    ['misto', 'scintilla', 'I miei, più qualcosa di nuovo',
+     'Parte dalle tue ricette e aggiunge alimenti e ricette nuovi dove servono.'],
+    ['nuovi', 'alimento', 'Tutto nuovo',
+     'Ricette pensate da capo. Gli alimenti che hai già li riusa col tuo nome.']
+  ];
+  for (const [id, ic, tit, det] of MODI) {
+    const b = el('button', 'ai-q pg-opt');
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(pgS.modo === id));
+    const box = el('span', 'ic'); box.append(assIcona(ic));
+    b.append(box);
+    b.append(el('span', 'gr', `<b>${esc(tit)}</b><span>${esc(det)}</span>`));
+    b.append(el('span', 'pg-ck', pgS.modo === id ? '✓' : ''));
+    b.onclick = () => { pgS.modo = id; sheetPianoAI(); };
+    w.append(b);
+  }
+
+  /* --- cosa entra nella domanda: dallo stesso contesto che la scrive --- */
+  const C = ai.contesto(AI_COMPITI.generaSettimana.contesto, pgDati());
+  const r = (tit, val, ok = true) =>
+    `<div class="pg-ctx-r${ok ? '' : ' no'}"><span>${esc(tit)}</span><b>${val}</b></div>`;
+  const ab = C.abitudini, at = C.attivita, co = C.corpo, ob = C.obiettivo;
+  const reg = ab?.registro?.giorni_con_pasti || 0;
+  const pr = prefGusti();
+  const nG = pr.di_piu.length + pr.di_meno.length + pr.mai.length;
+  w.append(el('div', 'ai-tit', 'Cosa entra nella domanda'));
+  w.append(el('div', 'pg-ctx',
+    r('Tu', [C.profilo?.eta ? C.profilo.eta + ' anni' : '', C.profilo?.peso_kg ? nf(C.profilo.peso_kg, 1) + ' kg' : '']
+      .filter(Boolean).join(' · ') || 'profilo da completare', !!C.profilo?.eta)
+    + r('Obiettivo', ob?.scelto ? esc(ob.nome) : 'nessuno', !!ob?.scelto)
+    + r('Target', C.target?.kcal ? `${nf(C.target.kcal)} kcal · ${nf(C.target.p)} g proteine` : 'non impostato', !!C.target?.kcal)
+    + r('Come mangi', reg ? `${reg} giorni su 28${ab.introito_medio ? ` · ${nf(ab.introito_medio.kcal)} kcal di media` : ''}`
+      : 'nessun giorno registrato', reg > 0)
+    + r('Allenamento', at?.sedute_settimana ? `${nf(at.sedute_settimana, 1)} sedute a settimana`
+      + (at.livello?.nome ? ` · ${esc(at.livello.nome.toLowerCase())}` : '') : 'nessuna seduta registrata', !!at?.sedute_settimana)
+    + r('Peso', co?.peso_tendenza_kg ? `${nf(co.peso_tendenza_kg, 1)} kg${co.ritmo_kg_settimana?.valore != null
+      ? ` · ${co.ritmo_kg_settimana.valore > 0 ? '+' : ''}${nf(co.ritmo_kg_settimana.valore, 2)} kg a settimana` : ''}`
+      : 'nessuna pesata', !!co?.peso_tendenza_kg)
+    + r('Gusti', nG ? `${nG} voci` : 'li scegli al passo dopo', nG > 0)));
+  w.append(el('p', 'note',
+    'Escono medie e conteggi delle ultime quattro settimane, mai il diario giorno per giorno. '
+    + 'Più dati ci sono, più il piano ti somiglia.'));
+
+  const ok = el('button', 'ai-btn', 'Continua');
+  ok.type = 'button';
+  ok.onclick = () => { pgS.passo = 'gusti'; sheetPianoAI(); };
+  w.append(ok);
+}
+
+/* --------------------------------------------------------- 2. cosa ti piace */
+function pgPassoGusti(w) {
+  const pr = prefGusti();
+  /* i suggerimenti per il campo: i tuoi alimenti e le tue ricette */
+  const dl = el('datalist');
+  dl.id = 'pg-dl';
+  const nomi = new Set([...Object.keys(D.alimenti || {}),
+    ...Object.values(D.pasti || {}).map(p => p.nome).filter(Boolean)]);
+  for (const n of [...nomi].sort()) { const o = el('option'); o.value = n; dl.append(o); }
+  w.append(dl);
+
+  const GRUPPI = [
+    ['di_piu', 'Di più', 'Li vuoi spesso nella settimana.'],
+    ['di_meno', 'Di meno', 'Al massimo un paio di volte a settimana.'],
+    ['mai', 'Mai', 'Allergie, intolleranze, o semplicemente no. Una ricetta che li contiene viene scartata.']
+  ];
+  for (const [k, tit, det] of GRUPPI) {
+    const g = el('div', 'pg-g pg-' + k);
+    g.append(el('div', 'pg-g-h', `<b>${tit}</b><span>${esc(det)}</span>`));
+    const toks = el('div', 'pg-toks');
+    const disegna = () => {
+      toks.innerHTML = '';
+      for (const [i, t] of pr[k].entries()) {
+        const s = el('span', 'pg-tok', esc(t));
+        const x = el('button', null, '×');
+        x.type = 'button';
+        x.setAttribute('aria-label', 'Togli ' + t);
+        x.onclick = () => { pr[k].splice(i, 1); save(); disegna(); };
+        s.append(x);
+        toks.append(s);
+      }
+    };
+    disegna();
+    g.append(toks);
+    /* Aggiungere non ridisegna il foglio: chiuderebbe la tastiera a ogni
+       voce, e qui se ne scrivono tante di fila. */
+    const add = el('div', 'pg-add');
+    const inp = el('input');
+    inp.type = 'text';
+    inp.setAttribute('list', 'pg-dl');
+    inp.placeholder = k === 'mai' ? 'Es. arachidi' : k === 'di_meno' ? 'Es. pasta di semola' : 'Es. tofu, cucina giapponese';
+    inp.setAttribute('aria-label', tit);
+    const b = el('button', null, 'Aggiungi');
+    b.type = 'button';
+    const metti = () => {
+      const v = inp.value.trim().toLowerCase();
+      if (!v) return;
+      for (const kk of ['di_piu', 'di_meno', 'mai']) {
+        const j = pr[kk].indexOf(v);
+        if (j >= 0) pr[kk].splice(j, 1);
+      }
+      pr[k].push(v);
+      save();
+      inp.value = '';
+      /* se era in un altro gruppo e' sparito da li': lo si ridisegna */
+      w.querySelectorAll('.pg-g').forEach(x => x._disegna && x._disegna());
+      disegna();
+    };
+    g._disegna = disegna;
+    b.onclick = metti;
+    inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); metti(); } };
+    add.append(inp, b);
+    g.append(add);
+    w.append(g);
+  }
+
+  /* dalle abitudini: le ricette che spunti di piu', a un tocco da "di piu'" */
+  const ab = ai.contesto(['abitudini']).abitudini;
+  const sug = (ab?.ricette_spuntate || []).filter(r => r.spuntata >= 2)
+    .map(r => String(r.ricetta).toLowerCase())
+    .filter(n => ![...pr.di_piu, ...pr.di_meno, ...pr.mai].includes(n)).slice(0, 5);
+  if (sug.length) {
+    w.append(el('div', 'ai-tit', 'Le ricette che spunti di più'));
+    const sc = el('div', 'pg-sug');
+    for (const n of sug) {
+      const b = el('button', null, '+ ' + esc(n));
+      b.type = 'button';
+      b.onclick = () => { pr.di_piu.push(n); save(); sheetPianoAI(); };
+      sc.append(b);
+    }
+    w.append(sc);
+  }
+
+  const nt = el('div', 'pg-g');
+  nt.append(el('div', 'pg-g-h', '<b>Altro da sapere</b><span>Come mangi, quanto tempo hai per cucinare, cosa porti al lavoro.</span>'));
+  const ta = el('textarea', 'pg-in');
+  ta.rows = 3;
+  ta.placeholder = 'Es. vegano; a pranzo mangio in ufficio, mi serve qualcosa da portare';
+  ta.value = pr.note || '';
+  ta.oninput = () => { pr.note = ta.value; save(); };
+  nt.append(ta);
+  w.append(nt);
+
+  const ok = el('button', 'ai-btn', 'Continua');
+  ok.type = 'button';
+  ok.onclick = () => {
+    pgS.passo = 'piano'; pgS.prop = null; pgS.err = null;
+    sheetPianoAI();
+    if (ai.pronta) pgChiedi();
+  };
+  w.append(ok);
+  const in2 = el('button', 'ai-link', 'Indietro');
+  in2.type = 'button';
+  in2.onclick = () => { pgS.passo = 'origine'; sheetPianoAI(); };
+  w.append(in2);
+}
+
+/* ---------------------------------------------------------- 3. la settimana */
+function pgPassoPiano(w) {
+  if (pgS.fatto) return pgFatto(w);
+  if (pgS.prop) return pgAnteprima(w);
+
+  if (pgS.stato === 'chiedo') {
+    const at = el('div', 'pf-att');
+    at.innerHTML = '<span class="sp"></span><b>Sto scrivendo la settimana…</b>'
+      + '<span>Sette giorni, ogni pasto, contro il tuo target.</span>';
+    w.append(at);
+    return;
+  }
+
+  if (!ai.pronta) {
+    const r = ai.richiesta('generaSettimana', pgDati());
+    const testo = ai.testoRichiesta(r);
+    w.append(el('p', 'pf-verd',
+      'L’assistente non è collegato a un modello. Copia la domanda, incollala nel tuo '
+      + '(ChatGPT, Claude, Gemini…) e incolla qui sotto la risposta: la leggo io.'));
+    const pre = el('pre', 'ai-prompt');
+    pre.textContent = testo;
+    w.append(pre);
+    const az = el('div', 'ai-az');
+    const c = el('button', 'pri', 'Copia la domanda');
+    c.type = 'button';
+    c.onclick = async () => {
+      try { await navigator.clipboard.writeText(testo); toast('Copiata'); }
+      catch {
+        const s = getSelection(), rg = document.createRange();
+        rg.selectNodeContents(pre); s.removeAllRanges(); s.addRange(rg);
+        toast('Selezionata: tieni premuto e copia');
+      }
+    };
+    az.append(c);
+    w.append(az);
+
+    w.append(el('div', 'ai-tit', 'La risposta'));
+    const leggi = el('button', 'ai-btn', 'Leggi la risposta');
+    leggi.type = 'button';
+    leggi.disabled = !(pgS.testo || '').trim();
+    leggi.onclick = () => pgLeggi(pgS.testo);
+    const ta = el('textarea', 'pg-in pg-risp');
+    ta.rows = 6;
+    ta.placeholder = 'Incolla qui la risposta del modello (il JSON)';
+    ta.value = pgS.testo || '';
+    ta.oninput = () => { pgS.testo = ta.value; leggi.disabled = !ta.value.trim(); };
+    w.append(ta, leggi);
+  }
+
+  if (pgS.err) {
+    const e = el('div', 'pf-err');
+    e.append(el('b', null, esc(pgS.err.titolo)));
+    e.append(el('span', null, esc(pgS.err.testo)));
+    for (const a of (pgS.err.avvisi || []).slice(0, 6)) e.append(el('span', 'pf-av', esc(a)));
+    w.append(e);
+    if (ai.pronta) {
+      const r = el('button', 'ai-btn', 'Riprova');
+      r.type = 'button';
+      r.onclick = () => pgChiedi();
+      w.append(r);
+    }
+  }
+
+  const in2 = el('button', 'ai-link', 'Indietro');
+  in2.type = 'button';
+  in2.onclick = () => { pgS.passo = 'gusti'; pgS.err = null; sheetPianoAI(); };
+  w.append(in2);
+}
+
+/** Con un modello collegato: la domanda parte da sola. */
+async function pgChiedi() {
+  pgS.stato = 'chiedo'; pgS.err = null;
+  sheetPianoAI();
+  try {
+    const res = await ai.chiedi('generaSettimana', pgDati());
+    pgS.stato = null;
+    pgAccetta(res);
+  } catch (e) {
+    pgS.stato = null;
+    pgS.err = { titolo: 'Non è arrivata una risposta', testo: e.message || 'Errore' };
+    sheetPianoAI();
+  }
+}
+
+/** La risposta incollata: dallo stesso controllo di una risposta vera. */
+function pgLeggi(testo) {
+  try {
+    pgAccetta(ai.valida('generaSettimana', testo, pgDati()));
+  } catch (e) {
+    pgS.err = { titolo: 'Non riesco a leggere la risposta',
+      testo: 'Deve contenere l’oggetto JSON che chiede la domanda. ' + (e.message || '') };
+    sheetPianoAI();
+  }
+}
+
+function pgAccetta(res) {
+  const P = res.piano;
+  const pieni = P ? P.giorni.filter(g => g.stato !== 'vuoto').length : 0;
+  if (!pieni) {
+    pgS.err = { titolo: 'Nella risposta non c’è una settimana usabile',
+      testo: 'Nessun pasto è stato assegnato a una ricetta valida.', avvisi: res.avvisi };
+    sheetPianoAI();
+    return;
+  }
+  pgS.prop = res; pgS.err = null;
+  sheetPianoAI();
+}
+
+/** La settimana proposta: giorno per giorno, con le cose nuove segnate. */
+function pgAnteprima(w) {
+  const R = pgS.prop, P = R.piano;
+  if (R.verdetto) w.append(el('p', 'pf-verd', esc(R.verdetto)));
+  if (R.osservazioni?.length) {
+    const ul = el('ul', 'pg-oss');
+    for (const o of R.osservazioni) ul.append(el('li', null, esc(o)));
+    w.append(ul);
+  }
+  /* tre avvisi in vista, gli altri dietro un tocco: dodici righe ambra
+     prima della settimana la spingevano fuori dallo schermo */
+  for (const a of R.avvisi.slice(0, 3)) w.append(el('p', 'pf-av', esc(a)));
+  if (R.avvisi.length > 3) {
+    const det = el('details', 'fc-det');
+    det.append(el('summary', null, `<span>Altri avvisi</span><span>${R.avvisi.length - 3}</span>`));
+    for (const a of R.avvisi.slice(3)) det.append(el('p', 'pf-av', esc(a)));
+    w.append(det);
+  }
+
+  w.append(el('div', 'pg-riass',
+    `<span><b>${P.giorni.filter(g => g.stato !== 'vuoto').length}</b> giorni</span>`
+    + `<span><b>${P.ricette.length}</b> ${P.ricette.length === 1 ? 'ricetta nuova' : 'ricette nuove'}</span>`
+    + `<span><b>${P.alimenti.length}</b> ${P.alimenti.length === 1 ? 'alimento nuovo' : 'alimenti nuovi'}</span>`));
+
+  const ETI = { ok: ['in linea', 'ok'], sopra: ['fuori target', 'warn'], sotto: ['fuori target', 'warn'],
+                basso: ['sotto il pavimento', 'bad'], vuoto: ['vuoto', ''] };
+  for (const g of P.giorni) {
+    const d = el('div', 'pg-day');
+    const [eti, cls] = ETI[g.stato] || ['', ''];
+    d.append(el('div', 'pg-day-h',
+      `<b>${esc(capIniziale(g.nome))}</b><span class="k">${nf(g.totali.kcal)}${
+        P.target ? ` <em>/ ${nf(P.target)}</em>` : ''} kcal</span>${eti ? `<span class="pill ${cls}">${eti}</span>` : ''}`));
+    d.append(el('div', 'pg-day-m', macroRiga(g.totali)));
+    for (const s of g.pasti) d.append(el('div', 'pg-row' + (s.codice ? '' : ' vuoto'),
+      `<span class="mt">${esc(s.slot)}</span><span class="nm">${s.codice ? esc(s.nome) : 'nessuna ricetta'}${
+        s.nuova ? ' <span class="pg-nuova">nuova</span>' : ''}</span><span class="kc">${
+        s.macro ? nf(s.macro.kcal) : ''}</span>`));
+    w.append(d);
+  }
+
+  if (P.ricette.length) {
+    const det = el('details', 'fc-det');
+    det.append(el('summary', null, `<span>Le ricette nuove</span><span>${P.ricette.length}</span>`));
+    for (const r of P.ricette) det.append(el('div', 'pg-det',
+      `<b>${esc(r.nome)}</b><span>${r.ingredienti.map(i => `${esc(i.alimento)} ${nf(i.qta)}`).join(' · ')}</span>`
+      + `<span class="m">${nf(r.macro.kcal)} kcal · ${macroRiga(r.macro)}</span>`));
+    w.append(det);
+  }
+  if (P.alimenti.length) {
+    const det = el('details', 'fc-det');
+    det.append(el('summary', null, `<span>Gli alimenti nuovi</span><span>stimati · ${P.alimenti.length}</span>`));
+    for (const a of P.alimenti) det.append(el('div', 'pg-det',
+      `<b>${esc(a.nome)}</b><span class="m">per 100 ${esc(a.unita)}: ${nf(a.valori.kcal)} kcal · ${macroRiga(a.valori)}</span>`
+      + (a.dubbio ? `<span class="pf-av">${esc(a.dubbio)}</span>` : '')));
+    w.append(det);
+  }
+
+  const ok = el('button', 'ai-btn', 'Applica al piano');
+  ok.type = 'button';
+  ok.onclick = pgApplica;
+  w.append(ok);
+  w.append(el('p', 'note',
+    'Sostituisce la settimana del piano. Quella di adesso resta: la riprendi con '
+    + '“Torna alla settimana di prima”, qui o nel passo Settimana. Gli alimenti nuovi '
+    + 'entrano come stima.'));
+  const in2 = el('button', 'ai-link', 'Cambia i gusti e rifai');
+  in2.type = 'button';
+  in2.onclick = () => { pgS.passo = 'gusti'; pgS.prop = null; pgS.testo = ''; sheetPianoAI(); };
+  w.append(in2);
+}
+
+/**
+ * Scrive la proposta nel piano: prima gli alimenti, poi le ricette (con i
+ * macro rifatti sugli alimenti appena entrati), poi la settimana. La
+ * settimana di prima si tiene in `settimanaPrima`.
+ */
+function pgApplica() {
+  const P = pgS.prop.piano;
+  const p = piano();
+  p.settimanaPrima = { quando: today(),
+    settimana: p.settimana ? JSON.parse(JSON.stringify(p.settimana)) : null };
+  for (const a of P.alimenti) {
+    if (alimento(a.nome)) continue;
+    p.alimenti[a.nome] = { ...a.valori, unita: a.unita || 'g',
+      categoria: a.categoria || 'altro', fonte: 'stima', origine: 'assistente' };
+  }
+  fondiPiano();
+  for (const r of P.ricette)
+    p.pasti[r.codice] = { nome: r.nome, ingredienti: r.ingredienti,
+                          macro: macroDaIngredienti(r.ingredienti) };
+  fondiPiano();
+  p.settimana = JSON.parse(JSON.stringify(D.settimana)).map((g, gi) => ({
+    ...g,
+    pasti: (g.pasti || []).map((s, si) => ({ ...s, codice: P.giorni[gi]?.pasti[si]?.codice ?? null }))
+  }));
+  save(); fondiPiano();
+  pgS.fatto = true;
+  route();
+  sheetPianoAI();
+}
+
+/** Torna alla settimana di prima. Le ricette e gli alimenti nuovi restano. */
+function pgAnnulla() {
+  const p = piano();
+  const sp = p.settimanaPrima;
+  if (!sp) return;
+  if (sp.settimana) p.settimana = sp.settimana; else delete p.settimana;
+  delete p.settimanaPrima;
+  save(); fondiPiano();
+  pgS = null;
+  closeSheet(); route();
+  toast('Tornata la settimana di prima');
+}
+
+function pgFatto(w) {
+  const P = pgS.prop.piano;
+  w.append(el('p', 'pf-verd',
+    `La settimana è nel piano${P.ricette.length ? `, con ${P.ricette.length} ricette nuove` : ''}${
+      P.alimenti.length ? ` e ${P.alimenti.length} alimenti nuovi` : ''}. La lista della spesa si è già aggiornata.`));
+  const ok = el('button', 'ai-btn', 'Apri la settimana');
+  ok.type = 'button';
+  ok.onclick = () => { pgS = null; closeSheet(); pianoTab = 'settimana'; apri('#/piano'); };
+  w.append(ok);
+  const an = el('button', 'ai-link', 'Torna alla settimana di prima');
+  an.type = 'button';
+  an.onclick = pgAnnulla;
+  w.append(an);
 }

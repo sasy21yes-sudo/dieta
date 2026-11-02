@@ -279,6 +279,73 @@ function casiPrevisioni() {
     p7 && vicino(p7.previsto, w + R.kgSett, 0.02), p7 && `${nf(p7.previsto, 2)} vs ${nf(w + R.kgSett, 2)}`);
 }
 
+/** Il piano settimanale dell'assistente: contesto pieno ma aggregato, risposta controllata, applica e torna. */
+function casiGeneraSettimana() {
+  const log = mangia(pesate(-0.1, 28, 70), 2400);
+  for (let i = 1; i <= 28; i++) if (i % 7 < 4) log[addDays(today(), -i)].allenamento = true;
+  stato({ log, settings: { obiettivo: { id: 'ricomp', pct: 0 } } });
+  const pref = { di_piu: ['tofu'], di_meno: ['pasta di semola'], mai: ['arachidi'], note: 'vegano' };
+  const r = ai.richiesta('generaSettimana', { modo: 'misto', preferenze: pref });
+  const ctx = JSON.parse(r.utente.slice(r.utente.indexOf('Contesto:') + 9));
+  verifica('la domanda porta abitudini, allenamento, corpo, struttura e gusti',
+    ctx.abitudini?.introito_medio?.kcal > 0 && ctx.attivita?.sedute_settimana > 0
+    && ctx.corpo?.peso_tendenza_kg > 0 && ctx.struttura?.length === 7
+    && ctx.preferenze?.mai?.[0] === 'arachidi' && ctx.obiettivo?.proposta_app?.kcal > 0,
+    Object.keys(ctx).join(','));
+  const date = (r.utente.match(/\d{4}-\d{2}-\d{2}/g) || []).length;
+  verifica('il diario giorno per giorno non esce: nessuna data nella domanda', date === 0, date + ' date');
+
+  // una risposta: un alimento nuovo, una ricetta nuova, una con le arachidi
+  const sl = D.settimana[0].pasti.map(s => s.slot);
+  const azioni = [
+    { tipo: 'creaAlimento', nome: 'lupini', unita: 'g', kcal: 119, p: 16.4, c: 7.2, g: 2.4, fibre: 4.8 },
+    { tipo: 'creaAlimento', nome: 'tempeh', unita: 'g', kcal: 999, p: 1, c: 1, g: 1, fibre: 0 },
+    { tipo: 'creaRicetta', codice: 'ai-bowl', nome: 'Bowl di tempeh', macro: { kcal: 9999 },
+      ingredienti: [{ alimento: 'lupini', qta: 120 }, { alimento: 'tempeh', qta: 100 }, { alimento: 'riso', qta: 80 }] },
+    { tipo: 'creaRicetta', codice: 'ai-satay', nome: 'Satay',
+      ingredienti: [{ alimento: 'tofu', qta: 150 }, { alimento: "burro d'arachidi", qta: 30 }] }
+  ];
+  for (let gi = 0; gi < 7; gi++) sl.forEach((s, si) =>
+    azioni.push({ tipo: 'assegnaPasto', giorno: gi, slot: s, codice: si === 1 ? 'ai-bowl' : si === 3 ? 'ai-satay' : 'C1' }));
+  const res = ai.valida('generaSettimana', JSON.stringify({ verdetto: 'ok', azioni }),
+    { modo: 'misto', preferenze: pref });
+  const P = res.piano;
+  const bowl = P.ricette.find(x => x.nome === 'Bowl di tempeh');
+  verifica('la ricetta nuova usa l\'alimento creato nella stessa risposta, coi macro rifatti dall\'app',
+    bowl && P.alimenti.length === 1 && P.alimenti[0].nome === 'lupini' && P.alimenti[0].fonte === 'stima'
+    && vicino(bowl.macro.kcal, 1.2 * 119 + D.alimenti.tempeh.kcal + 0.8 * D.alimenti.riso.kcal, 1), bowl ? nf(bowl.macro.kcal) : 'manca');
+  verifica('un ingrediente in "mai" scarta la ricetta e lascia il pasto vuoto, dicendolo',
+    !P.ricette.some(x => x.nome === 'Satay') && P.giorni[0].pasti[3].codice === null
+    && res.avvisi.some(a => /arachidi/.test(a)) && res.avvisi.some(a => /senza ricetta/.test(a)),
+    res.avvisi.join(' | '));
+
+  // C1 contiene burro d'arachidi: anche le ricette che hai gia' passano dal filtro
+  verifica('una ricetta che hai gia\' con un ingrediente in "mai" non viene assegnata',
+    P.giorni[0].pasti[0].codice === null);
+
+  // "olio evo" e' il tuo "olio EVO": le maiuscole non scartano una ricetta
+  const ev = ai.valida('generaSettimana', JSON.stringify({ azioni: [
+    { tipo: 'creaRicetta', codice: 'ai-x', nome: 'Riso all\'olio', ingredienti: [
+      { alimento: 'olio evo', qta: 10 }, { alimento: 'riso', qta: 80 }] },
+    { tipo: 'assegnaPasto', giorno: 0, slot: sl[1], codice: 'ai-x' }] }), { modo: 'salvati' });
+  const sola = ai._azione({ tipo: 'creaRicetta', nome: 'y',
+    ingredienti: [{ alimento: 'Olio Evo', qta: 10 }] }, []);
+  verifica('un alimento scritto con altre maiuscole si riconosce, nella settimana e nella ricetta singola',
+    ev.piano.ricette[0]?.ingredienti[0].alimento === 'olio EVO' && sola?.ingredienti[0].alimento === 'olio EVO',
+    ev.avvisi.join(' | '));
+
+  // applicata, e poi tolta
+  const prima = JSON.stringify(D.settimana.map(g => g.pasti.map(s => s.codice)));
+  pgS = { passo: 'piano', modo: 'misto', prop: res, fatto: false };
+  pgApplica();
+  verifica('applicata: la settimana usa la ricetta nuova, che e\' nel piano con i suoi macro',
+    D.settimana[2].pasti[1].codice === bowl.codice && D.pasti[bowl.codice]?.macro?.kcal > 0
+    && D.alimenti.lupini?.fonte === 'stima' && D.alimenti.tempeh.kcal !== 999);
+  pgAnnulla();
+  verifica('"torna alla settimana di prima" la rimette com\'era',
+    JSON.stringify(D.settimana.map(g => g.pasti.map(s => s.codice))) === prima);
+}
+
 /** I target dell'obiettivo: peso di tendenza, e il fattore di attivita' di chi li usa. */
 function casiTarget() {
   // l'ultima pesata gonfiata d'acqua non sposta la proposta
@@ -443,7 +510,7 @@ function casiVuoto() {
   const out = document.getElementById('esito');
   try {
     await caricaApp();
-    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiCalendario, casiSpunti, casiPrevisioni, casiTarget, casiLeve, casiVuoto]) {
+    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiCalendario, casiSpunti, casiPrevisioni, casiTarget, casiGeneraSettimana, casiLeve, casiVuoto]) {
       try { f(); } catch (e) { verifica(f.name + ' non deve lanciare', false, e.message); }
     }
   } catch (e) {

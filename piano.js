@@ -1527,6 +1527,30 @@ function sezSettimana(v) {
     av.append(b);
     v.append(av);
   }
+  /* Con l'assistente acceso, la settimana si puo' anche farla scrivere: e'
+     la stessa carta viola dell'assistente, perche' e' una sua proposta. E se
+     ne hai appena applicata una, qui c'e' la strada per tornare indietro. */
+  if (typeof aiAcceso === 'function' && aiAcceso() && typeof sheetPianoAI === 'function') {
+    const b = el('button', 'ai-q ai-foto pg-entra');
+    b.type = 'button';
+    const ic = el('span', 'ic'); ic.append(assIcona('calendario'));
+    b.append(ic);
+    b.append(el('span', 'gr', '<b>Genera la settimana con l’assistente</b>'
+      + '<span>Dai tuoi gusti, da come mangi e da come ti alleni.</span>'));
+    b.append(el('span', 'ch', '›'));
+    b.onclick = () => sheetPianoAI();
+    v.append(b);
+  }
+  if (p.settimanaPrima && typeof pgAnnulla === 'function') {
+    const r = el('div', 'pg-prima',
+      `<span>Settimana generata dall’assistente${p.settimanaPrima.quando
+        ? ' il ' + esc(dataEstesa(p.settimanaPrima.quando)) : ''}.</span>`);
+    const b = el('button', 'lev-link', 'Torna a quella di prima');
+    b.type = 'button';
+    b.onclick = () => { if (confirm('Rimettere la settimana di prima?')) pgAnnulla(); };
+    r.append(b);
+    v.append(r);
+  }
   /* In cima resta il riepilogo — quale giorno, e la direzione contro
      l'obiettivo, che e' una proprieta' della settimana e non ha una casa su
      un singolo giorno. Il verdetto del singolo giorno sta sul giorno. */

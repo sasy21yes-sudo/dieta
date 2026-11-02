@@ -31,6 +31,38 @@
  * normale e non un incidente.
  */
 
+/**
+ * Il nome vero di un alimento, a partire da come l'ha scritto un modello.
+ *
+ * I nomi delle risposte si mettono in minuscolo, e i tuoi alimenti no: "olio
+ * EVO" scritto "olio evo" non lo trovava nessuno, e la ricetta veniva
+ * scartata per un alimento che hai. Si cerca esatto, poi senza maiuscole ne'
+ * accenti; `extra` sono quelli creati nella stessa risposta.
+ */
+const aiNorm = x => String(x || '').toLowerCase().normalize('NFD')
+  .replace(/[̀-ͯ]/g, '').trim();
+function aiNomeAlimento(n, extra) {
+  if (!n) return null;
+  if (extra?.has(n) || D.alimenti?.[n]) return n;
+  const k = aiNorm(n);
+  for (const x of [...(extra ? extra.keys() : []), ...Object.keys(D.alimenti || {})])
+    if (aiNorm(x) === k) return x;
+  return null;
+}
+
+/**
+ * Toglie i campi vuoti. Un `"fame_1_5": null` non dice niente a chi legge, e
+ * la regola di questo file e' che un dato che manca **si dichiara** con una
+ * nota, non si lascia nudo: le fette che lo usano aggiungono la loro.
+ */
+function aiSenzaNull(o) {
+  if (Array.isArray(o)) return o.map(aiSenzaNull);
+  if (!o || typeof o !== 'object') return o;
+  const r = {};
+  for (const [k, v] of Object.entries(o)) if (v != null) r[k] = aiSenzaNull(v);
+  return r;
+}
+
 /** Cosa non si fa, mai. Va nel prompt e si ricontrolla sulla risposta. */
 const AI_REGOLE = [
   'Non dare punteggi al cibo e non dividerlo in buono e cattivo.',
@@ -144,6 +176,68 @@ const AI_COMPITI = {
       + 'comune per quell\'alimento. In `verdetto` scrivi in una riga cosa hai '
       + 'riconosciuto e quanto sei sicuro.'
   },
+  /*
+   * Una settimana intera, da capo.
+   *
+   * E' il compito che porta **piu' contesto** di tutti, e di proposito: un
+   * piano scritto senza sapere come mangi davvero, quanto ti alleni e cosa
+   * non ti piace e' un piano generico, cioe' uno che non si segue. Esce
+   * tutto **gia' aggregato** — medie, conteggi, le ricette piu' spuntate —
+   * mai il diario giorno per giorno.
+   *
+   * La risposta e' tre tipi di azione che l'app conosce gia' (alimenti,
+   * ricette, assegnazioni) e passa da `validaSettimana()`, che le guarda
+   * **insieme**: una ricetta puo' usare un alimento creato due righe sopra,
+   * e un giorno si giudica solo quando ha tutti i suoi pasti.
+   */
+  generaSettimana: {
+    n: 'Genera un piano settimanale',
+    contesto: ['profilo', 'target', 'obiettivo', 'struttura', 'settimana', 'ricette',
+               'alimenti', 'abitudini', 'attivita', 'corpo', 'preferenze'],
+    schema: { verdetto: 'string', osservazioni: ['string'],
+              azioni: ['creaAlimento', 'creaRicetta', 'assegnaPasto'] },
+    chiedi: d => {
+      const modo = {
+        salvati: 'Usa **solo** gli alimenti di `alimenti` e le ricette di `ricette`. '
+          + 'Puoi comporre ricette nuove, ma soltanto con quegli alimenti: non creare alimenti.',
+        misto: 'Parti dagli alimenti e dalle ricette che ho gia\' (`alimenti`, `ricette`); '
+          + 'aggiungi alimenti e ricette nuovi solo dove servono per varieta\', gusti o target.',
+        nuovi: 'Pensa ricette nuove. Se un alimento che ti serve e\' gia\' in `alimenti`, '
+          + 'usa quel nome esatto; se no crealo. Le ricette di `ricette` puoi non usarle.'
+      }[d.modo || 'misto'];
+      return 'Componi il piano alimentare di una settimana intera: per ognuno dei 7 giorni '
+        + 'di `struttura`, una ricetta per **ogni** pasto, con gli stessi pasti e orari.\n\n'
+        + 'Da dove partire: ' + modo + '\n\n'
+        + 'I numeri: ogni giorno entro il 5% di `target.kcal`, proteine almeno `target.p`, '
+        + 'mai sotto `pavimento_kcal`; almeno `target.min_p_per_pasto` g di proteine a '
+        + 'colazione, pranzo e cena; fibre vicino a `target.fibre`. Se c\'e\' '
+        + '`obiettivo.proposta_app`, e\' la ripartizione che l\'app stessa propone per '
+        + 'quell\'obiettivo. Nei giorni con un allenamento in `struttura.attivita` puoi '
+        + 'spostare un po\' di carboidrati verso il pasto prima o dopo.\n\n'
+        + 'Adatta il piano alla persona: `abitudini` dice come mangia davvero (cosa spunta, '
+        + 'cosa salta, cosa mangia fuori piano), `attivita` quanto si allena, `corpo` '
+        + 'come si muove il peso. Un piano che somiglia a come si mangia gia\' e\' un piano '
+        + 'che si segue: tieni i pasti che spunta sempre, cambia quelli che salta.\n\n'
+        + 'I gusti: usa spesso `preferenze.di_piu`, al massimo due volte a settimana '
+        + '`preferenze.di_meno`, **mai** `preferenze.mai`. Rispetta `preferenze.note`. '
+        + 'La stessa ricetta al massimo tre volte a settimana, salvo un pasto che le '
+        + 'abitudini mostrano sempre uguale.\n\n'
+        + 'Le azioni, in quest\'ordine:\n'
+        + '- `{"tipo":"creaAlimento","nome":"tempeh","unita":"g","categoria":"legumi",'
+        + '"kcal":192,"p":20.3,"c":7.6,"g":10.8,"fibre":5}` per ogni alimento nuovo, '
+        + 'valori per 100 g (o 100 ml) da tabella;\n'
+        + '- `{"tipo":"creaRicetta","codice":"ai-bowl-tempeh","nome":"Bowl di tempeh e riso",'
+        + '"ingredienti":[{"alimento":"tempeh","qta":120},{"alimento":"riso basmati","qta":80}]}` '
+        + 'per ogni ricetta nuova: grammi (o ml), nessun macro (li calcola l\'app), un '
+        + '`codice` nuovo che comincia con "ai-";\n'
+        + '- `{"tipo":"assegnaPasto","giorno":0,"slot":"Colazione","codice":"C1"}` per '
+        + 'ogni pasto di ogni giorno: `giorno` e\' l\'indice in `struttura` (0 = il primo), '
+        + '`slot` il nome del pasto com\'e\' scritto li\', `codice` una ricetta di '
+        + '`ricette` o una creata qui.\n\n'
+        + 'In `verdetto` l\'idea del piano in due righe; in `osservazioni` come hai usato '
+        + 'abitudini, allenamento e gusti, e i compromessi che hai fatto.';
+    }
+  },
   domandaLibera: {
     n: 'La tua domanda',
     contesto: ['profilo', 'target', 'obiettivo', 'periodo', 'settimana'],
@@ -208,7 +302,10 @@ class AI {
     if (q.has('profilo')) c.profilo = {
       eta: D.profilo?.eta ?? null, sesso: D.profilo?.sesso ?? null,
       altezza_cm: D.profilo?.altezza_cm ?? null,
-      peso_kg: typeof lastWeight === 'function' ? lastWeight() : null
+      /* il peso di tendenza, non la pesata del giorno: e' quello con cui
+         l'app fa i suoi conti (`pesoConti()`) */
+      peso_kg: typeof pesoConti === 'function' ? +pesoConti().toFixed(1)
+        : typeof lastWeight === 'function' ? lastWeight() : null
     };
     if (q.has('target')) {
       c.target = { ...D.target };
@@ -243,7 +340,13 @@ class AI {
     if (q.has('obiettivo')) {
       const o = typeof obiettivoAttivo === 'function' ? obiettivoAttivo() : null;
       c.obiettivo = o
-        ? { scelto: true, id: o.id, nome: o.n, pct_peso_settimana: o.pct }
+        ? { scelto: true, id: o.id, nome: o.n, pct_peso_settimana: o.pct,
+            /* quello che l'app stessa propone per quell'obiettivo: chi scrive un
+               piano deve sapere da che numeri parte l'app, o i due si
+               contraddicono */
+            ...(typeof pianoCalorico === 'function' && q.has('struttura')
+              ? { proposta_app: (({ kcal, p, c: cc, g, fibre }) => ({ kcal, p, c: cc, g, fibre }))(
+                  pianoCalorico(o.id, o.pct).macro) } : {}) }
         : { scelto: false,
             nota: 'Nessun obiettivo dichiarato. La direzione si legge lo '
               + 'stesso: un obiettivo qui e\' una posizione rispetto al '
@@ -279,6 +382,107 @@ class AI {
       .map(([nome, a]) => ({ nome, unita: a.unita || 'g', kcal: a.kcal,
                              p: a.p, c: a.c, g: a.g, fibre: a.fibre,
                              fonte: a.fonte }));
+
+    /* La struttura della settimana: giorni, pasti e orari, e cosa si fa quel
+       giorno. E' lo stampo da riempire. */
+    if (q.has('struttura')) c.struttura = (D.settimana || []).map((g, i) => ({
+      giorno: i, nome: g.giorno, attivita: g.attivita || null,
+      pasti: (g.pasti || []).map(s => ({ slot: s.slot, ora: s.ora || null }))
+    }));
+
+    /* Le ultime quattro settimane, chiuse a ieri. Non il periodo di
+       Andamento: per scrivere un piano serve come mangi **di solito**, non il
+       tratto che stai guardando nei grafici. */
+    const per28 = (q.has('abitudini') || q.has('attivita'))
+      && typeof revPeriodoDate === 'function'
+      ? revPeriodoDate(addDays(today(), -28), addDays(today(), -1)) : null;
+    const n1 = (v, d2 = 1) => (v == null || isNaN(v)) ? null : +(+v).toFixed(d2);
+
+    /* Come mangi davvero: **conteggi e medie**, non i giorni. Le ricette piu'
+       spuntate e quelle saltate dicono cosa tenere e cosa cambiare meglio di
+       qualunque descrizione. */
+    if (q.has('abitudini') && per28) {
+      const reg = typeof statRegistro === 'function' ? statRegistro(per28) : null;
+      const mac = typeof statMacro === 'function' ? statMacro(per28) : null;
+      const pas = typeof statPasti === 'function' ? statPasti(per28) : null;
+      const ext = typeof statExtra === 'function' ? statExtra(per28, 8) : null;
+      const abi = typeof statAbitudini === 'function' ? statAbitudini(per28) : null;
+      const ri = typeof realIntake === 'function' ? realIntake() : null;
+      c.abitudini = {
+        finestra: '28 giorni fino a ieri',
+        registro: reg && { giorni_con_qualcosa: reg.registrati, giorni_con_pasti: reg.conPasti,
+                           pesate: reg.pesate, su_giorni: reg.giorni },
+        introito_medio: mac && mac.giorni ? { kcal: n1(mac.kcal, 0), p: n1(mac.p), c: n1(mac.c),
+          g: n1(mac.g), fibre: n1(mac.fibre), su_giorni: mac.giorni } : null,
+        introito_dal_bilancio_kcal: ri != null ? Math.round(ri) : null,
+        ricette_spuntate: pas ? pas.pasti.filter(r => r.previsti >= 2)
+          .sort((a, b) => b.spuntati - a.spuntati).slice(0, 10)
+          .map(r => ({ ricetta: r.nome, spuntata: r.spuntati, prevista: r.previsti })) : null,
+        pasti_per_momento: pas ? pas.slot.map(r => ({ pasto: r.nome,
+          spuntato_pct: r.quota == null ? null : Math.round(r.quota) })) : null,
+        fuori_piano: ext && ext.voci.length ? {
+          kcal_al_giorno: n1(ext.kcalGiorno, 0),
+          voci: ext.voci.map(v => ({ nome: v.nome, volte: v.n, kcal_media: Math.round(v.kcal / v.n) }))
+        } : null,
+        acqua_l: n1(abi?.acqua), sonno_ore: n1(abi?.sonno), passi: n1(abi?.passi, 0),
+        fame_1_5: n1(abi?.fame), energia_1_5: n1(abi?.energia)
+      };
+      if (!reg?.conPasti) c.abitudini.nota = 'Nessun pasto registrato nelle ultime quattro '
+        + 'settimane: come mangia questa persona non si sa, e non va supposto.';
+      c.abitudini = aiSenzaNull(c.abitudini);
+    }
+
+    /* Quanto ti alleni: le sedute, i minuti, la forza, e il livello di
+       attivita' con cui l'app stima il dispendio finche' non l'ha misurato. */
+    if (q.has('attivita')) {
+      const gg = lastDays(addDays(today(), -1), 28);
+      const A = typeof attivitaGiorni === 'function' ? attivitaGiorni(gg) : null;
+      const st = per28 && typeof statAllenamento === 'function' ? statAllenamento(per28) : null;
+      const L = typeof lafAttivo === 'function' ? lafAttivo() : null;
+      c.attivita = {
+        finestra: '28 giorni fino a ieri',
+        livello: L ? { nome: L.livello?.n || null, fattore: L.laf,
+          da: { scelto: 'scelto da chi usa l\'app', dati: 'dedotto da allenamenti e passi',
+                modello: 'fattore di partenza del modello' }[L.fonte] } : null,
+        sedute_settimana: st ? n1(st.seduteSettimana) : null,
+        minuti_attivita_settimana: A ? n1(A.eq / 4, 0) : null,
+        giorni_forza_settimana: A ? n1(A.forza / 4) : null,
+        esercizi_piu_fatti: st?.esercizi?.length ? st.esercizi.map(e => e.nome) : null,
+        cardio: st && st.cardioN ? { sedute: st.cardioN, minuti: n1(st.cardioMin, 0),
+                                     km: n1(st.cardioKm) } : null,
+        riferimenti: 'OMS: 150 minuti a settimana (uno intenso vale due) e 2 giorni di forza. '
+          + 'Sono linee guida, non misure su questa persona.'
+      };
+      if (!st?.totali && !A?.sedute) c.attivita.nota = 'Nessun allenamento registrato nelle '
+        + 'ultime quattro settimane: non vuol dire che non si alleni, vuol dire che non si sa.';
+      c.attivita = aiSenzaNull(c.attivita);
+    }
+
+    /* Il corpo: la tendenza del peso, la composizione se c'e' una misura, e
+       il fisico a cui punta. */
+    if (q.has('corpo')) {
+      const R = typeof ritmoPeso === 'function' ? ritmoPeso() : null;
+      const co = typeof composizioneAl === 'function' ? composizioneAl(today()) : null;
+      const tf = D.target_fisico;
+      c.corpo = {
+        peso_tendenza_kg: typeof trendW === 'function' ? n1(trendW(today())) : null,
+        ritmo_kg_settimana: R?.ok ? { valore: n1(R.kgSett, 2), incertezza: n1(1.96 * R.se, 2),
+                                       su_pesate: R.n } : { non_calcolabile: R?.perche || 'poche pesate' },
+        composizione: co?.bf != null ? { grasso_pct: n1(co.bf), massa_magra_kg: n1(co.lbm),
+          da: String(co.quando || '').startsWith('bia') ? 'bioimpedenza' : 'formula della Marina (circonferenze)' } : null,
+        fisico_di_riferimento: tf?.nome ? { nome: tf.nome, peso_kg: tf.peso_kg ?? null,
+                                            grasso_pct: tf.bf_pct ?? null } : null
+      };
+      if (c.corpo.peso_tendenza_kg == null) c.corpo.nota = 'Nessuna pesata: il peso non si conosce.';
+      c.corpo = aiSenzaNull(c.corpo);
+    }
+
+    /* I gusti, come li ha scritti chi usa l'app. */
+    if (q.has('preferenze')) {
+      const pr = opz.preferenze || {};
+      c.preferenze = aiSenzaNull({ di_piu: pr.di_piu || [], di_meno: pr.di_meno || [],
+                                   mai: pr.mai || [], note: pr.note || null });
+    }
 
     /* Il periodo: **numeri gia' aggregati, non il diario.** La regola di
        questo file e' che il diario non esce dal telefono, e non cambia
@@ -383,7 +587,7 @@ class AI {
       modello: this.modello,
       compito,
       sistema,
-      utente: [c.chiedi, dati.domanda || '',
+      utente: [typeof c.chiedi === 'function' ? c.chiedi(dati) : c.chiedi, dati.domanda || '',
         'Contesto:', JSON.stringify(this.contesto(c.contesto, dati), null, 1)]
         .filter(Boolean).join('\n\n'),
       /* L'immagine viaggia a parte e non dentro il testo: ogni trasporto la
@@ -425,7 +629,7 @@ class AI {
       throw e;
     }
     const grezzo = await this.trasporto(this.richiesta(compito, dati));
-    return this.valida(compito, grezzo);
+    return this.valida(compito, grezzo, dati);
   }
 
   /**
@@ -436,7 +640,7 @@ class AI {
    * dallo stesso `coerenza()` che usa Open Food Facts — sotto il 15% va bene,
    * oltre il 30% qualcuno ha sbagliato a scrivere.
    */
-  valida(compito, grezzo) {
+  valida(compito, grezzo, dati = {}) {
     const c = AI_COMPITI[compito];
     let o = grezzo;
     if (typeof o === 'string') {
@@ -468,12 +672,15 @@ class AI {
       }
 
     const azioni = [];
-    for (const a of (Array.isArray(o.azioni) ? o.azioni : [])) {
+    let piano = null;
+    if (compito === 'generaSettimana')
+      piano = this.validaSettimana(Array.isArray(o.azioni) ? o.azioni : [], avvisi, dati);
+    else for (const a of (Array.isArray(o.azioni) ? o.azioni : [])) {
       const v = this._azione(a, avvisi);
       if (v) azioni.push(v);
     }
     return {
-      compito, n: c.n,
+      compito, n: c.n, piano,
       verdetto: vietato ? '' : testo,
       osservazioni: vietato ? [] : (o.osservazioni || []).map(String),
       azioni, avvisi, vietato, grezzo,
@@ -481,6 +688,148 @@ class AI {
          si applica altrove, dopo un tocco. */
       applicata: false
     };
+  }
+
+  /**
+   * Una settimana generata, guardata **tutta insieme**.
+   *
+   * Le azioni da sole non bastano: una ricetta puo' usare un alimento creato
+   * due righe sopra, che `alimento()` non conosce ancora, e un giorno si
+   * giudica solo quando ha tutti i suoi pasti. Quindi tre giri, nell'ordine
+   * in cui le cose dipendono l'una dall'altra:
+   *
+   * 1. gli **alimenti** nuovi, con lo stesso `coerenza()` di Open Food Facts,
+   *    sempre `stima`. Uno che esiste gia' non si ricrea: vale il tuo;
+   * 2. le **ricette** nuove, con gli ingredienti che esistono (tuoi o appena
+   *    creati) e i macro rifatti dall'app, mai presi dal modello;
+   * 3. le **assegnazioni**, sui pasti della struttura.
+   *
+   * E i gusti sono un filtro, non un consiglio: un ingrediente in "mai" butta
+   * la ricetta, e se il pasto resta vuoto lo si dice. "Di meno" piu' di due
+   * volte a settimana e' un avviso.
+   */
+  validaSettimana(lista, avvisi, dati = {}) {
+    const norm = aiNorm;
+    const pref = dati.preferenze || {};
+    const tocca = (nome, voci) => {
+      const n = norm(nome);
+      return (voci || []).map(norm).filter(t => t.length >= 3)
+        .find(t => n.includes(t) || t.includes(n)) || null;
+    };
+    const salvati = dati.modo === 'salvati';
+
+    /* 1. gli alimenti */
+    const nuovi = new Map();
+    for (const a of lista.filter(x => x?.tipo === 'creaAlimento')) {
+      if (salvati) { avvisi.push(`"${a.nome}": avevi chiesto solo i tuoi alimenti, scartato.`); continue; }
+      const v = this._azione(a, avvisi);
+      if (!v) continue;
+      if (aiNomeAlimento(v.nome)) continue;   // c'e' gia': vale il tuo
+      const no = tocca(v.nome, pref.mai);
+      if (no) { avvisi.push(`"${v.nome}": e' fra quelli che non mangi mai (${no}), scartato.`); continue; }
+      nuovi.set(v.nome, v);
+    }
+    const per100 = nome => nuovi.get(nome)?.valori
+      || (typeof alimento === 'function' && D.alimenti?.[nome] ? alimento(nome) : null);
+    const macroDi = ing => {
+      const t = { kcal: 0, p: 0, c: 0, g: 0, fibre: 0 };
+      for (const i of ing) {
+        const a = per100(i.alimento);
+        for (const x in t) t[x] += (a?.[x] || 0) * i.qta / 100;
+      }
+      for (const x in t) t[x] = Math.round(t[x] * 10) / 10;
+      return t;
+    };
+
+    /* 2. le ricette. Una scartata si ricorda: i pasti che la usavano
+       restano vuoti e finiscono nel conto dei vuoti, invece di dare un
+       avviso ciascuno per la stessa ricetta. */
+    const ricette = new Map();
+    const scartate = new Set();
+    for (const a of lista.filter(x => x?.tipo === 'creaRicetta')) {
+      const nome = String(a.nome || '').trim();
+      if (a.codice) scartate.add(String(a.codice));
+      const ing = (Array.isArray(a.ingredienti) ? a.ingredienti : [])
+        .map(i => {
+          const n = String(i?.alimento || '').trim();
+          return { alimento: aiNomeAlimento(n, nuovi) || n.toLowerCase(), qta: +i?.qta || 0 };
+        })
+        .filter(i => i.alimento && i.qta > 0);
+      if (!nome || !ing.length) { avvisi.push('Una ricetta senza nome o senza ingredienti: scartata.'); continue; }
+      const fuori = ing.filter(i => !per100(i.alimento));
+      if (fuori.length) {
+        avvisi.push(`"${nome}": ${fuori.map(i => i.alimento).join(', ')} non c'e' fra gli alimenti. Scartata.`);
+        continue;
+      }
+      const no = ing.map(i => tocca(i.alimento, pref.mai)).find(Boolean);
+      if (no) { avvisi.push(`"${nome}": contiene ${no}, che non mangi mai. Scartata.`); continue; }
+      /* il codice: quello proposto se e' nuovo, se no uno libero. Mai sopra
+         una ricetta che hai gia'. */
+      let cod = 'ai-' + norm(a.codice || nome).replace(/^ai-/, '').replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '').slice(0, 32);
+      if (cod === 'ai-') cod = 'ai-ricetta';
+      let k2 = cod, i2 = 2;
+      while ((D.pasti && D.pasti[k2]) || [...ricette.values()].some(r => r.codice === k2)) k2 = cod + '-' + i2++;
+      ricette.set(String(a.codice || nome), { codice: k2, nome, ingredienti: ing, macro: macroDi(ing) });
+      scartate.delete(String(a.codice));
+    }
+
+    /* 3. la settimana */
+    const giorni = (D.settimana || []).map((g, gi) => ({
+      giorno: gi, nome: g.giorno, attivita: g.attivita || '',
+      pasti: (g.pasti || []).map(s => ({ slot: s.slot, ora: s.ora || null, codice: null }))
+    }));
+    for (const a of lista.filter(x => x?.tipo === 'assegnaPasto')) {
+      const g = giorni[+a.giorno];
+      if (!g) { avvisi.push('Un giorno fuori dalla settimana: scartato.'); continue; }
+      const sl = g.pasti.find(s => norm(s.slot) === norm(a.slot));
+      if (!sl) { avvisi.push(`${capIniziale(g.nome)}: il pasto "${a.slot}" non c'e' nella struttura.`); continue; }
+      const nuova = ricette.get(String(a.codice));
+      const esist = !nuova && a.codice && typeof pasto === 'function' ? pasto(a.codice) : null;
+      if (!nuova && !esist && scartate.has(String(a.codice))) continue;
+      if (!nuova && !esist) { avvisi.push(`${capIniziale(g.nome)}, ${sl.slot}: la ricetta "${a.codice}" non esiste.`); continue; }
+      if (esist) {
+        const no = (esist.ingredienti || []).map(i => tocca(i.alimento, pref.mai)).find(Boolean);
+        if (no) { avvisi.push(`${capIniziale(g.nome)}, ${sl.slot}: "${esist.nome}" contiene ${no}, che non mangi mai. Lasciato vuoto.`); continue; }
+      }
+      sl.codice = nuova ? nuova.codice : a.codice;
+      sl.nome = nuova ? nuova.nome : esist.nome;
+      sl.nuova = !!nuova;
+      sl.macro = nuova ? nuova.macro
+        : (typeof macroRicetta === 'function' ? macroRicetta(esist) : esist.macro) || { kcal: 0, p: 0, c: 0, g: 0, fibre: 0 };
+      sl.ingredienti = (nuova || esist).ingredienti || [];
+    }
+
+    /* i totali, e come sta ogni giorno contro il target e il pavimento */
+    const tk = D.target?.kcal || 0;
+    const pav = typeof pavimentoCalorico === 'function' ? pavimentoCalorico().pavimento : 0;
+    const usiMeno = new Map();
+    for (const g of giorni) {
+      g.totali = { kcal: 0, p: 0, c: 0, g: 0, fibre: 0 };
+      for (const s of g.pasti) if (s.macro) for (const x in g.totali) g.totali[x] += s.macro[x] || 0;
+      for (const x in g.totali) g.totali[x] = Math.round(g.totali[x] * 10) / 10;
+      g.vuoti = g.pasti.filter(s => !s.codice).length;
+      const sc = tk ? (g.totali.kcal - tk) / tk : null;
+      g.stato = g.vuoti === g.pasti.length ? 'vuoto' : g.totali.kcal < pav ? 'basso'
+        : sc != null && sc < -0.1 ? 'sotto' : sc != null && sc > 0.1 ? 'sopra' : 'ok';
+      for (const s of g.pasti) for (const i of (s.ingredienti || [])) {
+        const t = tocca(i.alimento, pref.di_meno);
+        if (t) usiMeno.set(t, (usiMeno.get(t) || 0) + 1);
+      }
+    }
+    for (const g of giorni.filter(x => x.stato === 'basso'))
+      avvisi.push(`${capIniziale(g.nome)}: ${Math.round(g.totali.kcal)} kcal, sotto il pavimento di ${pav}.`);
+    for (const [t, n] of usiMeno) if (n > 2)
+      avvisi.push(`"${t}" compare ${n} volte, e lo volevi di meno.`);
+    const vuoti = giorni.reduce((a, g) => a + g.vuoti, 0);
+    if (vuoti) avvisi.push(`${vuoti === 1 ? 'Un pasto e\' rimasto' : vuoti + ' pasti sono rimasti'} senza ricetta.`);
+
+    /* le ricette nuove che nessun giorno usa non entrano */
+    const usate = new Set(giorni.flatMap(g => g.pasti.map(s => s.codice)));
+    const ric = [...ricette.values()].filter(r => usate.has(r.codice));
+    const ingUsati = new Set(ric.flatMap(r => r.ingredienti.map(i => i.alimento)));
+    const ali = [...nuovi.values()].filter(a => ingUsati.has(a.nome));
+    return { alimenti: ali, ricette: ric, giorni, pavimento: pav, target: tk };
   }
 
   /** Una singola azione proposta, ripulita. `null` = si butta. */
@@ -511,6 +860,7 @@ class AI {
                        qta: +i.qta || 0 }))
           .filter(i => i.alimento && i.qta > 0);
         if (!nome || !ing.length) return push('Una ricetta senza nome o senza ingredienti.');
+        for (const i of ing) i.alimento = aiNomeAlimento(i.alimento) || i.alimento;
         const fuori = ing.filter(i => !(typeof alimento === 'function' && alimento(i.alimento)));
         if (fuori.length) return push(`"${nome}": ${fuori.map(i => i.alimento).join(', ')} `
           + 'non e\' fra i tuoi alimenti. Scartata.');

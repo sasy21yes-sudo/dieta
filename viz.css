@@ -2531,3 +2531,82 @@ button.btn:disabled{opacity:.4}
 .att-r .d{display:block;font-size:12.5px;color:var(--ink-3);line-height:1.35;margin-top:1px}
 .att-r .d b{color:var(--ink-2);font-weight:600}
 .att-ck{flex:none;width:18px;color:var(--pine);font-weight:700;font-size:16px;text-align:center}
+
+/* ================================================ il piano settimanale
+   Il foglio dell'assistente che scrive una settimana: le stesse carte, lo
+   stesso viola, gli stessi passi della foto. Il viola resta dell'assistente
+   e di nient'altro — e' il suo colore anche qui. */
+.ai-btn{display:block;width:100%;margin-top:14px;padding:13px 16px;border:0;border-radius:14px;
+  font:inherit;font-size:15px;font-weight:600;color:#fff;cursor:pointer;
+  background:linear-gradient(140deg,var(--ai-1),var(--ai-2));
+  box-shadow:0 8px 20px -10px var(--ai-alone)}
+.ai-btn:active{transform:scale(.99)}
+.ai-btn:disabled{opacity:.45;box-shadow:none}
+.ai-link{display:block;margin:12px auto 0;border:0;background:none;padding:6px;font:inherit;
+  font-size:14px;color:var(--ai-ink);font-weight:600;cursor:pointer}
+.pg-opt[aria-pressed=true]{border-color:var(--ai-1);
+  background:color-mix(in srgb,var(--ai-1) 7%,var(--paper))}
+.pg-opt[aria-pressed=true] .ic{color:#fff;background:linear-gradient(140deg,var(--ai-1),var(--ai-2))}
+.pg-ck{flex:none;width:18px;text-align:center;color:var(--ai-1);font-weight:700;font-size:16px}
+
+.pg-ctx{margin-top:6px;border-radius:14px;background:var(--wash);overflow:hidden}
+.pg-ctx-r{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:9px 12px;font-size:13px;position:relative}
+.pg-ctx-r+.pg-ctx-r::before{content:'';position:absolute;top:0;left:12px;right:0;height:1px;
+  background:var(--rule)}
+.pg-ctx-r span{color:var(--ink-3);flex:none}
+.pg-ctx-r b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.pg-ctx-r.no b{color:var(--ink-3);font-weight:400}
+
+.pg-g{margin-top:16px}
+.pg-g-h b{display:block;font-size:15px;font-weight:600}
+.pg-g-h span{display:block;font-size:12px;color:var(--ink-3);margin-top:1px;line-height:1.35}
+.pg-toks{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pg-toks:empty{display:none}
+.pg-tok{display:inline-flex;align-items:center;gap:4px;padding:5px 6px 5px 11px;border-radius:999px;
+  font-size:13px;font-weight:600;color:var(--ai-ink);
+  background:color-mix(in srgb,var(--ai-1) 12%,transparent)}
+.pg-di_meno .pg-tok{color:var(--ink-2);background:var(--wash)}
+.pg-mai .pg-tok{color:var(--ink-2);background:var(--wash);text-decoration:line-through;
+  text-decoration-color:var(--ink-3)}
+.pg-tok button{width:20px;height:20px;border:0;border-radius:50%;padding:0;cursor:pointer;
+  font-size:13px;line-height:1;color:inherit;background:color-mix(in srgb,currentColor 14%,transparent)}
+.pg-add{display:flex;gap:8px;margin-top:8px}
+.pg-add input{flex:1;min-width:0;padding:9px 12px;border-radius:11px;border:0;
+  background:var(--wash);color:var(--ink);font:inherit;font-size:14px}
+.pg-add input:focus,.pg-in:focus{outline:2px solid var(--ai-1);outline-offset:-1px}
+.pg-add button{flex:none;padding:0 13px;border:0;border-radius:11px;font:inherit;font-size:13.5px;
+  font-weight:600;color:var(--ai-ink);cursor:pointer;
+  background:color-mix(in srgb,var(--ai-1) 12%,transparent)}
+.pg-sug{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pg-sug button{padding:6px 11px;border-radius:999px;border:1px dashed color-mix(in srgb,var(--ai-1) 45%,var(--rule));
+  background:none;font:inherit;font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.pg-in{display:block;width:100%;margin-top:8px;padding:10px 12px;border-radius:12px;border:0;
+  background:var(--wash);color:var(--ink);font:inherit;font-size:14px;line-height:1.4;resize:vertical}
+.pg-risp{font-family:var(--mono);font-size:12px}
+
+.pg-oss{margin:8px 0 0;padding-left:18px;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
+.pg-oss li+li{margin-top:3px}
+.pg-riass{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0 4px;font-size:12.5px;color:var(--ink-3)}
+.pg-riass b{color:var(--ink);font-size:15px;font-variant-numeric:tabular-nums}
+.pg-day{margin-top:10px;padding:11px 12px 6px;border-radius:14px;background:var(--wash)}
+.pg-day-h{display:flex;align-items:center;gap:8px}
+.pg-day-h b{font-size:15px;flex:1}
+.pg-day-h .k{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.pg-day-h .k em{font-style:normal;font-weight:400;color:var(--ink-3)}
+.pg-day-m{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin:2px 0 6px}
+.pg-row{display:grid;grid-template-columns:76px 1fr auto;gap:8px;align-items:baseline;
+  padding:7px 0;border-top:1px solid var(--rule);font-size:13.5px}
+.pg-row .mt{font-size:11.5px;color:var(--ink-3)}
+.pg-row .kc{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.pg-row.vuoto .nm{color:var(--ink-3)}
+.pg-nuova{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:999px;font-size:10.5px;
+  font-weight:600;color:#fff;vertical-align:1px;background:linear-gradient(140deg,var(--ai-1),var(--ai-2))}
+.pg-det{padding:8px 0;border-top:1px solid var(--rule);font-size:13px;line-height:1.4}
+.pg-det b{display:block;font-weight:600}
+.pg-det span{display:block;color:var(--ink-2)}
+.pg-det .m{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.pg-entra{margin:0 0 12px}
+.pg-prima{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:-4px 2px 12px;
+  font-size:13px;color:var(--ink-2)}
+.pg-prima .lev-link{flex:none}

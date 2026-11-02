@@ -1557,6 +1557,59 @@ Corretto anche il testo dei ritmi: "Crescere" diceva *sopra il dispendio del
 10-15%* mentre a 0,25% a settimana il surplus è l'8%; ora dice dal 5 al 15%
 secondo il ritmo, e "Perdere grasso" dal 10 al 25%.
 
+### Un piano settimanale dall'assistente
+
+Richiesta: un bottone che, con l'assistente acceso, generi un piano
+settimanale — con alimenti e ricette nuovi, con quelli salvati, o tutti e
+due — tenendo conto di cosa piace di più e di meno; e *"in input tutto il
+contesto necessario: media allenamenti, alimentazione attuale, target
+attuale. Più info si danno meglio è"*.
+
+**Due entrate, un foglio.** La prima proposta dell'assistente ("Genera un
+piano settimanale") e una carta viola in cima al passo Settimana del piano,
+solo se il modulo AI è acceso. Il foglio ha tre passi come quello della
+foto: *Da dove* (i miei, i miei più qualcosa di nuovo, tutto nuovo), *Gusti*
+(di più, di meno, mai, e una nota libera; le ricette spuntate più spesso sono
+a un tocco da "di più"), *La settimana*.
+
+**Il contesto più ricco dell'app, e nessun giorno.** Il compito
+`generaSettimana` porta profilo, target con pavimento e dispendio, obiettivo
+con la proposta dell'app (`pianoCalorico()`), la struttura dei pasti, la
+settimana di adesso, ricette e alimenti, e tre fette nuove sulle ultime
+quattro settimane chiuse a ieri: **abitudini** (introito medio, introito dal
+bilancio, ricette spuntate e previste, quota spuntata per momento della
+giornata, fuori piano più frequente, acqua, sonno, passi, fame, energia),
+**attività** (sedute, minuti OMS, giorni di forza, esercizi più fatti,
+cardio, il livello di attività e da dove viene), **corpo** (tendenza del
+peso, ritmo con l'incertezza, composizione con la fonte, fisico di
+riferimento). Sono conteggi e medie: un controllo fisso verifica che nella
+domanda non ci sia nemmeno una data. Il primo passo mostra il riassunto di
+quello che esce, letto dallo stesso `ai.contesto()` che scrive la domanda. I
+campi vuoti non escono come `null`: se manca tutto, una nota lo dichiara
+("non va supposto").
+
+**Senza modello si copia e si incolla**, e la risposta incollata passa dallo
+stesso controllo di una vera. `validaSettimana()` guarda le azioni insieme,
+nell'ordine in cui dipendono: alimenti nuovi (con `coerenza()`, sempre
+`stima`; uno che c'è già vale il tuo), ricette nuove (ingredienti tuoi o
+appena creati, macro rifatti dall'app e mai presi dal modello, codice `ai-`
+che non sovrascrive niente), assegnazioni sulla struttura. Un ingrediente in
+"mai" butta la ricetta, anche una che hai già; "di meno" più di due volte è
+un avviso; i giorni sotto il pavimento si dicono.
+
+Due difetti trovati guardando l'anteprima: **"olio EVO non c'è fra gli
+alimenti"** — le risposte si mettono in minuscolo e i tuoi alimenti no, e lo
+stesso difetto c'era già nel compito "Componi una ricetta"; ora i nomi
+passano da `aiNomeAlimento()`, che cerca senza maiuscole né accenti e rende
+il nome vero. E **gli avvisi a cascata**: una ricetta scartata dava un avviso
+per ogni pasto che la usava. Adesso quei pasti finiscono nel conto dei vuoti,
+e oltre il terzo avviso gli altri stanno dietro un tocco.
+
+**Si applica con un tocco**, nell'ordine giusto: alimenti, poi ricette coi
+macro calcolati sugli alimenti appena entrati, poi la settimana. Quella di
+prima resta in `settimanaPrima`, e "Torna alla settimana di prima" sta sia
+nel foglio sia nel passo Settimana.
+
 ### Il mese degli allenamenti
 
 La striscia dei giorni risponde a *questa settimana*: tre settimane, e si apre

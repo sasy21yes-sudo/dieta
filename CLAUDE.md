@@ -241,6 +241,15 @@ regole dell'app si ricontrollano in uscita (`valida()`), le proposte non si
 applicano da sole, il diario giorno per giorno non esce dal telefono, e un
 `null` nel contesto si dichiara (`{ scelto: false, nota }`).
 
+Il piano settimanale generato (`generaSettimana`, foglio in `assistente.js`)
+porta il contesto più ricco — abitudini, attività e corpo delle ultime
+quattro settimane, sempre **aggregati** — e la risposta, incollata o vera,
+passa da `validaSettimana()`: macro rifatti dall'app, alimenti nuovi `stima`,
+un ingrediente in "mai" butta la ricetta. Si applica con un tocco e la
+settimana di prima resta in `S.piano.settimanaPrima`. I gusti stanno in
+`S.settings.preferenze` (`di_piu`, `di_meno`, `mai`, `note`). I nomi degli
+alimenti scritti da un modello passano da `aiNomeAlimento()`.
+
 ## Roadmap
 
 1. Rampa fibre (avviso se il salto settimanale supera 5 g)
