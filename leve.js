@@ -409,6 +409,7 @@ function levPorzioni(g, righe, prima, regole, quante = 3) {
     .sort((a, b) => a.stima - b.stima)
     .slice(0, 80);
   for (const s of cand) levValuta(s, g, righe, prima, codPrima, regole);
+  const escluse = cand.filter(s => s.buona && !s.regole).length;
   const valide = cand.filter(s => s.regole && !levScartata({ tipo: 'porzione', ...s }, regole));
   valide.sort((a, b) => (b.buona - a.buona) || (a.costo - b.costo));
 
@@ -420,7 +421,7 @@ function levPorzioni(g, righe, prima, regole, quante = 3) {
   const ammessa = valide.some(s => s.buona) ? s => s.buona
     : s => chieste.every(r => Math.sign(s.d[r.k]) === Math.sign(r.b) && Math.abs(s.d[r.k]) >= Math.abs(r.b) / 2);
 
-  const elenchi = { porzioni: [], nuovi: [] };
+  const elenchi = { porzioni: [], nuovi: [], escluse };
   const viste = new Set();
   for (const s of valide) {
     if (!ammessa(s)) continue;
@@ -450,6 +451,7 @@ function levRicette(g, righe, prima, regole, quante = 3) {
   const codici = (g.pasti || []).map(s => s.codice);
   const gia = new Set(codici.map(c => codiceBaseRic(partiPasto(c)[0])));
   const migliori = new Map();
+  const escluse = new Set();
   (g.pasti || []).forEach((s, si) => {
     if (regole.pasti.includes(s.slot)) return;
     const parti = partiPasto(s.codice);
@@ -499,15 +501,19 @@ function levRicette(g, righe, prima, regole, quante = 3) {
           da: attuale.nome || parti[0], a: alt.nome || code, altrove,
           cambi: x.cambi, dopo, d, costo, buona: levBuona(d, righe)
         };
-        if (!levRispettaProteine(codici, cod2, g, regole) || levScartata(m, regole)) continue;
+        if (levScartata(m, regole)) continue;
+        if (!levRispettaProteine(codici, cod2, g, regole)) { if (m.buona) escluse.add(code); continue; }
         migliori.set(code, m);
       }
     }
   });
-  return [...migliori.values()]
+  const out = [...migliori.values()]
     .filter(x => x.buona)
     .sort((a, b) => a.costo - b.costo)
     .slice(0, quante);
+  /* quante ricette sono rimaste fuori **solo** per la regola delle proteine */
+  out.escluse = [...escluse].filter(c => !migliori.has(c)).length;
+  return out;
 }
 
 /**
@@ -518,12 +524,18 @@ function levRicette(g, righe, prima, regole, quante = 3) {
 function leveGiorno(gi, d, fermo = 'altri', x) {
   if (typeof d === 'string') { d = { [d]: fermo }; fermo = x || 'altri'; }
   const g = D.settimana[gi];
-  const vuoto = { porzioni: [], nuovi: [], ricette: [], prima: M0(), righe: [] };
+  const vuoto = { porzioni: [], nuovi: [], ricette: [], prima: M0(), righe: [], escluse: 0 };
   if (!g || !LEV_VOCI.some(v => d[v.id])) return vuoto;
   const regole = levRegole();
   const prima = levTotali((g.pasti || []).map(s => s.codice));
   const righe = levRighe(d, fermo);
-  return { prima, righe, ...levPorzioni(g, righe, prima, regole), ricette: levRicette(g, righe, prima, regole) };
+  const por = levPorzioni(g, righe, prima, regole), ric = levRicette(g, righe, prima, regole);
+  /* Quante proposte buone la regola delle proteine ha tolto: il foglio lo
+     dice. Alla prova, con grassi −10 il mercoledi' restavano solo due ricette
+     e nessuna spiegazione — le combinazioni migliori toglievano il burro
+     d'arachidi a una colazione gia' sotto i 25 g. */
+  return { prima, righe, porzioni: por.porzioni, nuovi: por.nuovi, ricette: ric,
+           escluse: por.escluse + (ric.escluse || 0) };
 }
 
 /** Scrive la proposta nel piano. La prima modifica clona la settimana di base. */
@@ -558,120 +570,133 @@ function levPartenza(tot, t) {
     if (!peggio || Math.abs(d) > Math.abs(peggio.d)) peggio = { v, d };
   }
   const id = peggio ? peggio.v.id : 'p';
-  return { sel: id, d: { p: 0, c: 0, g: 0, [id]: levDeltaVerso(id, tot, t) }, fermo: 'altri' };
+  return { d: { p: 0, c: 0, g: 0, [id]: levDeltaVerso(id, tot, t) }, fermo: 'altri' };
 }
 
-/* ------------------------------------------------------------- il foglio */
+/* ------------------------------------------------------------- il foglio
+ *
+ * Il foglio si legge dall'alto in basso come una domanda e la sua risposta:
+ *
+ * 1. **Quanto cambiare**: una riga per macro, con il suo − / + accanto. Nella
+ *    stessa riga il numero di adesso, quello di dopo e la barra col target —
+ *    il grafico e il comando sono la stessa cosa, e non c'e' niente da
+ *    "selezionare" prima di poterlo regolare. La prima versione aveva le
+ *    barre che facevano da selettore e un cursore solo che regolava quella
+ *    scelta: alla prova, "confusionario".
+ * 2. **Come farlo**: un elenco solo, al massimo cinque, il migliore in cima e
+ *    gia' scelto. Che sia una dose, un alimento in piu' o un'altra ricetta lo
+ *    dice una pastiglia, non tre titoli. La proposta scelta si apre e porta i
+ *    suoi due bottoni: applica, o non propormela piu'.
+ * 3. In fondo, chiuse, le regole ("Cosa non toccare") e "Come sceglie".
+ */
 
 const levSegno = (q, dec = 0) => {
   const r = Math.round(Math.abs(q) * 10 ** dec) / 10 ** dec;
   return r === 0 ? '0' : (q > 0 ? '+' : '−') + nf(r, dec);
 };
 
-/**
- * Le barre: una per macro, il prima pieno, il dopo chiaro, la tacca del
- * target, e sotto il nome lo spostamento chiesto. Ogni barra e' un bottone:
- * scegliere il macro da regolare e vederlo sono la stessa cosa. Sotto, le
- * calorie in una riga: seguono dai tre.
- */
-function levBarre(prima, dopo, t, st, scegli) {
-  const w = el('div', 'lev-barre');
-  for (const v of LEV_VOCI) {
-    const a = prima[v.id] || 0, b = dopo[v.id] || 0, tg = t[v.id] || 0;
-    const scala = Math.max(tg * 1.3, a * 1.08, b * 1.08, 1);
-    const pc = x => (Math.max(0, x) / scala * 100).toFixed(1) + '%';
-    const mosso = Math.round(b) !== Math.round(a);
-    const dv = st.d[v.id] || 0;
-    const stato = dv ? `${levSegno(dv)} g` : st.fermo === 'kcal' ? 'libero' : 'fermo';
-    const r = el('button', 'lev-r');
-    r.type = 'button';
-    r.setAttribute('aria-pressed', String(v.id === st.sel));
-    r.style.setProperty('--col', v.col);
-    r.innerHTML = `<span class="lev-n">${v.n}<small class="${dv ? 'chiesto' : ''}">${stato}</small></span>
-      <span class="lev-t">
-        <i class="lev-a" style="width:${pc(Math.min(a, b))}"></i>
-        ${b > a ? `<i class="lev-piu" style="left:${pc(a)};width:${pc(b - a)}"></i>` : ''}
-        ${b < a ? `<i class="lev-meno" style="left:${pc(b)};width:${pc(a - b)}"></i>` : ''}
-        ${tg ? `<b style="left:${pc(tg)}"></b>` : ''}
+/** Una riga per macro: nome, adesso → dopo, target, la barra e il suo − / +. */
+function levRigaMacro(v, prima, dopo, t, st, cambia) {
+  const a = prima[v.id] || 0, b = dopo[v.id] || 0, tg = t[v.id] || 0;
+  const scala = Math.max(tg * 1.3, a * 1.08, b * 1.08, 1);
+  const pc = x => (Math.max(0, x) / scala * 100).toFixed(1) + '%';
+  const mosso = Math.round(b) !== Math.round(a);
+  const dv = st.d[v.id] || 0;
+  const stato = dv ? `${levSegno(dv)} g` : st.fermo === 'kcal' ? 'libero' : 'uguale';
+  const r = el('div', 'lev-m');
+  r.style.setProperty('--col', v.col);
+  r.innerHTML = `<div class="lev-m-h">
+      <div class="lev-m-l"><span class="lev-m-n">${v.n}</span>
+        <span class="lev-m-v">${mosso ? `${nf(a)} → <b>${nf(b)}</b>` : `<b>${nf(a)}</b>`} g${
+          tg ? ` <em>· target ${nf(tg)}</em>` : ''}</span></div>
+      <output class="lev-m-d${dv ? ' on' : ''}">${stato}</output>
+      <span class="lev-step">
+        <button type="button" aria-label="${v.n}: meno">−</button><button type="button" aria-label="${v.n}: più">+</button>
       </span>
-      <span class="lev-v">${mosso ? `<s>${nf(a)}</s> ${nf(b)}` : nf(a)}<em>g</em></span>`;
-    r.onclick = () => scegli(v.id);
-    w.append(r);
-  }
-  const dk = (dopo.kcal || 0) - (prima.kcal || 0);
-  w.append(el('div', 'lev-kcal',
-    `<span>Calorie</span><span>${Math.abs(dk) >= 1
-      ? `${nf(prima.kcal)} → <b>${nf(dopo.kcal)}</b> (${levSegno(dk)})` : `<b>${nf(prima.kcal)}</b>`} kcal${
-      t.kcal ? ` <em>· target ${nf(t.kcal)}</em>` : ''}</span>`));
-  w.append(el('div', 'leg',
-    '<span><i class="lev-sw"></i>adesso</span><span><i class="lev-sw piu"></i>dopo</span>'
-    + '<span><i class="lev-sw meno"></i>tolto</span><span><i class="lev-sw tacca"></i>target</span>'));
-  return w;
+    </div>
+    <div class="lev-t" aria-hidden="true">
+      <i class="lev-a" style="width:${pc(Math.min(a, b))}"></i>
+      ${b > a ? `<i class="lev-piu" style="left:${pc(a)};width:${pc(b - a)}"></i>` : ''}
+      ${b < a ? `<i class="lev-meno" style="left:${pc(b)};width:${pc(a - b)}"></i>` : ''}
+      ${tg ? `<b style="left:${pc(tg)}"></b>` : ''}
+    </div>`;
+  const [meno, piu] = r.querySelectorAll('.lev-step button');
+  meno.disabled = dv <= -v.max;
+  piu.disabled = dv >= v.max;
+  meno.onclick = () => cambia(v.id, dv - v.passo);
+  piu.onclick = () => cambia(v.id, dv + v.passo);
+  return r;
 }
 
-/** Lo spostamento di una proposta in una riga: prima i macro chiesti. */
+/**
+ * Lo spostamento di una proposta in una riga. Si scrivono i macro chiesti,
+ * e degli altri solo quelli che si muovono di almeno un grammo: "0 G" ripetuto
+ * sotto ogni proposta era rumore da leggere per scoprire che non diceva niente.
+ */
 function levEffetto(m, righe) {
   const per = new Map(righe.map(r => [r.k, r]));
   const ordine = [...LEV_VOCI].sort((a, b) => (per.get(b.id)?.chiesto || 0) - (per.get(a.id)?.chiesto || 0));
   const out = [];
   for (const v of ordine) {
     const d = m.d[v.id] || 0, r = per.get(v.id);
-    let cls = '';
-    if (r?.chiesto) cls = Math.abs(d - r.b) > Math.max(2 * r.tol, Math.abs(r.b) * 0.25) ? 'lev-fatto fuori' : 'lev-fatto';
-    else if (r && Math.abs(d) > 2 * r.tol) cls = 'fuori';
-    out.push(`<span class="${cls}">${levSegno(d)} ${v.l}</span>`);
+    if (r?.chiesto) {
+      const corto = Math.abs(d - r.b) > Math.max(2 * r.tol, Math.abs(r.b) * 0.25);
+      out.push(`<span class="lev-fatto${corto ? ' fuori' : ''}">${levSegno(d)} ${v.l}</span>`);
+    } else if (Math.abs(d) >= 1) {
+      out.push(`<span class="${r && Math.abs(d) > 2 * r.tol ? 'fuori' : ''}">${levSegno(d)} ${v.l}</span>`);
+    }
   }
   const dk = m.d.kcal || 0, rk = per.get('kcal');
   out.push(`<span class="${rk && Math.abs(dk) > 2 * rk.tol ? 'fuori' : ''}">${levSegno(dk)} kcal</span>`);
   return out.join('');
 }
 
-/** Le righe di cosa cambia, una per quantita'. */
+/** Cosa cambia, raggruppato per pasto: tre righe di colazione sono una colazione. */
 function levCosa(m, g) {
   if (m.tipo === 'ricetta') {
     const pesi = m.cambi.map(c => `${esc(c.it.nome)} ${nf(c.it.q0)} → ${nf(c.q)} ${esc(c.it.unita)}`);
     return `<div class="lev-c"><span class="mt">${esc(m.slot || '')}</span>${esc(m.da)} → <b>${esc(m.a)}</b>${
-      m.altrove ? ` <span class="pill">di solito a ${esc(String(m.altrove).toLowerCase())}</span>` : ''}</div>`
-      + (pesi.length ? `<div class="lev-c lev-pesi">${pesi.join(' · ')}</div>` : '');
+      m.altrove ? ` <span class="pill">di solito a ${esc(String(m.altrove).toLowerCase())}</span>` : ''}${
+      pesi.length ? `<span class="lev-pesi">con ${pesi.join(' · ')}</span>` : ''}</div>`;
   }
-  /* raggruppate per pasto: tre righe di colazione sono una colazione */
   const perPasto = new Map();
   for (const c of m.cambi.slice().sort((a, b) => a.it.si - b.it.si || (a.it.nuovo ? 1 : 0) - (b.it.nuovo ? 1 : 0))) {
     if (!perPasto.has(c.it.si)) perPasto.set(c.it.si, []);
     perPasto.get(c.it.si).push(c.it.nuovo
-      ? `<span class="lev-add">aggiungi</span> ${esc(c.it.nome)} <b>${nf(c.q)}</b> ${esc(c.it.unita)}`
-      : `${esc(c.it.nome)} ${nf(c.it.q0)} → <b>${nf(c.q)}</b> ${esc(c.it.unita)}`);
+      ? `<span class="lev-add">+</span> ${esc(c.it.nome)} <b>${nf(c.q)} ${esc(c.it.unita)}</b>`
+      : `${esc(c.it.nome)} ${nf(c.it.q0)} → <b>${nf(c.q)} ${esc(c.it.unita)}</b>`);
   }
   return [...perPasto].map(([si, righe]) =>
     `<div class="lev-c"><span class="mt">${esc(g.pasti[si]?.slot || '')}</span>${righe.join('<br>')}</div>`).join('');
 }
 
-/** Le regole nel foglio: cosa non toccare, la soglia di proteine, le scartate. */
+/** "Cosa non toccare": pasti, ingredienti, la soglia di proteine, le scartate. */
 function levSezRegole(g, st, ridisegna) {
   const regole = levRegole();
   const nBloc = regole.pasti.length + regole.ingredienti.length;
   const det = el('details', 'fc-det lev-reg');
   det.open = !!st.regoleAperte;
   det.ontoggle = () => { st.regoleAperte = det.open; };
-  det.append(el('summary', null, `<span>Regole</span><span>${
-    nBloc ? `${nBloc} da non toccare` : 'nessun blocco'}</span>`));
+  det.append(el('summary', null, `<span>Cosa non toccare</span><span>${
+    nBloc ? (nBloc === 1 ? '1 blocco' : nBloc + ' blocchi') : 'niente'}</span>`));
 
+  const cambia = fai => { fai(); save(); st.regoleAperte = true; ridisegna(); };
   const chip = (lab, on, fai) => {
     const b = el('button', null, esc(lab));
     b.type = 'button';
     b.setAttribute('aria-pressed', String(on));
-    b.onclick = () => { fai(); save(); st.regoleAperte = true; ridisegna(); };
+    b.onclick = () => cambia(fai);
     return b;
   };
   const alterna = (arr, x) => { const i = arr.indexOf(x); if (i < 0) arr.push(x); else arr.splice(i, 1); };
 
-  det.append(el('div', 'lev-reg-t', 'Pasti da non toccare'));
+  det.append(el('div', 'lev-reg-t', 'Pasti'));
   const sp = el('div', 'seg chips');
   for (const s of (g.pasti || []).filter(x => pasto(x.codice)))
     sp.append(chip(s.slot, regole.pasti.includes(s.slot), () => alterna(regole.pasti, s.slot)));
   det.append(sp);
 
-  det.append(el('div', 'lev-reg-t', 'Ingredienti da non toccare'));
+  det.append(el('div', 'lev-reg-t', 'Ingredienti'));
   const nomi = new Set(regole.ingredienti);
   for (const s of (g.pasti || [])) for (const i of (pasto(s.codice)?.ingredienti || [])) nomi.add(i.alimento);
   const si = el('div', 'seg chips');
@@ -680,19 +705,16 @@ function levSezRegole(g, st, ridisegna) {
   det.append(si);
 
   const min = D.target?.min_p_per_pasto;
-  if (min > 0) {
-    det.append(el('div', 'lev-reg-t', 'Proteine'));
-    const sr = el('div', 'seg chips');
-    sr.append(chip(`Colazione, pranzo e cena non scendono sotto ${nf(min)} g`, regole.proteinePasto,
-      () => { regole.proteinePasto = !regole.proteinePasto; }));
-    det.append(sr);
-  }
+  if (min > 0) det.append(levInterruttore(`Almeno ${nf(min)} g di proteine a colazione, pranzo e cena`,
+    'Un pasto che ci arriva non scende sotto; uno che non ci arriva non perde proteine.',
+    regole.proteinePasto, () => cambia(() => { regole.proteinePasto = !regole.proteinePasto; })));
+
   if (regole.scartati.length) {
     const r = el('div', 'lev-reg-sc',
       `<span>${regole.scartati.length === 1 ? 'Una proposta scartata' : regole.scartati.length + ' proposte scartate'}</span>`);
-    const b = el('button', 'btn sm', 'Ripristina');
+    const b = el('button', 'lev-link', 'Ripristina');
     b.type = 'button';
-    b.onclick = () => { regole.scartati = []; save(); st.regoleAperte = true; ridisegna(); };
+    b.onclick = () => cambia(() => { regole.scartati = []; });
     r.append(b);
     det.append(r);
   }
@@ -700,13 +722,25 @@ function levSezRegole(g, st, ridisegna) {
   return det;
 }
 
+/** Un interruttore di iOS in una riga: titolo, una riga sotto, il bottone a destra. */
+function levInterruttore(tit, sotto, on, fai) {
+  const b = el('button', 'lev-tg' + (on ? ' on' : ''));
+  b.type = 'button';
+  b.setAttribute('role', 'switch');
+  b.setAttribute('aria-checked', String(on));
+  b.innerHTML = `<span class="body"><span class="t">${esc(tit)}</span><span class="d">${esc(sotto)}</span></span>
+    <span class="mod-sw" aria-hidden="true"><i></i></span>`;
+  b.onclick = fai;
+  return b;
+}
+
 /**
- * `sheetLeve(gi, st)` — di quanto, e come.
+ * `sheetLeve(gi, st)` — quanto cambiare, e come.
  *
- * `st` e' lo stato del foglio: `{ sel, d: { p, c, g }, fermo }`. Senza, parte
- * dal macro piu' fuori del giorno con la prima proposta gia' nelle barre:
- * aprire il foglio e trovarlo vuoto vorrebbe dire far scegliere prima di aver
- * detto cosa c'e' da scegliere. Accetta anche `(gi, id, delta, fermo)`.
+ * `st` e' lo stato del foglio: `{ d: { p, c, g }, fermo }`. Senza, parte dal
+ * macro piu' fuori del giorno con la prima proposta gia' scelta: aprire il
+ * foglio e trovarlo vuoto vorrebbe dire far scegliere prima di aver detto
+ * cosa c'e' da scegliere. Accetta anche `(gi, id, delta, fermo)`.
  */
 function sheetLeve(gi, st, delta, fermo) {
   const g = D.settimana[gi];
@@ -714,14 +748,13 @@ function sheetLeve(gi, st, delta, fermo) {
   const t = D.target || {};
   const tot = levTotali((g.pasti || []).map(s => s.codice));
   if (typeof st === 'string')
-    st = { sel: st, d: { p: 0, c: 0, g: 0, [st]: delta || levDeltaVerso(st, tot, t) }, fermo: fermo || 'altri' };
+    st = { d: { p: 0, c: 0, g: 0, [st]: delta || levDeltaVerso(st, tot, t) }, fermo: fermo || 'altri' };
   st ||= levPartenza(tot, t);
-  const ridisegna = () => sheetLeve(gi, st);
 
   const w = el('div');
   w.append(el('h2', 'sec', 'Aggiusta i macro'));
   w.lastChild.style.marginTop = '0';
-  w.append(el('p', 'muted lev-sub', `${esc(capIniziale(g.giorno || ''))} · tocca un macro per regolarlo`));
+  w.append(el('p', 'muted lev-sub', `${esc(capIniziale(g.giorno || ''))} · ${nf(tot.kcal)} kcal`));
 
   const assegnati = (g.pasti || []).filter(x => pasto(x.codice)).length;
   if (!assegnati) {
@@ -736,58 +769,13 @@ function sheetLeve(gi, st, delta, fermo) {
     return;
   }
 
-  const barre = el('div');
-  w.append(barre);
+  const cPiano = typeof controlloPiano === 'function' ? controlloPiano() : null;
+  const statoDi = kc => cPiano && typeof statoGiorno === 'function' ? statoGiorno(kc, assegnati, cPiano) : null;
+  const statoOra = statoDi(tot.kcal || 0);
 
-  /* --- di quanto, per il macro scelto --- */
-  const voce = levVoce(st.sel);
-  const cur = el('div', 'field cursore lev-cur');
-  cur.innerHTML = `<label><span>${voce.n}</span><b></b></label>
-    <input type="range" min="${-voce.max}" max="${voce.max}" step="${voce.passo}" value="${st.d[voce.id] || 0}"
-      aria-label="Di quanto spostare ${voce.art}, in grammi">
-    <div class="estremi"><span>−${voce.max} g</span><span>fermo</span><span>+${voce.max} g</span></div>`;
-  w.append(cur);
-  const rng = cur.querySelector('input');
-  const lab = cur.querySelector('b');
-
-  /* --- scorciatoie --- */
-  const az = el('div', 'lev-az');
-  const aTarget = el('button', 'btn sm', 'Porta a target');
-  aTarget.type = 'button';
-  aTarget.onclick = () => {
-    for (const v of LEV_VOCI) st.d[v.id] = levDeltaVerso(v.id, tot, t, false);
-    if (!LEV_VOCI.some(v => st.d[v.id])) { toast('Il giorno e\' gia\' a target'); return; }
-    st.fermo = 'altri';
-    ridisegna();
-  };
-  const aZero = el('button', 'btn sm', 'Tutti fermi');
-  aZero.type = 'button';
-  aZero.onclick = () => { st.d = { p: 0, c: 0, g: 0 }; ridisegna(); };
-  az.append(aTarget, aZero);
-  w.append(az);
-
-  /* --- cosa resta fermo: ha senso solo se qualcosa e' a zero --- */
-  const seg = el('div', 'seg lev-seg');
-  for (const [f, n] of [['altri', 'Gli altri fermi'], ['kcal', 'Calorie ferme']]) {
-    const b = el('button', null, n);
-    b.type = 'button';
-    b.setAttribute('aria-pressed', String(f === st.fermo));
-    b.onclick = () => { st.fermo = f; ridisegna(); };
-    seg.append(b);
-  }
-  w.append(seg);
-
-  const lista = el('div', 'lev-lista');
-  w.append(lista);
-
-  const ok = el('button', 'btn pri wide', 'Applica al piano');
-  ok.style.marginTop = '14px';
-  w.append(ok);
-  w.append(el('p', 'note', `Cambia il piano: vale per tutti i ${
-    esc(String(g.giorno || 'giorni').toLowerCase())}. Per un giorno solo ci sono le porzioni in Oggi.`));
-
-  w.append(levSezRegole(g, st, ridisegna));
-
+  const corpo = el('div');
+  w.append(corpo);
+  w.append(levSezRegole(g, st, () => sheetLeve(gi, st)));
   const det = el('details', 'fc-det');
   det.append(el('summary', null, '<span>Come sceglie</span>'));
   det.append(el('p', 'note',
@@ -799,95 +787,147 @@ function sheetLeve(gi, st, delta, fermo) {
     + 'toccano meno. Gli alimenti nuovi vengono dalle ricette dello stesso momento della giornata e '
     + 'dalla dispensa; una ricetta nuova entra ripesata tra la metà e il doppio delle sue dosi.'));
   w.append(det);
-
   const x = el('button', 'btn wide', 'Chiudi');
   x.style.marginTop = '10px';
   x.onclick = closeSheet;
   w.append(x);
 
-  const cPiano = typeof controlloPiano === 'function' ? controlloPiano() : null;
-  const statoDi = kc => cPiano && typeof statoGiorno === 'function' ? statoGiorno(kc, assegnati, cPiano) : null;
-  const statoOra = statoDi(tot.kcal || 0);
-
-  let scelta = null;
-  const scegliMacro = id => { if (id !== st.sel) { st.sel = id; ridisegna(); } };
-  const mostra = m => {
-    scelta = m;
-    barre.innerHTML = '';
-    barre.append(levBarre(tot, m ? m.dopo : tot, t, st, scegliMacro));
-    ok.disabled = !m;
-    lista.querySelectorAll('.lev-p').forEach(b =>
-      b.firstChild.setAttribute('aria-pressed', String(b._m === m)));
-  };
-
-  /* Il cursore ridisegna solo l'elenco e le barre: rifare il foglio intero a
-     ogni scatto gli toglierebbe il dito di sotto. */
+  /* Il conto si rifa' solo quando cambia la domanda; scegliere una proposta
+     ridisegna e basta. */
+  let ris = null, proposte = [], scelta = null;
+  const chiesto = () => LEV_VOCI.some(v => st.d[v.id]);
+  const modo = () => LEV_VOCI.every(v => st.d[v.id]) ? 'altri' : st.fermo;
   const calcola = () => {
-    st.d[voce.id] = +rng.value;
-    const dv = st.d[voce.id];
-    lab.textContent = dv ? `${levSegno(dv)} g` : 'fermo';
-    const tutti = LEV_VOCI.every(v => st.d[v.id]);
-    seg.hidden = tutti;
-    const fermo = tutti ? 'altri' : st.fermo;
-    lista.innerHTML = '';
-    if (!LEV_VOCI.some(v => st.d[v.id])) {
-      lista.append(el('p', 'muted lev-vuoto', 'Sposta il cursore, o tocca "Porta a target".'));
-      mostra(null);
+    ris = chiesto() ? leveGiorno(gi, st.d, modo()) : null;
+    /* due per tipo, poi tutte insieme per costo: cosi' una dose, un alimento
+       e una ricetta si vedono anche quando uno dei tre vince sempre */
+    proposte = ris ? [...ris.porzioni.slice(0, 2), ...ris.nuovi.slice(0, 2), ...ris.ricette.slice(0, 2)]
+      .sort((a, b) => (b.buona - a.buona) || (a.costo - b.costo)).slice(0, 5) : [];
+    scelta = proposte.find(m => m.buona) || proposte[0] || null;
+  };
+  const cambia = (id, dv) => { st.d[id] = dv; calcola(); disegna(); };
+
+  const disegna = () => {
+    corpo.innerHTML = '';
+
+    /* --- quanto cambiare --- */
+    const h = el('div', 'lev-hh');
+    h.append(el('h3', 'lev-h', 'Quanto cambiare'));
+    const lk = el('span', 'lev-links');
+    const aT = el('button', 'lev-link', 'Porta a target');
+    aT.type = 'button';
+    aT.onclick = () => {
+      for (const v of LEV_VOCI) st.d[v.id] = levDeltaVerso(v.id, tot, t, false);
+      if (!chiesto()) { toast('Il giorno e\' gia\' a target'); return; }
+      calcola(); disegna();
+    };
+    lk.append(aT);
+    if (chiesto()) {
+      const aZ = el('button', 'lev-link', 'Azzera');
+      aZ.type = 'button';
+      aZ.onclick = () => { st.d = { p: 0, c: 0, g: 0 }; calcola(); disegna(); };
+      lk.append(aZ);
+    }
+    h.append(lk);
+    corpo.append(h);
+
+    const grp = el('div', 'lev-grp');
+    const dopo = scelta ? scelta.dopo : tot;
+    for (const v of LEV_VOCI) grp.append(levRigaMacro(v, tot, dopo, t, { ...st, fermo: modo() }, cambia));
+    const dk = (dopo.kcal || 0) - (tot.kcal || 0);
+    grp.append(el('div', 'lev-kcal',
+      `<span>Calorie</span><span>${Math.abs(dk) >= 1
+        ? `${nf(tot.kcal)} → <b>${nf(dopo.kcal)}</b>` : `<b>${nf(tot.kcal)}</b>`} kcal${
+        t.kcal ? ` <em>· target ${nf(t.kcal)}</em>` : ''}</span>`));
+    corpo.append(grp);
+    corpo.append(el('div', 'leg lev-leg',
+      '<span><i class="lev-sw"></i>adesso</span><span><i class="lev-sw piu"></i>in più</span>'
+      + '<span><i class="lev-sw meno"></i>in meno</span><span><i class="lev-sw tacca"></i>target</span>'));
+
+    /* "Calorie ferme" ha senso solo se qualcosa e' su "uguale" e qualcosa no */
+    if (chiesto() && modo() === st.fermo && LEV_VOCI.some(v => !st.d[v.id])) {
+      const tg = el('div', 'lev-grp lev-grp-tg');
+      tg.append(levInterruttore('Calorie ferme',
+        st.fermo === 'kcal' ? 'I macro liberi si spostano per tenere le calorie dove sono.'
+          : 'Accesa, i macro su "uguale" possono muoversi per tenere ferme le calorie.',
+        st.fermo === 'kcal', () => { st.fermo = st.fermo === 'kcal' ? 'altri' : 'kcal'; calcola(); disegna(); }));
+      corpo.append(tg);
+    }
+
+    /* --- come farlo --- */
+    corpo.append(el('h3', 'lev-h', 'Come farlo'));
+    if (!chiesto()) {
+      corpo.append(el('p', 'muted lev-vuoto', 'Usa − e + accanto a un macro, oppure "Porta a target".'));
       return;
     }
-    const r = leveGiorno(gi, st.d, fermo);
-    const gruppi = [['Cambiando le quantità', r.porzioni], ['Aggiungendo un alimento', r.nuovi],
-                    ['Cambiando una ricetta', r.ricette]];
-    const tutte = [...r.porzioni, ...r.nuovi, ...r.ricette];
-    const buone = tutte.filter(m => m.buona);
-    if (!buone.length) {
-      lista.append(el('p', 'muted lev-vuoto', tutte.length
-        ? 'Tenendo fermo il resto non ci si arriva: queste sono le più vicine.'
-        : 'Con le ricette e le regole di questo giorno non c\'è un modo di farlo. '
-          + 'Prova uno spostamento più piccolo, le calorie ferme, o meno blocchi.'));
+    /* la regola delle proteine ha tolto delle proposte: si dice, e si puo'
+       spegnere da qui senza andare a cercarla */
+    if (ris.escluse && levRegole().proteinePasto) {
+      /* senza numero: le escluse sono varianti della stessa idea, e "10
+         proposte escluse" prometteva dieci alternative che non ci sono */
+      const r = el('div', 'lev-escl', `<span>Ce ne sono altre, escluse perché toglierebbero proteine
+        a un pasto principale sotto i ${nf(D.target.min_p_per_pasto)} g.</span>`);
+      const b = el('button', 'lev-link', 'Mostrale');
+      b.type = 'button';
+      b.onclick = () => { levRegole().proteinePasto = false; save(); toast('Regola delle proteine spenta'); sheetLeve(gi, st); };
+      r.append(b);
+      corpo.append(r);
     }
-    for (const [tit, arr] of gruppi) {
-      if (!arr.length) continue;
-      lista.append(el('h3', 'lev-h', tit));
-      const grp = el('div', 'lev-grp');
-      for (const m of arr) {
-        const riga = el('div', 'lev-p');
-        riga._m = m;
-        const b = el('button', 'lev-pb');
-        b.type = 'button';
-        const sg = statoDi(m.dopo.kcal || 0);
-        const verdetto = sg && statoOra && sg.stato !== statoOra.stato
-          ? ` <span class="pill ${sg.cls}">${esc(sg.eti)}</span>` : '';
-        b.innerHTML = `<div class="grow">${levCosa(m, g)}<div class="lev-e">${levEffetto(m, r.righe)}${verdetto}</div></div>
-          <span class="lev-ck" aria-hidden="true"></span>`;
-        b.onclick = () => mostra(m);
-        const no = el('button', 'lev-x', '×');
+    if (!proposte.length) {
+      corpo.append(el('p', 'muted lev-vuoto',
+        'Con le ricette e le regole di questo giorno non c\'è un modo di farlo. '
+        + 'Prova uno spostamento più piccolo, le calorie ferme, o meno blocchi.'));
+      return;
+    }
+    if (!proposte.some(m => m.buona))
+      corpo.append(el('p', 'muted lev-vuoto', 'Tenendo fermo il resto non ci si arriva: queste sono le più vicine.'));
+    corpo.append(el('p', 'note lev-dove', `Cambia il piano di tutti i ${
+      esc(String(g.giorno || 'giorni').toLowerCase())}. Per un giorno solo ci sono le porzioni in Oggi.`));
+
+    const lista = el('div', 'lev-grp');
+    for (const m of proposte) {
+      const on = m === scelta;
+      const card = el('div', 'lev-p' + (on ? ' on' : ''));
+      const b = el('button', 'lev-pb');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(on));
+      const tag = m.tipo === 'nuovo' ? '<span class="pill">alimento in più</span>'
+        : m.tipo === 'ricetta' ? '<span class="pill">altra ricetta</span>' : '';
+      const sg = statoDi(m.dopo.kcal || 0);
+      const verdetto = sg && statoOra && sg.stato !== statoOra.stato
+        ? `<span class="pill ${sg.cls}">${esc(sg.eti)}</span>` : '';
+      b.innerHTML = `<div class="grow">${levCosa(m, g)}
+          <div class="lev-e">${levEffetto(m, ris.righe)}${tag}${verdetto}</div></div>
+        <span class="lev-ck" aria-hidden="true"></span>`;
+      b.onclick = () => { if (!on) { scelta = m; disegna(); } };
+      card.append(b);
+      if (on) {
+        const az = el('div', 'lev-pa');
+        const ok = el('button', 'btn pri sm', 'Applica al piano');
+        ok.type = 'button';
+        ok.onclick = () => {
+          levApplica(gi, m);
+          closeSheet(); route();
+          toast(`${capIniziale(g.giorno || 'Giorno')}: ${LEV_VOCI.filter(v => st.d[v.id])
+            .map(v => `${levSegno(m.d[v.id])} g di ${v.n.toLowerCase()}`).join(', ')}`);
+        };
+        const no = el('button', 'lev-link', 'Non propormela più');
         no.type = 'button';
-        no.title = 'Non propormela più';
-        no.setAttribute('aria-label', 'Non propormela più');
         no.onclick = () => {
           levRegole().scartati.push(levFirma(m));
           save();
-          toast('Non la propongo più · si ripristina dalle regole');
-          calcola();
+          toast('Scartata · si ripristina da "Cosa non toccare"');
+          calcola(); disegna();
         };
-        riga.append(b, no);
-        grp.append(riga);
+        az.append(ok, no);
+        card.append(az);
       }
-      lista.append(grp);
+      lista.append(card);
     }
-    mostra(buone[0] || tutte[0] || null);
-  };
-  rng.oninput = calcola;
-
-  ok.onclick = () => {
-    if (!scelta) return;
-    levApplica(gi, scelta);
-    closeSheet(); route();
-    toast(`${capIniziale(g.giorno || 'Giorno')}: ${LEV_VOCI.filter(v => st.d[v.id])
-      .map(v => `${levSegno(scelta.d[v.id])} g di ${v.n.toLowerCase()}`).join(', ')}`);
+    corpo.append(lista);
   };
 
   calcola();
+  disegna();
   sheet(w);
 }

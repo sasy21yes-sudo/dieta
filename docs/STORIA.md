@@ -1480,6 +1480,40 @@ richieste (7 giorni × 10 combinazioni, una o piu' voci, porta a target
 compreso, × 2 modalita') tutte con almeno una proposta valida; 4 ms di
 mediana e 14 al massimo.
 
+### Aggiusta i macro: il foglio come una domanda e la sua risposta
+
+Poi: *"un po' confusionario"*. Ed era vero: le barre facevano da selettore
+senza sembrarlo, un cursore solo regolava "quello scelto", sotto c'erano due
+bottoni, un segmented con due modi, tre elenchi con un titolo ciascuno, una ×
+su ogni riga, il bottone in fondo, le regole e il come. Dieci cose da capire
+prima di cambiare un numero.
+
+Adesso il foglio si legge dall'alto in basso:
+
+1. **Quanto cambiare**: una riga per macro con il suo stepper − / + accanto,
+   come in iOS. Nella stessa riga il numero di adesso e quello di dopo, il
+   target e la barra: il comando e il grafico sono la stessa cosa, e non c'e'
+   niente da selezionare prima. Sopra, due link: "Porta a target" e "Azzera".
+   "Calorie ferme" e' un interruttore di iOS con una riga che dice cosa fa, e
+   compare solo quando ha senso (qualcosa su "uguale", qualcosa no). I macro
+   su "uguale" diventano "libero" quando le calorie sono ferme.
+2. **Come farlo**: un elenco solo, al massimo cinque (due per tipo, poi per
+   costo), il migliore gia' scelto. Il tipo lo dice una pastiglia ("alimento
+   in piu'", "altra ricetta"). La riga dell'effetto scrive i macro chiesti e,
+   degli altri, solo quelli che si muovono di almeno un grammo: "0 G" sotto
+   ogni proposta era rumore. **La proposta scelta si apre** e porta i suoi due
+   bottoni, "Applica al piano" e "Non propormela piu'": niente bottone in
+   fondo lontano da quello che applica, niente × accanto a ogni spunta.
+3. In fondo, chiusi: **Cosa non toccare** (era "Regole") e Come sceglie.
+
+E una cosa trovata guardandolo: con grassi −10 il mercoledi' restavano due
+ricette e basta, senza spiegazione. La regola delle proteine aveva tolto le
+combinazioni migliori, perche' toglievano il burro d'arachidi a una colazione
+gia' a 23 g. La regola e' giusta, il silenzio no: adesso una riga dice che ce
+ne sono altre escluse e perche', con "Mostrale" che la spegne. Senza numero,
+perche' le escluse sono varianti della stessa idea e "10 proposte escluse"
+prometteva dieci alternative che non c'erano.
+
 ### Il mese degli allenamenti
 
 La striscia dei giorni risponde a *questa settimana*: tre settimane, e si apre

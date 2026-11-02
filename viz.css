@@ -2424,70 +2424,98 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .tg-piano .go{color:var(--ink-3);font-size:18px}
 
 /* ================================================== aggiusta i macro
-   Le barre sono il selettore: una riga per macro, il prima pieno, il dopo
-   nella stessa tinta schiarita, il tolto vuoto col bordo, la tacca del
-   target. La riga scelta prende il riempimento grigio, come una cella
-   selezionata di iOS. */
-.lev-sub{margin:2px 0 10px;font-size:13px}
-.lev-barre{margin:0 -8px}
-.lev-r{display:grid;grid-template-columns:86px 1fr 74px;align-items:center;gap:10px;
-  width:100%;padding:9px 8px;border:0;border-radius:10px;background:none;color:var(--ink);
-  font:inherit;text-align:left;cursor:pointer}
-.lev-r[aria-pressed=true]{background:var(--wash)}
-.lev-r[aria-pressed=true] .lev-n{font-weight:600}
-.lev-n{font-size:14px}
-.lev-t{position:relative;height:12px;border-radius:6px;background:var(--wash)}
-.lev-r[aria-pressed=true] .lev-t{background:var(--paper)}
-.lev-t i{position:absolute;top:0;bottom:0;display:block;border-radius:6px}
+   Una riga per macro: nome e numeri a sinistra, lo spostamento chiesto e lo
+   stepper di iOS a destra, la barra sotto (adesso pieno, in piu' schiarito,
+   in meno vuoto col bordo, tacca del target). Le righe stanno in un gruppo
+   --wash come le celle di Impostazioni dentro un foglio. */
+.lev-sub{margin:2px 0 4px;font-size:13px}
+.lev-hh{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.lev-h{font-size:13px;font-weight:600;color:var(--ink-2);margin:18px 2px 7px}
+.lev-links{display:flex;gap:14px}
+.lev-link{border:0;background:none;padding:0;font:inherit;font-size:14px;color:var(--pine);
+  cursor:pointer}
+.lev-grp{background:var(--wash);border-radius:12px;overflow:hidden}
+.lev-grp-tg{margin-top:10px}
+
+.lev-m{padding:11px 12px 12px;position:relative}
+.lev-m+.lev-m::before,.lev-kcal::before{content:'';position:absolute;top:0;left:12px;right:0;
+  height:1px;background:var(--rule)}
+.lev-m-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.lev-m-l{flex:1;min-width:0;display:flex;flex-direction:column}
+.lev-m-n{font-size:15px;font-weight:600}
+.lev-m-v{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lev-m-v b{color:var(--ink);font-weight:600}
+.lev-m-v em{font-style:normal;color:var(--ink-3)}
+.lev-m-d{flex:none;min-width:50px;text-align:right;font-size:13px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums}
+.lev-m-d.on{color:var(--ink);font-weight:600;font-size:15px}
+.lev-step{flex:none;display:flex;background:var(--paper);border-radius:8px;overflow:hidden}
+.lev-step button{width:40px;height:32px;border:0;background:none;color:var(--ink);font-size:20px;
+  line-height:1;cursor:pointer;padding:0;position:relative}
+.lev-step button+button::before{content:'';position:absolute;left:0;top:7px;bottom:7px;width:1px;
+  background:var(--rule)}
+.lev-step button:active{background:var(--rule)}
+.lev-step button:disabled{color:var(--ink-3);opacity:.5}
+.lev-t{position:relative;height:8px;border-radius:4px;background:var(--paper)}
+.lev-t i{position:absolute;top:0;bottom:0;display:block;border-radius:4px}
 .lev-a{left:0;background:var(--col)}
 .lev-piu{background:color-mix(in srgb,var(--col) 40%,transparent)}
 .lev-meno{box-shadow:inset 0 0 0 1.5px var(--col)}
-.lev-t b{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;
-  border-radius:1px;background:var(--ink)}
-.lev-v{font-size:14px;font-weight:600;text-align:right;white-space:nowrap;
-  font-variant-numeric:tabular-nums}
-.lev-v s{color:var(--ink-3);font-weight:400;text-decoration:none;font-size:12px}
-.lev-v s::after{content:' →'}
-.lev-v em{font-style:normal;font-weight:400;color:var(--ink-3);font-size:11px;margin-left:1px}
-.lev-kcal{display:flex;justify-content:space-between;gap:10px;padding:8px 8px 0;
+.lev-t b{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;border-radius:1px;
+  background:var(--ink)}
+.lev-kcal{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;position:relative;
   font-size:13.5px;font-variant-numeric:tabular-nums}
 .lev-kcal em{font-style:normal;color:var(--ink-3)}
-.lev-barre .leg{padding:0 8px}
+.lev-leg{margin:7px 2px 0}
 .lev-sw{background:var(--ink-2)}
 .lev-sw.piu{background:color-mix(in srgb,var(--ink-2) 40%,transparent)}
 .lev-sw.meno{background:none;box-shadow:inset 0 0 0 1.5px var(--ink-2)}
 .lev-sw.tacca{width:2px!important;border-radius:1px!important;background:var(--ink)}
-.lev-cur{margin-top:14px}
-.lev-seg{margin-top:4px}
-.lev-h{font-size:13px;font-weight:600;color:var(--ink-2);margin:16px 2px 6px}
-.lev-grp{background:var(--wash);border-radius:12px;overflow:hidden}
-.lev-p{display:flex;align-items:stretch;position:relative}
-.lev-p+.lev-p::before{content:'';position:absolute;top:0;left:12px;right:0;height:1px;background:var(--rule)}
-.lev-pb{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:11px 4px 11px 12px;border:0;
+
+/* l'interruttore: la riga di Impostazioni, col bottone a destra */
+.lev-tg{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:0;
   background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
-.lev-x{flex:none;width:40px;border:0;background:none;color:var(--ink-3);font-size:20px;line-height:1;
-  cursor:pointer;padding:0}
-.lev-x:active{color:var(--ink)}
-.lev-add{color:var(--pine);font-weight:600}
-.lev-n small{display:block;font-size:11.5px;font-weight:400;color:var(--ink-3);
-  font-variant-numeric:tabular-nums}
-.lev-n small.chiesto{color:var(--ink);font-weight:600}
-.lev-az{display:flex;gap:8px;margin:2px 0 10px}
-.lev-az .btn{flex:1}
-.lev-reg-t{font-size:12.5px;font-weight:600;color:var(--ink-2);margin:10px 0 6px}
-.lev-reg .seg.chips button{min-height:30px;font-size:13px;padding:5px 11px}
-.lev-reg-sc{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;
-  font-size:13.5px}
-.lev-c{font-size:14px;line-height:1.35}
-.lev-c .mt{display:block;font-size:11.5px;color:var(--ink-3)}
-.lev-c+.lev-c{margin-top:5px}
-.lev-pesi{font-size:12.5px;color:var(--ink-2)}
-.lev-e{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px;font-size:12px;
+.lev-tg .body{flex:1;min-width:0}
+.lev-tg .t{display:block;font-size:15px}
+.lev-tg .d{display:block;font-size:12.5px;color:var(--ink-3);line-height:1.35;margin-top:2px}
+.lev-tg .mod-sw{flex:none;width:51px;height:31px;margin:0;background:rgba(118,118,128,.24);box-shadow:none}
+.lev-tg .mod-sw i{top:2px;left:2px;width:27px;height:27px}
+.lev-tg.on .mod-sw{background:var(--pine)}
+.lev-tg.on .mod-sw i{transform:translateX(20px)}
+
+/* le proposte: la scelta ha la spunta e porta i suoi due bottoni */
+.lev-dove{margin:-2px 2px 8px}
+.lev-p{position:relative}
+.lev-p+.lev-p::before{content:'';position:absolute;top:0;left:12px;right:0;height:1px;
+  background:var(--rule);z-index:1}
+.lev-pb{display:flex;align-items:flex-start;gap:10px;width:100%;padding:12px;border:0;
+  background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.lev-c{font-size:14.5px;line-height:1.4}
+.lev-c .mt{display:block;font-size:12px;color:var(--ink-3);margin-bottom:1px}
+.lev-c b{font-weight:600}
+.lev-c+.lev-c{margin-top:7px}
+.lev-pesi{display:block;font-size:13px;color:var(--ink-2);margin-top:2px}
+.lev-add{color:var(--pine);font-weight:700}
+.lev-e{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:7px;font-size:12.5px;
   color:var(--ink-3);font-variant-numeric:tabular-nums}
 .lev-e .lev-fatto{color:var(--ink);font-weight:600}
 .lev-e .fuori{color:var(--amber);font-weight:600}
-.lev-ck{flex:none;width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--rule)}
-.lev-pb[aria-pressed=true] .lev-ck{box-shadow:none;background:var(--pine)
+.lev-e .pill{font-family:var(--sans);font-size:11px}
+.lev-ck{flex:none;width:22px;height:22px;margin-top:1px;border-radius:50%;
+  box-shadow:inset 0 0 0 1.5px var(--ink-3);opacity:.6}
+.lev-pb[aria-pressed=true] .lev-ck{opacity:1;box-shadow:none;background:var(--pine)
   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E") center/14px no-repeat}
-.lev-vuoto{margin:14px 2px 0;font-size:13.5px}
+.lev-pa{display:flex;align-items:center;gap:16px;padding:0 12px 12px}
+.lev-pa .btn{flex:none}
+.lev-vuoto{margin:2px 2px 10px;font-size:13.5px}
+.lev-escl{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 2px 10px;
+  font-size:13px;color:var(--ink-2);line-height:1.4}
+.lev-escl .lev-link{flex:none;font-size:13.5px}
+
+/* le regole */
+.lev-reg-t{font-size:12.5px;font-weight:600;color:var(--ink-2);margin:10px 0 6px}
+.lev-reg .seg.chips button{min-height:30px;font-size:13px;padding:5px 11px}
+.lev-reg .lev-tg{padding:12px 0 4px}
+.lev-reg-sc{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;
+  font-size:13.5px}
 button.btn:disabled{opacity:.4}
