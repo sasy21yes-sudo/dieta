@@ -334,6 +334,21 @@ function casiGeneraSettimana() {
     ev.piano.ricette[0]?.ingredienti[0].alimento === 'olio EVO' && sola?.ingredienti[0].alimento === 'olio EVO',
     ev.avvisi.join(' | '));
 
+  // tre "Spuntino" nello stesso giorno: ognuno prende il suo, nell'ordine
+  const sett = JSON.parse(JSON.stringify(D.settimana));
+  sett[5].pasti = [{ slot: 'Spuntino', ora: null, codice: null }, { slot: 'Spuntino', ora: null, codice: null },
+                   { slot: 'Pranzo', ora: '13:00', codice: null }, { slot: 'Spuntino', ora: '16:30', codice: null }];
+  piano().settimana = sett; fondiPiano();
+  const tre = ai.valida('generaSettimana', JSON.stringify({ azioni: [
+    { tipo: 'assegnaPasto', giorno: 5, slot: 'Spuntino', codice: 'S1' },
+    { tipo: 'assegnaPasto', giorno: 5, slot: 'Spuntino', codice: 'S2' },
+    { tipo: 'assegnaPasto', giorno: 5, slot: 'Pranzo', codice: 'P1' },
+    { tipo: 'assegnaPasto', giorno: 5, slot: 'Spuntino', codice: 'S6' }] }), {});
+  verifica('tre pasti con lo stesso nome prendono tre ricette, non una sopra l\'altra',
+    tre.piano.giorni[5].pasti.map(s => s.codice).join() === 'S1,S2,P1,S6',
+    tre.piano.giorni[5].pasti.map(s => s.codice).join());
+  delete piano().settimana; fondiPiano();
+
   // applicata, e poi tolta
   const prima = JSON.stringify(D.settimana.map(g => g.pasti.map(s => s.codice)));
   pgS = { passo: 'piano', modo: 'misto', prop: res, fatto: false };

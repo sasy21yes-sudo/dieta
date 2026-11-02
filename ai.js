@@ -782,7 +782,13 @@ class AI {
     for (const a of lista.filter(x => x?.tipo === 'assegnaPasto')) {
       const g = giorni[+a.giorno];
       if (!g) { avvisi.push('Un giorno fuori dalla settimana: scartato.'); continue; }
-      const sl = g.pasti.find(s => norm(s.slot) === norm(a.slot));
+      /* Un giorno puo' avere tre "Spuntino" (il sabato dell'esempio): si
+         riempie il primo **ancora libero** con quel nome, nell'ordine in cui
+         arrivano. Prima si prendeva sempre il primo, e tre spuntini finivano
+         uno sopra l'altro lasciando vuoti gli altri due. */
+      const omonimi = g.pasti.filter(s => norm(s.slot) === norm(a.slot));
+      const sl = omonimi.find(s => !s.preso) || omonimi[0];
+      if (sl) sl.preso = true;
       if (!sl) { avvisi.push(`${capIniziale(g.nome)}: il pasto "${a.slot}" non c'e' nella struttura.`); continue; }
       const nuova = ricette.get(String(a.codice));
       const esist = !nuova && a.codice && typeof pasto === 'function' ? pasto(a.codice) : null;

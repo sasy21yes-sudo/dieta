@@ -1610,6 +1610,12 @@ macro calcolati sugli alimenti appena entrati, poi la settimana. Quella di
 prima resta in `settimanaPrima`, e "Torna alla settimana di prima" sta sia
 nel foglio sia nel passo Settimana.
 
+Al primo test vero, col contesto di chi lo usa: il sabato ha **tre pasti
+che si chiamano "Spuntino"**, e l'assegnazione cercava il pasto per nome
+prendendo sempre il primo. Tre spuntini finivano uno sopra l'altro e gli
+altri due restavano vuoti. Ora prende il primo ancora libero con quel nome,
+nell'ordine in cui arrivano le azioni.
+
 ### Il mese degli allenamenti
 
 La striscia dei giorni risponde a *questa settimana*: tre settimane, e si apre
