@@ -758,9 +758,11 @@ function dailyNoise() {
 
 /** Dispendio a priori: Mifflin-St Jeor × fattore di attività. */
 function priorTDEE() {
-  const p = D.profilo, w = lastWeight() ?? p.peso_iniziale_kg;
+  // il peso di tendenza e il fattore di attivita' di chi usa l'app: vedi
+  // pesoConti() e lafAttivo() in obiettivo.js
+  const p = D.profilo, w = typeof pesoConti === 'function' ? pesoConti() : lastWeight() ?? p.peso_iniziale_kg;
   const bmr = 10 * w + 6.25 * p.altezza_cm - 5 * p.eta + (p.sesso === 'm' ? 5 : -161);
-  return bmr * D.modello.laf;
+  return bmr * (typeof lafAttivo === 'function' ? lafAttivo().laf : D.modello.laf);
 }
 
 /**
@@ -800,7 +802,8 @@ function observedTDEE(k, span) {
  */
 let _mkey = null, _mval = null;
 function energyModel(k = today()) {
-  const sig = k + '|' + Object.keys(S.log).length + '|' + (S.model?.rev || 0);
+  const sig = k + '|' + Object.keys(S.log).length + '|' + (S.model?.rev || 0)
+    + '|' + (typeof lafAttivo === 'function' ? lafAttivo(k).laf : '') + '|' + (D.profilo?.eta || '');
   if (_mkey === sig) return _mval;
   const M = D.modello, days = Object.keys(S.log).filter(x => x <= k).sort();
   let mu = priorTDEE(), s2 = M.sigma_tdee_prior ** 2;
@@ -3417,7 +3420,8 @@ function forecastCard(k) {
           + `${E.n === 1 ? 'a' : 'e'} da quando registri. Allenamenti compresi: `
           + 'per questo le calorie bruciate non si sommano da nessuna parte.'
         : `ma per ora e\' solo una <strong>formula</strong> (Mifflin-St Jeor `
-          + `x ${M.laf}), non un dato tuo: diventa una misura dopo un paio di `
+          + `${lafTesto(lafAttivo(k).laf)}, ${lafAttivo(k).livello ? lafAttivo(k).livello.n.toLowerCase() : 'il fattore del modello'}`
+          + `${lafAttivo(k).fonte === 'dati' ? ' dai tuoi allenamenti e passi' : ''}), non un dato tuo: diventa una misura dopo un paio di `
           + 'settimane di pesate e di pasti registrati.')
     + ` Il margine di questa stima e\' di ±${nf(E.sigma)} kcal.`));
 

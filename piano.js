@@ -77,7 +77,10 @@ function targetNeutro() {
   const peso = piano().profilo?.peso_iniziale_kg;
   if (!(peso > 0 && pr.altezza_cm > 0 && pr.eta > 0)) return g;
   const bmr = 10 * peso + 6.25 * pr.altezza_cm - 5 * pr.eta + (pr.sesso === 'f' ? -161 : 5);
-  const kcal = Math.round(bmr * (DBASE.modello?.laf || 1.35) / 10) * 10;
+  /* il livello scelto in "Chi sei", se c'e'; qui D non e' ancora pronto, e
+     dedurlo dai dati sarebbe leggere uno stato a meta' */
+  const liv = typeof LIVELLI_ATTIVITA !== 'undefined' && LIVELLI_ATTIVITA.find(l => l.id === pr.attivita);
+  const kcal = Math.round(bmr * (liv ? liv.laf : DBASE.modello?.laf || 1.35) / 10) * 10;
   const prot = Math.round(peso * 2);
   const gr = Math.round(kcal * 0.25 / 9);
   return { ...g, kcal, p: prot, g: gr,
@@ -836,6 +839,7 @@ function sezProfilo(v) {
   };
   c.append(b);
   v.append(c);
+  if (typeof campoAttivita === 'function') v.append(campoAttivita(p));
 
   /* Il fisico di riferimento sta qui e non in "Quanto mangiare": parla del
      corpo a cui punti, non di quante calorie mangiare, e li' era la quarta

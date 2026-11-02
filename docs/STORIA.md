@@ -1514,6 +1514,49 @@ ne sono altre escluse e perche', con "Mostrale" che la spegne. Senza numero,
 perche' le escluse sono varianti della stessa idea e "10 proposte escluse"
 prometteva dieci alternative che non c'erano.
 
+### I target dell'obiettivo: quanto ti muovi, e quale peso
+
+Domanda: *"sicuro che i target ricomposizione eccetera siano corretti?"*. I
+macro reggono il confronto con la letteratura — proteine 2,2 g/kg in deficit e
+in ricomposizione (dentro i 1,6–2,2 di Morton 2018, e i 2,3–3,1 g/kg di massa
+magra di Helms 2014 per chi è magro e in deficit), 1,8 in mantenimento, 1,9 in
+crescita; grassi al 25% con il pavimento a 0,6 g/kg; ritmi 0,25–1% del peso a
+settimana in perdita e 0,15–0,5% in crescita; fibre a 14 g ogni 1000 kcal. Il
+problema era **da dove partivano le calorie**:
+
+- **il fattore di attività era fisso a 1,35 per tutti**. Finché il filtro di
+  Kalman non ha misurato il dispendio (due finestre da quattordici giorni con
+  pesate e pasti), la proposta è il metabolismo a riposo per quel fattore. Col
+  profilo dell'esempio (24 anni, 180 cm, 69,8 kg, palestra e HYROX) faceva
+  2300 kcal: "Ricomporsi" proponeva 180 kcal sotto il target del nutrizionista
+  (2482), e "Crescere" a 0,25% proponeva 2490, cioè quello che il
+  nutrizionista aveva scritto come mantenimento. Lo stesso 1,35 entrava nel
+  pavimento calorico e nel punto di partenza del filtro;
+- **il peso era l'ultima pesata**, non la tendenza: `pianoCalorico()`,
+  `pavimentoCalorico()` e `priorTDEE()` leggevano `lastWeight()` per primo.
+  Una mattina con 73,5 kg di acqua su una tendenza di 70 portava le proteine
+  da 155 a 162 g. È la regola di sempre (il peso si legge sulla tendenza), e
+  quei tre la saltavano.
+
+Ora in "Chi sei" c'è **Quanto ti muovi**: *Automatico* (il livello più alto
+fra quello degli allenamenti degli ultimi 28 giorni, contati con
+`allenatoIl()`, e quello dei passi) oppure uno dei cinque fattori di uso
+comune con Mifflin-St Jeor, 1,2 / 1,375 / 1,55 / 1,725 / 1,9, dichiarati come
+letteratura. Senza allenamenti né passi registrati resta il fattore del
+modello. `lafAttivo()` lo dà a proposta, pavimento e filtro; `pesoConti()` dà
+la tendenza a tutti e tre. La scelta sta in una carta sua: una riga toccata
+salva e ridisegna, e dentro la carta dei dati avrebbe buttato via i campi non
+ancora salvati.
+
+Sull'esempio, con lo stesso peso: poco attivo 2350 kcal in ricomposizione,
+attivo 2650, molto attivo 2950. Il target del nutrizionista, 2482, sta fra i
+primi due. È proprio per questo che il numero di partenza è una stima, e che
+conta quello misurato dopo tre settimane di registro.
+
+Corretto anche il testo dei ritmi: "Crescere" diceva *sopra il dispendio del
+10-15%* mentre a 0,25% a settimana il surplus è l'8%; ora dice dal 5 al 15%
+secondo il ritmo, e "Perdere grasso" dal 10 al 25%.
+
 ### Il mese degli allenamenti
 
 La striscia dei giorni risponde a *questa settimana*: tre settimane, e si apre

@@ -43,7 +43,7 @@ const OBIETTIVI = [
     ritmi: [-0.0025, -0.005, -0.0075, -0.01],
     ico: 'giu',
     d: 'Un deficit calorico, con le proteine alte per tenere il muscolo che hai.',
-    perche: 'Sotto il dispendio di circa il 15-20%. Il grasso e\' l\'unica cosa '
+    perche: 'Sotto il dispendio, dal 10 al 25% secondo il ritmo. Il grasso e\' l\'unica cosa '
       + 'che si toglie in fretta, e anche cosi\' "in fretta" vuol dire mesi.',
     p_per_kg: 2.2 },
   { id: 'ricomp', n: 'Ricomporsi', pct: 0, ritmi: null,
@@ -64,7 +64,7 @@ const OBIETTIVI = [
     ritmi: [0.0015, 0.0025, 0.0035, 0.005],
     ico: 'su',
     d: 'Un surplus piccolo. Piu' + '’ grande non fa crescere di piu\', fa ingrassare.',
-    perche: 'Sopra il dispendio del 10-15%. Il muscolo si costruisce a un ritmo '
+    perche: 'Sopra il dispendio, dal 5 al 15% secondo il ritmo. Il muscolo si costruisce a un ritmo '
       + 'suo, che il cibo in eccesso non accelera: quello che avanza diventa '
       + 'grasso e basta.',
     p_per_kg: 1.9 }
@@ -92,6 +92,125 @@ function bmrDi(peso, altezza, eta, sesso) {
 }
 
 /**
+ * Il peso con cui si fanno i conti: la **tendenza**, non la pesata del giorno.
+ *
+ * La proposta, il pavimento e il dispendio di partenza leggevano
+ * `lastWeight()`, cioe' l'ultima pesata cruda — un chilo d'acqua in piu' la
+ * mattina dopo una pizza alzava le proteine di due grammi e il pavimento di
+ * dieci calorie. E' la regola di sempre del progetto: il peso si legge sulla
+ * tendenza, con le pesate anomale escluse.
+ */
+function pesoConti(k = today()) {
+  return trendW(k) ?? lastWeight() ?? D.profilo?.peso_iniziale_kg ?? 70;
+}
+
+/* =================================================== quanto ti muovi
+ *
+ * Finche' il filtro non ha misurato niente, il dispendio e' il metabolismo a
+ * riposo per un fattore di attivita'. Il fattore era **fisso a 1,35 per
+ * tutti** — poco attivo — anche per chi si allena cinque volte a settimana:
+ * col profilo dell'esempio (24 anni, 180 cm, 69 kg, palestra e HYROX) faceva
+ * 2300 kcal, "Ricomporsi" proponeva 180 kcal sotto il target del
+ * nutrizionista e "Crescere" proponeva quello che il nutrizionista aveva
+ * scritto come mantenimento.
+ *
+ * I cinque livelli sono i fattori di uso comune con Mifflin-St Jeor: costanti
+ * di letteratura, non misure sull'utente, e la UI lo dice. In automatico il
+ * livello si deduce dagli ultimi 28 giorni — allenamenti (`allenatoIl()`, la
+ * regola unica) e passi — e se non c'e' niente da cui dedurlo resta quello
+ * del modello.
+ */
+const LIVELLI_ATTIVITA = [
+  { id: 'sed', n: 'Sedentario', laf: 1.2, d: 'Lavoro seduto, nessun allenamento.' },
+  { id: 'poco', n: 'Poco attivo', laf: 1.375, d: '1–2 allenamenti a settimana, o si cammina parecchio.' },
+  { id: 'att', n: 'Attivo', laf: 1.55, d: '3–5 allenamenti a settimana.' },
+  { id: 'molto', n: 'Molto attivo', laf: 1.725, d: '6–7 allenamenti a settimana.' },
+  { id: 'estr', n: 'Estremo', laf: 1.9, d: 'Lavoro fisico e allenamenti, o due sedute al giorno.' }
+];
+
+/** Il livello che dicono gli ultimi 28 giorni, o `null` se non dicono niente. */
+function attivitaDaiDati(k = today()) {
+  let allenati = 0;
+  const passi = [];
+  for (const d of lastDays(k, 28)) {
+    if (allenatoIl(d)) allenati++;
+    const p = S.log[d]?.passi;
+    if (p > 0) passi.push(p);
+  }
+  if (!allenati && passi.length < 10) return null;
+  const sett = allenati / 4;
+  const mp = passi.length >= 10 ? avg(passi) : null;
+  /* il livello piu' alto fra quello degli allenamenti e quello dei passi:
+     chi non registra la palestra ma cammina dodicimila passi non e' seduto */
+  const daAll = sett < 0.5 ? 0 : sett < 2.5 ? 1 : sett < 5.5 ? 2 : 3;
+  const daPassi = mp == null ? 0 : mp < 5000 ? 0 : mp < 10000 ? 1 : mp < 12500 ? 2 : 3;
+  return { livello: LIVELLI_ATTIVITA[Math.max(daAll, daPassi)], sett, passi: mp };
+}
+
+/**
+ * Il fattore di attivita' in uso, e da dove viene: scelto, dedotto dai dati,
+ * o quello del modello. Memorizzato: lo chiede `energyModel()`, che gira a
+ * ogni carta.
+ */
+let _lafKey = null, _lafVal = null;
+function lafAttivo(k = today()) {
+  const scelto = LIVELLI_ATTIVITA.find(l => l.id === D.profilo?.attivita);
+  if (scelto) return { laf: scelto.laf, livello: scelto, fonte: 'scelto' };
+  const key = k + '|' + Object.keys(S.log || {}).length + '|'
+    + JSON.stringify(S.palestra?.sessioni ? Object.keys(S.palestra.sessioni).length : 0) + '|'
+    + JSON.stringify(S.palestra?.cardio ? Object.keys(S.palestra.cardio).length : 0);
+  if (_lafKey === key) return _lafVal;
+  const dd = attivitaDaiDati(k);
+  _lafVal = dd ? { laf: dd.livello.laf, livello: dd.livello, fonte: 'dati', dati: dd }
+    : { laf: D.modello?.laf || 1.35, livello: null, fonte: 'modello' };
+  _lafKey = key;
+  return _lafVal;
+}
+
+/** Un fattore scritto come si legge: ×1,2, ×1,375, ×1,55. */
+const lafTesto = x => '×' + nf(x, 3).replace(/0+$/, '').replace(/,$/, '');
+
+/**
+ * "Quanto ti muovi", in una carta sua sotto i dati del profilo: una riga
+ * toccata salva subito e ridisegna, e dentro la carta dei dati avrebbe
+ * buttato via quello che stavi scrivendo nei campi prima di "Salva".
+ */
+function campoAttivita(p) {
+  const f = el('div', 'card');
+  f.append(el('h2', 'sec', 'Quanto ti muovi'));
+  f.lastChild.style.marginTop = '0';
+  const dd = attivitaDaiDati();
+  const grp = el('div', 'att-grp');
+  const riga = (id, tit, sotto) => {
+    const on = (D.profilo.attivita || null) === id;
+    const b = el('button', 'att-r');
+    b.type = 'button';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(on));
+    b.innerHTML = `<span class="body"><span class="t">${esc(tit)}</span><span class="d">${sotto}</span></span>
+      <span class="att-ck" aria-hidden="true">${on ? '✓' : ''}</span>`;
+    b.onclick = () => {
+      if (id) p.profilo.attivita = id; else delete p.profilo.attivita;
+      save(); fondiPiano(); route();
+      toast(id ? 'Livello di attivita\' aggiornato' : 'Livello dedotto dai tuoi dati');
+    };
+    grp.append(b);
+  };
+  const cosa = dd ? [dd.sett ? `${nf(dd.sett, 1)} allenamenti a settimana` : '',
+                     dd.passi ? `${nf(dd.passi)} passi al giorno` : ''].filter(Boolean).join(', ') : '';
+  riga(null, 'Automatico', dd
+    ? `Ultimi 28 giorni: ${cosa} → <b>${esc(dd.livello.n.toLowerCase())}</b>`
+    : `Servono allenamenti o passi registrati: per ora vale ${lafTesto(D.modello?.laf || 1.35)}.`);
+  for (const l of LIVELLI_ATTIVITA) riga(l.id, l.n, `${esc(l.d)} ${lafTesto(l.laf)}`);
+  f.append(grp);
+  f.append(el('div', 'hint',
+    'Moltiplica il metabolismo a riposo finché l\'app non ha misurato il tuo dispendio, cioè per le '
+    + 'prime due o tre settimane di pesate e pasti registrati. Poi conta la misura. I fattori sono '
+    + 'di letteratura, non misure su di te.'));
+  return f;
+}
+
+/**
  * La proposta completa: calorie e macro, con scritto da dove escono.
  *
  * Il dispendio e' quello **misurato** appena il motore ha abbastanza storia;
@@ -102,13 +221,13 @@ function bmrDi(peso, altezza, eta, sesso) {
 function pianoCalorico(idObiettivo, pctScelta, k = today()) {
   const ob = obiettivoDi(idObiettivo);
   const pct = pctScelta ?? ob.pct;
-  const peso = lastWeight() ?? trendW(k) ?? D.profilo.peso_iniziale_kg ?? 70;
+  const peso = pesoConti(k);
   const h = D.profilo.altezza_cm, eta = D.profilo.eta, sesso = D.profilo.sesso;
   const bmr = bmrDi(peso, h, eta, sesso);
 
   const E = typeof energyModel === 'function' ? energyModel(k) : { tdee: null, n: 0 };
   const misurato = E.n >= 2 && E.tdee > 0;
-  const tdee = misurato ? E.tdee : Math.round(bmr * (D.modello?.laf || 1.35));
+  const tdee = misurato ? E.tdee : Math.round(bmr * lafAttivo(k).laf);
 
   /* Il ritmo in kg a settimana, e da li' le calorie: 7700 kcal per chilo e'
      la densita' del tessuto adiposo, gia' nel modello. Vale per il grasso —
@@ -162,11 +281,11 @@ function pianoCalorico(idObiettivo, pctScelta, k = today()) {
  * prima o poi diventano tre soglie.
  */
 function pavimentoCalorico(k = today()) {
-  const peso = lastWeight() ?? trendW(k) ?? D.profilo.peso_iniziale_kg ?? 70;
+  const peso = pesoConti(k);
   const bmr = bmrDi(peso, D.profilo.altezza_cm, D.profilo.eta, D.profilo.sesso);
   const E = typeof energyModel === 'function' ? energyModel(k) : { tdee: null, n: 0 };
   const misurato = E.n >= 2 && E.tdee > 0;
-  const tdee = misurato ? E.tdee : Math.round(bmr * (D.modello?.laf || 1.35));
+  const tdee = misurato ? E.tdee : Math.round(bmr * lafAttivo(k).laf);
   const daBmr = Math.round(bmr * 1.1), daTdee = Math.round(tdee * 0.75);
   return {
     bmr, tdee, misurato, daBmr, daTdee,

@@ -2519,3 +2519,15 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .lev-reg-sc{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;
   font-size:13.5px}
 button.btn:disabled{opacity:.4}
+
+/* "Quanto ti muovi": una scelta sola, come le liste di Impostazioni, con la
+   spunta a destra sulla riga scelta */
+.att-grp{background:var(--wash);border-radius:12px;overflow:hidden;margin-top:4px}
+.att-r{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border:0;
+  background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer;position:relative}
+.att-r+.att-r::before{content:'';position:absolute;top:0;left:12px;right:0;height:1px;background:var(--rule)}
+.att-r .body{flex:1;min-width:0}
+.att-r .t{display:block;font-size:15px}
+.att-r .d{display:block;font-size:12.5px;color:var(--ink-3);line-height:1.35;margin-top:1px}
+.att-r .d b{color:var(--ink-2);font-weight:600}
+.att-ck{flex:none;width:18px;color:var(--pine);font-weight:700;font-size:16px;text-align:center}

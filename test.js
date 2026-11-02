@@ -47,6 +47,7 @@ function stato({ log = {}, settings = {}, palestra = {} } = {}) {
   if (typeof _ffCache !== 'undefined') _ffCache.clear();
   if (typeof _trCache !== 'undefined') _trCache.clear();
   _mkey = null;
+  if (typeof _lafKey !== 'undefined') _lafKey = null;
 }
 
 /** Pesate al ritmo dato (kg a settimana) per n giorni, con un rumore fisso. */
@@ -278,6 +279,39 @@ function casiPrevisioni() {
     p7 && vicino(p7.previsto, w + R.kgSett, 0.02), p7 && `${nf(p7.previsto, 2)} vs ${nf(w + R.kgSett, 2)}`);
 }
 
+/** I target dell'obiettivo: peso di tendenza, e il fattore di attivita' di chi li usa. */
+function casiTarget() {
+  // l'ultima pesata gonfiata d'acqua non sposta la proposta
+  const log = pesate(0, 21, 70);
+  log[today()] = { pasti: {}, extra: [], peso: 73.5 };
+  stato({ log, settings: { obiettivo: { id: 'ricomp', pct: 0 } } });
+  const pc = pianoCalorico('ricomp');
+  verifica('le proteine dell\'obiettivo vengono dal peso di tendenza, non dall\'ultima pesata',
+    vicino(pc.peso, trendW(today()), 0.01) && pc.macro.p < Math.round(73.5 * 2.2), `peso ${nf(pc.peso, 1)}, P ${pc.macro.p}`);
+
+  // senza allenamenti ne' passi resta il fattore del modello
+  stato({ log: pesate(0, 21, 70) });
+  verifica('senza dati di attivita\' il fattore e\' quello del modello',
+    lafAttivo().fonte === 'modello' && lafAttivo().laf === D.modello.laf);
+
+  // quattro allenamenti a settimana: attivo, e la proposta sale di conseguenza
+  const lg = pesate(0, 28, 70);
+  for (let i = 0; i < 28; i++) if (i % 7 < 4) (lg[addDays(today(), -i)] ||= { pasti: {}, extra: [] }).allenamento = true;
+  stato({ log: lg });
+  const L = lafAttivo();
+  const bmr = bmrDi(pesoConti(), D.profilo.altezza_cm, D.profilo.eta, D.profilo.sesso);
+  verifica('quattro allenamenti a settimana: livello attivo (×1,55)', L.fonte === 'dati' && L.laf === 1.55,
+    `${L.fonte} ${L.laf}`);
+  verifica('il mantenimento proposto usa quel fattore', vicino(pianoCalorico('mant').tdee, bmr * 1.55, 2),
+    `${pianoCalorico('mant').tdee} contro ${Math.round(bmr * 1.55)}`);
+
+  // il livello scelto vince su quello dedotto, e arriva al dispendio di partenza
+  piano().profilo.attivita = 'molto';
+  fondiPiano();
+  verifica('il livello scelto vince: molto attivo (×1,725) anche nel dispendio di partenza',
+    lafAttivo().laf === 1.725 && vicino(priorTDEE(), bmr * 1.725, 2), nf(priorTDEE()));
+}
+
 /** Aggiusta i macro: sposta quello scelto, tiene fermo il resto, scrive quello che dice. */
 function casiLeve() {
   verifica('il sistema 3x3 si risolve esatto',
@@ -409,7 +443,7 @@ function casiVuoto() {
   const out = document.getElementById('esito');
   try {
     await caricaApp();
-    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiCalendario, casiSpunti, casiPrevisioni, casiLeve, casiVuoto]) {
+    for (const f of [casiMese, casiPrevisione, casiAttivita, casiMisure, casiDiario, casiScarico, casiCalendario, casiSpunti, casiPrevisioni, casiTarget, casiLeve, casiVuoto]) {
       try { f(); } catch (e) { verifica(f.name + ' non deve lanciare', false, e.message); }
     }
   } catch (e) {
