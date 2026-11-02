@@ -1229,6 +1229,16 @@ function sheetAlimento(nome, pre) {
   if (inCat.value && !cats.includes(inCat.value)) inCat.style.display = '';
   segna();
   w.append(fc);
+  /* Il pezzo: planted da 150 g, straccetti da 160, tempeh in due da 75. Sono
+     confezioni che non si dividono, e un piano che chiede 220 g di planted
+     vuol dire aprirne una seconda e buttarne mezza. */
+  w.append(el('div', 'field',
+    `<label>Si compra a pezzi da <span class="muted">(g, facoltativo)</span></label>
+     <input type="text" inputmode="decimal" id="al-pezzo" value="${cur?.pezzo > 0 ? esc(String(cur.pezzo)) : ''}"
+       placeholder="es. 150 per una confezione che non si divide">`));
+  w.append(el('div', 'hint',
+    'Se lo scrivi, l\'assistente e “Aggiusta i macro” lo usano solo a pezzi interi: '
+    + '150, 300… mai 220.'));
   w.append(el('div', 'hint',
     'Serve al motore delle sostituzioni, che cerca alternative dentro la stessa '
     + 'famiglia. Senza sceglierne una finisce in <strong>altro</strong>, insieme a '
@@ -1270,6 +1280,8 @@ function sheetAlimento(nome, pre) {
     };
     if (pre?.barcode) p.alimenti[n].barcode = pre.barcode;
     if (pre?.origine && !confermato) p.alimenti[n].origine = pre.origine;
+    const pz = parseNum($('#al-pezzo').value);
+    if (pz > 0) p.alimenti[n].pezzo = Math.round(pz);
     if (p.alimenti[n].kcal <= 0) { toast('Le calorie non possono essere zero'); return; }
     save(); fondiPiano(); closeSheet(); route(); toast('Alimento salvato');
   };

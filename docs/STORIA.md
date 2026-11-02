@@ -1616,6 +1616,24 @@ prendendo sempre il primo. Tre spuntini finivano uno sopra l'altro e gli
 altri due restavano vuoti. Ora prende il primo ancora libero con quel nome,
 nell'ordine in cui arrivano le azioni.
 
+Due correzioni dallo stesso test, tutte e due di buon senso e non di conti.
+La prima: un piano che tornava coi numeri aveva il toast col tofu affumicato
+a colazione, col tofu fra i "di meno". La domanda ora dice che ogni pasto
+deve essere uno che si mangia a quell'ora (le colazioni sul modello di
+quelle che la persona ha già), niente stesso carboidrato a pranzo e a cena,
+e che i "di meno" si usano solo se senza non si arriva ai numeri: non sono
+una quota da riempire.
+
+La seconda: **planted si compra a confezioni da 150 g, gli straccetti da
+160, il tempeh in due pezzi da 75**, e un piano che chiede 220 g di planted
+vuol dire aprirne una seconda e buttarne mezza. Ogni alimento può avere un
+`pezzo`, scritto nell'editor ("Si compra a pezzi da"). La domanda
+all'assistente lo porta come `pezzo_g` con la regola dei multipli esatti;
+`validaSettimana()` riporta una quantità sbagliata al multiplo più vicino,
+almeno uno, e lo dice; "Aggiusta i macro" muove quegli alimenti solo di
+pezzi interi (fra uno e il doppio di quelli di partenza), arrotonda e
+rifinisce a pezzi, e un alimento nuovo a pezzi entra come un pezzo intero.
+
 ### Il mese degli allenamenti
 
 La striscia dei giorni risponde a *questa settimana*: tre settimane, e si apre

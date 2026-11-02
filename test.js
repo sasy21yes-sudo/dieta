@@ -334,6 +334,21 @@ function casiGeneraSettimana() {
     ev.piano.ricette[0]?.ingredienti[0].alimento === 'olio EVO' && sola?.ingredienti[0].alimento === 'olio EVO',
     ev.avvisi.join(' | '));
 
+  // un alimento a pezzi: la domanda lo dice, la risposta va al multiplo giusto
+  piano().alimenti.tempeh = { ...D.alimenti.tempeh, pezzo: 75 };
+  fondiPiano();
+  const rq = ai.richiesta('generaSettimana', { modo: 'misto' });
+  const ctxP = JSON.parse(rq.utente.slice(rq.utente.indexOf('Contesto:') + 9));
+  const tp = ai.valida('generaSettimana', JSON.stringify({ azioni: [
+    { tipo: 'creaRicetta', codice: 'ai-t', nome: 'Tempeh e riso', ingredienti: [
+      { alimento: 'tempeh', qta: 170 }, { alimento: 'riso', qta: 80 }] },
+    { tipo: 'assegnaPasto', giorno: 0, slot: sl[1], codice: 'ai-t' }] }), { modo: 'misto' });
+  verifica('il tempeh a pezzi da 75 g: la domanda lo dice, 170 g diventano 150 e lo si avvisa',
+    ctxP.alimenti.find(a => a.nome === 'tempeh')?.pezzo_g === 75
+    && tp.piano.ricette[0]?.ingredienti[0].qta === 150 && tp.avvisi.some(a => /pezzi da 75/.test(a)),
+    tp.avvisi.join(' | '));
+  delete piano().alimenti.tempeh; fondiPiano();
+
   // tre "Spuntino" nello stesso giorno: ognuno prende il suo, nell'ordine
   const sett = JSON.parse(JSON.stringify(D.settimana));
   sett[5].pasti = [{ slot: 'Spuntino', ora: null, codice: null }, { slot: 'Spuntino', ora: null, codice: null },
@@ -493,6 +508,17 @@ function casiLeve() {
   const r2 = tutte(leveGiorno(2, 'g', -6, 'altri'));
   verifica('una proposta scartata non viene riproposta',
     !r2.some(m => JSON.stringify(levFirma(m)) === JSON.stringify(levFirma(prima1))));
+
+  // un alimento che si compra a pezzi si muove solo di pezzi interi
+  stato();
+  piano().alimenti.tofu = { ...D.alimenti.tofu, pezzo: 100 };
+  fondiPiano();
+  const pz = [];
+  for (const gi of [0, 2, 3]) for (const d of [{ p: 10 }, { p: -10 }, { g: -6 }, { p: 15, c: -20 }])
+    for (const m of tutte(leveGiorno(gi, d))) for (const c of m.cambi)
+      if (c.it.nome === 'tofu') pz.push(c.q);
+  verifica('il tofu a pezzi da 100 g cambia solo di pezzi interi', pz.length > 0 && pz.every(q => q % 100 === 0),
+    pz.join(', ') || 'mai toccato');
 
   stato({ settings: { pianoBase: 'vuoto' } });
   const v = leveGiorno(0, 'p', 10, 'altri');

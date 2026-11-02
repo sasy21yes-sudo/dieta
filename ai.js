@@ -232,6 +232,9 @@ const AI_COMPITI = {
         + 'ha gia\' in `settimana` e `ricette`; niente piatti da pranzo o da cena al '
         + 'mattino, e al pre-nanna qualcosa di leggero. Non mettere lo stesso carboidrato '
         + 'principale (riso, pasta, patate) a pranzo e a cena dello stesso giorno.\n\n'
+        + 'Gli alimenti con `pezzo_g` si comprano a confezioni o pezzi che non si dividono: '
+        + 'usali **solo a multipli esatti** di `pezzo_g` (un pezzo, due pezzi), e aggiusta '
+        + 'le calorie con gli alimenti che si pesano al grammo.\n\n'
         + 'Le azioni, in quest\'ordine:\n'
         + '- `{"tipo":"creaAlimento","nome":"tempeh","unita":"g","categoria":"legumi",'
         + '"kcal":192,"p":20.3,"c":7.6,"g":10.8,"fibre":5}` per ogni alimento nuovo, '
@@ -391,7 +394,9 @@ class AI {
     if (q.has('alimenti')) c.alimenti = Object.entries(D.alimenti || {})
       .map(([nome, a]) => ({ nome, unita: a.unita || 'g', kcal: a.kcal,
                              p: a.p, c: a.c, g: a.g, fibre: a.fibre,
-                             fonte: a.fonte }));
+                             fonte: a.fonte,
+                             /* una confezione che non si divide: si usa a multipli */
+                             ...(a.pezzo > 0 ? { pezzo_g: a.pezzo } : {}) }));
 
     /* La struttura della settimana: giorni, pasti e orari, e cosa si fa quel
        giorno. E' lo stampo da riempire. */
@@ -773,6 +778,15 @@ class AI {
       }
       const no = ing.map(i => tocca(i.alimento, pref.mai)).find(Boolean);
       if (no) { avvisi.push(`"${nome}": contiene ${no}, che non mangi mai. Scartata.`); continue; }
+      /* i pezzi che non si dividono: la quantita' va al multiplo piu' vicino,
+         almeno uno, e lo si dice. I macro si rifanno dopo, su quella giusta. */
+      for (const i of ing) {
+        const pz = D.alimenti?.[i.alimento]?.pezzo;
+        if (!(pz > 0) || i.qta % pz === 0) continue;
+        const q = Math.max(pz, Math.round(i.qta / pz) * pz);
+        avvisi.push(`"${nome}": ${i.alimento} ${i.qta} g → ${q} g, si compra a pezzi da ${pz}.`);
+        i.qta = q;
+      }
       /* il codice: quello proposto se e' nuovo, se no uno libero. Mai sopra
          una ricetta che hai gia'. */
       let cod = 'ai-' + norm(a.codice || nome).replace(/^ai-/, '').replace(/[^a-z0-9]+/g, '-')

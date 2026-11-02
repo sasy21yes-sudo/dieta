@@ -102,6 +102,9 @@ test.html / test.js   controlli fissi
 - Codici sintetici risolti da `pasto()`: `ali:<qta>:<nome>`, `ric:<id>:<pesi>`,
   `piu:<a>+<b>`. Mai leggere `D.pasti[code]` per uno slot. Macro di una
   ricetta da `macroRicetta()` (`macro: null` vuol dire "ricalcola").
+- Un alimento può avere `pezzo` (grammi di una confezione o di un pezzo che
+  non si divide: planted 150, tempeh 75). Chi propone quantità — "Aggiusta i
+  macro", l'assistente e il suo controllo — usa solo multipli interi.
 - Una spunta tolta si **cancella**, non diventa `false`. I pasti spuntati si
   contano sui valori, i giorni registrati con `giornoPieno()`/`loggedDays()`.
 - Navigazione solo con `apri(hash)`. `#/dati`, `#/analisi`, `#/revisione`,

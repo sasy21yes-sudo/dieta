@@ -95,10 +95,14 @@ function levTotali(codici) {
 }
 
 /** Le quantita' si muovono a scatti che si possono pesare in cucina. */
-function levArrotonda(q) {
+function levArrotonda(q, pezzo) {
+  if (pezzo > 0) return Math.max(pezzo, Math.round(q / pezzo) * pezzo);
   return q < 100 ? Math.round(q / 5) * 5 : Math.round(q / 10) * 10;
 }
-const levScatto = q => q < 100 ? 5 : 10;
+const levScatto = (q, pezzo) => pezzo > 0 ? pezzo : q < 100 ? 5 : 10;
+/* Un alimento che si compra a pezzi (planted da 150 g, tempeh da 75) si muove
+   di pezzi interi: fra uno e il doppio di quelli di partenza, mai a meta'. */
+const levPezzo = nome => +alimento(nome)?.pezzo > 0 ? +alimento(nome).pezzo : 0;
 
 /** Cosa ogni grammo di un alimento porta: kcal, P, C, G. */
 function levPerGrammo(nome) {
@@ -171,7 +175,7 @@ function levCombina(voci, righe, maxK = 3) {
     for (let j = 0; j < k; j++) {
       const it = voci[idx[j]], q = it.q0 + x[j];
       if (q < it.lo - 0.01 || q > it.hi + 0.01) return;
-      const qr = Math.min(Math.max(levArrotonda(q), it.lo), it.hi);
+      const qr = Math.min(Math.max(levArrotonda(q, it.pezzo), it.lo), it.hi);
       if (qr !== it.q0) cambi.push({ it, q: qr });
     }
     if (!cambi.length) return;
@@ -266,11 +270,12 @@ function levPorzioniGiorno(g, regole) {
         const v = levPerGrammo(ing.alimento);
         const q0 = ing.qta || 0;
         if (!v || !(q0 > 0) || !(v.kcal > 0)) continue;
+        const pezzo = levPezzo(ing.alimento);
         voci.push({
-          si, pi, solo, nome: ing.alimento, q0, v, slot: s.slot,
+          si, pi, solo, nome: ing.alimento, q0, v, slot: s.slot, pezzo,
           unita: alimento(ing.alimento)?.unita || 'g',
-          lo: Math.max(5, levArrotonda(q0 * LEV_FONDO)),
-          hi: levArrotonda(q0 * LEV_TETTO)
+          lo: pezzo ? pezzo : Math.max(5, levArrotonda(q0 * LEV_FONDO)),
+          hi: pezzo ? Math.max(pezzo, Math.ceil(q0 / pezzo) * pezzo * 2) : levArrotonda(q0 * LEV_TETTO)
         });
       }
     });
@@ -323,9 +328,10 @@ function levNuoviPasto(g, si, righe, regole) {
     const cos = w.reduce((x, wi, i) => x + wi * u[i], 0) / (Math.hypot(...w) * nu || 1);
     if (cos < 0.3) continue;
     const tip = levDoseTipica(nome);
-    fuori.push({ si, nuovo: true, nome, q0: 0, v, slot: s.slot, cos,
+    const pezzo = levPezzo(nome);
+    fuori.push({ si, nuovo: true, nome, q0: 0, v, slot: s.slot, cos, pezzo,
       unita: alimento(nome)?.unita || 'g',
-      lo: Math.max(5, levArrotonda(tip * 0.25)), hi: Math.max(5, levArrotonda(tip)) });
+      lo: pezzo || Math.max(5, levArrotonda(tip * 0.25)), hi: pezzo || Math.max(5, levArrotonda(tip)) });
   }
   return fuori.sort((a, b) => b.cos - a.cos).slice(0, LEV_NUOVI_PER_PASTO);
 }
@@ -379,7 +385,7 @@ function levRifinisci(s, g, righe, prima, codPrima, regole) {
     let meglio = null;
     s.cambi.forEach((c, i) => {
       for (const verso of [-1, 1]) {
-        const q = c.q + verso * levScatto(c.q);
+        const q = c.q + verso * levScatto(c.q, c.it.pezzo);
         if (q < c.it.lo || q > c.it.hi || q === c.it.q0) continue;
         const prova = { cambi: s.cambi.map((x, j) => j === i ? { ...x, q } : x) };
         levValuta(prova, g, righe, prima, codPrima, regole);
@@ -469,10 +475,11 @@ function levRicette(g, righe, prima, regole, quante = 3) {
       for (const ing of alt.ingredienti) {
         const v = levPerGrammo(ing.alimento);
         if (!v || !(ing.qta > 0) || regole.ingredienti.includes(ing.alimento)) continue;
-        voci.push({ si, nome: ing.alimento, q0: ing.qta, v,
+        const pezzo = levPezzo(ing.alimento);
+        voci.push({ si, nome: ing.alimento, q0: ing.qta, v, pezzo,
           unita: alimento(ing.alimento)?.unita || 'g',
-          lo: Math.max(5, levArrotonda(ing.qta * LEV_RIC_FONDO)),
-          hi: levArrotonda(ing.qta * LEV_RIC_TETTO) });
+          lo: pezzo || Math.max(5, levArrotonda(ing.qta * LEV_RIC_FONDO)),
+          hi: pezzo ? Math.max(pezzo, Math.ceil(ing.qta / pezzo) * pezzo * 2) : levArrotonda(ing.qta * LEV_RIC_TETTO) });
       }
       const loc = righe.map(r => ({ ...r, b: r.b + (mOra[r.k] || 0) - (mAlt[r.k] || 0) }));
       const sol = [{ cambi: [] }, ...levCombina(voci, loc, loc.length)];
