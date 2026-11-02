@@ -2461,9 +2461,23 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .lev-seg{margin-top:4px}
 .lev-h{font-size:13px;font-weight:600;color:var(--ink-2);margin:16px 2px 6px}
 .lev-grp{background:var(--wash);border-radius:12px;overflow:hidden}
-.lev-p{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:0;
-  background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer;position:relative}
+.lev-p{display:flex;align-items:stretch;position:relative}
 .lev-p+.lev-p::before{content:'';position:absolute;top:0;left:12px;right:0;height:1px;background:var(--rule)}
+.lev-pb{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:11px 4px 11px 12px;border:0;
+  background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.lev-x{flex:none;width:40px;border:0;background:none;color:var(--ink-3);font-size:20px;line-height:1;
+  cursor:pointer;padding:0}
+.lev-x:active{color:var(--ink)}
+.lev-add{color:var(--pine);font-weight:600}
+.lev-n small{display:block;font-size:11.5px;font-weight:400;color:var(--ink-3);
+  font-variant-numeric:tabular-nums}
+.lev-n small.chiesto{color:var(--ink);font-weight:600}
+.lev-az{display:flex;gap:8px;margin:2px 0 10px}
+.lev-az .btn{flex:1}
+.lev-reg-t{font-size:12.5px;font-weight:600;color:var(--ink-2);margin:10px 0 6px}
+.lev-reg .seg.chips button{min-height:30px;font-size:13px;padding:5px 11px}
+.lev-reg-sc{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;
+  font-size:13.5px}
 .lev-c{font-size:14px;line-height:1.35}
 .lev-c .mt{display:block;font-size:11.5px;color:var(--ink-3)}
 .lev-c+.lev-c{margin-top:5px}
@@ -2473,7 +2487,7 @@ button.gd-prog-c{width:100%;text-align:left;font:inherit;cursor:pointer;
 .lev-e .lev-fatto{color:var(--ink);font-weight:600}
 .lev-e .fuori{color:var(--amber);font-weight:600}
 .lev-ck{flex:none;width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--rule)}
-.lev-p[aria-pressed=true] .lev-ck{box-shadow:none;background:var(--pine)
+.lev-pb[aria-pressed=true] .lev-ck{box-shadow:none;background:var(--pine)
   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E") center/14px no-repeat}
 .lev-vuoto{margin:14px 2px 0;font-size:13.5px}
 button.btn:disabled{opacity:.4}

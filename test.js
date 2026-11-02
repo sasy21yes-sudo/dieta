@@ -287,7 +287,7 @@ function casiLeve() {
   const ric = JSON.stringify(D.pasti);
   for (const [id, dv] of [['p', 10], ['c', -20], ['g', -6]]) {
     const r = leveGiorno(0, id, dv, 'altri');
-    const m = [...r.porzioni, ...r.ricette].find(x => x.buona);
+    const m = [...r.porzioni, ...r.nuovi, ...r.ricette].find(x => x.buona);
     const altri = LEV_VOCI.filter(v => v.id !== id);
     verifica(`${id} ${dv > 0 ? '+' : ''}${dv}: si sposta e gli altri due restano fermi`,
       m && vicino(m.d[id], dv, levVoce(id).tol * 2) && altri.every(v => Math.abs(m.d[v.id]) <= v.tol * 2),
@@ -308,9 +308,79 @@ function casiLeve() {
     verifica('applicata, le ricette del registro restano quelle', JSON.stringify(D.pasti) === ric);
   } else verifica('proteine +15 il mercoledi\' ha una proposta', false);
 
+  // piu' macro insieme
+  stato();
+  const tutte = r => [...r.porzioni, ...r.nuovi, ...r.ricette];
+  const mm = tutte(leveGiorno(0, { p: 10, c: -20, g: 0 })).find(x => x.buona);
+  verifica('proteine +10 e carboidrati −20 insieme, grassi fermi',
+    mm && vicino(mm.d.p, 10, 4) && vicino(mm.d.c, -20, 6) && Math.abs(mm.d.g) <= 3, mm ? JSON.stringify(mm.d) : 'nessuna');
+
+  // porta a target: ogni macro finisce piu' vicino al suo target (o resta li')
+  const tg = D.target;
+  for (const gi of [1, 4, 6]) {
+    const tot = levTotali(D.settimana[gi].pasti.map(s => s.codice));
+    const d = {};
+    for (const v of LEV_VOCI) d[v.id] = levDeltaVerso(v.id, tot, tg, false);
+    const best = tutte(leveGiorno(gi, d)).find(x => x.buona);
+    verifica(`porta a target il giorno ${gi}: ogni macro si avvicina`,
+      !LEV_VOCI.some(v => d[v.id]) || (best && LEV_VOCI.every(v =>
+        Math.abs(best.dopo[v.id] - tg[v.id]) <= Math.abs(tot[v.id] - tg[v.id]) + v.tol * 2)),
+      best ? JSON.stringify(best.d) + ' da ' + JSON.stringify(d) : 'nessuna');
+  }
+
+  // un pasto bloccato non si tocca, in nessuna proposta
+  stato();
+  levRegole().pasti.push('Pranzo');
+  const iPr = D.settimana[0].pasti.findIndex(s => s.slot === 'Pranzo');
+  const conBlocco = tutte(leveGiorno(0, 'p', 10, 'altri'));
+  verifica('il pranzo bloccato resta com\'e\'', conBlocco.length > 0
+    && conBlocco.every(m => m.codici[iPr] === D.settimana[0].pasti[iPr].codice), conBlocco.length + ' proposte');
+
+  // tutti gli ingredienti bloccati: resta solo aggiungere qualcosa
+  stato();
+  const reg = levRegole();
+  for (const s of D.settimana[0].pasti)
+    for (const i of (pasto(s.codice)?.ingredienti || [])) reg.ingredienti.push(i.alimento);
+  const soloNuovi = leveGiorno(0, 'p', 10, 'altri');
+  verifica('ingredienti bloccati: nessuna dose cambiata, si propone un alimento nuovo',
+    !soloNuovi.porzioni.length && !soloNuovi.ricette.length && soloNuovi.nuovi.length > 0
+    && soloNuovi.nuovi.every(m => m.cambi.every(c => c.it.nuovo)),
+    `${soloNuovi.porzioni.length} porzioni, ${soloNuovi.nuovi.length} nuovi`);
+  const nv = soloNuovi.nuovi[0];
+  if (nv) {
+    levApplica(0, nv);
+    const c = nv.cambi[0];
+    verifica('l\'alimento nuovo entra nel pasto come parte in piu\', la ricetta resta',
+      partiPasto(D.settimana[0].pasti[c.it.si].codice).includes(codiceAlimento(c.it.nome, c.q)));
+  }
+
+  // la soglia di proteine dei pasti principali
+  stato();
+  const min = D.target.min_p_per_pasto;
+  let rotte = 0;
+  for (const gi of [0, 2, 5]) for (const d of [{ p: -20 }, { c: 30 }, { g: -8 }]) {
+    const prima = D.settimana[gi].pasti.map(s => s.codice);
+    for (const m of tutte(leveGiorno(gi, d)))
+      D.settimana[gi].pasti.forEach((s, si) => {
+        if (!LEV_PRINCIPALI.includes(s.slot)) return;
+        const a = levM(prima[si]).p, b = levM(m.codici[si]).p;
+        if (a >= min && b < min) rotte++;
+      });
+  }
+  verifica(`nessuna proposta porta un pasto principale sotto ${min} g di proteine`, rotte === 0, rotte + ' casi');
+
+  // una proposta scartata non torna
+  stato();
+  const r1 = leveGiorno(2, 'g', -6, 'altri');
+  const prima1 = tutte(r1)[0];
+  levRegole().scartati.push(levFirma(prima1));
+  const r2 = tutte(leveGiorno(2, 'g', -6, 'altri'));
+  verifica('una proposta scartata non viene riproposta',
+    !r2.some(m => JSON.stringify(levFirma(m)) === JSON.stringify(levFirma(prima1))));
+
   stato({ settings: { pianoBase: 'vuoto' } });
   const v = leveGiorno(0, 'p', 10, 'altri');
-  verifica('piano vuoto: nessuna proposta, nessun errore', !v.porzioni.length && !v.ricette.length);
+  verifica('piano vuoto: nessuna proposta, nessun errore', !tutte(v).length);
 }
 
 /** Le schermate nuove si disegnano anche senza niente dentro, e senza parole rotte. */

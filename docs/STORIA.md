@@ -1437,6 +1437,49 @@ fermo il resto; a ±3 e ±4 passi restano senza 7 su 168, tutte grassi giù o
 carboidrati su a calorie ferme. Il calcolo prende 2 ms di mediana e 7 ms al
 massimo, quindi segue il cursore senza scatti.
 
+### Aggiusta i macro: piu' macro, alimenti nuovi, regole
+
+Il giorno dopo: *"troppo banale"*. Tre cose, scelte da chi lo usa:
+
+1. **Piu' macro insieme.** Lo stato del foglio e' `{ sel, d: { p, c, g },
+   fermo }`: ogni macro ha il suo spostamento, zero vuol dire fermo, e la
+   barra lo scrive sotto il nome ("+10 g", "fermo", "libero" se le calorie
+   sono ferme). Il cursore regola il macro selezionato; **Porta a target**
+   mette in un tocco lo scarto di tutti e tre, arrotondato al passo. Il
+   sistema e' lo stesso, con una riga per macro; "Calorie ferme" ha senso solo
+   se almeno un macro e' a zero, e con tutti e tre mossi sparisce.
+2. **Un alimento nuovo.** Oltre alle dosi, un pasto puo' prendere un alimento
+   che non ha. Non dal catalogo intero: da quelli che compaiono nelle ricette
+   di **quel momento della giornata** (`slotAbituale()`) e da quelli in
+   dispensa; dei candidati si provano i tre col coseno piu' alto fra quello
+   che porta un grammo e quello che si chiede. Al massimo uno per proposta,
+   fra un quarto e una dose tipica (la mediana delle ricette che lo usano), e
+   costa piu' di cambiare una dose. Entra come parte `ali:` di un `piu:`:
+   "colazione + 15 g di proteine vegetali", senza toccare la ricetta.
+3. **Regole**, in `S.piano.leve`, valide per tutti i giorni: pasti e
+   ingredienti da non toccare (un pasto con un ingrediente bloccato non si
+   sostituisce nemmeno, perche' cambiare ricetta lo toglierebbe), la soglia di
+   proteine nei pasti principali (`min_p_per_pasto`: non si porta sotto un
+   pasto che ci stava, non si tolgono proteine a uno gia' sotto), e le
+   proposte scartate con la ×. Una scartata e' una **firma** — cosa tocca e in
+   che verso — e non torna nessuna proposta che la contenga tutta.
+
+E due rifiniture trovate guardandolo:
+
+- **la rifinitura dell'arrotondamento**: dopo lo scatto a 5 g si prova uno
+  scatto in piu' o in meno su ogni voce, sul conto vero, finche' il costo
+  scende (due giri). Recupera il grammo che l'arrotondamento aveva perso;
+- **una ricetta di un altro momento costa 4, non 1**: con 1, per proteine su
+  e carboidrati giu', in cima c'era "tofu e patate a colazione" davanti al
+  toast salato. Adesso le ricette dello stesso momento passano prima, e le
+  altre restano solo se non c'e' niente di meglio.
+
+Il verdetto della giornata (`statoGiorno()`, col pavimento calorico) torna
+come pastiglia sulla proposta che lo cambia. Misurato sull'esempio: 140
+richieste (7 giorni × 10 combinazioni, una o piu' voci, porta a target
+compreso, × 2 modalita') tutte con almeno una proposta valida; 4 ms di
+mediana e 14 al massimo.
+
 ### Il mese degli allenamenti
 
 La striscia dei giorni risponde a *questa settimana*: tre settimane, e si apre
